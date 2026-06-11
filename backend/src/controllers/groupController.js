@@ -1,0 +1,191 @@
+const { PrismaClient } = require('@prisma/client');
+const XLSX = require('xlsx');
+const prisma = new PrismaClient();
+const emailService = require('../services/emailService');
+
+exports.getGroups = async (req, res) => {
+  try {
+    const groups = await prisma.projectGroup.findMany({
+      include: {
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        academicYear: { include: { department: true } },
+        evaluations: true,
+        evaluationComponents: true,
+      },
+    });
+    res.json(groups);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getGroup = async (req, res) => {
+  try {
+    const group = await prisma.projectGroup.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: {
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        academicYear: { include: { department: true } },
+        evaluations: {
+          include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
+        },
+        evaluationComponents: true,
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
+        recommendations: true,
+      },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    res.json(group);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.createGroup = async (req, res) => {
+  try {
+    const { name, projectTitle, academicYearId } = req.body;
+    const group = await prisma.projectGroup.create({
+      data: { name, projectTitle, academicYearId: parseInt(academicYearId) },
+    });
+    // Create default evaluation components
+    const defaults = [
+      { name: 'Supervisor', maxMarks: 25 },
+      { name: 'Proposal Defense', maxMarks: 5 },
+      { name: 'Mid-Term Defense', maxMarks: 5 },
+      { name: 'Final Defense', maxMarks: 5 },
+      { name: 'Internal Examiner', maxMarks: 10 },
+    ];
+    for (const comp of defaults) {
+      await prisma.evaluationComponent.create({
+        data: { ...comp, groupId: group.id, createdById: req.user.id },
+      });
+    }
+    res.status(201).json(group);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.uploadExcel = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(sheet);
+    const { academicYearId } = req.body;
+    const created = [];
+    for (const row of data) {
+      const groupName = row['Group Name'] || row['groupName'];
+      const projectTitle = row['Project Title'] || row['projectTitle'];
+      const memberNames = (row['Member Names'] || row['memberNames'] || '').toString();
+      const rollNumbers = (row['Roll Numbers'] || row['rollNumbers'] || '').toString();
+      const names = memberNames.split(',').map(s => s.trim()).filter(Boolean);
+      const rolls = rollNumbers.split(',').map(s => s.trim()).filter(Boolean);
+      const group = await prisma.projectGroup.create({
+        data: {
+          name: groupName,
+          projectTitle,
+          academicYearId: parseInt(academicYearId),
+        },
+      });
+      // Create default evaluation components
+      const defaults = [
+        { name: 'Supervisor', maxMarks: 25 },
+        { name: 'Proposal Defense', maxMarks: 5 },
+        { name: 'Mid-Term Defense', maxMarks: 5 },
+        { name: 'Final Defense', maxMarks: 5 },
+        { name: 'Internal Examiner', maxMarks: 10 },
+      ];
+      for (const comp of defaults) {
+        await prisma.evaluationComponent.create({
+          data: { ...comp, groupId: group.id, createdById: req.user.id },
+        });
+      }
+      // Create or find students and add as members
+      for (let i = 0; i < names.length; i++) {
+        const nameParts = names[i].split(' ');
+        const firstName = nameParts[0] || names[i];
+        const lastName = nameParts.slice(1).join(' ') || '';
+        const roll = rolls[i] || `R${Date.now()}${i}`;
+        let student = await prisma.user.findFirst({
+          where: { lastName: lastName, firstName: firstName, role: 'STUDENT' },
+        });
+        if (!student) {
+          student = await prisma.user.create({
+            data: {
+              email: `${roll.toLowerCase()}@university.edu`,
+              password: '$2a$10$placeholder', // needs reset
+              firstName,
+              lastName,
+              role: 'STUDENT',
+            },
+          });
+        }
+        await prisma.groupMember.create({
+          data: { studentId: student.id, groupId: group.id, rollNumber: roll },
+        });
+      }
+      created.push(group);
+    }
+    res.status(201).json({ message: `${created.length} groups created`, groups: created });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.assignSupervisor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supervisorId } = req.body;
+    const group = await prisma.projectGroup.update({
+      where: { id: parseInt(id) },
+      data: { supervisorId: parseInt(supervisorId), status: 'ACTIVE' },
+      include: {
+        members: { include: { student: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+    // Send emails
+    const sup = group.supervisor;
+    if (sup) {
+      emailService.notifySupervisorAssigned(
+        sup.email, `${sup.firstName} ${sup.lastName}`, group.name, group.projectTitle, group.members.map(m => ({ firstName: m.student.firstName, lastName: m.student.lastName, rollNumber: m.rollNumber }))
+      );
+    }
+    const studentEmails = group.members.map(m => m.student.email).filter(Boolean);
+    if (studentEmails.length && sup) {
+      emailService.notifyStudentsSupervisorAssigned(
+        studentEmails, group.name, group.projectTitle, `${sup.firstName} ${sup.lastName}`
+      );
+    }
+    res.json(group);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateGroupStatus = async (req, res) => {
+  try {
+    const group = await prisma.projectGroup.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: req.body.status },
+    });
+    res.json(group);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateEvaluationComponent = async (req, res) => {
+  try {
+    const component = await prisma.evaluationComponent.update({
+      where: { id: parseInt(req.params.id) },
+      data: { name: req.body.name, maxMarks: parseFloat(req.body.maxMarks) },
+    });
+    res.json(component);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
