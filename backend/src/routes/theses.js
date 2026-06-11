@@ -11,5 +11,6 @@ router.get('/:id', authenticate, thesisController.getThesis);
 router.post('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.createThesis);
 router.post('/upload', authenticate, authorize('COORDINATOR'), upload.single('file'), thesisController.uploadExcel);
 router.put('/:id/supervisor', authenticate, authorize('COORDINATOR'), thesisController.assignSupervisor);
+router.put('/:id/status', authenticate, authorize('COORDINATOR'), thesisController.updateThesisStatus);
 
 module.exports = router;

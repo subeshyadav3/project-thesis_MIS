@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const XLSX = require('xlsx');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const emailService = require('../services/emailService');
 
@@ -45,10 +46,36 @@ exports.getGroup = async (req, res) => {
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, projectTitle, academicYearId } = req.body;
+    const { name, projectTitle, academicYearId, supervisorId, students } = req.body;
     const group = await prisma.projectGroup.create({
-      data: { name, projectTitle, academicYearId: parseInt(academicYearId) },
+      data: {
+        name,
+        projectTitle,
+        academicYearId: parseInt(academicYearId),
+        supervisorId: supervisorId ? parseInt(supervisorId) : null,
+        status: supervisorId ? 'ACTIVE' : 'PENDING',
+      },
     });
+    // Create or find students and add as members
+    if (students && students.length > 0) {
+      for (const st of students) {
+        const fn = (st.firstName || '').trim();
+        const ln = (st.lastName || '').trim();
+        const roll = (st.rollNumber || '').trim();
+        if (!fn && !roll) continue;
+        const email = `${roll.toLowerCase() || `${fn.toLowerCase()}.${ln.toLowerCase()}`}@pcampus.edu.np`;
+        let student = await prisma.user.findFirst({ where: { email } });
+        if (!student) {
+          const hash = await bcrypt.hash('subesh', 10);
+          student = await prisma.user.create({
+            data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT' },
+          });
+        }
+        await prisma.groupMember.create({
+          data: { studentId: student.id, groupId: group.id, rollNumber: roll || email },
+        });
+      }
+    }
     // Create default evaluation components
     const defaults = [
       { name: 'Supervisor', maxMarks: 25 },
@@ -62,7 +89,13 @@ exports.createGroup = async (req, res) => {
         data: { ...comp, groupId: group.id, createdById: req.user.id },
       });
     }
-    res.status(201).json(group);
+    const created = await prisma.projectGroup.findUnique({
+      where: { id: group.id },
+      include: {
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+      },
+    });
+    res.status(201).json(created);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

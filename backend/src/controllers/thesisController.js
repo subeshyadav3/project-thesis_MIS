@@ -43,9 +43,15 @@ exports.getThesis = async (req, res) => {
 
 exports.createThesis = async (req, res) => {
   try {
-    const { title, studentId, academicYearId } = req.body;
+    const { title, studentId, academicYearId, supervisorId } = req.body;
     const thesis = await prisma.thesis.create({
-      data: { title, studentId: parseInt(studentId), academicYearId: parseInt(academicYearId) },
+      data: {
+        title,
+        studentId: parseInt(studentId),
+        academicYearId: parseInt(academicYearId),
+        supervisorId: supervisorId ? parseInt(supervisorId) : null,
+        status: supervisorId ? 'ACTIVE' : 'PENDING',
+      },
     });
     const defaults = [
       { name: 'Supervisor', maxMarks: 25 },
@@ -112,6 +118,18 @@ exports.uploadExcel = async (req, res) => {
       created.push(thesis);
     }
     res.status(201).json({ message: `${created.length} theses created`, theses: created });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateThesisStatus = async (req, res) => {
+  try {
+    const thesis = await prisma.thesis.update({
+      where: { id: parseInt(req.params.id) },
+      data: { status: req.body.status },
+    });
+    res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
