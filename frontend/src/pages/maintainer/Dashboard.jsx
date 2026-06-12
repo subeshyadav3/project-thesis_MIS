@@ -97,7 +97,7 @@ function MaintainerDashboard() {
         <div className="card-header">
           <h3>Detailed Breakdown</h3>
         </div>
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="stats-grid stats-grid-breakdown">
           {breakdowns.map((item, i) => (
             <div key={i} className="stat-card bento-card">
               <div className="stat-icon" style={{ background: `${item.color}15`, color: item.color }}>

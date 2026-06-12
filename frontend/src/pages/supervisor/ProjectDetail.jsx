@@ -183,26 +183,18 @@ function ProjectDetail() {
             <h3>Marks</h3>
           </div>
           {components.map(c => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <span style={{ flex: 1, fontSize: 14, color: 'var(--color-on-surface)', fontWeight: 500 }}>{c.name}</span>
+            <div key={c.id} className="marks-row">
+              <span className="marks-row-label">{c.name}</span>
               <input
                 type="number"
-                style={{
-                  width: 80,
-                  padding: '8px 12px',
-                  border: '1px solid var(--color-outline)',
-                  borderRadius: 6,
-                  fontSize: 14,
-                  fontFamily: 'var(--font-body)',
-                  backgroundColor: 'var(--color-surface-container-lowest)',
-                  textAlign: 'center'
-                }}
+                className="marks-input"
                 value={marks[c.id] || ''}
                 onChange={e => setMarks({...marks, [c.id]: e.target.value})}
                 max={c.maxMarks}
                 min="0"
+                placeholder="0"
               />
-              <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>/ {c.maxMarks}</span>
+              <span className="marks-row-max">/ {c.maxMarks}</span>
             </div>
           ))}
           <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={handleSubmitMarks}>

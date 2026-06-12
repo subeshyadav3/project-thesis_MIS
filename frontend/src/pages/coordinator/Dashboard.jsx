@@ -10,21 +10,8 @@ function CoordinatorDashboard() {
     api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
   }, []);
 
-  const actions = (
-    <>
-      <a href="/coordinator/bachelor-projects" className="btn btn-sm btn-primary">
-        <span className="material-symbols-outlined">school</span>
-        Bachelor Projects
-      </a>
-      <a href="/coordinator/master-thesis" className="btn btn-sm btn-primary">
-        <span className="material-symbols-outlined">library_books</span>
-        Master's Thesis
-      </a>
-    </>
-  );
-
   return (
-    <PageLayout title="Dashboard" user={user} actions={actions}>
+    <PageLayout title="Dashboard" user={user}>
       <div className="stats-grid">
         <div className="stat-card bento-card">
           <div className="stat-icon">
