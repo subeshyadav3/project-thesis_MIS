@@ -1,33 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-function Sidebar({ user }) {
+function Sidebar({ user, isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/login');
+    navigate('/login'); 
   };
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/') ? 'active' : '';
 
   const maintainerLinks = [
-    { path: '/maintainer', label: 'Dashboard', exact: true },
-    { path: '/maintainer/users', label: 'User Management' },
-    { path: '/maintainer/departments', label: 'Departments' },
+    { path: '/maintainer', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/maintainer/users', label: 'User Management', icon: 'groups' },
+    { path: '/maintainer/departments', label: 'Departments', icon: 'account_balance' },
   ];
 
   const coordinatorLinks = [
-    { path: '/coordinator', label: 'Dashboard', exact: true },
-    { path: '/coordinator/bachelor', label: 'Bachelor Projects' },
-    { path: '/coordinator/master', label: "Master's Thesis" },
-    { path: '/coordinator/evaluations', label: 'Evaluations' },
+    { path: '/coordinator', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/coordinator/bachelor', label: 'Bachelor Projects', icon: 'school' },
+    { path: '/coordinator/master', label: "Master's Thesis", icon: 'library_books' },
+    { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
+    { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
   ];
 
   const supervisorLinks = [
-    { path: '/supervisor', label: 'Dashboard', exact: true },
+    { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
   ];
 
   const links = user?.role === 'MAINTAINER' ? maintainerLinks
@@ -36,22 +38,85 @@ function Sidebar({ user }) {
     : [];
 
   return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <h2>University TM</h2>
-        <p>{user?.firstName} {user?.lastName} ({user?.role})</p>
+    <>
+      {/* Backdrop Mobile Overlay: Clicking outside the sidebar automatically triggers onClose */}
+      <div
+        className={`sidebar-overlay ${isOpen ? 'open' : ''}`}
+        onClick={onClose}
+      />
+
+      {/* Sidebar Container: Dynamically receives '.open' layout state */}
+      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="logo-area">
+            <img src="https://ioe.tu.edu.np/assets/logo.png" alt="IOE Logo" className="sidebar-logo" />
+            <div className="logo-text">
+              <h2>TPMS</h2>
+              <p>Thesis/Project Management System</p>
+            </div>
+          </div>
+          {/* Close button visible only inside mobile viewports */}
+          <button className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <ul className="sidebar-nav">
+          {links.map((link) => (
+            <li key={link.path}>
+              {/* Added onClose trigger to menu links so drawer rolls away upon selecting pages */}
+              <Link to={link.path} className={isActive(link.path)} onClick={onClose}>
+                <span className="material-symbols-outlined">{link.icon}</span>
+                <span>{link.label}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-profile" onClick={() => { navigate('/profile'); onClose && onClose(); }}>
+            <div className="sidebar-profile-avatar">
+              {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || ''}
+            </div>
+            <div className="sidebar-profile-info">
+              <div className="sidebar-profile-name">{user?.firstName} {user?.lastName}</div>
+              <div className="sidebar-profile-email">{user?.email || ''}</div>
+            </div>
+            <span className="material-symbols-outlined sidebar-profile-arrow">chevron_right</span>
+          </div>
+          <button className="sidebar-logout-btn" onClick={() => setShowLogoutConfirm(true)}>
+            <span className="material-symbols-outlined">logout</span>
+            <span>Logout</span>
+          </button>
+        </div>
+
+        {showLogoutConfirm && (
+          <div className="modal-overlay" onClick={() => setShowLogoutConfirm(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+              <div className="modal-header">
+                <div className="modal-header-icon danger">
+                  <span className="material-symbols-outlined">logout</span>
+                </div>
+                <div className="modal-header-text">
+                  <h2>Confirm Logout</h2>
+                  <p>Are you sure you want to sign out?</p>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setShowLogoutConfirm(false)}>
+                  <span className="material-symbols-outlined">close</span>
+                  Cancel
+                </button>
+                <button className="btn btn-danger" onClick={handleLogout}>
+                  <span className="material-symbols-outlined">logout</span>
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      <ul className="sidebar-nav">
-        {links.map((link) => (
-          <li key={link.path}>
-            <Link to={link.path} className={isActive(link.path)}>
-              {link.label}
-            </Link>
-          </li>
-        ))}
-        <li><button onClick={handleLogout}>Logout</button></li>
-      </ul>
-    </div>
+    </>
   );
 }
 
