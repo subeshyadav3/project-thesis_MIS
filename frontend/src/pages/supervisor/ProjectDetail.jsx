@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 
 function ProjectDetail() {
   const { type, id } = useParams();
+  const navigate = useNavigate();
   const [item, setItem] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
   const [components, setComponents] = useState([]);
@@ -32,10 +33,22 @@ function ProjectDetail() {
     api.get(endpoint).then(({ data }) => { setItem(data); }).catch(() => {});
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint).then(({ data }) => {
-      setEvaluations(data.evaluations || []);
-      setComponents(data.components || []);
+      const evals = data.evaluations || [];
+      const comps = data.components || [];
+      setEvaluations(evals);
+      setComponents(comps);
       const m = {};
-      (data.components || []).forEach(c => { m[c.id] = ''; });
+      comps.forEach(c => {
+        let val = '';
+        if (c.name === 'Proposal Defense') {
+          const p = evals.filter(e => e.stage === 'PROPOSAL' && e.marks !== null);
+          if (p.length) val = p[p.length - 1].marks.toString();
+        } else if (c.name === 'Mid-Term Defense') {
+          const p = evals.filter(e => e.stage === 'MID_TERM' && e.marks !== null);
+          if (p.length) val = p[p.length - 1].marks.toString();
+        }
+        m[c.id] = val;
+      });
       setMarks(m);
     }).catch(() => {}).finally(() => setLoading(false));
   };
@@ -58,7 +71,7 @@ function ProjectDetail() {
   const handleSubmitMarks = async () => {
     try {
       const totalMarks = Object.values(marks).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
-      const payload = { stage: activeTab.toUpperCase(), marks: totalMarks, comment: 'Marks submitted' };
+      const payload = { stage: activeTab.toUpperCase(), marks: totalMarks };
       if (type === 'group') payload.groupId = parseInt(id);
       else payload.thesisId = parseInt(id);
       await api.post('/evaluations', payload);
@@ -81,9 +94,22 @@ function ProjectDetail() {
   };
 
   const getStageEvals = (stage) => evaluations.filter(e => e.stage === stage.toUpperCase());
-  const hasStageEval = (stage) => evaluations.some(e => e.stage === stage.toUpperCase());
-  const calcTotal = () => evaluations.reduce((s, e) => s + (e.marks || 0), 0);
+  const hasStageMarks = (stage) => evaluations.some(e => e.stage === stage.toUpperCase() && e.marks !== null);
+  const getLatestStageMarks = (stage) => {
+    const evals = evaluations.filter(e => e.stage === stage.toUpperCase() && e.marks !== null);
+    return evals.length > 0 ? evals[evals.length - 1].marks : 0;
+  };
+  const getSubmittedTotal = () => {
+    const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
+    return stages.reduce((s, st) => s + getLatestStageMarks(st), 0);
+  };
+  const currentTotal = Object.values(marks).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const safeMembers = (item) => (item?.members || []).filter(m => m.student);
+  const filterComponents = (stage) => {
+    if (stage === 'proposal') return components.filter(c => c.name === 'Proposal Defense');
+    if (stage === 'MID_TERM') return components.filter(c => c.name === 'Mid-Term Defense');
+    return components; // Final = all components
+  };
 
   if (!item && loading) {
     return (
@@ -101,7 +127,7 @@ function ProjectDetail() {
 
   // Role-based stats
   const stats = isSupervisor ? [
-    { icon: 'score', value: calcTotal(), label: 'Total Marks / 50' },
+    { icon: 'score', value: getSubmittedTotal(), label: 'Total Marks / 50' },
     { icon: 'grading', value: evaluations.length, label: 'Evaluations' },
     { icon: 'groups', value: item?.members?.length || 1, label: 'Students' },
   ] : [
@@ -113,20 +139,32 @@ function ProjectDetail() {
   // Progress stepper logic
   const completedStages = stages.filter(s => {
     if (s.key === 'COMPLETED') return item?.status === 'COMPLETED';
-    return hasStageEval(s.key);
+    return hasStageMarks(s.key);
   }).map(s => s.key);
+
+  const backPath = isSupervisor
+    ? (type === 'group' ? '/supervisor/bachelor' : '/supervisor/master')
+    : (type === 'group' ? '/coordinator/bachelor' : '/coordinator/master');
 
   return (
     <PageLayout
       title={title}
       subtitle={name}
       user={user}
-      actions={isSupervisor ? (
-        <button className="btn btn-primary btn-sm" onClick={() => setShowRecommend(true)}>
-          <span className="material-symbols-outlined">description</span>
-          Issue Recommendation
-        </button>
-      ) : null}
+      actions={
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-outline btn-sm" onClick={() => navigate(backPath)}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
+            Back to {type === 'group' ? 'Projects' : 'Theses'}
+          </button>
+          {isSupervisor && (
+            <button className="btn btn-primary btn-sm" onClick={() => setShowRecommend(true)}>
+              <span className="material-symbols-outlined">description</span>
+              Issue Recommendation
+            </button>
+          )}
+        </div>
+      }
     >
       {/* ─── Role-based Stats ─────────────────────────── */}
       <div className="stats-grid" style={{ marginBottom: 24 }}>
@@ -255,152 +293,250 @@ function ProjectDetail() {
                 </div>
               )}
             </div>
-          ) : (
-            /* ─── Stage Tabs ────────────────────── */
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              {/* Left: Components (Requirements) */}
-              <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
-                <div className="card-header">
-                  <h3>Evaluation Components</h3>
-                </div>
-                {components.length === 0 ? (
-                  <div className="empty-state" style={{ padding: '32px 16px' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>checklist</span>
-                    <p>No evaluation components configured</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {components.map(c => (
-                      <div key={c.id} style={{ 
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                        padding: '12px 16px', background: 'var(--color-surface-container-low)', 
-                        borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-outline-variant)' 
-                      }}>
-                        <span style={{ fontWeight: 500, fontSize: 14 }}>{c.name}</span>
-                        <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
-                          Max: {c.maxMarks}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Stage-specific evaluation history (read-only for coordinator) */}
-                <div style={{ marginTop: 32 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, display: 'block' }}>
-                    Stage History
-                  </label>
-                  {getStageEvals(activeTab).length === 0 ? (
-                    <div className="empty-state" style={{ padding: '24px 16px' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>history</span>
-                      <p style={{ fontSize: 14 }}>No evaluations for this stage yet</p>
+              ) : (
+              /* ─── Stage Tabs ────────────────────── */
+              activeTab === 'proposal' || activeTab === 'MID_TERM' ? (
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  {/* Left: Marks */}
+                  <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
+                    <div className="card-header">
+                      <h3>{activeTab === 'proposal' ? 'Proposal Defense' : 'Mid-Term Defense'}</h3>
+                      <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
+                        Max: {filterComponents(activeTab).reduce((s, c) => s + c.maxMarks, 0)}
+                      </span>
                     </div>
-                  ) : (
-                    getStageEvals(activeTab).map(e => (
-                      <div key={e.id} style={{
-                        background: 'var(--color-surface-container-low)', padding: 16, borderRadius: 8, 
-                        marginBottom: 12, border: '1px solid var(--color-outline-variant)' 
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <strong style={{ color: 'var(--color-primary)', fontSize: 14 }}>{e.marks !== null ? `Marks: ${e.marks}` : 'Feedback Only'}</strong>
-                          <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>{new Date(e.createdAt).toLocaleDateString()}</span>
+                    {isSupervisor ? (
+                      <>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                          {filterComponents(activeTab).map(c => (
+                            <div key={c.id} className="marks-row">
+                              <span className="marks-row-label">{c.name}</span>
+                              <input
+                                type="number"
+                                className="marks-input"
+                                value={marks[c.id] || ''}
+                                onChange={e => setMarks({...marks, [c.id]: e.target.value})}
+                                max={c.maxMarks}
+                                min="0"
+                                placeholder="0"
+                              />
+                              <span className="marks-row-max">/ {c.maxMarks}</span>
+                            </div>
+                          ))}
                         </div>
-                        {e.comment && <p style={{ margin: '0 0 8px', color: 'var(--color-on-surface-variant)', fontSize: 14 }}>{e.comment}</p>}
-                        <p style={{ margin: 0, color: 'var(--color-on-surface-variant)', fontSize: 12 }}>
-                          by {e.submittedBy?.firstName} {e.submittedBy?.lastName}
+                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitMarks}>
+                          <span className="material-symbols-outlined">save</span>
+                          Submit Marks
+                        </button>
+                      </>
+                    ) : (
+                      <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14 }}>
+                        {hasStageMarks(activeTab)
+                          ? `Marks submitted: ${getLatestStageMarks(activeTab)}`
+                          : 'No marks submitted yet'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Right: Feedback + Comments */}
+                  <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
+                    <div className="card-header">
+                      <h3>Feedback</h3>
+                    </div>
+                    {isSupervisor ? (
+                      <>
+                        <div className="form-group" style={{ marginBottom: 12 }}>
+                          <textarea
+                            value={feedback}
+                            onChange={e => setFeedback(e.target.value)}
+                            placeholder="Write your feedback for this stage..."
+                            style={{ minHeight: 80 }}
+                          />
+                        </div>
+                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitFeedback}>
+                          <span className="material-symbols-outlined">send</span>
+                          Submit Feedback
+                        </button>
+                      </>
+                    ) : (
+                      <div className="empty-state" style={{ padding: '24px 16px', textAlign: 'left', alignItems: 'flex-start' }}>
+                        <p style={{ fontSize: 14, color: 'var(--color-on-surface-variant)' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 4 }}>visibility</span>
+                          Read-only view
                         </p>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Right: Feedback & Marks (Supervisor only) or Read-only summary (Coordinator) */}
-              <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
-                <div className="card-header">
-                  <h3>{isSupervisor ? 'Submit Evaluation' : 'Evaluation Summary'}</h3>
-                </div>
-
-                {isSupervisor ? (
-                  <>
-                    <div className="form-group">
-                      <label>Feedback</label>
-                      <textarea
-                        value={feedback}
-                        onChange={e => setFeedback(e.target.value)}
-                        placeholder="Enter your feedback for this stage..."
-                      />
-                    </div>
-                    <button className="btn btn-primary btn-sm" onClick={handleSubmitFeedback}>
-                      <span className="material-symbols-outlined">send</span>
-                      Submit Feedback
-                    </button>
+                    )}
 
                     <div style={{ marginTop: 24 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, display: 'block' }}>
-                        Marks
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, display: 'block' }}>
+                        Comments History
                       </label>
-                      {components.map(c => (
-                        <div key={c.id} className="marks-row">
-                          <span className="marks-row-label">{c.name}</span>
-                          <input
-                            type="number"
-                            className="marks-input"
-                            value={marks[c.id] || ''}
-                            onChange={e => setMarks({...marks, [c.id]: e.target.value})}
-                            max={c.maxMarks}
-                            min="0"
-                            placeholder="0"
-                          />
-                          <span className="marks-row-max">/ {c.maxMarks}</span>
-                        </div>
-                      ))}
-                      <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={handleSubmitMarks}>
-                        <span className="material-symbols-outlined">save</span>
-                        Submit Marks
-                      </button>
+                      {getStageEvals(activeTab).filter(e => e.comment).length === 0 ? (
+                        <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', fontStyle: 'italic' }}>No comments yet</p>
+                      ) : (
+                        getStageEvals(activeTab).filter(e => e.comment).map(e => (
+                          <div key={e.id} style={{
+                            background: 'var(--color-surface-container-low)', padding: 12, borderRadius: 8,
+                            marginBottom: 8, border: '1px solid var(--color-outline-variant)'
+                          }}>
+                            <p style={{ margin: '0 0 4px', fontSize: 14 }}>{e.comment}</p>
+                            <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                              {e.submittedBy?.firstName} {e.submittedBy?.lastName} — {new Date(e.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="empty-state" style={{ padding: '32px 16px', textAlign: 'left', alignItems: 'flex-start' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>visibility</span>
-                      <p style={{ margin: '8px 0 4px', fontWeight: 600 }}>Coordinator View</p>
-                      <p style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', textAlign: 'left' }}>
-                        You have read-only access to evaluations. Only supervisors can submit marks and feedback.
-                      </p>
+                  </div>
+                </div>
+              ) : (
+                /* ─── Final Tab ─── */
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  {/* Left: All Components Marks */}
+                  <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
+                    <div className="card-header">
+                      <h3>Comprehensive Evaluation</h3>
+                      <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
+                        Total: 50
+                      </span>
                     </div>
-
-                    {/* Show latest evaluation for this stage if any */}
-                    {getStageEvals(activeTab).length > 0 && (
-                      <div style={{ marginTop: 16 }}>
-                        <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, display: 'block' }}>
-                          Latest Evaluation
-                        </label>
-                        {(() => {
-                          const latest = getStageEvals(activeTab)[0];
-                          return (
-                            <div style={{
-                              background: 'var(--color-surface-container-low)', padding: 16, borderRadius: 8,
-                              border: '1px solid var(--color-outline-variant)'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <strong style={{ color: 'var(--color-primary)', fontSize: 14 }}>{latest.marks !== null ? `Marks: ${latest.marks}` : 'Feedback Only'}</strong>
-                                <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>{new Date(latest.createdAt).toLocaleDateString()}</span>
-                              </div>
-                              {latest.comment && <p style={{ margin: '0 0 8px', color: 'var(--color-on-surface-variant)', fontSize: 14 }}>{latest.comment}</p>}
-                              <p style={{ margin: 0, color: 'var(--color-on-surface-variant)', fontSize: 12 }}>
-                                by {latest.submittedBy?.firstName} {latest.submittedBy?.lastName}
-                              </p>
+                    {isSupervisor ? (
+                      <>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+                          {components.map(c => (
+                            <div key={c.id} className="marks-row">
+                              <span className="marks-row-label">{c.name}</span>
+                              <input
+                                type="number"
+                                className="marks-input"
+                                value={marks[c.id] || ''}
+                                onChange={e => setMarks({...marks, [c.id]: e.target.value})}
+                                max={c.maxMarks}
+                                min="0"
+                                placeholder="0"
+                              />
+                              <span className="marks-row-max">/ {c.maxMarks}</span>
                             </div>
-                          );
-                        })()}
+                          ))}
+                        </div>
+                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitMarks}>
+                          <span className="material-symbols-outlined">save</span>
+                          Submit All Marks
+                        </button>
+                      </>
+                    ) : (
+                      <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14 }}>
+                        {evaluations.filter(e => e.marks !== null).length > 0 ? `Total marks: ${getSubmittedTotal()}` : 'No evaluations yet'}
+                      </p>
+                    )}
+
+                    {/* Previous Stage Summaries with All Comments */}
+                    <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--color-outline-variant)' }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 16, display: 'block' }}>
+                        Previous Stages
+                      </label>
+                      {['PROPOSAL', 'MID_TERM'].map(stage => {
+                        const evals = getStageEvals(stage);
+                        const hasMarks = evals.some(e => e.marks !== null);
+                        const stageMarks = getLatestStageMarks(stage);
+                        const label = stage === 'PROPOSAL' ? 'Proposal' : 'Mid-Term';
+                        const comments = evals.filter(e => e.comment);
+                        return (
+                          <div key={stage} style={{
+                            padding: '12px 14px', borderRadius: 8, marginBottom: 10,
+                            border: `1px solid ${hasMarks ? 'var(--color-success)' : 'var(--color-outline-variant)'}`,
+                            background: hasMarks ? 'rgba(22, 163, 74, 0.05)' : 'var(--color-surface-container-low)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                              <span className={`badge badge-${hasMarks ? 'completed' : 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
+                                {hasMarks ? 'Done' : 'Pending'}
+                              </span>
+                              <span style={{ fontWeight: 600, fontSize: 14 }}>{label}</span>
+                              {hasMarks && (
+                                <span style={{ marginLeft: 'auto', fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>
+                                  {stageMarks}
+                                </span>
+                              )}
+                            </div>
+                            {comments.length > 0 && (
+                              <div style={{ marginTop: 8 }}>
+                                {comments.map(e => (
+                                  <p key={e.id} style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                                    "{e.comment}" — <span style={{ fontSize: 11 }}>{e.submittedBy?.firstName} {e.submittedBy?.lastName}, {new Date(e.createdAt).toLocaleDateString()}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right: Final Feedback + Grand Total */}
+                  <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
+                    <div className="card-header">
+                      <h3>Final Feedback</h3>
+                    </div>
+                    {isSupervisor ? (
+                      <>
+                        <div className="form-group" style={{ marginBottom: 12 }}>
+                          <textarea
+                            value={feedback}
+                            onChange={e => setFeedback(e.target.value)}
+                            placeholder="Enter your final feedback for the project..."
+                            style={{ minHeight: 80 }}
+                          />
+                        </div>
+                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitFeedback}>
+                          <span className="material-symbols-outlined">send</span>
+                          Submit Feedback
+                        </button>
+                      </>
+                    ) : (
+                      <div className="empty-state" style={{ padding: '24px 16px', textAlign: 'left', alignItems: 'flex-start' }}>
+                        <p style={{ fontSize: 14, color: 'var(--color-on-surface-variant)' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 4 }}>visibility</span>
+                          Read-only view
+                        </p>
                       </div>
                     )}
-                  </>
-                )}
-              </div>
-            </div>
+
+                    {/* Final Comments History */}
+                    <div style={{ marginTop: 24 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, display: 'block' }}>
+                        Comments History
+                      </label>
+                      {getStageEvals('FINAL').filter(e => e.comment).length === 0 ? (
+                        <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', fontStyle: 'italic' }}>No comments yet</p>
+                      ) : (
+                        getStageEvals('FINAL').filter(e => e.comment).map(e => (
+                          <div key={e.id} style={{
+                            background: 'var(--color-surface-container-low)', padding: 12, borderRadius: 8,
+                            marginBottom: 8, border: '1px solid var(--color-outline-variant)'
+                          }}>
+                            <p style={{ margin: '0 0 4px', fontSize: 14 }}>{e.comment}</p>
+                            <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                              {e.submittedBy?.firstName} {e.submittedBy?.lastName} — {new Date(e.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Grand Total */}
+                    <div style={{ marginTop: 32, padding: 20, background: 'var(--color-surface-container-low)', borderRadius: 12, border: '1px solid var(--color-outline-variant)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-on-surface-variant)', marginBottom: 4 }}>
+                        Grand Total
+                      </div>
+                      <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--color-primary)' }}>
+                        {currentTotal}
+                        <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / 50</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
           )}
         </div>
 

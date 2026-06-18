@@ -17,126 +17,136 @@ function SupervisorDashboard() {
       api.get('/supervisors/groups').then(({ data }) => setGroups(data)),
       api.get('/supervisors/theses').then(({ data }) => setTheses(data)),
     ]).catch((err) => {
-      toast.error(err.response?.data?.error || 'Failed to load data');
+      toast.error(err.response?.data?.error || 'Failed to load assignments');
     }).finally(() => setLoading(false));
   }, []);
 
+  const allItems = [...groups, ...theses];
+  const totalAssigned = allItems.length;
+  const completedCount = allItems.filter(i => i.status === 'COMPLETED').length;
+  const pendingCount = allItems.filter(i => i.status === 'ACTIVE' || i.status === 'PENDING').length;
+
   return (
-    <PageLayout title="Supervisor Dashboard" subtitle="Your assigned projects and theses" user={user}>
-      <div className="stats-grid" style={{ marginBottom: 32 }}>
+    <PageLayout title="Supervisor Dashboard" subtitle="Overview of your assignments" user={user}>
+      <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">groups</span></div>
-          <div className="stat-number">{groups.length}</div>
-          <div className="stat-label">Bachelor Groups</div>
+          <div className="stat-icon"><span className="material-symbols-outlined">assignment_ind</span></div>
+          <div className="stat-number">{totalAssigned}</div>
+          <div className="stat-label">Total Assigned</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
-          <div className="stat-number">{theses.length}</div>
-          <div className="stat-label">Master's Theses</div>
+          <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
+          <div className="stat-number">{pendingCount}</div>
+          <div className="stat-label">Pending Evaluations</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">supervisor_account</span></div>
-          <div className="stat-number">{groups.length + theses.length}</div>
-          <div className="stat-label">Total Assignments</div>
+          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-number">{completedCount}</div>
+          <div className="stat-label">Completed</div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="loading-state">
-          <span className="material-symbols-outlined">progress_activity</span>
-          <p>Loading your assignments...</p>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div className="card" style={{ flex: 1, minWidth: 280 }}>
+          <div className="card-header">
+            <h3>Bachelor Projects</h3>
+            <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>{groups.length}</span>
+          </div>
+          <div style={{ padding: '16px 0' }}>
+            {loading ? (
+              <div className="loading-state" style={{ padding: 20 }}>
+                <span className="material-symbols-outlined">progress_activity</span>
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="empty-state" style={{ padding: 24 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>school</span>
+                <p style={{ fontSize: 14 }}>No projects assigned</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {groups.slice(0, 5).map(g => (
+                  <Link key={g.id} to={`/supervisor/project/group/${g.id}`} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 16px', borderRadius: 8, textDecoration: 'none',
+                    background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)',
+                    border: '1px solid var(--color-outline-variant)'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 14 }}>{g.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
+                        <span className="dot" />
+                        {g.status || 'PENDING'}
+                      </span>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>chevron_right</span>
+                    </div>
+                  </Link>
+                ))}
+                {groups.length > 5 && (
+                  <Link to="/supervisor/bachelor" style={{
+                    fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none',
+                    textAlign: 'center', padding: 8
+                  }}>
+                    View all {groups.length} projects →
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <>
-          <div className="card">
-            <div className="card-header">
-              <h3>Bachelor Project Groups ({groups.length})</h3>
-            </div>
-            {groups.length === 0 ? (
-              <div className="empty-state" style={{ padding: 40 }}>
-                <span className="material-symbols-outlined">groups</span>
-                <h3>No groups assigned</h3>
-                <p>You haven't been assigned to any bachelor project groups yet.</p>
-              </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Project Title</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groups.map(g => (
-                    <tr key={g.id}>
-                      <td>
-                        <Link to={`/supervisor/project/group/${g.id}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
-                            {g.name}
-                          </div>
-                        </Link>
-                      </td>
-                      <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                      <td>
-                        <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
-                          <span className="dot" />
-                          {g.status || 'PENDING'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
 
-          <div className="card" style={{ marginTop: 24 }}>
-            <div className="card-header">
-              <h3>Master's Theses ({theses.length})</h3>
-            </div>
-            {theses.length === 0 ? (
-              <div className="empty-state" style={{ padding: 40 }}>
-                <span className="material-symbols-outlined">library_books</span>
-                <h3>No theses assigned</h3>
-                <p>You haven't been assigned to supervise any master's theses yet.</p>
+        <div className="card" style={{ flex: 1, minWidth: 280 }}>
+          <div className="card-header">
+            <h3>Master's Theses</h3>
+            <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>{theses.length}</span>
+          </div>
+          <div style={{ padding: '16px 0' }}>
+            {loading ? (
+              <div className="loading-state" style={{ padding: 20 }}>
+                <span className="material-symbols-outlined">progress_activity</span>
+              </div>
+            ) : theses.length === 0 ? (
+              <div className="empty-state" style={{ padding: 24 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>library_books</span>
+                <p style={{ fontSize: 14 }}>No theses assigned</p>
               </div>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Project Title</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {theses.map(t => (
-                    <tr key={t.id}>
-                      <td>
-                        <Link to={`/supervisor/project/thesis/${t.id}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>
-                            {t.student?.firstName} {t.student?.lastName}
-                          </div>
-                        </Link>
-                      </td>
-                      <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
-                      <td>
-                        <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
-                          <span className="dot" />
-                          {t.status || 'PENDING'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {theses.slice(0, 5).map(t => (
+                  <Link key={t.id} to={`/supervisor/project/thesis/${t.id}`} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 16px', borderRadius: 8, textDecoration: 'none',
+                    background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)',
+                    border: '1px solid var(--color-outline-variant)'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 14 }}>{t.student?.firstName} {t.student?.lastName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{t.title}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
+                        <span className="dot" />
+                        {t.status || 'PENDING'}
+                      </span>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>chevron_right</span>
+                    </div>
+                  </Link>
+                ))}
+                {theses.length > 5 && (
+                  <Link to="/supervisor/master" style={{
+                    fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none',
+                    textAlign: 'center', padding: 8
+                  }}>
+                    View all {theses.length} theses →
+                  </Link>
+                )}
+              </div>
             )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </PageLayout>
   );
 }
