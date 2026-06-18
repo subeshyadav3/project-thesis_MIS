@@ -12,6 +12,8 @@ import MasterThesis from './pages/coordinator/MasterThesis';
 import Evaluations from './pages/coordinator/Evaluations';
 import SupervisorList from './pages/coordinator/SupervisorList';
 import SupervisorDashboard from './pages/supervisor/Dashboard';
+import SupervisorBachelorProjects from './pages/supervisor/BachelorProjects';
+import SupervisorMasterThesis from './pages/supervisor/MasterThesis';
 import ProjectDetail from './pages/supervisor/ProjectDetail';
 import PrivateRoute from './components/PrivateRoute';
 import './App.css';
@@ -31,6 +33,8 @@ function App() {
           <Route path="/coordinator/supervisors" element={<PrivateRoute role="COORDINATOR"><SupervisorList /></PrivateRoute>} />
           <Route path="/coordinator/project/:type/:id" element={<PrivateRoute role="COORDINATOR"><ProjectDetail /></PrivateRoute>} />
           <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
+          <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />
+          <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
           <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
           <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />

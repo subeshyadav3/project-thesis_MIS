@@ -30,6 +30,8 @@ function Sidebar({ user, isOpen, onClose }) {
 
   const supervisorLinks = [
     { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' },
+    { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
   ];
 
   const links = user?.role === 'MAINTAINER' ? maintainerLinks

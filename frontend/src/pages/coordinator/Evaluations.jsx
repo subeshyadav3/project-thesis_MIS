@@ -31,7 +31,9 @@ function Evaluations() {
       toast.success('Results forwarded to Exam Department successfully');
       setShowForward(false);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Forwarding failed');
+      const msg = err.response?.data?.error || err.message;
+      const cleanMsg = typeof msg === 'string' && msg.length > 120 ? msg.slice(0, 120) + '...' : msg;
+      toast.error(cleanMsg || 'Failed to forward results. Server error occurred.');
     }
   };
 

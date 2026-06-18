@@ -53,10 +53,11 @@ exports.submitEvaluation = async (req, res) => {
 exports.submitFeedback = async (req, res) => {
   try {
     const { stage, comment, groupId, thesisId } = req.body;
-    const proposal = await prisma.proposal.create({
+    const evaluation = await prisma.evaluation.create({
       data: {
         stage,
-        supervisorComment: comment,
+        marks: null,
+        comment,
         submittedById: req.user.id,
         groupId: groupId ? parseInt(groupId) : null,
         thesisId: thesisId ? parseInt(thesisId) : null,
@@ -91,7 +92,7 @@ exports.submitFeedback = async (req, res) => {
         );
       }
     }
-    res.status(201).json(proposal);
+    res.status(201).json(evaluation);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
