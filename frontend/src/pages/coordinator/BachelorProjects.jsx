@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -7,6 +8,7 @@ const PAGE_SIZE = 10;
 
 function BachelorProjects() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allSupervisors, setAllSupervisors] = useState([]);
@@ -439,7 +441,7 @@ function BachelorProjects() {
               </thead>
               <tbody>
                 {paginatedGroups.map(g => (
-                  <tr key={g.id} className="clickable-row" onClick={() => openDetail(g, 'view')}>
+                  <tr key={g.id} onClick={() => navigate(`/coordinator/project/group/${g.id}`)} style={{ cursor: 'pointer' }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">{g.name?.slice(0, 2).toUpperCase()}</div>
