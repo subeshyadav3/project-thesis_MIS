@@ -34,9 +34,31 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
   ];
 
+  // Read student type from localStorage for dynamic label
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const studentType = storedUser?.studentType;
+  const assignmentLabel = studentType === 'bachelor' ? 'My Project'
+    : studentType === 'master' ? 'My Thesis'
+    : 'My Assignment';
+
+  const studentLinks = [
+    { path: '/student', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/student/assignment', label: assignmentLabel, icon: 'school' },
+    { path: '/student/submissions', label: 'Submissions', icon: 'upload_file' },
+    { path: '/student/marks', label: 'Marks & Feedback', icon: 'grading' },
+    { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
+  ];
+
+  const externalLinks = [
+    { path: '/external', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/external/evaluations', label: 'Evaluations', icon: 'grading' },
+  ];
+
   const links = user?.role === 'MAINTAINER' ? maintainerLinks
     : user?.role === 'COORDINATOR' ? coordinatorLinks
     : user?.role === 'SUPERVISOR' ? supervisorLinks
+    : user?.role === 'STUDENT' ? studentLinks
+    : user?.role === 'EXTERNAL_EXAMINER' ? externalLinks
     : [];
 
   return (

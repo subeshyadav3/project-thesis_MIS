@@ -21,7 +21,8 @@ function Login() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       toast.success('Login successful');
-      navigate(`/${data.user.role.toLowerCase()}`);
+      const rolePath = data.user.role === 'EXTERNAL_EXAMINER' ? 'external' : data.user.role.toLowerCase();
+      navigate(`/${rolePath}`);
     } catch (err) {
       const msg = err.response?.data?.error || 'Login failed';
       setError(msg);

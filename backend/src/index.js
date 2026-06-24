@@ -14,8 +14,11 @@ const evaluationRoutes = require('./routes/evaluations');
 const notificationRoutes = require('./routes/notifications');
 const forwardRoutes = require('./routes/forward');
 const departmentRoutes = require('./routes/departments');
+const studentRoutes = require('./routes/students');
+const externalExaminerRoutes = require('./routes/externalExaminers');
 
 const app = express();
+
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -31,6 +34,8 @@ app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/forward', forwardRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/external-examiners', externalExaminerRoutes);
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();

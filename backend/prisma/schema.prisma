@@ -12,6 +12,7 @@ enum Role {
   COORDINATOR
   SUPERVISOR
   STUDENT
+  EXTERNAL_EXAMINER
 }
 
 enum GroupStatus {

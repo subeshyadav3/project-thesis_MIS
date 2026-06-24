@@ -15,6 +15,14 @@ import SupervisorDashboard from './pages/supervisor/Dashboard';
 import SupervisorBachelorProjects from './pages/supervisor/BachelorProjects';
 import SupervisorMasterThesis from './pages/supervisor/MasterThesis';
 import ProjectDetail from './pages/supervisor/ProjectDetail';
+import StudentDashboard from './pages/student/Dashboard';
+import StudentAssignment from './pages/student/Assignment';
+import StudentMarksFeedback from './pages/student/MarksFeedback';
+import StudentSubmissions from './pages/student/Submissions';
+import StudentNotifications from './pages/student/Notifications';
+import ExternalDashboard from './pages/external/Dashboard';
+import ExternalEvaluationsList from './pages/external/EvaluationsList';
+import ExternalEvaluationPage from './pages/external/EvaluationPage';
 import PrivateRoute from './components/PrivateRoute';
 import './App.css';
 
@@ -37,6 +45,17 @@ function App() {
           <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
           <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
           <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
+          <Route path="/student/assignment" element={<PrivateRoute role="STUDENT"><StudentAssignment /></PrivateRoute>} />
+          <Route path="/student/marks" element={<PrivateRoute role="STUDENT"><StudentMarksFeedback /></PrivateRoute>} />
+          <Route path="/student/feedback" element={<PrivateRoute role="STUDENT"><StudentMarksFeedback /></PrivateRoute>} />
+          <Route path="/student/submissions" element={<PrivateRoute role="STUDENT"><StudentSubmissions /></PrivateRoute>} />
+          <Route path="/student/notifications" element={<PrivateRoute role="STUDENT"><StudentNotifications /></PrivateRoute>} />
+          <Route path="/student/*" element={<PrivateRoute role="STUDENT"><StudentDashboard /></PrivateRoute>} />
+          <Route path="/external/groups" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
+          <Route path="/external/theses" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
+          <Route path="/external/evaluations" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
+          <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationPage /></PrivateRoute>} />
+          <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/" element={<Login />} />
         </Routes>

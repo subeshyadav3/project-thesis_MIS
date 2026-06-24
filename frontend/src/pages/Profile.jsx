@@ -140,6 +140,10 @@ function Profile() {
                 <p style={{ margin: 0 }}>You can manage student groups, assign supervisors, track evaluations, and forward results to the Examination Department.</p>
               ) : user.role === 'MAINTAINER' ? (
                 <p style={{ margin: 0 }}>You have full system access to manage users, departments, and system configurations.</p>
+              ) : user.role === 'STUDENT' ? (
+                <p style={{ margin: 0 }}>You can view your project/thesis details, submit documents, and track evaluations and feedback.</p>
+              ) : user.role === 'EXTERNAL_EXAMINER' ? (
+                <p style={{ margin: 0 }}>You can view assigned projects and theses, and submit evaluation marks and comments.</p>
               ) : (
                 <p style={{ margin: 0 }}>Standard user access.</p>
               )}
