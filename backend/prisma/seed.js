@@ -98,10 +98,12 @@ async function main() {
     { fn: 'Dr. Hari', ln: 'Adhikari', email: 'hari.adhikari@ioe.edu.np' },
     { fn: 'Prof. Suman', ln: 'Bhattarai', email: 'suman.bhattarai@ioe.edu.np' },
   ];
+  const externalExaminers = [];
   for (const ex of externalExamDefs) {
-    await prisma.user.create({
+    const u = await prisma.user.create({
       data: { email: ex.email, password: hash, firstName: ex.fn, lastName: ex.ln, role: 'EXTERNAL_EXAMINER' },
     });
+    externalExaminers.push(u);
   }
   console.log(`Created ${externalExamDefs.length} external examiners`);
 
@@ -217,11 +219,11 @@ async function main() {
 
     // Default evaluation components
     const defaults = [
-      { name: 'Supervisor', maxMarks: 25 },
-      { name: 'Proposal Defense', maxMarks: 5 },
-      { name: 'Mid-Term Defense', maxMarks: 5 },
-      { name: 'Final Defense', maxMarks: 5 },
-      { name: 'Internal Examiner', maxMarks: 10 },
+      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR' },
+      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE' },
+      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE' },
+      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE' },
+      { name: 'External Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER' },
     ];
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
@@ -257,11 +259,11 @@ async function main() {
       },
     });
     const defaults = [
-      { name: 'Supervisor', maxMarks: 25 },
-      { name: 'Proposal Defense', maxMarks: 5 },
-      { name: 'Mid-Term Defense', maxMarks: 5 },
-      { name: 'Final Defense', maxMarks: 5 },
-      { name: 'Internal Examiner', maxMarks: 10 },
+      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR' },
+      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE' },
+      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE' },
+      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE' },
+      { name: 'External Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER' },
     ];
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
@@ -283,16 +285,30 @@ async function main() {
       await prisma.proposal.create({
         data: { stage: 'PROPOSAL', documentUrl: '/storage/groups/sample_proposal.pdf', submittedById: groupMemberStudent.id, groupId: g.id },
       });
-      // 2. Supervisor gives feedback (with marks stored in DB for coordinator use)
+      // 2. Supervisor gives feedback (marks: null)
       await prisma.evaluation.create({
-        data: { stage: 'PROPOSAL', marks: 4.2, comment: 'Well-structured proposal. Refine methodology and add more references.', submittedById: g.supervisorId, groupId: g.id },
+        data: { stage: 'PROPOSAL', marks: null, comment: 'Well-structured proposal. Refine methodology and add more references.', submittedById: g.supervisorId, groupId: g.id },
       });
+      // 3. Coordinator enters Proposal Defense marks
       await prisma.evaluation.create({
-        data: { stage: 'MID_TERM', marks: 3.8, comment: 'Good progress. Work on data collection and analysis.', submittedById: g.supervisorId, groupId: g.id },
+        data: { stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 4.0, comment: 'Strong defense presentation.', submittedById: coord.id, groupId: g.id },
+      });
+      // 4. Coordinator enters Mid-Term Defense marks
+      await prisma.evaluation.create({
+        data: { stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 3.5, comment: 'Progress is on track.', submittedById: coord.id, groupId: g.id },
+      });
+      // 5. Supervisor enters Supervisor marks (out of 25)
+      await prisma.evaluation.create({
+        data: { stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 21.5, comment: 'Consistently high performance throughout the semester.', submittedById: g.supervisorId, groupId: g.id },
+      });
+      // 6. External Examiner enters External Examiner marks (out of 10)
+      const examiner = externalExaminers[i % externalExaminers.length];
+      await prisma.evaluation.create({
+        data: { stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 8.0, comment: 'Solid technical implementation and well-written final report.', submittedById: examiner.id, groupId: g.id },
       });
     }
   }
-  console.log('Created sample submissions & feedback for first 5 groups');
+/  console.log('Created sample submissions & feedback for first 5 groups');
 
   // ============================================================
   // NOTIFICATIONS for some students

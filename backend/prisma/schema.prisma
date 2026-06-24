@@ -33,6 +33,14 @@ enum EvaluationStage {
   FINAL
 }
 
+enum EvaluationType {
+  SUPERVISOR
+  PROPOSAL_DEFENSE
+  MIDTERM_DEFENSE
+  FINAL_DEFENSE
+  EXTERNAL_EXAMINER
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
@@ -127,32 +135,34 @@ model Thesis {
 }
 
 model Evaluation {
-  id        Int      @id @default(autoincrement())
-  stage     EvaluationStage
-  marks     Float?
-  comment   String?
-  submittedById Int
-  submittedBy   User  @relation(fields: [submittedById], references: [id])
-  groupId   Int?
-  group     ProjectGroup? @relation(fields: [groupId], references: [id])
-  thesisId  Int?
-  thesis    Thesis?  @relation(fields: [thesisId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             Int             @id @default(autoincrement())
+  stage          EvaluationStage
+  evaluationType EvaluationType?
+  marks          Float?
+  comment        String?
+  submittedById  Int
+  submittedBy    User            @relation(fields: [submittedById], references: [id])
+  groupId        Int?
+  group          ProjectGroup?   @relation(fields: [groupId], references: [id])
+  thesisId       Int?
+  thesis         Thesis?         @relation(fields: [thesisId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model EvaluationComponent {
-  id            Int    @id @default(autoincrement())
-  name          String
-  maxMarks      Float
-  groupId       Int?
-  group         ProjectGroup? @relation(fields: [groupId], references: [id])
-  thesisId      Int?
-  thesis        Thesis?  @relation(fields: [thesisId], references: [id])
-  createdById   Int
-  createdBy     User    @relation(fields: [createdById], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             Int             @id @default(autoincrement())
+  name           String
+  evaluationType EvaluationType?
+  maxMarks       Float
+  groupId        Int?
+  group          ProjectGroup?   @relation(fields: [groupId], references: [id])
+  thesisId       Int?
+  thesis         Thesis?         @relation(fields: [thesisId], references: [id])
+  createdById    Int
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model Proposal {

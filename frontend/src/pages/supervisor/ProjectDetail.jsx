@@ -40,13 +40,8 @@ function ProjectDetail() {
       const m = {};
       comps.forEach(c => {
         let val = '';
-        if (c.name === 'Proposal Defense') {
-          const p = evals.filter(e => e.stage === 'PROPOSAL' && e.marks !== null);
-          if (p.length) val = p[p.length - 1].marks.toString();
-        } else if (c.name === 'Mid-Term Defense') {
-          const p = evals.filter(e => e.stage === 'MID_TERM' && e.marks !== null);
-          if (p.length) val = p[p.length - 1].marks.toString();
-        }
+        const relevant = evals.filter(e => e.evaluationType === c.evaluationType && e.marks !== null);
+        if (relevant.length) val = relevant[relevant.length - 1].marks.toString();
         m[c.id] = val;
       });
       setMarks(m);
@@ -68,16 +63,39 @@ function ProjectDetail() {
     } catch (err) { toast.error(err.response?.data?.error || 'Error submitting feedback'); }
   };
 
-  const handleSubmitMarks = async () => {
+  const handleSubmitSupervisorMarks = async () => {
+    const supComp = components.find(c => c.evaluationType === 'SUPERVISOR');
+    if (!supComp) {
+      toast.error('Supervisor evaluation component not found.');
+      return;
+    }
+    const valStr = marks[supComp.id];
+    if (valStr === undefined || valStr === '') {
+      toast.warning('Please enter supervisor marks');
+      return;
+    }
+    const val = parseFloat(valStr);
+    if (isNaN(val) || val < 0 || val > 25) {
+      toast.warning('Supervisor marks must be between 0 and 25');
+      return;
+    }
+
     try {
-      const totalMarks = Object.values(marks).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
-      const payload = { stage: activeTab.toUpperCase(), marks: totalMarks };
+      const payload = {
+        stage: 'FINAL',
+        evaluationType: 'SUPERVISOR',
+        marks: val,
+        comment: feedback || undefined,
+      };
       if (type === 'group') payload.groupId = parseInt(id);
       else payload.thesisId = parseInt(id);
       await api.post('/evaluations', payload);
-      toast.success('Marks submitted. Email sent to students.');
+      toast.success('Supervisor marks submitted successfully.');
+      setFeedback('');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Error submitting marks'); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error submitting supervisor marks');
+    }
   };
 
   const handleRecommend = async () => {
@@ -99,16 +117,20 @@ function ProjectDetail() {
     const evals = evaluations.filter(e => e.stage === stage.toUpperCase() && e.marks !== null);
     return evals.length > 0 ? evals[evals.length - 1].marks : 0;
   };
-  const getSubmittedTotal = () => {
-    const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
-    return stages.reduce((s, st) => s + getLatestStageMarks(st), 0);
+  const getLatestMarksByType = (type) => {
+    const evals = evaluations.filter(e => e.evaluationType === type && e.marks !== null);
+    return evals.length > 0 ? evals[evals.length - 1].marks : null;
   };
-  const currentTotal = Object.values(marks).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  const getSubmittedTotal = () => {
+    const types = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
+    return types.reduce((s, type) => s + (getLatestMarksByType(type) || 0), 0);
+  };
+  const currentTotal = getSubmittedTotal();
   const safeMembers = (item) => (item?.members || []).filter(m => m.student);
   const filterComponents = (stage) => {
-    if (stage === 'proposal') return components.filter(c => c.name === 'Proposal Defense');
-    if (stage === 'MID_TERM') return components.filter(c => c.name === 'Mid-Term Defense');
-    return components; // Final = all components
+    if (stage === 'proposal') return components.filter(c => c.evaluationType === 'PROPOSAL_DEFENSE');
+    if (stage === 'MID_TERM') return components.filter(c => c.evaluationType === 'MIDTERM_DEFENSE');
+    return components;
   };
 
   if (!item && loading) {
@@ -302,46 +324,37 @@ function ProjectDetail() {
                     <div className="card-header">
                       <h3>{activeTab === 'proposal' ? 'Proposal Defense' : 'Mid-Term Defense'}</h3>
                       <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
-                        Max: {filterComponents(activeTab).reduce((s, c) => s + c.maxMarks, 0)}
+                        Max Marks: 5
                       </span>
                     </div>
-                    {isSupervisor ? (
-                      <>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-                          {filterComponents(activeTab).map(c => (
-                            <div key={c.id} className="marks-row">
-                              <span className="marks-row-label">{c.name}</span>
-                              <input
-                                type="number"
-                                className="marks-input"
-                                value={marks[c.id] || ''}
-                                onChange={e => setMarks({...marks, [c.id]: e.target.value})}
-                                max={c.maxMarks}
-                                min="0"
-                                placeholder="0"
-                              />
-                              <span className="marks-row-max">/ {c.maxMarks}</span>
+                    <div style={{ padding: '8px 0' }}>
+                      {getLatestMarksByType(activeTab === 'proposal' ? 'PROPOSAL_DEFENSE' : 'MIDTERM_DEFENSE') !== null ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span className="material-symbols-outlined" style={{ color: 'var(--color-success)', fontSize: 32 }}>check_circle</span>
+                          <div>
+                            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)' }}>
+                              {getLatestMarksByType(activeTab === 'proposal' ? 'PROPOSAL_DEFENSE' : 'MIDTERM_DEFENSE')}
+                              <span style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', fontWeight: 400 }}> / 5</span>
                             </div>
-                          ))}
+                            <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Submitted by Coordinator</div>
+                          </div>
                         </div>
-                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitMarks}>
-                          <span className="material-symbols-outlined">save</span>
-                          Submit Marks
-                        </button>
-                      </>
-                    ) : (
-                      <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14 }}>
-                        {hasStageMarks(activeTab)
-                          ? `Marks submitted: ${getLatestStageMarks(activeTab)}`
-                          : 'No marks submitted yet'}
-                      </p>
-                    )}
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span className="material-symbols-outlined" style={{ color: 'var(--color-on-surface-variant)', fontSize: 32 }}>pending_actions</span>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>Pending Coordinator Evaluation</div>
+                            <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Defense marks will be updated by the coordinator.</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Right: Feedback + Comments */}
                   <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
                     <div className="card-header">
-                      <h3>Feedback</h3>
+                      <h3>Supervisor Feedback</h3>
                     </div>
                     {isSupervisor ? (
                       <>
@@ -392,81 +405,96 @@ function ProjectDetail() {
               ) : (
                 /* ─── Final Tab ─── */
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  {/* Left: All Components Marks */}
+                  {/* Left: Supervisor Marks Form */}
                   <div className="card" style={{ flex: 1, minWidth: 300, marginBottom: 0 }}>
                     <div className="card-header">
-                      <h3>Comprehensive Evaluation</h3>
+                      <h3>Supervisor Assessment</h3>
                       <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
-                        Total: 50
+                        Max Marks: 25
                       </span>
                     </div>
                     {isSupervisor ? (
                       <>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-                          {components.map(c => (
+                          {components.filter(c => c.evaluationType === 'SUPERVISOR').map(c => (
                             <div key={c.id} className="marks-row">
-                              <span className="marks-row-label">{c.name}</span>
+                              <span className="marks-row-label">Supervisor Score</span>
                               <input
                                 type="number"
                                 className="marks-input"
                                 value={marks[c.id] || ''}
                                 onChange={e => setMarks({...marks, [c.id]: e.target.value})}
-                                max={c.maxMarks}
+                                max="25"
                                 min="0"
-                                placeholder="0"
+                                step="0.5"
+                                placeholder="0-25"
                               />
-                              <span className="marks-row-max">/ {c.maxMarks}</span>
+                              <span className="marks-row-max">/ 25</span>
                             </div>
                           ))}
                         </div>
-                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitMarks}>
+                        <button className="btn btn-secondary" style={{ width: '100%' }} onClick={handleSubmitSupervisorMarks}>
                           <span className="material-symbols-outlined">save</span>
-                          Submit All Marks
+                          Submit Supervisor Mark
                         </button>
                       </>
                     ) : (
-                      <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14 }}>
-                        {evaluations.filter(e => e.marks !== null).length > 0 ? `Total marks: ${getSubmittedTotal()}` : 'No evaluations yet'}
-                      </p>
+                      <div style={{ padding: '8px 0' }}>
+                        {getLatestMarksByType('SUPERVISOR') !== null ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span className="material-symbols-outlined" style={{ color: 'var(--color-success)', fontSize: 32 }}>check_circle</span>
+                            <div>
+                              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)' }}>
+                                {getLatestMarksByType('SUPERVISOR')}
+                                <span style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', fontWeight: 400 }}> / 25</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Submitted by Supervisor</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span className="material-symbols-outlined" style={{ color: 'var(--color-on-surface-variant)', fontSize: 32 }}>pending_actions</span>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>Pending Supervisor Evaluation</div>
+                              <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Marks will be entered by the assigned supervisor.</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
 
-                    {/* Previous Stage Summaries with All Comments */}
+                    {/* Breakdown of other marks */}
                     <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--color-outline-variant)' }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 16, display: 'block' }}>
-                        Previous Stages
+                        Evaluation Components Breakdown
                       </label>
-                      {['PROPOSAL', 'MID_TERM'].map(stage => {
-                        const evals = getStageEvals(stage);
-                        const hasMarks = evals.some(e => e.marks !== null);
-                        const stageMarks = getLatestStageMarks(stage);
-                        const label = stage === 'PROPOSAL' ? 'Proposal' : 'Mid-Term';
-                        const comments = evals.filter(e => e.comment);
+                      {[
+                        { label: 'Proposal Defense', type: 'PROPOSAL_DEFENSE', max: 5, actor: 'Coordinator' },
+                        { label: 'Mid-Term Defense', type: 'MIDTERM_DEFENSE', max: 5, actor: 'Coordinator' },
+                        { label: 'Final Defense', type: 'FINAL_DEFENSE', max: 5, actor: 'Coordinator' },
+                        { label: 'External Examiner', type: 'EXTERNAL_EXAMINER', max: 10, actor: 'External Examiner' },
+                      ].map(stage => {
+                        const score = getLatestMarksByType(stage.type);
+                        const hasMarks = score !== null;
                         return (
-                          <div key={stage} style={{
+                          <div key={stage.type} style={{
                             padding: '12px 14px', borderRadius: 8, marginBottom: 10,
                             border: `1px solid ${hasMarks ? 'var(--color-success)' : 'var(--color-outline-variant)'}`,
                             background: hasMarks ? 'rgba(22, 163, 74, 0.05)' : 'var(--color-surface-container-low)'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span className={`badge badge-${hasMarks ? 'completed' : 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
                                 {hasMarks ? 'Done' : 'Pending'}
                               </span>
-                              <span style={{ fontWeight: 600, fontSize: 14 }}>{label}</span>
-                              {hasMarks && (
-                                <span style={{ marginLeft: 'auto', fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>
-                                  {stageMarks}
-                                </span>
-                              )}
-                            </div>
-                            {comments.length > 0 && (
-                              <div style={{ marginTop: 8 }}>
-                                {comments.map(e => (
-                                  <p key={e.id} style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
-                                    "{e.comment}" — <span style={{ fontSize: 11 }}>{e.submittedBy?.firstName} {e.submittedBy?.lastName}, {new Date(e.createdAt).toLocaleDateString()}</span>
-                                  </p>
-                                ))}
+                              <div>
+                                <span style={{ fontWeight: 600, fontSize: 13, display: 'block' }}>{stage.label}</span>
+                                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Evaluator: {stage.actor}</span>
                               </div>
-                            )}
+                              <span style={{ marginLeft: 'auto', fontSize: 16, fontWeight: 700, color: 'var(--color-primary)' }}>
+                                {hasMarks ? score : '—'}
+                              </span>
+                              <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>/ {stage.max}</span>
+                            </div>
                           </div>
                         );
                       })}

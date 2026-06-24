@@ -43,10 +43,17 @@ exports.getAssignedTheses = async (req, res) => {
 exports.submitEvaluation = async (req, res) => {
   try {
     const { stage, marks, comment, groupId, thesisId } = req.body;
+    const parsedMarks = marks !== undefined && marks !== null ? parseFloat(marks) : null;
+    if (parsedMarks !== null) {
+      if (parsedMarks < 0 || parsedMarks > 10) {
+        return res.status(400).json({ error: 'External examiner marks must be between 0 and 10' });
+      }
+    }
     const evaluation = await prisma.evaluation.create({
       data: {
         stage,
-        marks: marks ? parseFloat(marks) : null,
+        evaluationType: 'EXTERNAL_EXAMINER',
+        marks: parsedMarks,
         comment,
         submittedById: req.user.id,
         groupId: groupId ? parseInt(groupId) : null,

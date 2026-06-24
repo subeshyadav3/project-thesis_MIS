@@ -11,7 +11,7 @@ function ExternalEvaluationPage() {
   const [evaluations, setEvaluations] = useState([]);
   const [marks, setMarks] = useState('');
   const [comment, setComment] = useState('');
-  const [stage, setStage] = useState('PROPOSAL');
+  const [stage, setStage] = useState('FINAL');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
@@ -88,13 +88,11 @@ function ExternalEvaluationPage() {
               <div className="card-header"><h3>Submit Evaluation</h3></div>
               <div className="form-group">
                 <label>Stage</label>
-                <select value={stage} onChange={e => setStage(e.target.value)}>
-                  {stages.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
+                <input type="text" value="Final Defense" disabled />
               </div>
               <div className="form-group">
                 <label>Marks</label>
-                <input type="number" value={marks} onChange={e => setMarks(e.target.value)} min="0" max="50" placeholder="Enter marks out of 50" step="0.5" />
+                <input type="number" value={marks} onChange={e => setMarks(e.target.value)} min="0" max="10" placeholder="Enter marks out of 10" step="0.5" />
               </div>
               <div className="form-group">
                 <label>Comment</label>
