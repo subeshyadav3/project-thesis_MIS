@@ -34,18 +34,21 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
   ];
 
-  // Read student type from localStorage for dynamic label
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const studentType = storedUser?.studentType;
-  const assignmentLabel = studentType === 'bachelor' ? 'My Project'
-    : studentType === 'master' ? 'My Thesis'
-    : 'My Assignment';
+  const sType = storedUser?.studentType;
 
   const studentLinks = [
     { path: '/student', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/student/assignment', label: assignmentLabel, icon: 'school' },
+    ...(sType === 'bachelor'
+      ? [{ path: '/student/projects', label: 'Projects', icon: 'school' }]
+      : sType === 'master'
+        ? [{ path: '/student/theses', label: 'Theses', icon: 'library_books' }]
+        : [
+            { path: '/student/projects', label: 'Projects', icon: 'school' },
+            { path: '/student/theses', label: 'Theses', icon: 'library_books' },
+          ]
+    ),
     { path: '/student/submissions', label: 'Submissions', icon: 'upload_file' },
-    { path: '/student/marks', label: 'Marks & Feedback', icon: 'grading' },
     { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 

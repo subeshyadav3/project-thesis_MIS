@@ -36,6 +36,7 @@ app.use('/api/forward', forwardRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/external-examiners', externalExaminerRoutes);
+app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();

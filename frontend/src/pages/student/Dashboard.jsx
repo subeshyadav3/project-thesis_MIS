@@ -5,8 +5,8 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 
 function StudentDashboard() {
-  const [myGroup, setMyGroup] = useState(null);
-  const [myThesis, setMyThesis] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [theses, setTheses] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
@@ -14,184 +14,182 @@ function StudentDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    let foundGroup = null;
-    let foundThesis = null;
     Promise.all([
-      api.get('/students/my-group').then(({ data }) => { foundGroup = data; setMyGroup(data); }).catch(() => {}),
-      api.get('/students/my-thesis').then(({ data }) => { foundThesis = data; setMyThesis(data); }).catch(() => {}),
+      api.get('/students/groups').then(({ data }) => { setGroups(data); return data; }).catch(() => []),
+      api.get('/students/theses').then(({ data }) => { setTheses(data); return data; }).catch(() => []),
       api.get('/students/notifications').then(({ data }) => setNotifications(data)).catch(() => {}),
-    ]).catch((err) => {
-      toast.error(err.response?.data?.error || 'Failed to load data');
-    }).finally(() => {
+    ]).then(([g, t]) => {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
-      if (foundGroup) u.studentType = 'bachelor';
-      else if (foundThesis) u.studentType = 'master';
+      if (g.length > 0) u.studentType = 'bachelor';
+      else if (t.length > 0) u.studentType = 'master';
       else u.studentType = 'unassigned';
       localStorage.setItem('user', JSON.stringify(u));
-      setLoading(false);
-    });
+    }).catch(() => {
+      toast.error('Failed to load data');
+    }).finally(() => setLoading(false));
   }, []);
 
-  const hasAssignment = myGroup || myThesis;
-  const assignmentType = myGroup ? 'Bachelor Project' : myThesis ? "Master's Thesis" : null;
-  const assignment = myGroup || myThesis;
+  const all = [...groups, ...theses];
+  const completed = all.filter(a => a.status === 'COMPLETED').length;
+  const active = all.filter(a => a.status === 'ACTIVE' || a.status === 'PENDING').length;
+  const unread = notifications.filter(n => !n.read).length;
 
   return (
-    <PageLayout title="Student Dashboard" subtitle="Overview of your academic project/thesis" user={user}>
-      {/* Stats */}
+    <PageLayout title="Student Dashboard" subtitle={`${all.length} assignment${all.length !== 1 ? 's' : ''} total`} user={user}>
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">school</span></div>
-          <div className="stat-number">{assignmentType || 'N/A'}</div>
-          <div className="stat-label">Assignment Type</div>
+          <div className="stat-icon"><span className="material-symbols-outlined">assignment</span></div>
+          <div className="stat-number">{all.length}</div>
+          <div className="stat-label">Total Assignments</div>
+        </div>
+        <div className="stat-card bento-card">
+          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-number">{completed}</div>
+          <div className="stat-label">Completed</div>
         </div>
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
-          <div className="stat-number">{assignment?.status || 'PENDING'}</div>
-          <div className="stat-label">Status</div>
+          <div className="stat-number">{active}</div>
+          <div className="stat-label">Working / Pending</div>
         </div>
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">notifications</span></div>
-          <div className="stat-number">{notifications.filter(n => !n.read).length}</div>
+          <div className="stat-number">{unread}</div>
           <div className="stat-label">Unread Notifications</div>
         </div>
       </div>
 
-      {/* Assignment Details & Supervisor */}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
-        {/* Left: My Project / Thesis */}
-        <div className="card" style={{ flex: 2, minWidth: 280, marginBottom: 0 }}>
-          <div className="card-header">
-            <h3>My {assignmentType || 'Assignment'}</h3>
-            <span className={`badge badge-${assignment?.status?.toLowerCase() || 'pending'}`}>
-              <span className="dot" />
-              {assignment?.status || 'PENDING'}
-            </span>
-          </div>
-          {loading ? (
-            <div className="loading-state" style={{ padding: 20 }}>
-              <span className="material-symbols-outlined">progress_activity</span>
-            </div>
-          ) : !hasAssignment ? (
-            <div className="empty-state" style={{ padding: 32 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>school</span>
-              <p>You have not been assigned to any project or thesis yet.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="detail-grid" style={{ marginBottom: 0 }}>
-                <div className="detail-item">
-                  <span className="detail-label">{myGroup ? 'Project Title' : 'Thesis Title'}</span>
-                  <span style={{ fontWeight: 600 }}>{myGroup ? assignment.projectTitle : assignment.title}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">{myGroup ? 'Group' : 'Student'}</span>
-                  <span>{myGroup ? assignment.name : `${user.firstName} ${user.lastName}`}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Supervisor</span>
-                  <span>{assignment.supervisor ? `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}` : <span className="badge badge-pending"><span className="dot" />Unassigned</span>}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Academic Year</span>
-                  <span>{assignment.academicYear?.year || '—'}</span>
-                </div>
-              </div>
-              <div style={{ paddingTop: 12, borderTop: '1px solid var(--color-outline-variant)' }}>
-                <Link to="/student/assignment" className="btn btn-secondary" style={{ width: '100%', textAlign: 'center', display: 'block' }}>
-                  <span className="material-symbols-outlined">visibility</span>
-                  View Details
+      {/* Projects list */}
+      {loading ? (
+        <div className="loading-state" style={{ padding: 20 }}>
+          <span className="material-symbols-outlined">progress_activity</span>
+        </div>
+      ) : (
+        <>
+          {groups.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-header">
+                <h3>Bachelor Projects ({groups.length})</h3>
+                <Link to="/student/projects" className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }}>
+                  View All
                 </Link>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {groups.slice(0, 3).map(g => (
+                  <Link key={g.id} to={`/student/project/${g.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{
+                      padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                      borderBottom: '1px solid var(--color-outline-variant)',
+                      transition: 'background 0.15s', cursor: 'pointer',
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{
+                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                        background: g.status === 'COMPLETED' ? 'var(--color-success)' : g.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-outline)',
+                      }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {g.projectTitle}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                          {g.name} · {g.academicYear?.year || '—'}
+                        </div>
+                      </div>
+                      <span className={`badge badge-${g.status?.toLowerCase() === 'active' ? 'active' : g.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>
+                        <span className="dot" />{g.status}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
           )}
-        </div>
 
-        {/* Right: Supervisor Info & Quick Links */}
-        <div style={{ width: 300, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card" style={{ marginBottom: 0 }}>
-            <div className="card-header" style={{ paddingBottom: 12 }}>
-              <h3>Supervisor</h3>
+          {theses.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-header">
+                <h3>Master's Theses ({theses.length})</h3>
+                <Link to="/student/theses" className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12, textDecoration: 'none' }}>
+                  View All
+                </Link>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {theses.slice(0, 3).map(t => (
+                  <Link key={t.id} to={`/student/thesis/${t.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{
+                      padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                      borderBottom: '1px solid var(--color-outline-variant)',
+                      transition: 'background 0.15s', cursor: 'pointer',
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{
+                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                        background: t.status === 'COMPLETED' ? 'var(--color-success)' : t.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-outline)',
+                      }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {t.title}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                          {t.academicYear?.year || '—'}
+                        </div>
+                      </div>
+                      <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>
+                        <span className="dot" />{t.status}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
-            {assignment?.supervisor ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: '50%', background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700
-                }}>
-                  {assignment.supervisor.firstName[0]}{assignment.supervisor.lastName[0]}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{assignment.supervisor.firstName} {assignment.supervisor.lastName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{assignment.supervisor.email}</div>
-                </div>
+          )}
+
+          {/* Notifications */}
+          <div className="card">
+            <div className="card-header">
+              <h3>Notifications</h3>
+              {unread > 0 && (
+                <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
+                  {unread} unread
+                </span>
+              )}
+            </div>
+            {notifications.length === 0 ? (
+              <div className="empty-state" style={{ padding: 24 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>notifications_off</span>
+                <p>No notifications yet</p>
               </div>
             ) : (
-              <p style={{ fontSize: 14, color: 'var(--color-on-surface-variant)' }}>No supervisor assigned yet.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {notifications.slice(0, 5).map(n => (
+                  <div key={n.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px',
+                    background: n.read ? 'transparent' : 'var(--color-primary-container)',
+                    opacity: n.read ? 0.6 : 1,
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }}>
+                      {n.read ? 'check_circle' : 'notifications'}
+                    </span>
+                    <div style={{ flex: 1, fontSize: 13 }}>{n.message}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                      {new Date(n.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))}
+                {notifications.length > 5 && (
+                  <Link to="/student/notifications" style={{ padding: '8px 16px', fontSize: 12, color: 'var(--color-primary)', textDecoration: 'none', textAlign: 'center' }}>
+                    View all notifications
+                  </Link>
+                )}
+              </div>
             )}
           </div>
-
-          <div className="card" style={{ marginBottom: 0 }}>
-            <div className="card-header" style={{ paddingBottom: 12 }}>
-              <h3>Quick Actions</h3>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Link to="/student/submissions" className="btn btn-outline" style={{ justifyContent: 'flex-start', gap: 8 }}>
-                <span className="material-symbols-outlined">upload_file</span>
-                My Submissions
-              </Link>
-              <Link to="/student/marks" className="btn btn-outline" style={{ justifyContent: 'flex-start', gap: 8 }}>
-                <span className="material-symbols-outlined">grading</span>
-                View Marks
-              </Link>
-              <Link to="/student/feedback" className="btn btn-outline" style={{ justifyContent: 'flex-start', gap: 8 }}>
-                <span className="material-symbols-outlined">chat</span>
-                Feedback
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Notifications */}
-      <div className="card" style={{ marginBottom: 0 }}>
-        <div className="card-header">
-          <h3>Notifications</h3>
-          <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
-            {notifications.filter(n => !n.read).length} unread
-          </span>
-        </div>
-        {loading ? (
-          <div className="loading-state" style={{ padding: 20 }}>
-            <span className="material-symbols-outlined">progress_activity</span>
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="empty-state" style={{ padding: 24 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>notifications_off</span>
-            <p>No notifications yet</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {notifications.slice(0, 5).map(n => (
-              <div key={n.id} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 8,
-                background: n.read ? 'transparent' : 'var(--color-primary-container)', opacity: n.read ? 0.7 : 1
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-surface-variant)' }}>
-                  {n.read ? 'check_circle' : 'notifications'}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{n.message}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                    {new Date(n.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-                {!n.read && <span className="badge badge-pending" style={{ fontSize: 10, padding: '2px 6px' }}><span className="dot" />New</span>}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </PageLayout>
   );
 }

@@ -16,8 +16,9 @@ import SupervisorBachelorProjects from './pages/supervisor/BachelorProjects';
 import SupervisorMasterThesis from './pages/supervisor/MasterThesis';
 import ProjectDetail from './pages/supervisor/ProjectDetail';
 import StudentDashboard from './pages/student/Dashboard';
-import StudentAssignment from './pages/student/Assignment';
-import StudentMarksFeedback from './pages/student/MarksFeedback';
+import StudentProjects from './pages/student/Projects';
+import StudentTheses from './pages/student/Theses';
+import StudentProjectDetail from './pages/student/Assignment';
 import StudentSubmissions from './pages/student/Submissions';
 import StudentNotifications from './pages/student/Notifications';
 import ExternalDashboard from './pages/external/Dashboard';
@@ -45,9 +46,10 @@ function App() {
           <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
           <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
           <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
-          <Route path="/student/assignment" element={<PrivateRoute role="STUDENT"><StudentAssignment /></PrivateRoute>} />
-          <Route path="/student/marks" element={<PrivateRoute role="STUDENT"><StudentMarksFeedback /></PrivateRoute>} />
-          <Route path="/student/feedback" element={<PrivateRoute role="STUDENT"><StudentMarksFeedback /></PrivateRoute>} />
+          <Route path="/student/projects" element={<PrivateRoute role="STUDENT"><StudentProjects /></PrivateRoute>} />
+          <Route path="/student/theses" element={<PrivateRoute role="STUDENT"><StudentTheses /></PrivateRoute>} />
+          <Route path="/student/project/:id" element={<PrivateRoute role="STUDENT"><StudentProjectDetail /></PrivateRoute>} />
+          <Route path="/student/thesis/:id" element={<PrivateRoute role="STUDENT"><StudentProjectDetail /></PrivateRoute>} />
           <Route path="/student/submissions" element={<PrivateRoute role="STUDENT"><StudentSubmissions /></PrivateRoute>} />
           <Route path="/student/notifications" element={<PrivateRoute role="STUDENT"><StudentNotifications /></PrivateRoute>} />
           <Route path="/student/*" element={<PrivateRoute role="STUDENT"><StudentDashboard /></PrivateRoute>} />

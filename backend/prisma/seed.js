@@ -272,23 +272,27 @@ async function main() {
   console.log(`Created ${thesisDefs.length} master theses`);
 
   // ============================================================
-  // SAMPLE EVALUATIONS (first 5 groups + first 3 theses)
+  // SAMPLE SUBMISSIONS & FEEDBACK (first 5 groups + first 3 theses)
+  // Order: student submits first → then supervisor gives feedback
   // ============================================================
   for (let i = 0; i < 5 && i < createdGroups.length; i++) {
     const g = createdGroups[i];
     if (g.supervisorId) {
+      // 1. Student submits proposal document
+      const groupMemberStudent = students[i * 3]; // first member of each group
+      await prisma.proposal.create({
+        data: { stage: 'PROPOSAL', documentUrl: '/storage/groups/sample_proposal.pdf', submittedById: groupMemberStudent.id, groupId: g.id },
+      });
+      // 2. Supervisor gives feedback (with marks stored in DB for coordinator use)
       await prisma.evaluation.create({
         data: { stage: 'PROPOSAL', marks: 4.2, comment: 'Well-structured proposal. Refine methodology and add more references.', submittedById: g.supervisorId, groupId: g.id },
       });
       await prisma.evaluation.create({
         data: { stage: 'MID_TERM', marks: 3.8, comment: 'Good progress. Work on data collection and analysis.', submittedById: g.supervisorId, groupId: g.id },
       });
-      await prisma.proposal.create({
-        data: { stage: 'PROPOSAL', supervisorComment: 'Solid topic. Consider adding literature from Nepali context.', submittedById: g.supervisorId, groupId: g.id },
-      });
     }
   }
-  console.log('Created sample evaluations for first 5 groups');
+  console.log('Created sample submissions & feedback for first 5 groups');
 
   // ============================================================
   // NOTIFICATIONS for some students
