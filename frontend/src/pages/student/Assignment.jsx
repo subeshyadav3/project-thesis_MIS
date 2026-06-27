@@ -5,10 +5,17 @@ import DocumentViewer from '../../components/DocumentViewer';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
+const ROLE_LABEL = {
+  SUPERVISOR: 'Supervisor',
+  COORDINATOR: 'Coordinator',
+  EXTERNAL_EXAMINER: 'Internal Examiner',
+};
+
 function StudentProjectDetail() {
   const { type, id } = useParams();
   const isGroup = type === 'project';
   const [assignment, setAssignment] = useState(null);
+  const [evaluationsData, setEvaluationsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [feedbackTab, setFeedbackTab] = useState('PROPOSAL');
   const [viewerDoc, setViewerDoc] = useState(null);
@@ -22,7 +29,13 @@ function StudentProjectDetail() {
     const endpoint = isGroup ? `/students/groups/${id}` : `/students/theses/${id}`;
     api.get(endpoint)
       .then(({ data }) => setAssignment(data))
-      .catch(() => setAssignment(null))
+      .catch(() => setAssignment(null));
+
+    // Also pull the canonical component list + evaluations to show progress
+    const evalEndpoint = isGroup ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
+    api.get(evalEndpoint)
+      .then(({ data }) => setEvaluationsData(data))
+      .catch(() => setEvaluationsData(null))
       .finally(() => setLoading(false));
   }, [id, type]);
 
@@ -54,7 +67,7 @@ function StudentProjectDetail() {
 
   const stageStatus = (stage) => {
     const hasSubmitted = submittedStages.includes(stage);
-    const hasFeedback = evaluations.some(e => e.stage === stage);
+    const hasFeedback = evaluations.some(e => e.stage === stage && e.comment);
     if (hasSubmitted && hasFeedback) return 'done';
     if (hasSubmitted) return 'submitted';
     return 'inactive';
@@ -73,6 +86,18 @@ function StudentProjectDetail() {
   const tabExt = tabProposal?.documentUrl?.match(/\.(\w+)$/)?.[1] || 'pdf';
   const tabLabel = feedbackTab === 'MID_TERM' ? 'Mid-Term' : feedbackTab.charAt(0) + feedbackTab.slice(1).toLowerCase();
 
+  // Ordered 5-component breakdown
+  const orderedTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
+  const components = (evaluationsData?.components || []).slice().sort((a, b) =>
+    orderedTypes.indexOf(a.evaluationType) - orderedTypes.indexOf(b.evaluationType)
+  );
+  const evalByComponent = new Map((evaluationsData?.evaluations || []).map(e => [e.componentId, e]));
+  const breakdown = components.map(c => ({ component: c, evaluation: evalByComponent.get(c.id) }));
+  const completedComponents = breakdown.filter(b => b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined).length;
+  const totalMarks = breakdown.reduce((s, b) => s + (b.evaluation?.marks ?? 0), 0);
+  const isComplete = completedComponents === breakdown.length && breakdown.length > 0;
+  const showMarks = isComplete; // only show numeric marks once everything is graded
+
   return (
     <PageLayout
       title={title}
@@ -85,6 +110,86 @@ function StudentProjectDetail() {
       }
       user={user}
     >
+      {/* Evaluation progress banner — shows 5 components and final total when ready */}
+      {breakdown.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }}>fact_check</span>
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 15 }}>Final Evaluation</h3>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                  {isComplete
+                    ? `All ${breakdown.length} components evaluated · Final result below`
+                    : `${completedComponents} of ${breakdown.length} components evaluated · Final result will appear when complete`}
+                </p>
+              </div>
+            </div>
+            <span className={`badge ${isComplete ? 'badge-completed' : 'badge-pending'}`}>
+              <span className="dot" />{isComplete ? 'Complete' : 'In Progress'}
+            </span>
+          </div>
+
+          <div style={{ padding: '0 16px 16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 12 }}>
+              {breakdown.map(b => {
+                const has = b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined;
+                return (
+                  <div key={b.component.id} style={{
+                    padding: 10, borderRadius: 8,
+                    background: has ? 'var(--color-surface-container-low)' : 'transparent',
+                    border: '1px solid var(--color-outline-variant)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span className="material-symbols-outlined" style={{
+                        fontSize: 16,
+                        color: has ? 'var(--color-success)' : 'var(--color-outline-variant)',
+                      }}>{has ? 'check_circle' : 'pending'}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>{b.component.name}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      {ROLE_LABEL[b.component.evaluatorRole]}
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4, color: has ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                      {showMarks && has ? `${b.evaluation.marks} / ${b.component.maxMarks}` : `— / ${b.component.maxMarks}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {showMarks ? (
+              <div style={{
+                padding: 14, borderRadius: 10,
+                background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>Final Total</div>
+                  <div style={{ fontSize: 11 }}>Sum of all 5 evaluation components</div>
+                </div>
+                <div style={{ fontSize: 32, fontWeight: 800 }}>
+                  {totalMarks.toFixed(1)}
+                  <span style={{ fontSize: 14, fontWeight: 400 }}> / 50</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: 12, borderRadius: 8,
+                background: 'var(--color-surface-container-low)',
+                border: '1px dashed var(--color-outline-variant)',
+                textAlign: 'center', fontSize: 13, color: 'var(--color-on-surface-variant)',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>lock</span>
+                Your final marks will be revealed once all 5 components are evaluated by their respective evaluators.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
         <div className="card" style={{ flex: 1.5, minWidth: 300, marginBottom: 0 }}>
           <div className="card-header">

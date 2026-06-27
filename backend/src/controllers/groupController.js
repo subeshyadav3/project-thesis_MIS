@@ -78,11 +78,11 @@ exports.createGroup = async (req, res) => {
     }
     // Create default evaluation components
     const defaults = [
-      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR' },
-      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE' },
-      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE' },
-      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE' },
-      { name: 'External Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER' },
+      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
+      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ];
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
@@ -125,11 +125,11 @@ exports.uploadExcel = async (req, res) => {
       });
       // Create default evaluation components
       const defaults = [
-        { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR' },
-        { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE' },
-        { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE' },
-        { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE' },
-        { name: 'External Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER' },
+        { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
+        { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
       ];
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({

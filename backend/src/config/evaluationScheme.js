@@ -1,112 +1,144 @@
-const EVALUATION_TYPES = {
-  SUPERVISOR: {
+// Single source of truth for the 5 evaluation components of the minor project.
+// Total = 50 marks. This mirrors the academic regulation table exactly:
+//   Supervisor (25) + Proposal Defense (5) + Mid-Term Defense (5)
+//   + Final Defense (5) + Internal Examiner (10)
+
+const EVALUATION_SCHEME = [
+  {
+    type: 'SUPERVISOR',
+    name: 'Supervisor',
     label: 'Supervisor',
+    shortLabel: 'Supervisor',
     maxMarks: 25,
-    role: 'SUPERVISOR',
     stage: 'FINAL',
+    evaluatorRole: 'SUPERVISOR',
+    description: 'Continuous assessment of progress, quality of work and engagement throughout the project.',
+    evaluatorDescription: 'Supervisor',
   },
-  PROPOSAL_DEFENSE: {
+  {
+    type: 'PROPOSAL_DEFENSE',
+    name: 'Proposal Defense',
     label: 'Proposal Defense',
+    shortLabel: 'Proposal',
     maxMarks: 5,
-    role: 'COORDINATOR',
     stage: 'PROPOSAL',
+    evaluatorRole: 'COORDINATOR',
+    description: 'Evaluation of the proposal defense presentation by the project coordinator.',
+    evaluatorDescription: 'Coordinator',
   },
-  MIDTERM_DEFENSE: {
+  {
+    type: 'MIDTERM_DEFENSE',
+    name: 'Mid-Term Defense',
     label: 'Mid-Term Defense',
+    shortLabel: 'Mid-Term',
     maxMarks: 5,
-    role: 'COORDINATOR',
     stage: 'MID_TERM',
+    evaluatorRole: 'COORDINATOR',
+    description: 'Evaluation of mid-semester progress and demonstration by the project coordinator.',
+    evaluatorDescription: 'Coordinator',
   },
-  FINAL_DEFENSE: {
+  {
+    type: 'FINAL_DEFENSE',
+    name: 'Final Defense',
     label: 'Final Defense',
+    shortLabel: 'Final Def.',
     maxMarks: 5,
-    role: 'COORDINATOR',
     stage: 'FINAL',
+    evaluatorRole: 'COORDINATOR',
+    description: 'Evaluation of the final defense / viva by the project coordinator.',
+    evaluatorDescription: 'Coordinator',
   },
-  EXTERNAL_EXAMINER: {
-    label: 'External Examiner',
+  {
+    type: 'EXTERNAL_EXAMINER',
+    name: 'Internal Examiner',
+    label: 'Internal Examiner',
+    shortLabel: 'Int. Examiner',
     maxMarks: 10,
-    role: 'EXTERNAL_EXAMINER',
     stage: 'FINAL',
+    evaluatorRole: 'EXTERNAL_EXAMINER',
+    description: 'Independent assessment of the final deliverable by the appointed internal examiner.',
+    evaluatorDescription: 'Internal Examiner',
   },
+];
+
+const TOTAL_MAX_MARKS = EVALUATION_SCHEME.reduce((s, c) => s + c.maxMarks, 0); // 50
+const SCHEME_BY_TYPE = Object.fromEntries(EVALUATION_SCHEME.map(c => [c.type, c]));
+
+const ROLE_LABEL = {
+  SUPERVISOR: 'Supervisor',
+  COORDINATOR: 'Coordinator',
+  EXTERNAL_EXAMINER: 'Internal Examiner',
+  STUDENT: 'Student',
+  MAINTAINER: 'Maintainer',
 };
 
-const TOTAL_MAX_MARKS = 50;
+function getComponentByType(type) { return SCHEME_BY_TYPE[type] || null; }
 
-const TYPE_BY_ROLE = {
-  SUPERVISOR: 'SUPERVISOR',
-  COORDINATOR: ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE'],
-  EXTERNAL_EXAMINER: 'EXTERNAL_EXAMINER',
-};
-
-function getTypeConfig(type) {
-  return EVALUATION_TYPES[type];
-}
-
-function validateMarks(type, marks) {
-  const config = EVALUATION_TYPES[type];
-  if (!config) return { valid: false, error: 'Invalid evaluation type' };
-  if (marks === null || marks === undefined) return { valid: true };
-  if (marks < 0) return { valid: false, error: 'Marks cannot be negative' };
-  if (marks > config.maxMarks) {
-    return { valid: false, error: `Marks cannot exceed ${config.maxMarks}` };
-  }
+function validateMarks(marks, maxMarks) {
+  if (marks === null || marks === undefined || marks === '') return { valid: true };
+  const num = Number(marks);
+  if (Number.isNaN(num)) return { valid: false, error: 'Marks must be a number' };
+  if (num < 0) return { valid: false, error: 'Marks cannot be negative' };
+  if (num > maxMarks) return { valid: false, error: `Marks cannot exceed ${maxMarks}` };
   return { valid: true };
 }
 
-function validateRoleForType(role, type) {
-  const config = EVALUATION_TYPES[type];
-  if (!config) return { valid: false, error: 'Invalid evaluation type' };
-  if (config.role !== role) {
-    return { valid: false, error: `${role} cannot submit ${type} evaluation` };
-  }
-  return { valid: true };
+// Build the canonical component list to seed for a new group/thesis.
+// Each component is linked to an evaluator role.
+function getDefaultComponents() {
+  return EVALUATION_SCHEME.map(c => ({
+    name: c.name,
+    evaluationType: c.type,
+    evaluatorRole: c.evaluatorRole,
+    maxMarks: c.maxMarks,
+  }));
 }
 
-function computeSummary(evaluations) {
-  const summary = {
-    supervisor: { marks: null, maxMarks: 25, label: 'Supervisor' },
-    proposalDefense: { marks: null, maxMarks: 5, label: 'Proposal Defense' },
-    midtermDefense: { marks: null, maxMarks: 5, label: 'Mid-Term Defense' },
-    finalDefense: { marks: null, maxMarks: 5, label: 'Final Defense' },
-    externalExaminer: { marks: null, maxMarks: 10, label: 'External Examiner' },
+// Compute the per-component + total summary used by every UI.
+function computeSummary(evaluations, components) {
+  const componentMap = new Map((components || []).map(c => [c.id, c]));
+  const breakdown = (components || []).map(c => {
+    const evalRec = (evaluations || []).find(e => e.componentId === c.id);
+    return {
+      componentId: c.id,
+      evaluationType: c.evaluationType,
+      name: c.name,
+      label: c.name,
+      shortLabel: c.shortLabel,
+      description: c.description,
+      evaluatorRole: c.evaluatorRole,
+      evaluatorDescription: ROLE_LABEL[c.evaluatorRole] || c.evaluatorRole,
+      stage: c.evaluationType === 'SUPERVISOR' || c.evaluationType === 'EXTERNAL_EXAMINER' || c.evaluationType === 'FINAL_DEFENSE' ? 'FINAL'
+        : c.evaluationType === 'MIDTERM_DEFENSE' ? 'MID_TERM' : 'PROPOSAL',
+      maxMarks: c.maxMarks,
+      marks: evalRec ? evalRec.marks : null,
+      comment: evalRec ? evalRec.comment : null,
+      submittedBy: evalRec ? evalRec.submittedBy : null,
+      submittedAt: evalRec ? evalRec.createdAt : null,
+      evaluationId: evalRec ? evalRec.id : null,
+      status: evalRec && evalRec.marks !== null ? 'COMPLETED' : 'PENDING',
+    };
+  });
+
+  const total = breakdown.reduce((s, b) => s + (b.marks !== null && b.marks !== undefined ? Number(b.marks) : 0), 0);
+  const completedCount = breakdown.filter(b => b.status === 'COMPLETED').length;
+  return {
+    breakdown,
+    total,
+    maxTotal: TOTAL_MAX_MARKS,
+    completedCount,
+    totalCount: breakdown.length,
+    isComplete: completedCount === breakdown.length,
   };
-
-  const typeToKey = {
-    SUPERVISOR: 'supervisor',
-    PROPOSAL_DEFENSE: 'proposalDefense',
-    MIDTERM_DEFENSE: 'midtermDefense',
-    FINAL_DEFENSE: 'finalDefense',
-    EXTERNAL_EXAMINER: 'externalExaminer',
-  };
-
-  for (const eval of evaluations) {
-    if (eval.evaluationType && eval.marks !== null && eval.marks !== undefined) {
-      const key = typeToKey[eval.evaluationType];
-      if (key) {
-        summary[key].marks = eval.marks;
-      }
-    }
-  }
-
-  let total = 0;
-  let maxTotal = 0;
-  for (const key of Object.keys(summary)) {
-    maxTotal += summary[key].maxMarks;
-    if (summary[key].marks !== null) {
-      total += summary[key].marks;
-    }
-  }
-
-  return { breakdown: summary, total, maxTotal };
 }
 
 module.exports = {
-  EVALUATION_TYPES,
+  EVALUATION_SCHEME,
+  SCHEME_BY_TYPE,
   TOTAL_MAX_MARKS,
-  TYPE_BY_ROLE,
-  getTypeConfig,
+  ROLE_LABEL,
+  getComponentByType,
+  getDefaultComponents,
   validateMarks,
-  validateRoleForType,
   computeSummary,
 };

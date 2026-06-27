@@ -65,6 +65,7 @@ exports.getMyGroups = async (req, res) => {
             evaluations: {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
             },
+            evaluationComponents: true,
             proposals: {
               include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
             },
@@ -90,6 +91,7 @@ exports.getMyTheses = async (req, res) => {
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
+        evaluationComponents: true,
         proposals: {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
@@ -115,6 +117,7 @@ exports.getGroupById = async (req, res) => {
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
+        evaluationComponents: true,
         proposals: {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
@@ -138,6 +141,7 @@ exports.getThesisById = async (req, res) => {
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
+        evaluationComponents: true,
         proposals: {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
