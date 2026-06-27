@@ -294,7 +294,7 @@ async function main() {
     // 1. Student submits proposal document
     const groupMemberStudent = students[i * 3];
     await prisma.proposal.create({
-      data: { stage: 'PROPOSAL', documentUrl: '/storage/groups/sample_proposal.pdf', submittedById: groupMemberStudent.id, groupId: g.id },
+      data: { stage: 'PROPOSAL', documentUrl: '/api/files/groups/sample_proposal.pdf', submittedById: groupMemberStudent.id, groupId: g.id },
     });
 
     // 2. Coordinator enters Proposal Defense marks (out of 5)

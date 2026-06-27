@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 function Sidebar({ user, isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await api.post('/auth/logout').catch(() => {});
     localStorage.removeItem('user');
     navigate('/login'); 
   };

@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+const { authenticate } = require('./middleware/auth');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
@@ -22,9 +25,18 @@ const app = express();
 
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL || 'http://localhost:3000';
+app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many login attempts, please try again later.' },
+});
+app.use('/api/auth/login', loginLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -38,12 +50,28 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/external-examiners', externalExaminerRoutes);
 app.use('/api/examiner-assignments', examinerAssignmentRoutes);
-app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const fs = require('fs');
 
-app.get('/api/stats', async (req, res) => {
+app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
+  try {
+    const { type, filename } = req.params;
+    const allowedTypes = ['groups', 'theses'];
+    if (!allowedTypes.includes(type)) return res.status(400).json({ error: 'Invalid file type' });
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    const filePath = path.join(__dirname, '..', 'storage', type, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    res.sendFile(filePath);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/stats', authenticate, async (req, res) => {
   try {
     const totalGroups = await prisma.projectGroup.count();
     const totalTheses = await prisma.thesis.count();

@@ -10,12 +10,16 @@ exports.uploadDocument = async (req, res) => {
     const allowedStages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
     if (!allowedStages.includes(stage)) return res.status(400).json({ error: 'Invalid stage' });
 
-    const documentUrl = `/storage/${type}s/${req.file.filename}`;
+    const documentUrl = `/api/files/${type}s/${req.file.filename}`;
 
     let whereClause = {};
     if (type === 'group') {
       if (req.body.groupId) {
-        whereClause = { groupId: parseInt(req.body.groupId), stage };
+        const member = await prisma.groupMember.findFirst({
+          where: { studentId: req.user.id, groupId: parseInt(req.body.groupId) },
+        });
+        if (!member) return res.status(403).json({ error: 'You are not a member of this group' });
+        whereClause = { groupId: member.groupId, stage };
       } else {
         const member = await prisma.groupMember.findFirst({ where: { studentId: req.user.id } });
         if (!member) return res.status(404).json({ error: 'You are not in any group' });
@@ -23,7 +27,11 @@ exports.uploadDocument = async (req, res) => {
       }
     } else {
       if (req.body.thesisId) {
-        whereClause = { thesisId: parseInt(req.body.thesisId), stage };
+        const thesis = await prisma.thesis.findFirst({
+          where: { id: parseInt(req.body.thesisId), studentId: req.user.id },
+        });
+        if (!thesis) return res.status(403).json({ error: 'This thesis does not belong to you' });
+        whereClause = { thesisId: thesis.id, stage };
       } else {
         const thesis = await prisma.thesis.findFirst({ where: { studentId: req.user.id } });
         if (!thesis) return res.status(404).json({ error: 'You have no thesis' });
@@ -135,6 +143,8 @@ exports.getGroupById = async (req, res) => {
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
+    const isMember = group.members.some(m => m.studentId === req.user.id);
+    if (!isMember) return res.status(403).json({ error: 'You are not a member of this group' });
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -157,6 +167,7 @@ exports.getThesisById = async (req, res) => {
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (thesis.studentId !== req.user.id) return res.status(403).json({ error: 'This thesis does not belong to you' });
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: error.message });

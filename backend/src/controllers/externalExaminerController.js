@@ -78,6 +78,19 @@ exports.submitEvaluation = async (req, res) => {
       return res.status(403).json({ error: 'This component is not evaluated by the Internal Examiner.' });
     }
 
+    // Verify examiner is assigned to this group/thesis
+    if (groupId) {
+      const assigned = await prisma.examinerAssignment.findFirst({
+        where: { externalExaminerId: req.user.id, groupId: parseInt(groupId) },
+      });
+      if (!assigned) return res.status(403).json({ error: 'You are not assigned to evaluate this group' });
+    } else if (thesisId) {
+      const assigned = await prisma.examinerAssignment.findFirst({
+        where: { externalExaminerId: req.user.id, thesisId: parseInt(thesisId) },
+      });
+      if (!assigned) return res.status(403).json({ error: 'You are not assigned to evaluate this thesis' });
+    }
+
     const validation = validateMarks(marks, component.maxMarks);
     if (!validation.valid) return res.status(400).json({ error: validation.error });
 

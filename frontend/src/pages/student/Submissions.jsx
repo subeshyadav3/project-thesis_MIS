@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import PageLayout from '../../components/PageLayout';
 import DocumentViewer from '../../components/DocumentViewer';
 import { useToast } from '../../contexts/ToastContext';
-import { API_ORIGIN } from '../../services/api';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
@@ -197,7 +196,7 @@ function StudentSubmissions() {
                           title="Download">
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                         </button>
-                        <a href={`${API_ORIGIN}${existing.documentUrl}`} target="_blank" rel="noopener noreferrer"
+                        <a href={existing.documentUrl} target="_blank" rel="noopener noreferrer"
                           className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12, textDecoration: 'none' }}
                           title="Open in new tab">
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>

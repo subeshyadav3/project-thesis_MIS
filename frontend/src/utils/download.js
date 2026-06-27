@@ -1,7 +1,5 @@
-import { API_ORIGIN } from '../services/api';
-
 export async function downloadFile(fileUrl, fileName = 'document') {
-  const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${API_ORIGIN}${fileUrl}`;
+  const fullUrl = fileUrl.startsWith('http') ? fileUrl : fileUrl;
   try {
     const res = await fetch(fullUrl);
     if (!res.ok) throw new Error('Download failed');

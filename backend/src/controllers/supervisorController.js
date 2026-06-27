@@ -38,6 +38,17 @@ exports.getMyTheses = async (req, res) => {
 exports.issueRecommendation = async (req, res) => {
   try {
     const { groupId, thesisId, content } = req.body;
+    if (groupId) {
+      const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { supervisorId: true } });
+      if (!group || group.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not the supervisor of this group' });
+      }
+    } else if (thesisId) {
+      const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { supervisorId: true } });
+      if (!thesis || thesis.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
+      }
+    }
     const recommendation = await prisma.recommendation.create({
       data: {
         content,

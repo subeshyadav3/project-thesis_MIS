@@ -13,6 +13,9 @@ exports.submitComponentMarks = async (req, res) => {
     if (!componentId || (groupId == null && thesisId == null)) {
       return res.status(400).json({ error: 'componentId and groupId/thesisId are required' });
     }
+    if (marks !== null && marks !== undefined && marks !== '' && (typeof marks !== 'number' || marks < 0)) {
+      return res.status(400).json({ error: 'marks must be a non-negative number' });
+    }
 
     const component = await prisma.evaluationComponent.findUnique({
       where: { id: parseInt(componentId) },
@@ -24,6 +27,40 @@ exports.submitComponentMarks = async (req, res) => {
       return res.status(403).json({
         error: `${req.user.role} cannot evaluate the "${component.name}" component (evaluator: ${component.evaluatorRole}).`,
       });
+    }
+
+    // Verify assignment: supervisors can only mark their own groups/theses
+    if (req.user.role === 'SUPERVISOR') {
+      const groupIdNum = groupId ? parseInt(groupId) : null;
+      const thesisIdNum = thesisId ? parseInt(thesisId) : null;
+      if (groupIdNum) {
+        const group = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { supervisorId: true } });
+        if (!group || group.supervisorId !== req.user.id) {
+          return res.status(403).json({ error: 'You are not the supervisor of this group' });
+        }
+      } else if (thesisIdNum) {
+        const thesis = await prisma.thesis.findUnique({ where: { id: thesisIdNum }, select: { supervisorId: true } });
+        if (!thesis || thesis.supervisorId !== req.user.id) {
+          return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
+        }
+      }
+    }
+
+    // Verify assignment: external examiners can only mark what they're assigned to
+    if (req.user.role === 'EXTERNAL_EXAMINER') {
+      const groupIdNum = groupId ? parseInt(groupId) : null;
+      const thesisIdNum = thesisId ? parseInt(thesisId) : null;
+      if (groupIdNum) {
+        const assigned = await prisma.examinerAssignment.findFirst({
+          where: { externalExaminerId: req.user.id, groupId: groupIdNum },
+        });
+        if (!assigned) return res.status(403).json({ error: 'You are not assigned to evaluate this group' });
+      } else if (thesisIdNum) {
+        const assigned = await prisma.examinerAssignment.findFirst({
+          where: { externalExaminerId: req.user.id, thesisId: thesisIdNum },
+        });
+        if (!assigned) return res.status(403).json({ error: 'You are not assigned to evaluate this thesis' });
+      }
     }
 
     // Validate marks (allow null to clear)
@@ -96,6 +133,17 @@ exports.submitComponentMarks = async (req, res) => {
 exports.submitFeedback = async (req, res) => {
   try {
     const { stage, comment, groupId, thesisId, componentId } = req.body;
+    if (groupId) {
+      const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { supervisorId: true } });
+      if (!group || group.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not the supervisor of this group' });
+      }
+    } else if (thesisId) {
+      const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { supervisorId: true } });
+      if (!thesis || thesis.supervisorId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
+      }
+    }
     const evaluation = await prisma.evaluation.create({
       data: {
         stage,

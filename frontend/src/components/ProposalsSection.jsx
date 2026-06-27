@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { API_ORIGIN } from '../services/api';
 import { downloadFile } from '../utils/download';
 import DocumentViewer from './DocumentViewer';
 
@@ -139,7 +138,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents' }) {
                           title="Download">
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                         </button>
-                        <a href={`${API_ORIGIN}${doc.documentUrl}`} target="_blank" rel="noopener noreferrer"
+                        <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer"
                           className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
                           title="Open in new tab">
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>

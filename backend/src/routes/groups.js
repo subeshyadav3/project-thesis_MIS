@@ -6,8 +6,8 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.get('/', authenticate, groupController.getGroups);
-router.get('/:id', authenticate, groupController.getGroup);
+router.get('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), groupController.getGroups);
+router.get('/:id', authenticate, authorize('COORDINATOR', 'MAINTAINER'), groupController.getGroup);
 router.post('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), groupController.createGroup);
 router.post('/upload', authenticate, authorize('COORDINATOR'), upload.single('file'), groupController.uploadExcel);
 router.put('/:id/supervisor', authenticate, authorize('COORDINATOR'), groupController.assignSupervisor);

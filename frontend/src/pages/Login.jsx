@@ -18,7 +18,6 @@ function Login() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       toast.success('Login successful');
       const rolePath = data.user.role === 'EXTERNAL_EXAMINER' ? 'external' : data.user.role.toLowerCase();

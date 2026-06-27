@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { API_ORIGIN } from '../services/api';
 
 function DocumentViewer({ fileUrl, fileName, onClose }) {
   const [previewError, setPreviewError] = useState(false);
-  const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${API_ORIGIN}${fileUrl}`;
+  const fullUrl = fileUrl.startsWith('http') ? fileUrl : fileUrl;
   const ext = fileUrl.match(/\.(\w+)$/)?.[1]?.toLowerCase() || '';
   const isPreviewable = ['pdf'].includes(ext);
 

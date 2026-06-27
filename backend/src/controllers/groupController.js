@@ -51,6 +51,12 @@ exports.getGroup = async (req, res) => {
 exports.createGroup = async (req, res) => {
   try {
     const { name, projectTitle, academicYearId, supervisorId, students } = req.body;
+    if (!name || !projectTitle || !academicYearId) {
+      return res.status(400).json({ error: 'name, projectTitle, and academicYearId are required' });
+    }
+    if (typeof name !== 'string' || name.length > 100) {
+      return res.status(400).json({ error: 'name must be a string with max 100 characters' });
+    }
     const group = await prisma.projectGroup.create({
       data: {
         name,
@@ -153,7 +159,7 @@ exports.uploadExcel = async (req, res) => {
           student = await prisma.user.create({
             data: {
               email: `${roll.toLowerCase()}@university.edu`,
-              password: '$2a$10$placeholder', // needs reset
+              password: await bcrypt.hash('subesh', 10),
               firstName,
               lastName,
               role: 'STUDENT',

@@ -48,6 +48,9 @@ exports.getThesis = async (req, res) => {
 exports.createThesis = async (req, res) => {
   try {
     const { title, studentId, academicYearId, supervisorId } = req.body;
+    if (!title || !studentId || !academicYearId) {
+      return res.status(400).json({ error: 'title, studentId, and academicYearId are required' });
+    }
     const thesis = await prisma.thesis.create({
       data: {
         title,

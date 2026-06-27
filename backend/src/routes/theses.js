@@ -6,8 +6,8 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.get('/', authenticate, thesisController.getTheses);
-router.get('/:id', authenticate, thesisController.getThesis);
+router.get('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.getTheses);
+router.get('/:id', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.getThesis);
 router.post('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.createThesis);
 router.post('/upload', authenticate, authorize('COORDINATOR'), upload.single('file'), thesisController.uploadExcel);
 router.put('/:id/supervisor', authenticate, authorize('COORDINATOR'), thesisController.assignSupervisor);
