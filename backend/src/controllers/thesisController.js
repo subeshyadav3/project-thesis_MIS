@@ -12,6 +12,7 @@ exports.getTheses = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     res.json(theses);
@@ -32,6 +33,7 @@ exports.getThesis = async (req, res) => {
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         recommendations: true,
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });

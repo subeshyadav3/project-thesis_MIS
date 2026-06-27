@@ -26,6 +26,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/master', label: "Master's Thesis", icon: 'library_books' },
     { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
+    { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },
   ];
 
   const supervisorLinks = [

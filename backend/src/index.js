@@ -16,6 +16,7 @@ const forwardRoutes = require('./routes/forward');
 const departmentRoutes = require('./routes/departments');
 const studentRoutes = require('./routes/students');
 const externalExaminerRoutes = require('./routes/externalExaminers');
+const examinerAssignmentRoutes = require('./routes/examinerAssignments');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/forward', forwardRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/external-examiners', externalExaminerRoutes);
+app.use('/api/examiner-assignments', examinerAssignmentRoutes);
 app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
 
 const { PrismaClient } = require('@prisma/client');

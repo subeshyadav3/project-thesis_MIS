@@ -13,6 +13,7 @@ exports.getGroups = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     res.json(groups);
@@ -35,6 +36,7 @@ exports.getGroup = async (req, res) => {
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         recommendations: true,
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
