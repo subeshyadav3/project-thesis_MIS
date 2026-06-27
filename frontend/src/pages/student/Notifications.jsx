@@ -11,7 +11,7 @@ function StudentNotifications() {
 
   const loadNotifications = () => {
     setLoading(true);
-    api.get('/students/notifications')
+    api.get('/notifications')
       .then(({ data }) => setNotifications(data))
       .catch((err) => { toast.error(err.response?.data?.error || 'Failed to load notifications'); })
       .finally(() => setLoading(false));
@@ -21,7 +21,7 @@ function StudentNotifications() {
 
   const markRead = async (id) => {
     try {
-      await api.put(`/students/notifications/${id}/read`);
+      await api.put(`/notifications/${id}/read`);
       toast.success('Marked as read');
       loadNotifications();
     } catch (err) {
@@ -29,8 +29,25 @@ function StudentNotifications() {
     }
   };
 
+  const markAllRead = async () => {
+    try {
+      await api.put('/notifications/read-all');
+      toast.success('All notifications marked as read');
+      loadNotifications();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed');
+    }
+  };
+
   return (
-    <PageLayout title="Notifications" subtitle="Stay updated with your project/thesis activity" user={user}>
+    <PageLayout title="Notifications" subtitle="Stay updated with your project/thesis activity" user={user}
+      actions={notifications.some(n => !n.read) ? (
+        <button className="btn btn-outline btn-sm" onClick={markAllRead}>
+          <span className="material-symbols-outlined">done_all</span>
+          Mark all read
+        </button>
+      ) : undefined}
+    >
       {loading ? (
         <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading notifications...</p></div>
       ) : notifications.length === 0 ? (

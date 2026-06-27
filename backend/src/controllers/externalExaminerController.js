@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
+const notifSvc = require('../services/notificationService');
 
 exports.getAssignedGroups = async (req, res) => {
   try {
@@ -16,13 +17,13 @@ exports.getAssignedGroups = async (req, res) => {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
             },
             evaluationComponents: true,
+            proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
           },
         },
       },
     });
     res.json(assignments.map(a => a.group).filter(Boolean));
   } catch (error) {
-    console.error('getAssignedGroups error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -41,6 +42,7 @@ exports.getAssignedTheses = async (req, res) => {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
             },
             evaluationComponents: true,
+            proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
           },
         },
       },
@@ -106,6 +108,23 @@ exports.submitEvaluation = async (req, res) => {
       include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
     });
     const summary = computeSummary(evaluations, components);
+
+    // In-app notification on marks submitted
+    try {
+      const itemTitle = groupId
+        ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true } }))?.projectTitle
+        : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { title: true } }))?.title;
+      await notifSvc.notifyMarksSubmitted({
+        groupId: groupId ? parseInt(groupId) : undefined,
+        thesisId: thesisId ? parseInt(thesisId) : undefined,
+        componentName: component.name,
+        marks: data.marks,
+        maxMarks: component.maxMarks,
+        evaluatorRole: component.evaluatorRole,
+        itemTitle: itemTitle || 'project',
+        submitterId: req.user.id,
+      });
+    } catch (e) { console.error('notifyMarksSubmitted:', e.message); }
 
     res.status(existing ? 200 : 201).json({ evaluation, summary });
   } catch (error) {

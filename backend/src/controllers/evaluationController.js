@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
+const notifSvc = require('../services/notificationService');
 
 // Submit / update marks for a specific evaluation component.
 // The component decides who can evaluate it (`evaluatorRole`).
@@ -65,6 +66,24 @@ exports.submitComponentMarks = async (req, res) => {
       include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
     });
     const summary = computeSummary(evaluations, components);
+
+    // In-app notification on marks submitted
+    try {
+      const submitter = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const itemTitle = groupId
+        ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true } }))?.projectTitle
+        : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { title: true } }))?.title;
+      await notifSvc.notifyMarksSubmitted({
+        groupId: groupId ? parseInt(groupId) : undefined,
+        thesisId: thesisId ? parseInt(thesisId) : undefined,
+        componentName: component.name,
+        marks: data.marks,
+        maxMarks: component.maxMarks,
+        evaluatorRole: component.evaluatorRole,
+        itemTitle: itemTitle || 'project',
+        submitterId: req.user.id,
+      });
+    } catch (e) { console.error('notifyMarksSubmitted:', e.message); }
 
     res.status(existing ? 200 : 201).json({ evaluation, summary });
   } catch (error) {

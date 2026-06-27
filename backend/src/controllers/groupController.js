@@ -3,6 +3,7 @@ const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const emailService = require('../services/emailService');
+const notifSvc = require('../services/notificationService');
 
 exports.getGroups = async (req, res) => {
   try {
@@ -13,6 +14,7 @@ exports.getGroups = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
@@ -34,7 +36,7 @@ exports.getGroup = async (req, res) => {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
-        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
@@ -170,6 +172,7 @@ exports.uploadExcel = async (req, res) => {
   }
 };
 
+// Supervisor assignment with notification
 exports.assignSupervisor = async (req, res) => {
   try {
     const { id } = req.params;
@@ -195,6 +198,15 @@ exports.assignSupervisor = async (req, res) => {
         studentEmails, group.name, group.projectTitle, `${sup.firstName} ${sup.lastName}`
       );
     }
+    // In-app notification
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+      const studentIds = group.members.map(m => m.studentId);
+      await notifSvc.notifySupervisorAssignment({
+        supervisorId: sup?.id, itemTitle: group.projectTitle, type: 'group', assignerName, studentIds,
+      });
+    } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -203,10 +215,20 @@ exports.assignSupervisor = async (req, res) => {
 
 exports.updateGroupStatus = async (req, res) => {
   try {
+    const oldGroup = await prisma.projectGroup.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, projectTitle: true } });
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
+    // In-app notification
+    if (oldGroup && oldGroup.status !== req.body.status) {
+      try {
+        await notifSvc.notifyStatusChange({
+          groupId: group.id, oldStatus: oldGroup.status, newStatus: req.body.status,
+          itemTitle: oldGroup.projectTitle, changerId: req.user.id,
+        });
+      } catch (e) { console.error('notifyStatusChange:', e.message); }
+    }
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
+import NotificationBell from './NotificationBell';
 
 function PageLayout({ children, title, subtitle, actions, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,6 +26,7 @@ function PageLayout({ children, title, subtitle, actions, user }) {
             {/* Optional text or element inside topbar left can go here if needed */}
           </div>
           <div className="top-bar-actions">
+            <NotificationBell />
             {actions}
           </div>
         </header>

@@ -24,3 +24,26 @@ exports.markAsRead = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.markAllAsRead = async (req, res) => {
+  try {
+    const result = await prisma.notification.updateMany({
+      where: { userId: req.user.id, read: false },
+      data: { read: true },
+    });
+    res.json({ message: `${result.count} notifications marked as read`, count: result.count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const count = await prisma.notification.count({
+      where: { userId: req.user.id, read: false },
+    });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

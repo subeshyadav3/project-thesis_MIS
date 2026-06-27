@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
+const notifSvc = require('../services/notificationService');
 
 exports.getTheses = async (req, res) => {
   try {
@@ -12,6 +13,7 @@ exports.getTheses = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
@@ -31,7 +33,7 @@ exports.getThesis = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
-        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
@@ -127,10 +129,19 @@ exports.uploadExcel = async (req, res) => {
 
 exports.updateThesisStatus = async (req, res) => {
   try {
+    const oldThesis = await prisma.thesis.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, title: true } });
     const thesis = await prisma.thesis.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
+    if (oldThesis && oldThesis.status !== req.body.status) {
+      try {
+        await notifSvc.notifyStatusChange({
+          thesisId: thesis.id, oldStatus: oldThesis.status, newStatus: req.body.status,
+          itemTitle: oldThesis.title, changerId: req.user.id,
+        });
+      } catch (e) { console.error('notifyStatusChange:', e.message); }
+    }
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -153,6 +164,15 @@ exports.assignSupervisor = async (req, res) => {
         thesis.title, [{ firstName: thesis.student.firstName, lastName: thesis.student.lastName, rollNumber: '' }]
       );
     }
+    // In-app notification
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+      await notifSvc.notifySupervisorAssignment({
+        supervisorId: sup?.id, itemTitle: thesis.title, type: 'thesis', assignerName,
+        studentIds: thesis.studentId ? [thesis.studentId] : [],
+      });
+    } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: error.message });

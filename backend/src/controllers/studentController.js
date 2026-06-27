@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const path = require('path');
+const notifSvc = require('../services/notificationService');
 
 exports.uploadDocument = async (req, res) => {
   try {
@@ -30,21 +31,37 @@ exports.uploadDocument = async (req, res) => {
       }
     }
 
-    const existing = await prisma.proposal.findFirst({ where: whereClause });
-    if (existing) {
-      await prisma.proposal.update({ where: { id: existing.id }, data: { documentUrl } });
-    } else {
-      await prisma.proposal.create({
-        data: {
-          stage,
-          documentUrl,
-          submittedById: req.user.id,
-          ...(type === 'group' ? { groupId: whereClause.groupId } : { thesisId: whereClause.thesisId }),
-        },
+    // Always create a new Proposal record — keep full version history.
+    const parentId = whereClause.groupId || whereClause.thesisId;
+    const proposal = await prisma.proposal.create({
+      data: {
+        stage,
+        documentUrl,
+        submittedById: req.user.id,
+        ...(type === 'group' ? { groupId: whereClause.groupId } : { thesisId: whereClause.thesisId }),
+      },
+    });
+
+    // Notify supervisor + coordinators (not the student)
+    try {
+      const uploader = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const studentName = uploader ? `${uploader.firstName} ${uploader.lastName}` : 'A student';
+      const itemTitle = type === 'group'
+        ? (await prisma.projectGroup.findUnique({ where: { id: whereClause.groupId }, select: { projectTitle: true } }))?.projectTitle
+        : (await prisma.thesis.findUnique({ where: { id: whereClause.thesisId }, select: { title: true } }))?.title;
+      await notifSvc.notifyProposalUpload({
+        groupId: type === 'group' ? whereClause.groupId : undefined,
+        thesisId: type === 'thesis' ? whereClause.thesisId : undefined,
+        stage,
+        uploaderId: req.user.id,
+        studentName,
+        itemTitle: itemTitle || 'project',
       });
+    } catch (e) {
+      console.error('notifyProposalUpload error:', e.message);
     }
 
-    res.json({ message: 'Document uploaded successfully', documentUrl });
+    res.json({ message: 'Document uploaded successfully', documentUrl, proposal });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -66,9 +83,7 @@ exports.getMyGroups = async (req, res) => {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
             },
             evaluationComponents: true,
-            proposals: {
-              include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
-            },
+            proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
           },
         },
       },
@@ -92,9 +107,7 @@ exports.getMyTheses = async (req, res) => {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
-        proposals: {
-          include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
-        },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -118,9 +131,7 @@ exports.getGroupById = async (req, res) => {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
-        proposals: {
-          include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
-        },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -142,9 +153,7 @@ exports.getThesisById = async (req, res) => {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
-        proposals: {
-          include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
-        },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });

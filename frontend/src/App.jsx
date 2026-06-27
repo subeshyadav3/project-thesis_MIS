@@ -43,10 +43,12 @@ function App() {
           <Route path="/coordinator/supervisors" element={<PrivateRoute role="COORDINATOR"><SupervisorList /></PrivateRoute>} />
           <Route path="/coordinator/examiners" element={<PrivateRoute role="COORDINATOR"><ExaminerList /></PrivateRoute>} />
           <Route path="/coordinator/project/:type/:id" element={<PrivateRoute role="COORDINATOR"><ProjectDetail /></PrivateRoute>} />
+          <Route path="/coordinator/notifications" element={<PrivateRoute role="COORDINATOR"><StudentNotifications /></PrivateRoute>} />
           <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
           <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />
           <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
           <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
+          <Route path="/supervisor/notifications" element={<PrivateRoute role="SUPERVISOR"><StudentNotifications /></PrivateRoute>} />
           <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
           <Route path="/student/projects" element={<PrivateRoute role="STUDENT"><StudentProjects /></PrivateRoute>} />
           <Route path="/student/theses" element={<PrivateRoute role="STUDENT"><StudentTheses /></PrivateRoute>} />
@@ -58,6 +60,7 @@ function App() {
           <Route path="/external/theses" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
           <Route path="/external/evaluations" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
           <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationPage /></PrivateRoute>} />
+          <Route path="/external/notifications" element={<PrivateRoute role="EXTERNAL_EXAMINER"><StudentNotifications /></PrivateRoute>} />
           <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/" element={<Login />} />

@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const notifSvc = require('../services/notificationService');
 
 exports.assignExaminerToGroup = async (req, res) => {
   try {
@@ -15,9 +16,18 @@ exports.assignExaminerToGroup = async (req, res) => {
       },
       include: {
         externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
-        group: true,
+        group: { select: { projectTitle: true } },
       },
     });
+    // Notify examiner
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+      await notifSvc.notifyExaminerAssignment({
+        examinerId: parseInt(externalExaminerId), itemTitle: assignment.group?.projectTitle || 'project',
+        type: 'group', assignerName,
+      });
+    } catch (e) { console.error('notifyExaminerAssignment:', e.message); }
     res.status(201).json(assignment);
   } catch (error) {
     console.error('assignExaminerToGroup error:', error);
@@ -42,9 +52,18 @@ exports.assignExaminerToThesis = async (req, res) => {
       },
       include: {
         externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
-        thesis: true,
+        thesis: { select: { title: true } },
       },
     });
+    // Notify examiner
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+      await notifSvc.notifyExaminerAssignment({
+        examinerId: parseInt(externalExaminerId), itemTitle: assignment.thesis?.title || 'thesis',
+        type: 'thesis', assignerName,
+      });
+    } catch (e) { console.error('notifyExaminerAssignment:', e.message); }
     res.status(201).json(assignment);
   } catch (error) {
     console.error('assignExaminerToThesis error:', error);

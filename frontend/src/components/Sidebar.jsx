@@ -27,12 +27,14 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
     { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },
+    { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
   const supervisorLinks = [
     { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
     { path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' },
     { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
+    { path: '/supervisor/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -56,6 +58,7 @@ function Sidebar({ user, isOpen, onClose }) {
   const externalLinks = [
     { path: '/external', label: 'Dashboard', icon: 'dashboard' },
     { path: '/external/evaluations', label: 'Evaluations', icon: 'grading' },
+    { path: '/external/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
   const links = user?.role === 'MAINTAINER' ? maintainerLinks

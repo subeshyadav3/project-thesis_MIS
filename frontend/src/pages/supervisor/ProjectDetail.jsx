@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
+import ProposalsSection from '../../components/ProposalsSection';
+import ExaminerAssignmentSection from '../../components/ExaminerAssignmentSection';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 
@@ -165,6 +167,23 @@ function ProjectDetail() {
           </div>
         )}
       </div>
+
+      {/* Submitted documents / proposals */}
+      <div style={{ marginBottom: 24 }}>
+        <ProposalsSection proposals={item?.proposals || []} />
+      </div>
+
+      {/* COORDINATOR: assign internal examiner */}
+      {isCoordinator && (
+        <div style={{ marginBottom: 24 }}>
+          <ExaminerAssignmentSection
+            type={type}
+            id={parseInt(id)}
+            currentAssignments={item?.examinerAssignments || []}
+            onRefresh={loadData}
+          />
+        </div>
+      )}
 
       {/* SUPERVISOR: enter/edit the 25-mark Supervisor component */}
       {isSupervisor && (() => {
