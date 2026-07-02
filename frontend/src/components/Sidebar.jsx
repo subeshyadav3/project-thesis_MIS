@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 function Sidebar({ user, isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await api.post('/auth/logout').catch(() => {});
     localStorage.removeItem('user');
     navigate('/login'); 
   };
@@ -26,17 +27,46 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/master', label: "Master's Thesis", icon: 'library_books' },
     { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
+    { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },
+    { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
   const supervisorLinks = [
     { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
     { path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' },
     { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
+    { path: '/supervisor/notifications', label: 'Notifications', icon: 'notifications' },
+  ];
+
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const sType = storedUser?.studentType;
+
+  const studentLinks = [
+    { path: '/student', label: 'Dashboard', icon: 'dashboard' },
+    ...(sType === 'bachelor'
+      ? [{ path: '/student/projects', label: 'Projects', icon: 'school' }]
+      : sType === 'master'
+        ? [{ path: '/student/theses', label: 'Theses', icon: 'library_books' }]
+        : [
+            { path: '/student/projects', label: 'Projects', icon: 'school' },
+            { path: '/student/theses', label: 'Theses', icon: 'library_books' },
+          ]
+    ),
+    { path: '/student/submissions', label: 'Submissions', icon: 'upload_file' },
+    { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
+  ];
+
+  const externalLinks = [
+    { path: '/external', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/external/evaluations', label: 'Evaluations', icon: 'grading' },
+    { path: '/external/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
   const links = user?.role === 'MAINTAINER' ? maintainerLinks
     : user?.role === 'COORDINATOR' ? coordinatorLinks
     : user?.role === 'SUPERVISOR' ? supervisorLinks
+    : user?.role === 'STUDENT' ? studentLinks
+    : user?.role === 'EXTERNAL_EXAMINER' ? externalLinks
     : [];
 
   return (

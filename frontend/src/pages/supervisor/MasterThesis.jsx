@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import Pagination from '../../components/Pagination';
 
 const PAGE_SIZE = 10;
 
@@ -255,42 +256,7 @@ function SupervisorMasterThesis() {
                   ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, sortedTheses.length)} of ${sortedTheses.length}`
                   : '0 results'}
               </span>
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button className="btn btn-xs btn-outline" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>
-                    <span className="material-symbols-outlined">first_page</span>
-                  </button>
-                  <button className="btn btn-xs btn-outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-                    <span className="material-symbols-outlined">chevron_left</span>
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                    .reduce((acc, p, idx, arr) => {
-                      if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
-                      acc.push(p);
-                      return acc;
-                    }, [])
-                    .map((p, i) =>
-                      p === '...' ? (
-                        <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
-                      ) : (
-                        <button
-                          key={p}
-                          className={`btn btn-xs ${p === currentPage ? 'pagination-active' : 'btn-outline'}`}
-                          onClick={() => setCurrentPage(p)}
-                        >
-                          {p}
-                        </button>
-                      )
-                    )}
-                  <button className="btn btn-xs btn-outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-                    <span className="material-symbols-outlined">chevron_right</span>
-                  </button>
-                  <button className="btn btn-xs btn-outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)}>
-                    <span className="material-symbols-outlined">last_page</span>
-                  </button>
-                </div>
-              )}
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             </div>
           </>
         )}

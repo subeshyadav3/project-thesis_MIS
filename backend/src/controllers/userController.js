@@ -13,9 +13,17 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+const VALID_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'STUDENT', 'EXTERNAL_EXAMINER'];
+
 exports.createUser = async (req, res) => {
   try {
     const { email, password, firstName, lastName, role } = req.body;
+    if (!email || !password || !firstName || !lastName || !role) {
+      return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
+    }
+    if (!VALID_ROLES.includes(role)) {
+      return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+    }
     const hash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: { email, password: hash, firstName, lastName, role },

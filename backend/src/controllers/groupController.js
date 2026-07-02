@@ -3,6 +3,7 @@ const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const emailService = require('../services/emailService');
+const notifSvc = require('../services/notificationService');
 
 exports.getGroups = async (req, res) => {
   try {
@@ -13,6 +14,8 @@ exports.getGroups = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     res.json(groups);
@@ -33,8 +36,9 @@ exports.getGroup = async (req, res) => {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
-        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -47,6 +51,12 @@ exports.getGroup = async (req, res) => {
 exports.createGroup = async (req, res) => {
   try {
     const { name, projectTitle, academicYearId, supervisorId, students } = req.body;
+    if (!name || !projectTitle || !academicYearId) {
+      return res.status(400).json({ error: 'name, projectTitle, and academicYearId are required' });
+    }
+    if (typeof name !== 'string' || name.length > 100) {
+      return res.status(400).json({ error: 'name must be a string with max 100 characters' });
+    }
     const group = await prisma.projectGroup.create({
       data: {
         name,
@@ -78,11 +88,11 @@ exports.createGroup = async (req, res) => {
     }
     // Create default evaluation components
     const defaults = [
-      { name: 'Supervisor', maxMarks: 25 },
-      { name: 'Proposal Defense', maxMarks: 5 },
-      { name: 'Mid-Term Defense', maxMarks: 5 },
-      { name: 'Final Defense', maxMarks: 5 },
-      { name: 'Internal Examiner', maxMarks: 10 },
+      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
+      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ];
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
@@ -125,11 +135,11 @@ exports.uploadExcel = async (req, res) => {
       });
       // Create default evaluation components
       const defaults = [
-        { name: 'Supervisor', maxMarks: 25 },
-        { name: 'Proposal Defense', maxMarks: 5 },
-        { name: 'Mid-Term Defense', maxMarks: 5 },
-        { name: 'Final Defense', maxMarks: 5 },
-        { name: 'Internal Examiner', maxMarks: 10 },
+        { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
+        { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
       ];
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
@@ -149,7 +159,7 @@ exports.uploadExcel = async (req, res) => {
           student = await prisma.user.create({
             data: {
               email: `${roll.toLowerCase()}@university.edu`,
-              password: '$2a$10$placeholder', // needs reset
+              password: await bcrypt.hash('subesh', 10),
               firstName,
               lastName,
               role: 'STUDENT',
@@ -168,6 +178,7 @@ exports.uploadExcel = async (req, res) => {
   }
 };
 
+// Supervisor assignment with notification
 exports.assignSupervisor = async (req, res) => {
   try {
     const { id } = req.params;
@@ -193,6 +204,15 @@ exports.assignSupervisor = async (req, res) => {
         studentEmails, group.name, group.projectTitle, `${sup.firstName} ${sup.lastName}`
       );
     }
+    // In-app notification
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+      const studentIds = group.members.map(m => m.studentId);
+      await notifSvc.notifySupervisorAssignment({
+        supervisorId: sup?.id, itemTitle: group.projectTitle, type: 'group', assignerName, studentIds,
+      });
+    } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -201,10 +221,20 @@ exports.assignSupervisor = async (req, res) => {
 
 exports.updateGroupStatus = async (req, res) => {
   try {
+    const oldGroup = await prisma.projectGroup.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, projectTitle: true } });
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
+    // In-app notification
+    if (oldGroup && oldGroup.status !== req.body.status) {
+      try {
+        await notifSvc.notifyStatusChange({
+          groupId: group.id, oldStatus: oldGroup.status, newStatus: req.body.status,
+          itemTitle: oldGroup.projectTitle, changerId: req.user.id,
+        });
+      } catch (e) { console.error('notifyStatusChange:', e.message); }
+    }
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: error.message });

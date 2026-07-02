@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
+const notifSvc = require('../services/notificationService');
 
 exports.getTheses = async (req, res) => {
   try {
@@ -12,6 +13,8 @@ exports.getTheses = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     res.json(theses);
@@ -30,8 +33,9 @@ exports.getThesis = async (req, res) => {
         academicYear: { include: { department: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
-        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
@@ -44,6 +48,9 @@ exports.getThesis = async (req, res) => {
 exports.createThesis = async (req, res) => {
   try {
     const { title, studentId, academicYearId, supervisorId } = req.body;
+    if (!title || !studentId || !academicYearId) {
+      return res.status(400).json({ error: 'title, studentId, and academicYearId are required' });
+    }
     const thesis = await prisma.thesis.create({
       data: {
         title,
@@ -54,11 +61,11 @@ exports.createThesis = async (req, res) => {
       },
     });
     const defaults = [
-      { name: 'Supervisor', maxMarks: 25 },
-      { name: 'Proposal Defense', maxMarks: 5 },
-      { name: 'Mid-Term Defense', maxMarks: 5 },
-      { name: 'Final Defense', maxMarks: 5 },
-      { name: 'Internal Examiner', maxMarks: 10 },
+      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
+      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+      { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ];
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
@@ -104,11 +111,11 @@ exports.uploadExcel = async (req, res) => {
         data: { title, studentId: student.id, academicYearId: parseInt(academicYearId) },
       });
       const defaults = [
-        { name: 'Supervisor', maxMarks: 25 },
-        { name: 'Proposal Defense', maxMarks: 5 },
-        { name: 'Mid-Term Defense', maxMarks: 5 },
-        { name: 'Final Defense', maxMarks: 5 },
-        { name: 'Internal Examiner', maxMarks: 10 },
+        { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
+        { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
+        { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
       ];
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
@@ -125,10 +132,19 @@ exports.uploadExcel = async (req, res) => {
 
 exports.updateThesisStatus = async (req, res) => {
   try {
+    const oldThesis = await prisma.thesis.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, title: true } });
     const thesis = await prisma.thesis.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
+    if (oldThesis && oldThesis.status !== req.body.status) {
+      try {
+        await notifSvc.notifyStatusChange({
+          thesisId: thesis.id, oldStatus: oldThesis.status, newStatus: req.body.status,
+          itemTitle: oldThesis.title, changerId: req.user.id,
+        });
+      } catch (e) { console.error('notifyStatusChange:', e.message); }
+    }
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -151,6 +167,15 @@ exports.assignSupervisor = async (req, res) => {
         thesis.title, [{ firstName: thesis.student.firstName, lastName: thesis.student.lastName, rollNumber: '' }]
       );
     }
+    // In-app notification
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+      await notifSvc.notifySupervisorAssignment({
+        supervisorId: sup?.id, itemTitle: thesis.title, type: 'thesis', assignerName,
+        studentIds: thesis.studentId ? [thesis.studentId] : [],
+      });
+    } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: error.message });

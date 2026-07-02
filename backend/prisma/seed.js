@@ -6,6 +6,26 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const prisma = new PrismaClient();
 
+// The 5 evaluation components for the minor project. Each component declares
+// which role is responsible for filling it in. This is the single source of
+// truth that mirrors the academic regulation table (50 marks total).
+const EVALUATION_COMPONENTS = [
+  { name: 'Supervisor',         evaluationType: 'SUPERVISOR',        evaluatorRole: 'SUPERVISOR',        maxMarks: 25 },
+  { name: 'Proposal Defense',   evaluationType: 'PROPOSAL_DEFENSE',  evaluatorRole: 'COORDINATOR',       maxMarks: 5 },
+  { name: 'Mid-Term Defense',   evaluationType: 'MIDTERM_DEFENSE',   evaluatorRole: 'COORDINATOR',       maxMarks: 5 },
+  { name: 'Final Defense',      evaluationType: 'FINAL_DEFENSE',     evaluatorRole: 'COORDINATOR',       maxMarks: 5 },
+  { name: 'Internal Examiner',  evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER', maxMarks: 10 },
+];
+
+const STAGE_BY_TYPE = {
+  SUPERVISOR: 'FINAL',
+  PROPOSAL_DEFENSE: 'PROPOSAL',
+  MIDTERM_DEFENSE: 'MID_TERM',
+  FINAL_DEFENSE: 'FINAL',
+  EXTERNAL_EXAMINER: 'FINAL',
+};
+// (kept for reference; stage is now derived from evaluationType in the controller)
+
 async function main() {
   console.log('Seeding database...');
 
@@ -26,7 +46,7 @@ async function main() {
   const hash = await bcrypt.hash('subesh', 10);
 
   // ============================================================
-  // DEPARTMENTS — Pulchowk Engineering Campus, IOE, Tribhuvan University
+  // DEPARTMENTS
   // ============================================================
   const depts = {};
   const deptDefs = [
@@ -43,7 +63,7 @@ async function main() {
   console.log(`Created ${deptDefs.length} departments`);
 
   // ============================================================
-  // ACADEMIC YEARS — Nepali B.S. calendar
+  // ACADEMIC YEARS
   // ============================================================
   const ayBCT = {};
   const ayDefs = [
@@ -55,7 +75,6 @@ async function main() {
     const created = await prisma.academicYear.create({ data: a });
     ayBCT[a.year] = created;
   }
-  // One for BEX
   const ayBEX = await prisma.academicYear.create({
     data: { year: '2080', semester: 'Regular', departmentId: depts.BEX.id, isActive: false },
   });
@@ -76,7 +95,7 @@ async function main() {
   });
   console.log('Created COORDINATOR: coordinator@pcampus.edu.np / subesh');
 
-  // Supervisors — Pulchowk faculty
+  // Supervisors
   const supDefs = [
     { fn: 'Prabesh', ln: 'Bhattarai', email: 'prabeshbchettri25@gmail.com' },
     { fn: 'Ramesh', ln: 'Sharma', email: 'ramesh.sharma@pcampus.edu.np' },
@@ -94,9 +113,23 @@ async function main() {
   }
   console.log(`Created ${supervisors.length} supervisors`);
 
-  // Students — 45 students across BCT and BEX (3 per group × 15 groups)
+  // External Examiners (these users fill the "Internal Examiner" component)
+  const externalExamDefs = [
+    { fn: 'Dr. Hari', ln: 'Adhikari', email: 'hari.adhikari@ioe.edu.np' },
+    { fn: 'Prof. Suman', ln: 'Bhattarai', email: 'suman.bhattarai@ioe.edu.np' },
+  ];
+  const externalExaminers = [];
+  for (const ex of externalExamDefs) {
+    const u = await prisma.user.create({
+      data: { email: ex.email, password: hash, firstName: ex.fn, lastName: ex.ln, role: 'EXTERNAL_EXAMINER' },
+    });
+    externalExaminers.push(u);
+  }
+  console.log(`Created ${externalExamDefs.length} external examiners (Internal Examiners)`);
+
+  // Students — 40 total: 30 bachelor, 6 master, 4 unassigned
   const studentDefs = [
-    // BCT 2078 batch — roll format: 078BCTXXX
+    // ── BACHELOR STUDENTS (indices 0-29) ──
     { fn: 'Aarav', ln: 'Khadka', roll: '078BCT001' },
     { fn: 'Binita', ln: 'Shrestha', roll: '078BCT002' },
     { fn: 'Chandra', ln: 'Thapa', roll: '078BCT003' },
@@ -112,7 +145,7 @@ async function main() {
     { fn: 'Madhav', ln: 'Bastola', roll: '078BCT013' },
     { fn: 'Nisha', ln: 'Lama', roll: '078BCT014' },
     { fn: 'Om', ln: 'Pandey', roll: '078BCT015' },
-    // BCT 2080 batch
+    // BCT 2080 batch (roll: 080BCTXXX)
     { fn: 'Pooja', ln: 'Magar', roll: '080BCT001' },
     { fn: 'Rabi', ln: 'Koirala', roll: '080BCT002' },
     { fn: 'Sita', ln: 'Bhattarai', roll: '080BCT003' },
@@ -129,13 +162,14 @@ async function main() {
     { fn: 'Sarita', ln: 'Oli', roll: '080BEX003' },
     { fn: 'Nabin', ln: 'Chalise', roll: '080BEX004' },
     { fn: 'Reema', ln: 'Pathak', roll: '080BEX005' },
-    // BCT 2081 batch
+    // ── MASTER THESIS STUDENTS (indices 30-35) ──
     { fn: 'Anup', ln: 'Baral', roll: '081BCT001' },
     { fn: 'Bhawana', ln: 'Sapkota', roll: '081BCT002' },
     { fn: 'Dinesh', ln: 'Parajuli', roll: '081BCT003' },
     { fn: 'Elina', ln: 'Maskey', roll: '081BCT004' },
     { fn: 'Firoj', ln: 'Ansari', roll: '081BCT005' },
     { fn: 'Gita', ln: 'Neupane', roll: '081BCT006' },
+    // ── UNASSIGNED STUDENTS (indices 36-39) ──
     { fn: 'Hari', ln: 'Bohora', roll: '081BCT007' },
     { fn: 'Isha', ln: 'Adhikari', roll: '081BCT008' },
     { fn: 'Jeevan', ln: 'Bhandari', roll: '081BCT009' },
@@ -155,10 +189,22 @@ async function main() {
     });
     students.push(student);
   }
-  console.log(`Created ${students.length} students`);
+  console.log(`Created ${students.length} students (30 bachelor, 6 master, 4 unassigned)`);
+
+  // Helper to attach the 5 default components to a group/thesis
+  async function attachComponents({ groupId, thesisId }) {
+    const out = {};
+    for (const c of EVALUATION_COMPONENTS) {
+      const created = await prisma.evaluationComponent.create({
+        data: { ...c, groupId, thesisId, createdById: maintainer.id },
+      });
+      out[c.evaluationType] = created;
+    }
+    return out;
+  }
 
   // ============================================================
-  // PROJECT GROUPS — Bachelor (15 groups, 3 students each)
+  // BACHELOR PROJECT GROUPS (10 groups × 3 students = 30 students)
   // ============================================================
   const groupDefs = [
     { name: 'AlphaDev', title: 'AI-Powered Code Review Assistant for Nepali Developers', ay: ayBCT['2080'] },
@@ -171,117 +217,201 @@ async function main() {
     { name: 'CyberShield', title: 'Network Intrusion Detection for Government ISPs', ay: ayBCT['2078'] },
     { name: 'GreenCompute', title: 'Energy-Efficient Edge Computing Framework', ay: ayBCT['2078'] },
     { name: 'AutoBibaran', title: 'Automated Report Generation for Local Wards using NLP', ay: ayBCT['2078'] },
-    { name: 'SwasthaSathi', title: 'Mental Health Chatbot in Nepali Language', ay: ayBCT['2081'] },
-    { name: 'SmartClass', title: 'Classroom Attendance via Facial Recognition', ay: ayBCT['2081'] },
-    { name: 'RouteOpt', title: 'GPS-based Route Optimization for Kathmandu Logistics', ay: ayBCT['2081'] },
-    { name: 'Bibechana', title: 'Semantic Search Engine for Nepali Research Papers', ay: ayBCT['2081'] },
-    { name: 'Samparka', title: 'Disaster Response Coordination Platform', ay: ayBEX },
   ];
 
   const createdGroups = [];
   for (let i = 0; i < groupDefs.length; i++) {
     const g = groupDefs[i];
-    const sup = i < 12 ? supervisors[i % supervisors.length] : null;
+    const sup = supervisors[i % supervisors.length];
 
     const group = await prisma.projectGroup.create({
       data: {
         name: g.name,
         projectTitle: g.title,
-        status: sup ? 'ACTIVE' : 'PENDING',
-        supervisorId: sup?.id || null,
+        status: 'ACTIVE',
+        supervisorId: sup.id,
         academicYearId: g.ay.id,
       },
     });
 
-    // 3 students per group
+    // 3 bachelor students per group
     for (let m = 0; m < 3; m++) {
-      const si = (i * 3 + m) % students.length;
+      const si = i * 3 + m;
       const student = students[si];
       const studentDef = studentDefs[si];
       await prisma.groupMember.create({
-        data: {
-          studentId: student.id,
-          groupId: group.id,
-          rollNumber: studentDef.roll,
-        },
+        data: { studentId: student.id, groupId: group.id, rollNumber: studentDef.roll },
       });
     }
 
-    // Default evaluation components
-    const defaults = [
-      { name: 'Supervisor', maxMarks: 25 },
-      { name: 'Proposal Defense', maxMarks: 5 },
-      { name: 'Mid-Term Defense', maxMarks: 5 },
-      { name: 'Final Defense', maxMarks: 5 },
-      { name: 'Internal Examiner', maxMarks: 10 },
-    ];
-    for (const comp of defaults) {
-      await prisma.evaluationComponent.create({
-        data: { ...comp, groupId: group.id, createdById: maintainer.id },
-      });
-    }
+    await attachComponents({ groupId: group.id });
     createdGroups.push(group);
   }
-  console.log(`Created ${createdGroups.length} project groups (3 students each)`);
+  console.log(`Created ${createdGroups.length} bachelor project groups (3 students each)`);
 
   // ============================================================
-  // MASTER THESES (6)
+  // MASTER THESES (6 — students 30-35)
   // ============================================================
-  // Use students 15-20 (080BCT001 to 080BCT006) for master theses
   const thesisDefs = [
-    { title: 'Deep Learning for Nepali Handwriting Recognition', studentIdx: 15, supIdx: 0 },
-    { title: 'Optimizing Transformer Models for Low-Resource Nepali Languages', studentIdx: 16, supIdx: 1 },
-    { title: 'Federated Learning for Privacy-Preserving Healthcare in Nepal', studentIdx: 17, supIdx: 2 },
-    { title: 'Explainable AI for Credit Risk Assessment in Nepali Banks', studentIdx: 18, supIdx: 3 },
-    { title: 'Autonomous Navigation using Reinforcement Learning for Nepali Terrain', studentIdx: 19, supIdx: 4 },
-    { title: 'GAN-based Medical Image Augmentation for Rural Diagnostics', studentIdx: 20, supIdx: 5 },
+    { title: 'Deep Learning for Nepali Handwriting Recognition', supIdx: 0 },
+    { title: 'Optimizing Transformer Models for Low-Resource Nepali Languages', supIdx: 1 },
+    { title: 'Federated Learning for Privacy-Preserving Healthcare in Nepal', supIdx: 2 },
+    { title: 'Explainable AI for Credit Risk Assessment in Nepali Banks', supIdx: 3 },
+    { title: 'Autonomous Navigation using Reinforcement Learning for Nepali Terrain', supIdx: 4 },
+    { title: 'GAN-based Medical Image Augmentation for Rural Diagnostics', supIdx: 5 },
   ];
 
-  for (const t of thesisDefs) {
+  const createdTheses = [];
+  for (let i = 0; i < thesisDefs.length; i++) {
+    const t = thesisDefs[i];
+    const studentIdx = 30 + i;
     const thesis = await prisma.thesis.create({
       data: {
         title: t.title,
-        studentId: students[t.studentIdx].id,
+        studentId: students[studentIdx].id,
         status: 'ACTIVE',
         supervisorId: supervisors[t.supIdx].id,
         academicYearId: ayBCT['2080'].id,
       },
     });
-    const defaults = [
-      { name: 'Supervisor', maxMarks: 25 },
-      { name: 'Proposal Defense', maxMarks: 5 },
-      { name: 'Mid-Term Defense', maxMarks: 5 },
-      { name: 'Final Defense', maxMarks: 5 },
-      { name: 'Internal Examiner', maxMarks: 10 },
-    ];
-    for (const comp of defaults) {
-      await prisma.evaluationComponent.create({
-        data: { ...comp, thesisId: thesis.id, createdById: maintainer.id },
-      });
-    }
+    await attachComponents({ thesisId: thesis.id });
+    createdTheses.push(thesis);
   }
   console.log(`Created ${thesisDefs.length} master theses`);
 
   // ============================================================
-  // SAMPLE EVALUATIONS (first 5 assigned groups)
+  // SAMPLE SUBMISSIONS & EVALUATIONS for the first 5 groups
+  // Each role evaluates its own component via componentId.
   // ============================================================
   for (let i = 0; i < 5 && i < createdGroups.length; i++) {
     const g = createdGroups[i];
-    if (g.supervisorId) {
-      await prisma.evaluation.create({
-        data: { stage: 'PROPOSAL', marks: 4.2, comment: 'Well-structured proposal. Refine methodology and add more references.', submittedById: g.supervisorId, groupId: g.id },
-      });
-      await prisma.evaluation.create({
-        data: { stage: 'MID_TERM', marks: 3.8, comment: 'Good progress. Work on data collection and analysis.', submittedById: g.supervisorId, groupId: g.id },
-      });
-      await prisma.proposal.create({
-        data: { stage: 'PROPOSAL', supervisorComment: 'Solid topic. Consider adding literature from Nepali context.', submittedById: g.supervisorId, groupId: g.id },
-      });
-    }
+    if (!g.supervisorId) continue;
+
+    // Pull the components for this group
+    const components = await prisma.evaluationComponent.findMany({ where: { groupId: g.id } });
+    const compByType = Object.fromEntries(components.map(c => [c.evaluationType, c]));
+
+    // 1. Student submits proposal document
+    const groupMemberStudent = students[i * 3];
+    await prisma.proposal.create({
+      data: { stage: 'PROPOSAL', documentUrl: '/api/files/groups/sample_proposal.pdf', submittedById: groupMemberStudent.id, groupId: g.id },
+    });
+
+    // 2. Coordinator enters Proposal Defense marks (out of 5)
+    await prisma.evaluation.create({
+      data: {
+        componentId: compByType.PROPOSAL_DEFENSE.id,
+        stage: 'PROPOSAL',
+        evaluationType: 'PROPOSAL_DEFENSE',
+        marks: 4.0,
+        comment: 'Strong defense presentation.',
+        submittedById: coord.id,
+        groupId: g.id,
+      },
+    });
+
+    // 3. Coordinator enters Mid-Term Defense marks (out of 5)
+    await prisma.evaluation.create({
+      data: {
+        componentId: compByType.MIDTERM_DEFENSE.id,
+        stage: 'MID_TERM',
+        evaluationType: 'MIDTERM_DEFENSE',
+        marks: 3.5,
+        comment: 'Progress is on track.',
+        submittedById: coord.id,
+        groupId: g.id,
+      },
+    });
+
+    // 4. Supervisor enters Supervisor marks (out of 25) — single row per component
+    await prisma.evaluation.create({
+      data: {
+        componentId: compByType.SUPERVISOR.id,
+        stage: 'FINAL',
+        evaluationType: 'SUPERVISOR',
+        marks: 21.5,
+        comment: 'Well-structured proposal. Consistently high performance throughout the semester.',
+        submittedById: g.supervisorId,
+        groupId: g.id,
+      },
+    });
+
+    // 5. Internal Examiner (EXTERNAL_EXAMINER) enters Internal Examiner marks (out of 10)
+    const examiner = externalExaminers[i % externalExaminers.length];
+    await prisma.evaluation.create({
+      data: {
+        componentId: compByType.EXTERNAL_EXAMINER.id,
+        stage: 'FINAL',
+        evaluationType: 'EXTERNAL_EXAMINER',
+        marks: 8.0,
+        comment: 'Solid technical implementation and well-written final report.',
+        submittedById: examiner.id,
+        groupId: g.id,
+      },
+    });
+
+    // 6. Coordinator enters Final Defense marks (out of 5)
+    await prisma.evaluation.create({
+      data: {
+        componentId: compByType.FINAL_DEFENSE.id,
+        stage: 'FINAL',
+        evaluationType: 'FINAL_DEFENSE',
+        marks: 4.5,
+        comment: 'Confident final defense with clear demonstration.',
+        submittedById: coord.id,
+        groupId: g.id,
+      },
+    });
   }
+  console.log('Created sample submissions & feedback for first 5 groups');
 
   // ============================================================
-  // EXTERNAL EXAMINERS
+  // EXAMINER ASSIGNMENTS (assign external examiners to first 5 groups + first 3 theses)
+  // ============================================================
+  for (let i = 0; i < 5 && i < createdGroups.length; i++) {
+    const g = createdGroups[i];
+    const examiner = externalExaminers[i % externalExaminers.length];
+    await prisma.examinerAssignment.create({
+      data: { externalExaminerId: examiner.id, groupId: g.id, assignedById: coord.id },
+    });
+  }
+  for (let i = 0; i < Math.min(3, createdTheses.length); i++) {
+    const thesis = createdTheses[i];
+    const examiner = externalExaminers[i % externalExaminers.length];
+    await prisma.examinerAssignment.create({
+      data: { externalExaminerId: examiner.id, thesisId: thesis.id, assignedById: coord.id },
+    });
+  }
+  console.log('Created examiner assignments');
+
+  // ============================================================
+  // NOTIFICATIONS for some students
+  // ============================================================
+  await prisma.notification.create({
+    data: {
+      type: 'SUPERVISOR_ASSIGNED',
+      message: 'Supervisor Prabesh Bhattarai has been assigned to your group AlphaDev.',
+      userId: students[0].id,
+    },
+  });
+  await prisma.notification.create({
+    data: {
+      type: 'FEEDBACK',
+      message: 'Supervisor provided feedback on your Proposal stage.',
+      userId: students[0].id,
+    },
+  });
+  await prisma.notification.create({
+    data: {
+      type: 'SUPERVISOR_ASSIGNED',
+      message: 'Supervisor Prabesh Bhattarai has been assigned to your thesis.',
+      userId: students[30].id,
+    },
+  });
+  console.log('Created sample notifications');
+
+  // ============================================================
+  // EXTERNAL EXAMINER ENTRIES (reference records, separate from Users)
   // ============================================================
   await prisma.externalExaminer.create({
     data: { name: 'Dr. Hari Adhikari', email: 'hari.adhikari@ioe.edu.np', phone: '9851122334', department: 'Computer Engineering' },
@@ -291,13 +421,16 @@ async function main() {
   });
 
   console.log('\n=== SEED COMPLETE ===');
-  console.log('Login credentials:');
-  console.log('  MAINTAINER: subeshgaming@gmail.com / subesh');
-  console.log('  COORDINATOR: coordinator@pcampus.edu.np / subesh');
-  console.log('  SUPERVISORS: all use password subesh');
-  console.log('  STUDENTS:    <roll>@pcampus.edu.np / subesh (e.g. 078bct001@pcampus.edu.np)');
-  console.log(`\nTotal: 1 maintainer, 1 coordinator, ${supervisors.length} supervisors, ${students.length} students`);
-  console.log(`${createdGroups.length} project groups (3 students each), ${thesisDefs.length} master theses`);
+  console.log('Login credentials (all use password: subesh):');
+  console.log('  MAINTAINER:          subeshgaming@gmail.com');
+  console.log('  COORDINATOR:         coordinator@pcampus.edu.np');
+  console.log('  SUPERVISOR:          <any supervisor email>');
+  console.log('  INTERNAL EXAMINER:   hari.adhikari@ioe.edu.np');
+  console.log('  BACHELOR STUDENT:    078bct001@pcampus.edu.np');
+  console.log('  MASTER STUDENT:      081bct001@pcampus.edu.np');
+  console.log(`\nTotal: 1 maintainer, 1 coordinator, ${supervisors.length} supervisors, 2 internal examiners`);
+  console.log(`30 bachelor students (10 groups × 3), 6 master students, 4 unassigned students`);
+  console.log(`Evaluation scheme: Supervisor 25 + Proposal 5 + Mid-Term 5 + Final 5 + Internal Examiner 10 = 50 marks`);
 }
 
 main()
