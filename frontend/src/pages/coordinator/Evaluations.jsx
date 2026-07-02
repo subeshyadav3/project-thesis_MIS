@@ -408,20 +408,15 @@ function Evaluations() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ minWidth: 1100 }}>
+            <table style={{ minWidth: 700 }}>
               <thead>
                 <tr>
                   <th style={{ width: 150 }}>{viewMode === 'bachelor' ? 'Group' : 'Student'}</th>
                   <th style={{ width: 220 }}>Project / Thesis</th>
                   <th style={{ width: 140 }}>Supervisor</th>
-                  <th style={{ textAlign: 'center' }}>Supervisor<br/>(25)</th>
-                  <th style={{ textAlign: 'center' }}>Proposal<br/>(5)</th>
-                  <th style={{ textAlign: 'center' }}>Mid-Term<br/>(5)</th>
-                  <th style={{ textAlign: 'center' }}>Final<br/>(5)</th>
-                  <th style={{ textAlign: 'center' }}>Internal<br/>(10)</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
                   <th style={{ textAlign: 'center' }}>Total</th>
-                  <th style={{ width: 220, textAlign: 'center' }}>Actions</th>
+                  <th className="sticky-right" style={{ width: 220, textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -439,11 +434,6 @@ function Evaluations() {
                       <td style={{ fontWeight: 500 }}>{item.name}</td>
                       <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{item.project}</td>
                       <td style={{ fontSize: 13 }}>{item.supervisorName}</td>
-                      <td style={{ textAlign: 'center' }}><ComponentCell evaluation={byType('SUPERVISOR')} maxMarks={25} /></td>
-                      <td style={{ textAlign: 'center' }}><ComponentCell evaluation={byType('PROPOSAL_DEFENSE')} maxMarks={5} /></td>
-                      <td style={{ textAlign: 'center' }}><ComponentCell evaluation={byType('MIDTERM_DEFENSE')} maxMarks={5} /></td>
-                      <td style={{ textAlign: 'center' }}><ComponentCell evaluation={byType('FINAL_DEFENSE')} maxMarks={5} /></td>
-                      <td style={{ textAlign: 'center' }}><ComponentCell evaluation={byType('EXTERNAL_EXAMINER')} maxMarks={10} /></td>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                           <span style={{ fontSize: 11, fontWeight: 600, color: statusColor, textTransform: 'uppercase', letterSpacing: 0.4 }}>
@@ -460,16 +450,15 @@ function Evaluations() {
                         <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}> / 50</span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all 5 components">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                          <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all 5 components" style={{ minWidth: 32, padding: '6px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
                           </button>
-                          <button className="btn btn-primary btn-sm" onClick={() => handleOpenDefenseModal(item)} title="Enter defense marks">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit_note</span>
-                            Defense
+                          <button className="btn btn-primary btn-sm" onClick={() => handleOpenDefenseModal(item)} title="Enter defense marks" style={{ minWidth: 32, padding: '6px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>edit_note</span>
                           </button>
-                          <button className="btn btn-outline btn-sm" onClick={() => handlePrintSingle(item)} title="Print / Save PDF" disabled={done === 0}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>print</span>
+                          <button className="btn btn-outline btn-sm" onClick={() => handlePrintSingle(item)} title="Print / Save PDF" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>print</span>
                           </button>
                         </div>
                       </td>
@@ -589,10 +578,25 @@ function Evaluations() {
                   </div>
                 );
               })}
-              <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>Grand Total</span>
-                  <span style={{ fontSize: 28, fontWeight: 800 }}>{totalMarks(selectedItem).toFixed(1)}<span style={{ fontSize: 14, fontWeight: 400 }}> / 50</span></span>
+              <div style={{
+                marginTop: 14, padding: 0, borderRadius: 12, overflow: 'hidden',
+                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                display: 'flex', alignItems: 'stretch',
+              }}>
+                <div style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#94a3b8' }}>award_star</span>
+                    <span style={{ fontWeight: 600, fontSize: 12, color: '#94a3b8', letterSpacing: 0.5, textTransform: 'uppercase' }}>Grand Total</span>
+                  </div>
+                </div>
+                <div style={{
+                  padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'rgba(255,255,255,0.06)', borderLeft: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <span style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
+                    {totalMarks(selectedItem).toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginTop: 10 }}>/ 50</span>
                 </div>
               </div>
             </div>
@@ -622,20 +626,6 @@ function Evaluations() {
         </div>
       )}
     </PageLayout>
-  );
-}
-
-function ComponentCell({ evaluation, maxMarks }) {
-  if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
-    return <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>;
-  }
-  const pct = (evaluation.marks / maxMarks) * 100;
-  const color = pct >= 75 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-primary)' : 'var(--color-warning)';
-  return (
-    <span style={{ fontWeight: 600, color }}>
-      {Number(evaluation.marks).toFixed(1)}
-      <span style={{ color: 'var(--color-on-surface-variant)', fontWeight: 400, fontSize: 11 }}> / {maxMarks}</span>
-    </span>
   );
 }
 

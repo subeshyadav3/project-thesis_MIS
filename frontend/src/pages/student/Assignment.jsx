@@ -162,17 +162,30 @@ function StudentProjectDetail() {
 
             {showMarks ? (
               <div style={{
-                padding: 14, borderRadius: 10,
-                background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: 0, borderRadius: 12, overflow: 'hidden',
+                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                display: 'flex', alignItems: 'stretch',
               }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>Final Total</div>
-                  <div style={{ fontSize: 11 }}>Sum of all 5 evaluation components</div>
+                <div style={{
+                  padding: '16px 20px', flex: 1,
+                  display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#94a3b8' }}>award_star</span>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: '#94a3b8', letterSpacing: 0.5, textTransform: 'uppercase' }}>Grand Total</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginLeft: 26 }}>Sum of all 5 evaluation components</div>
                 </div>
-                <div style={{ fontSize: 32, fontWeight: 800 }}>
-                  {totalMarks.toFixed(1)}
-                  <span style={{ fontSize: 14, fontWeight: 400 }}> / 50</span>
+                <div style={{
+                  padding: '16px 28px',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'rgba(255,255,255,0.06)',
+                  borderLeft: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <span style={{ fontSize: 38, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
+                    {totalMarks.toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 500, color: '#64748b', marginTop: 12 }}>/ 50</span>
                 </div>
               </div>
             ) : (
