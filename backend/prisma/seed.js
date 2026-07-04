@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const { getDefaultComponents } = require('../src/config/evaluationScheme');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
@@ -17,20 +18,12 @@ const EVALUATION_COMPONENTS = [
   { name: 'Internal Examiner',  evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER', maxMarks: 10 },
 ];
 
-const STAGE_BY_TYPE = {
-  SUPERVISOR: 'FINAL',
-  PROPOSAL_DEFENSE: 'PROPOSAL',
-  MIDTERM_DEFENSE: 'MID_TERM',
-  FINAL_DEFENSE: 'FINAL',
-  EXTERNAL_EXAMINER: 'FINAL',
-};
-// (kept for reference; stage is now derived from evaluationType in the controller)
-
 async function main() {
   console.log('Seeding database...');
 
   // Clean existing data
   await prisma.recommendation.deleteMany();
+  await prisma.examinerAssignment.deleteMany();
   await prisma.proposal.deleteMany();
   await prisma.evaluation.deleteMany();
   await prisma.evaluationComponent.deleteMany();
@@ -127,53 +120,53 @@ async function main() {
   }
   console.log(`Created ${externalExamDefs.length} external examiners (Internal Examiners)`);
 
-  // Students — 40 total: 30 bachelor, 6 master, 4 unassigned
+  // Students — 44 total: 30 bachelor, 6 master, 4 unassigned, 2 test, 2 dummy
   const studentDefs = [
     // ── BACHELOR STUDENTS (indices 0-29) ──
-    { fn: 'Aarav', ln: 'Khadka', roll: '078BCT001' },
-    { fn: 'Binita', ln: 'Shrestha', roll: '078BCT002' },
-    { fn: 'Chandra', ln: 'Thapa', roll: '078BCT003' },
-    { fn: 'Deepa', ln: 'Poudel', roll: '078BCT004' },
-    { fn: 'Ekaraj', ln: 'Rana', roll: '078BCT005' },
-    { fn: 'Falguni', ln: 'Neupane', roll: '078BCT006' },
-    { fn: 'Ganesh', ln: 'Bhandari', roll: '078BCT007' },
-    { fn: 'Hima', ln: 'Acharya', roll: '078BCT008' },
-    { fn: 'Indra', ln: 'Joshi', roll: '078BCT009' },
-    { fn: 'Janaki', ln: 'Dahal', roll: '078BCT010' },
-    { fn: 'Krishna', ln: 'Pokharel', roll: '078BCT011' },
-    { fn: 'Laxmi', ln: 'Regmi', roll: '078BCT012' },
-    { fn: 'Madhav', ln: 'Bastola', roll: '078BCT013' },
-    { fn: 'Nisha', ln: 'Lama', roll: '078BCT014' },
-    { fn: 'Om', ln: 'Pandey', roll: '078BCT015' },
+    { fn: 'Aarav', ln: 'Khadka', roll: '078BCT001', degreeType: 'BACHELOR' },
+    { fn: 'Binita', ln: 'Shrestha', roll: '078BCT002', degreeType: 'BACHELOR' },
+    { fn: 'Chandra', ln: 'Thapa', roll: '078BCT003', degreeType: 'BACHELOR' },
+    { fn: 'Deepa', ln: 'Poudel', roll: '078BCT004', degreeType: 'BACHELOR' },
+    { fn: 'Ekaraj', ln: 'Rana', roll: '078BCT005', degreeType: 'BACHELOR' },
+    { fn: 'Falguni', ln: 'Neupane', roll: '078BCT006', degreeType: 'BACHELOR' },
+    { fn: 'Ganesh', ln: 'Bhandari', roll: '078BCT007', degreeType: 'BACHELOR' },
+    { fn: 'Hima', ln: 'Acharya', roll: '078BCT008', degreeType: 'BACHELOR' },
+    { fn: 'Indra', ln: 'Joshi', roll: '078BCT009', degreeType: 'BACHELOR' },
+    { fn: 'Janaki', ln: 'Dahal', roll: '078BCT010', degreeType: 'BACHELOR' },
+    { fn: 'Krishna', ln: 'Pokharel', roll: '078BCT011', degreeType: 'BACHELOR' },
+    { fn: 'Laxmi', ln: 'Regmi', roll: '078BCT012', degreeType: 'BACHELOR' },
+    { fn: 'Madhav', ln: 'Bastola', roll: '078BCT013', degreeType: 'BACHELOR' },
+    { fn: 'Nisha', ln: 'Lama', roll: '078BCT014', degreeType: 'BACHELOR' },
+    { fn: 'Om', ln: 'Pandey', roll: '078BCT015', degreeType: 'BACHELOR' },
     // BCT 2080 batch (roll: 080BCTXXX)
-    { fn: 'Pooja', ln: 'Magar', roll: '080BCT001' },
-    { fn: 'Rabi', ln: 'Koirala', roll: '080BCT002' },
-    { fn: 'Sita', ln: 'Bhattarai', roll: '080BCT003' },
-    { fn: 'Tika', ln: 'Adhikari', roll: '080BCT004' },
-    { fn: 'Usha', ln: 'Dhami', roll: '080BCT005' },
-    { fn: 'Bibek', ln: 'Chaudhary', roll: '080BCT006' },
-    { fn: 'Muna', ln: 'Gautam', roll: '080BCT007' },
-    { fn: 'Rajan', ln: 'Puri', roll: '080BCT008' },
-    { fn: 'Sushma', ln: 'Karki', roll: '080BCT009' },
-    { fn: 'Dipesh', ln: 'Giri', roll: '080BCT010' },
+    { fn: 'Pooja', ln: 'Magar', roll: '080BCT001', degreeType: 'BACHELOR' },
+    { fn: 'Rabi', ln: 'Koirala', roll: '080BCT002', degreeType: 'BACHELOR' },
+    { fn: 'Sita', ln: 'Bhattarai', roll: '080BCT003', degreeType: 'BACHELOR' },
+    { fn: 'Tika', ln: 'Adhikari', roll: '080BCT004', degreeType: 'BACHELOR' },
+    { fn: 'Usha', ln: 'Dhami', roll: '080BCT005', degreeType: 'BACHELOR' },
+    { fn: 'Bibek', ln: 'Chaudhary', roll: '080BCT006', degreeType: 'BACHELOR' },
+    { fn: 'Muna', ln: 'Gautam', roll: '080BCT007', degreeType: 'BACHELOR' },
+    { fn: 'Rajan', ln: 'Puri', roll: '080BCT008', degreeType: 'BACHELOR' },
+    { fn: 'Sushma', ln: 'Karki', roll: '080BCT009', degreeType: 'BACHELOR' },
+    { fn: 'Dipesh', ln: 'Giri', roll: '080BCT010', degreeType: 'BACHELOR' },
     // BEX 2080 batch
-    { fn: 'Kabita', ln: 'Bista', roll: '080BEX001' },
-    { fn: 'Yubaraj', ln: 'Dhakal', roll: '080BEX002' },
-    { fn: 'Sarita', ln: 'Oli', roll: '080BEX003' },
-    { fn: 'Nabin', ln: 'Chalise', roll: '080BEX004' },
-    { fn: 'Reema', ln: 'Pathak', roll: '080BEX005' },
+    { fn: 'Kabita', ln: 'Bista', roll: '080BEX001', degreeType: 'BACHELOR' },
+    { fn: 'Yubaraj', ln: 'Dhakal', roll: '080BEX002', degreeType: 'BACHELOR' },
+    { fn: 'Sarita', ln: 'Oli', roll: '080BEX003', degreeType: 'BACHELOR' },
+    { fn: 'Nabin', ln: 'Chalise', roll: '080BEX004', degreeType: 'BACHELOR' },
+    { fn: 'Reema', ln: 'Pathak', roll: '080BEX005', degreeType: 'BACHELOR' },
     // ── MASTER THESIS STUDENTS (indices 30-35) ──
-    { fn: 'Anup', ln: 'Baral', roll: '081BCT001' },
-    { fn: 'Bhawana', ln: 'Sapkota', roll: '081BCT002' },
-    { fn: 'Dinesh', ln: 'Parajuli', roll: '081BCT003' },
-    { fn: 'Elina', ln: 'Maskey', roll: '081BCT004' },
-    { fn: 'Firoj', ln: 'Ansari', roll: '081BCT005' },
-    { fn: 'Gita', ln: 'Neupane', roll: '081BCT006' },
+    { fn: 'Anup', ln: 'Baral', roll: '081BCT001', degreeType: 'MASTER' },
+    { fn: 'Bhawana', ln: 'Sapkota', roll: '081BCT002', degreeType: 'MASTER' },
+    { fn: 'Dinesh', ln: 'Parajuli', roll: '081BCT003', degreeType: 'MASTER' },
+    { fn: 'Elina', ln: 'Maskey', roll: '081BCT004', degreeType: 'MASTER' },
+    { fn: 'Firoj', ln: 'Ansari', roll: '081BCT005', degreeType: 'MASTER' },
+    { fn: 'Gita', ln: 'Neupane', roll: '081BCT006', degreeType: 'MASTER' },
     // ── UNASSIGNED STUDENTS (indices 36-39) ──
-    { fn: 'Hari', ln: 'Bohora', roll: '081BCT007' },
-    { fn: 'Isha', ln: 'Adhikari', roll: '081BCT008' },
-    { fn: 'Jeevan', ln: 'Bhandari', roll: '081BCT009' },
-    { fn: 'Kamala', ln: 'Poudel', roll: '081BCT010' },
+    { fn: 'Hari', ln: 'Bohora', roll: '081BCT007', degreeType: 'BACHELOR' },
+    { fn: 'Isha', ln: 'Adhikari', roll: '081BCT008', degreeType: 'BACHELOR' },
+    { fn: 'Jeevan', ln: 'Bhandari', roll: '081BCT009', degreeType: 'BACHELOR' },
+    { fn: 'Kamala', ln: 'Poudel', roll: '081BCT010', degreeType: 'BACHELOR' },
   ];
 
   const students = [];
@@ -185,16 +178,18 @@ async function main() {
         firstName: s.fn,
         lastName: s.ln,
         role: 'STUDENT',
+        degreeType: s.degreeType,
       },
     });
     students.push(student);
   }
   console.log(`Created ${students.length} students (30 bachelor, 6 master, 4 unassigned)`);
 
-  // Helper to attach the 5 default components to a group/thesis
-  async function attachComponents({ groupId, thesisId }) {
+  // Helper to attach default components based on project type
+  async function attachComponents({ groupId, thesisId, projectType }) {
     const out = {};
-    for (const c of EVALUATION_COMPONENTS) {
+    const defaults = getDefaultComponents(projectType || 'MINOR');
+    for (const c of defaults) {
       const created = await prisma.evaluationComponent.create({
         data: { ...c, groupId, thesisId, createdById: maintainer.id },
       });
@@ -228,6 +223,7 @@ async function main() {
       data: {
         name: g.name,
         projectTitle: g.title,
+        projectType: 'MINOR',
         status: 'ACTIVE',
         supervisorId: sup.id,
         academicYearId: g.ay.id,
@@ -244,7 +240,7 @@ async function main() {
       });
     }
 
-    await attachComponents({ groupId: group.id });
+    await attachComponents({ groupId: group.id, projectType: 'MINOR' });
     createdGroups.push(group);
   }
   console.log(`Created ${createdGroups.length} bachelor project groups (3 students each)`);
@@ -268,13 +264,14 @@ async function main() {
     const thesis = await prisma.thesis.create({
       data: {
         title: t.title,
+        projectType: 'MASTER',
         studentId: students[studentIdx].id,
         status: 'ACTIVE',
         supervisorId: supervisors[t.supIdx].id,
         academicYearId: ayBCT['2080'].id,
       },
     });
-    await attachComponents({ thesisId: thesis.id });
+    await attachComponents({ thesisId: thesis.id, projectType: 'MASTER' });
     createdTheses.push(thesis);
   }
   console.log(`Created ${thesisDefs.length} master theses`);
@@ -305,6 +302,7 @@ async function main() {
         evaluationType: 'PROPOSAL_DEFENSE',
         marks: 4.0,
         comment: 'Strong defense presentation.',
+        status: 'COMPLETED',
         submittedById: coord.id,
         groupId: g.id,
       },
@@ -318,6 +316,7 @@ async function main() {
         evaluationType: 'MIDTERM_DEFENSE',
         marks: 3.5,
         comment: 'Progress is on track.',
+        status: 'COMPLETED',
         submittedById: coord.id,
         groupId: g.id,
       },
@@ -331,6 +330,7 @@ async function main() {
         evaluationType: 'SUPERVISOR',
         marks: 21.5,
         comment: 'Well-structured proposal. Consistently high performance throughout the semester.',
+        status: 'COMPLETED',
         submittedById: g.supervisorId,
         groupId: g.id,
       },
@@ -345,6 +345,7 @@ async function main() {
         evaluationType: 'EXTERNAL_EXAMINER',
         marks: 8.0,
         comment: 'Solid technical implementation and well-written final report.',
+        status: 'COMPLETED',
         submittedById: examiner.id,
         groupId: g.id,
       },
@@ -358,9 +359,17 @@ async function main() {
         evaluationType: 'FINAL_DEFENSE',
         marks: 4.5,
         comment: 'Confident final defense with clear demonstration.',
+        status: 'COMPLETED',
         submittedById: coord.id,
         groupId: g.id,
       },
+    });
+  }
+  // Mark first 5 groups as COMPLETED since all evaluations are done
+  for (let i = 0; i < 5 && i < createdGroups.length; i++) {
+    await prisma.projectGroup.update({
+      where: { id: createdGroups[i].id },
+      data: { status: 'COMPLETED' },
     });
   }
   console.log('Created sample submissions & feedback for first 5 groups');
@@ -420,17 +429,98 @@ async function main() {
     data: { name: 'Prof. Suman Bhattarai', email: 'suman.bhattarai@ioe.edu.np', phone: '9845566778', department: 'Computer Engineering' },
   });
 
+  // ============================================================
+  // TEST USERS with simple emails for easy testing
+  // ============================================================
+  const testSup = await prisma.user.create({
+    data: { email: 'supervisor@test.com', password: hash, firstName: 'Test', lastName: 'Supervisor', role: 'SUPERVISOR' },
+  });
+  const testExaminer = await prisma.user.create({
+    data: { email: 'examiner@test.com', password: hash, firstName: 'Test', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER' },
+  });
+  const testBachelorStu = await prisma.user.create({
+    data: { email: 'bachelor@test.com', password: hash, firstName: 'Bach', lastName: 'Student', role: 'STUDENT', degreeType: 'BACHELOR' },
+  });
+  const testMasterStu = await prisma.user.create({
+    data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER' },
+  });
+
+  // Create a MAJOR project group to test 100-mark scheme
+  const majorGroup = await prisma.projectGroup.create({
+    data: {
+      name: 'MajorTest',
+      projectTitle: 'Major Project Test — Advanced ML System',
+      projectType: 'MAJOR',
+      status: 'ACTIVE',
+      supervisorId: testSup.id,
+      academicYearId: ayBCT['2080'].id,
+    },
+  });
+  // Add 2 students to the major group
+  for (const s of [testBachelorStu, students[students.length - 1]]) {
+    await prisma.groupMember.create({
+      data: { studentId: s.id, groupId: majorGroup.id, rollNumber: s.id === testBachelorStu.id ? 'TEST001' : 'TEST002' },
+    });
+  }
+  // Attach MAJOR components (100 marks)
+  const majorComponents = await attachComponents({ groupId: majorGroup.id, projectType: 'MAJOR' });
+
+  // Assign external examiner to major group
+  await prisma.examinerAssignment.create({
+    data: { externalExaminerId: testExaminer.id, groupId: majorGroup.id, assignedById: coord.id },
+  });
+
+  // Create a master thesis for test master student
+  const testThesis = await prisma.thesis.create({
+    data: {
+      title: 'Test Master Thesis — AI in Healthcare',
+      projectType: 'MASTER',
+      studentId: testMasterStu.id,
+      status: 'ACTIVE',
+      supervisorId: testSup.id,
+      academicYearId: ayBCT['2080'].id,
+    },
+  });
+  await attachComponents({ thesisId: testThesis.id, projectType: 'MASTER' });
+  await prisma.examinerAssignment.create({
+    data: { externalExaminerId: testExaminer.id, thesisId: testThesis.id, assignedById: coord.id },
+  });
+
+  // Sample evaluations for major group (some components filled)
+  await prisma.evaluation.create({
+    data: {
+      componentId: majorComponents.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR',
+      marks: 42, comment: 'Good progress on the major project.', status: 'COMPLETED',
+      submittedById: testSup.id, groupId: majorGroup.id,
+    },
+  });
+
+  // Sample evaluation for master thesis (supervisor marks - partial)
+  const masterComponents = await prisma.evaluationComponent.findMany({ where: { thesisId: testThesis.id } });
+  const masterSupComp = masterComponents.find(c => c.evaluatorRole === 'SUPERVISOR');
+  if (masterSupComp) {
+    await prisma.evaluation.create({
+      data: {
+        componentId: masterSupComp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR',
+        marks: 85, comment: 'Excellent thesis work with thorough research.', status: 'COMPLETED',
+        submittedById: testSup.id, thesisId: testThesis.id,
+      },
+    });
+  }
+
   console.log('\n=== SEED COMPLETE ===');
   console.log('Login credentials (all use password: subesh):');
   console.log('  MAINTAINER:          subeshgaming@gmail.com');
   console.log('  COORDINATOR:         coordinator@pcampus.edu.np');
-  console.log('  SUPERVISOR:          <any supervisor email>');
-  console.log('  INTERNAL EXAMINER:   hari.adhikari@ioe.edu.np');
-  console.log('  BACHELOR STUDENT:    078bct001@pcampus.edu.np');
-  console.log('  MASTER STUDENT:      081bct001@pcampus.edu.np');
-  console.log(`\nTotal: 1 maintainer, 1 coordinator, ${supervisors.length} supervisors, 2 internal examiners`);
-  console.log(`30 bachelor students (10 groups × 3), 6 master students, 4 unassigned students`);
-  console.log(`Evaluation scheme: Supervisor 25 + Proposal 5 + Mid-Term 5 + Final 5 + Internal Examiner 10 = 50 marks`);
+  console.log('  SUPERVISOR:          supervisor@test.com');
+  console.log('  INTERNAL EXAMINER:   examiner@test.com');
+  console.log('  BACHELOR STUDENT:    bachelor@test.com');
+  console.log('  MASTER STUDENT:      master@test.com');
+  console.log(`\nTotal: 1 maintainer, 1 coordinator, ${supervisors.length + 1} supervisors, 3 internal examiners`);
+  console.log(`30 bachelor students (10 groups × 3), 6 master students, 4 unassigned + 2 test students`);
+  console.log(`Bachelor Minor: Supervisor 25 + Proposal 5 + Mid-Term 5 + Final 5 + Internal Examiner 10 = 50 marks`);
+  console.log(`Bachelor Major: Supervisor 50 + Proposal 10 + Mid-Term 10 + Final 10 + Internal Examiner 20 = 100 marks`);
+  console.log(`Master Thesis: Supervisor 100 + External Examiner 100 = 200 marks`);
 }
 
 main()

@@ -15,7 +15,7 @@ exports.assignExaminerToGroup = async (req, res) => {
         assignedById: req.user.id,
       },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         group: { select: { projectTitle: true } },
       },
     });
@@ -51,7 +51,7 @@ exports.assignExaminerToThesis = async (req, res) => {
         assignedById: req.user.id,
       },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         thesis: { select: { title: true } },
       },
     });
@@ -79,7 +79,7 @@ exports.getAssignedExaminersForGroup = async (req, res) => {
     const assignments = await prisma.examinerAssignment.findMany({
       where: { groupId: parseInt(req.params.id) },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
       },
     });
     res.json(assignments);
@@ -94,7 +94,7 @@ exports.getAssignedExaminersForThesis = async (req, res) => {
     const assignments = await prisma.examinerAssignment.findMany({
       where: { thesisId: parseInt(req.params.id) },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
       },
     });
     res.json(assignments);

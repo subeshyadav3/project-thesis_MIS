@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -16,6 +17,12 @@ const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Not Evaluated' },
 ];
 
+const TYPE_OPTIONS = [
+  { value: 'ALL', label: 'All Types' },
+  { value: 'MINOR', label: 'Minor' },
+  { value: 'MAJOR', label: 'Major' },
+];
+
 const EVAL_STATUS = {
   COMPLETE: 'Evaluated',
   PARTIAL: 'In Progress',
@@ -24,6 +31,7 @@ const EVAL_STATUS = {
 
 function Evaluations() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +43,7 @@ function Evaluations() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = () => {
@@ -103,6 +112,25 @@ function Evaluations() {
     loadData();
   };
 
+  const handleFinalize = async () => {
+    if (!window.confirm('Are you sure you want to finalize this project? This will mark it as COMPLETED and no further changes can be made.')) return;
+    setSaving(true);
+    try {
+      const status = 'COMPLETED';
+      if (viewMode === 'bachelor') {
+        await api.put(`/groups/${selectedItem.id}/status`, { status });
+      } else {
+        await api.put(`/theses/${selectedItem.id}/status`, { status });
+      }
+      toast.success('Project finalized successfully');
+      setShowDefenseModal(false);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Finalize failed');
+    }
+    setSaving(false);
+  };
+
   const findBreakdown = (item) => {
     const components = item.evaluationComponents || [];
     const evaluations = item.evaluations || [];
@@ -114,6 +142,11 @@ function Evaluations() {
 
   const totalMarks = (item) => findBreakdown(item)
     .reduce((sum, b) => sum + (b.evaluation?.marks ?? 0), 0);
+
+  const getMaxTotal = (item) => {
+    if (viewMode === 'master') return 200;
+    return item.projectType === 'MAJOR' ? 100 : 50;
+  };
 
   const completedCountFor = (item) => findBreakdown(item)
     .filter(b => b.evaluation?.marks !== null && b.evaluation?.marks !== undefined).length;
@@ -136,6 +169,7 @@ function Evaluations() {
       ...item,
       name: viewMode === 'bachelor' ? item.name : `${item.student?.firstName} ${item.student?.lastName}`,
       project: viewMode === 'bachelor' ? item.projectTitle : item.title,
+      projectType: viewMode === 'bachelor' ? (item.projectType || 'MINOR') : 'MASTER',
       members: viewMode === 'bachelor'
         ? item.members?.map(m => `${m.student?.firstName} ${m.student?.lastName}`).join(', ')
         : `${item.student?.firstName} ${item.student?.lastName}`,
@@ -143,6 +177,7 @@ function Evaluations() {
         ? item.members?.map(m => m.rollNumber).join(', ')
         : '',
       supervisorName: item.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : 'N/A',
+      status: item.status || 'PENDING',
     }));
   }, [items, viewMode]);
 
@@ -154,6 +189,10 @@ function Evaluations() {
         const status = computeStatus(item);
         if (status !== statusFilter) return false;
       }
+      // Type filter (bachelor only)
+      if (viewMode === 'bachelor' && typeFilter !== 'ALL') {
+        if (item.projectType !== typeFilter) return false;
+      }
       // Search filter across name/project/members/rolls
       if (q) {
         const haystack = `${item.name} ${item.project} ${item.members} ${item.rolls} ${item.supervisorName}`.toLowerCase();
@@ -161,7 +200,7 @@ function Evaluations() {
       }
       return true;
     });
-  }, [processedItems, searchTerm, statusFilter, viewMode]);
+  }, [processedItems, searchTerm, statusFilter, typeFilter, viewMode]);
 
   // Stats
   const total = processedItems.length;
@@ -230,7 +269,7 @@ function Evaluations() {
           <thead><tr><th>Component</th><th>Evaluated By</th><th style="text-align:right">Max</th><th style="text-align:right">Marks</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        <div class="total"><span class="label">Grand Total</span><span class="value">${total.toFixed(1)} / 50</span></div>
+          <div class="total"><span class="label">Grand Total</span><span class="value">${total.toFixed(1)} / ${getMaxTotal(item)}</span></div>
         <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:8px 16px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;">Print</button>
       </body></html>`);
   };
@@ -273,7 +312,7 @@ function Evaluations() {
             <thead><tr><th>Component</th><th>Evaluated By</th><th style="text-align:right">Max</th><th style="text-align:right">Marks</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
-          <div class="total"><span class="label">Grand Total</span><span class="value">${total.toFixed(1)} / 50</span></div>
+        <div class="total"><span class="label">Grand Total</span><span class="value">${total.toFixed(1)} / ${getMaxTotal(item)}</span></div>
         </div>`;
     }).join('<div class="page-break"></div>');
 
@@ -311,30 +350,10 @@ function Evaluations() {
     w.document.close();
   }
 
+  const isCompleted = (item) => computeStatus(item) === 'COMPLETE';
+
   return (
     <PageLayout title="Evaluations" user={user} actions={actions}>
-      {/* Scheme explainer */}
-      <div className="card" style={{ marginBottom: 16, padding: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)' }}>info</span>
-          <h3 style={{ margin: 0, fontSize: 15 }}>Minor Project Evaluation Scheme (50 marks)</h3>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-          {[
-            { name: 'Supervisor', marks: 25, role: 'SUPERVISOR' },
-            { name: 'Proposal Defense', marks: 5, role: 'COORDINATOR' },
-            { name: 'Mid-Term Defense', marks: 5, role: 'COORDINATOR' },
-            { name: 'Final Defense', marks: 5, role: 'COORDINATOR' },
-            { name: 'Internal Examiner', marks: 10, role: 'EXTERNAL_EXAMINER' },
-          ].map(c => (
-            <div key={c.name} style={{ padding: 10, borderRadius: 8, background: 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{c.name}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)', marginTop: 2 }}>{c.marks} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>marks</span></div>
-              <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>Evaluated by <strong style={{ color: 'var(--color-on-surface)' }}>{ROLE_LABEL[c.role]}</strong></div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       <div className="stats-grid" style={{ marginBottom: 16 }}>
         <div className="stat-card bento-card">
@@ -390,6 +409,13 @@ function Evaluations() {
               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          {viewMode === 'bachelor' && (
+            <div className="filter-item" style={{ margin: 0 }}>
+              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+                {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
             {filteredItems.length} of {processedItems.length} shown
           </div>
@@ -422,19 +448,21 @@ function Evaluations() {
               <tbody>
                 {filteredItems.map(item => {
                   const breakdown = findBreakdown(item);
-                  const byType = (type) => breakdown.find(b => b.component.evaluationType === type)?.evaluation;
                   const done = breakdown.filter(b => b.evaluation?.marks !== null && b.evaluation?.marks !== undefined).length;
                   const tot = breakdown.length || 5;
                   const total = totalMarks(item);
                   const status = computeStatus(item);
                   const statusColor = status === 'COMPLETE' ? 'var(--color-success)'
                     : status === 'PARTIAL' ? 'var(--color-warning)' : 'var(--color-on-surface-variant)';
+                  const completed = status === 'COMPLETE';
+                  const rowPath = viewMode === 'bachelor' ? `/coordinator/project/group/${item.id}` : `/coordinator/project/thesis/${item.id}`;
+
                   return (
-                    <tr key={item.id}>
-                      <td style={{ fontWeight: 500 }}>{item.name}</td>
-                      <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{item.project}</td>
-                      <td style={{ fontSize: 13 }}>{item.supervisorName}</td>
-                      <td style={{ textAlign: 'center' }}>
+                    <tr key={item.id} style={{ cursor: 'pointer', opacity: completed ? 0.7 : 1, background: completed ? 'var(--color-surface-container-low)' : 'transparent' }}>
+                      <td style={{ fontWeight: 500 }} onClick={() => navigate(rowPath)}>{item.name}</td>
+                      <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }} onClick={() => navigate(rowPath)}>{item.project}</td>
+                      <td style={{ fontSize: 13 }} onClick={() => navigate(rowPath)}>{item.supervisorName}</td>
+                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                           <span style={{ fontSize: 11, fontWeight: 600, color: statusColor, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                             {EVAL_STATUS[status]}
@@ -445,16 +473,22 @@ function Evaluations() {
                           <span style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>{done} / {tot}</span>
                         </div>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-primary)' }}>{total.toFixed(1)}</span>
-                        <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}> / 50</span>
+                        <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}> / {getMaxTotal(item)}</span>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all 5 components" style={{ minWidth: 32, padding: '6px 8px' }}>
+                          <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all components" style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
                           </button>
-                          <button className="btn btn-primary btn-sm" onClick={() => handleOpenDefenseModal(item)} title="Enter defense marks" style={{ minWidth: 32, padding: '6px 8px' }}>
+                          <button className="btn btn-primary btn-sm" onClick={() => {
+                            if (completed) {
+                              toast.warning('Already complete, can\'t edit');
+                              return;
+                            }
+                            handleOpenDefenseModal(item);
+                          }} title="Enter defense marks" disabled={completed || item.status === 'COMPLETED'} style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>edit_note</span>
                           </button>
                           <button className="btn btn-outline btn-sm" onClick={() => handlePrintSingle(item)} title="Print / Save PDF" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
@@ -503,11 +537,11 @@ function Evaluations() {
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                         <div className="form-group" style={{ width: 110, marginBottom: 0 }}>
                           <label style={{ fontSize: 11 }}>Marks (out of {c.maxMarks})</label>
-                          <input id={`marks-${c.id}`} type="number" defaultValue={evalRec?.marks ?? ''} min="0" max={c.maxMarks} step="0.5" placeholder={`0–${c.maxMarks}`} />
+                          <input id={'marks-${c.id}'} type="number" defaultValue={evalRec?.marks ?? ''} min="0" max={c.maxMarks} step="0.5" placeholder={'0-${c.maxMarks}'} disabled={selectedItem.status === 'COMPLETED'} />
                         </div>
                         <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                           <label style={{ fontSize: 11 }}>Comments</label>
-                          <input id={`comment-${c.id}`} type="text" defaultValue={evalRec?.comment ?? ''} placeholder={`Enter ${c.name.toLowerCase()} comments...`} />
+                          <input id={'comment-${c.id}'} type="text" defaultValue={evalRec?.comment ?? ''} placeholder={'Enter ${c.name.toLowerCase()} comments...'} disabled={selectedItem.status === 'COMPLETED'} />
                         </div>
                       </div>
                     </div>
@@ -520,9 +554,9 @@ function Evaluations() {
                     const e = (selectedItem.evaluations || []).find(ev => ev.componentId === c.id);
                     return (
                       <div key={c.id} style={{ padding: 12, background: 'var(--color-surface-container-low)', borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>{c.name} · by {ROLE_LABEL[c.evaluatorRole]}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>{c.name} by {ROLE_LABEL[c.evaluatorRole]}</div>
                         <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: e?.marks !== null && e?.marks !== undefined ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                          {e?.marks !== null && e?.marks !== undefined ? e.marks : '—'}
+                          {e?.marks !== null && e?.marks !== undefined ? e.marks : '-'}
                           <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {c.maxMarks}</span>
                         </div>
                         {e?.comment && <div style={{ fontSize: 11, fontStyle: 'italic', marginTop: 4, color: 'var(--color-on-surface-variant)' }}>"{e.comment}"</div>}
@@ -535,10 +569,24 @@ function Evaluations() {
               <button className="btn btn-outline" onClick={() => setShowDefenseModal(false)} disabled={saving}>
                 <span className="material-symbols-outlined">close</span>Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSaveAllDefenses} disabled={saving}>
-                <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'check'}</span>
-                {saving ? 'Saving...' : 'Save All Defenses'}
-              </button>
+              {selectedItem.status !== 'COMPLETED' && (
+                <>
+                  <button className="btn btn-primary" onClick={handleSaveAllDefenses} disabled={saving}>
+                    <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'check'}</span>
+                    {saving ? 'Saving...' : 'Save All Defenses'}
+                  </button>
+                  <button className="btn btn-success" onClick={handleFinalize} disabled={saving}>
+                    <span className="material-symbols-outlined">task_alt</span>
+                    Finalize
+                  </button>
+                </>
+              )}
+              {selectedItem.status === 'COMPLETED' && (
+                <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                  Completed
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -566,11 +614,11 @@ function Evaluations() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Evaluated by {ROLE_LABEL[c.evaluatorRole]} · Max {c.maxMarks} marks</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Evaluated by {ROLE_LABEL[c.evaluatorRole]} Max {c.maxMarks} marks</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 18, fontWeight: 700, color: status === 'done' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                        {e?.marks !== null && e?.marks !== undefined ? e.marks : '—'}
+                        {e?.marks !== null && e?.marks !== undefined ? e.marks : '-'}
                         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {c.maxMarks}</span>
                       </div>
                       {e?.submittedBy && <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>{e.submittedBy.firstName} {e.submittedBy.lastName}</div>}
@@ -580,8 +628,7 @@ function Evaluations() {
               })}
               <div style={{
                 marginTop: 14, padding: 0, borderRadius: 12, overflow: 'hidden',
-                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                display: 'flex', alignItems: 'stretch',
+                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', display: 'flex', alignItems: 'stretch',
               }}>
                 <div style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 }}>
@@ -593,10 +640,8 @@ function Evaluations() {
                   padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 4,
                   background: 'rgba(255,255,255,0.06)', borderLeft: '1px solid rgba(255,255,255,0.08)',
                 }}>
-                  <span style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
-                    {totalMarks(selectedItem).toFixed(1)}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginTop: 10 }}>/ 50</span>
+                  <span style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>{totalMarks(selectedItem).toFixed(1)}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginTop: 10 }}>/ {getMaxTotal(selectedItem)}</span>
                 </div>
               </div>
             </div>

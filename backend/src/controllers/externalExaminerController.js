@@ -11,7 +11,7 @@ exports.getAssignedGroups = async (req, res) => {
         group: {
           include: {
             members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-            supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+            supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
             academicYear: true,
             evaluations: {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
@@ -36,7 +36,7 @@ exports.getAssignedTheses = async (req, res) => {
         thesis: {
           include: {
             student: { select: { id: true, firstName: true, lastName: true, email: true } },
-            supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+            supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
             academicYear: true,
             evaluations: {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },

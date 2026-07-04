@@ -7,12 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BachelorProjectType {
+  MINOR
+  MAJOR
+}
+
 enum Role {
   MAINTAINER
   COORDINATOR
   SUPERVISOR
   STUDENT
   EXTERNAL_EXAMINER
+}
+
+enum DegreeType {
+  BACHELOR
+  MASTER
 }
 
 enum GroupStatus {
@@ -24,6 +34,11 @@ enum GroupStatus {
 enum ThesisStatus {
   PENDING
   ACTIVE
+  COMPLETED
+}
+
+enum EvaluationStatus {
+  DRAFT
   COMPLETED
 }
 
@@ -42,14 +57,16 @@ enum EvaluationType {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role      Role
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int         @id @default(autoincrement())
+  email       String      @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        Role
+  degreeType  DegreeType?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   supervisedGroups             ProjectGroup[]         @relation("SupervisedGroups")
   supervisedTheses             Thesis[]               @relation("SupervisedTheses")
@@ -87,10 +104,11 @@ model AcademicYear {
 }
 
 model ProjectGroup {
-  id             Int          @id @default(autoincrement())
+  id             Int                 @id @default(autoincrement())
   name           String
   projectTitle   String
-  status         GroupStatus  @default(PENDING)
+  projectType    BachelorProjectType @default(MINOR)
+  status         GroupStatus         @default(PENDING)
   supervisorId   Int?
   supervisor     User?        @relation("SupervisedGroups", fields: [supervisorId], references: [id])
   academicYearId Int
@@ -121,6 +139,7 @@ model GroupMember {
 model Thesis {
   id             Int          @id @default(autoincrement())
   title          String
+  projectType    String       @default("MASTER")
   studentId      Int
   student        User         @relation("StudentTheses", fields: [studentId], references: [id])
   status         ThesisStatus @default(PENDING)
@@ -167,6 +186,7 @@ model Evaluation {
   evaluationType EvaluationType
   marks          Float?
   comment        String?
+  status         EvaluationStatus   @default(DRAFT)
   submittedById  Int
   submittedBy    User               @relation("EvaluationSubmitter", fields: [submittedById], references: [id])
   groupId        Int?

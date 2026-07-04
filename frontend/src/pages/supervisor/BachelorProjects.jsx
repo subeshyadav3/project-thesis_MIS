@@ -31,11 +31,23 @@ function SupervisorBachelorProjects() {
 
   const handleComplete = async (id) => {
     try {
-      await api.put(`/groups/${id}/status`, { status: 'COMPLETED' });
-      toast.success('Group marked as completed');
+      // Find the supervisor component for this group
+      const { data } = await api.get(`/evaluations/group/${id}`);
+      const supervisorComp = (data.components || []).find(c => c.evaluatorRole === 'SUPERVISOR');
+      if (!supervisorComp) {
+        toast.error('No supervisor evaluation component found');
+        return;
+      }
+      const evaluation = (data.evaluations || []).find(e => e.componentId === supervisorComp.id);
+      if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
+        const confirmed = window.confirm('No marks submitted yet. Complete without marks?');
+        if (!confirmed) return;
+      }
+      await api.put(`/evaluations/${supervisorComp.id}/complete`, { groupId: id });
+      toast.success('Supervisor evaluation finalized');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete evaluation'); }
   };
 
   const filteredGroups = useMemo(() => {
@@ -121,6 +133,13 @@ function SupervisorBachelorProjects() {
                   <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
                     <span className="dot" />
                     {showDetail.status || 'PENDING'}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Type</span>
+                  <span className={`badge badge-${showDetail.projectType === 'MAJOR' ? 'warning' : 'info'}`}>
+                    <span className="dot" />
+                    {showDetail.projectType === 'MAJOR' ? 'Major' : 'Minor'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -237,6 +256,7 @@ function SupervisorBachelorProjects() {
                 <tr>
                   <th>Group</th>
                   <th>Project Title</th>
+                  <th>Type</th>
                   <th>Members</th>
                   <th>Status</th>
                   <th>Year</th>
@@ -253,6 +273,12 @@ function SupervisorBachelorProjects() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
+                    <td>
+                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 11 }}>
+                        <span className="dot" />
+                        {g.projectType === 'MAJOR' ? 'Major' : 'Minor'}
+                      </span>
+                    </td>
                     <td>
                       <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                         {safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(', ') || '—'}

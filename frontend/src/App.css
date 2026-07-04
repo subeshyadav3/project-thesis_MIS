@@ -1241,6 +1241,20 @@
   }
   .badge-inactive .dot { background: var(--color-outline); }
 
+  .badge-info {
+    background: var(--color-secondary-container);
+    color: var(--color-on-secondary-container);
+    border-color: var(--color-secondary-container);
+  }
+  .badge-info .dot { background: var(--color-secondary); }
+
+  .badge-warning {
+    background: var(--color-tertiary-container);
+    color: var(--color-on-tertiary-container);
+    border-color: var(--color-tertiary-container);
+  }
+  .badge-warning .dot { background: var(--color-tertiary); }
+
   /* ─── Upload Zone ────────────────────────── */
   .upload-zone {
     border: 2px dashed var(--color-outline);

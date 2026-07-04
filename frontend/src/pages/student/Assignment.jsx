@@ -95,6 +95,7 @@ function StudentProjectDetail() {
   const breakdown = components.map(c => ({ component: c, evaluation: evalByComponent.get(c.id) }));
   const completedComponents = breakdown.filter(b => b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined).length;
   const totalMarks = breakdown.reduce((s, b) => s + (b.evaluation?.marks ?? 0), 0);
+  const maxTotal = evaluationsData?.summary?.maxTotal || components.reduce((s, c) => s + c.maxMarks, 0) || 50;
   const isComplete = completedComponents === breakdown.length && breakdown.length > 0;
   const showMarks = isComplete; // only show numeric marks once everything is graded
 
@@ -174,7 +175,7 @@ function StudentProjectDetail() {
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#94a3b8' }}>award_star</span>
                     <span style={{ fontWeight: 600, fontSize: 13, color: '#94a3b8', letterSpacing: 0.5, textTransform: 'uppercase' }}>Grand Total</span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginLeft: 26 }}>Sum of all 5 evaluation components</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginLeft: 26 }}>Sum of all {components.length} evaluation components</div>
                 </div>
                 <div style={{
                   padding: '16px 28px',
@@ -185,7 +186,7 @@ function StudentProjectDetail() {
                   <span style={{ fontSize: 38, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
                     {totalMarks.toFixed(1)}
                   </span>
-                  <span style={{ fontSize: 16, fontWeight: 500, color: '#64748b', marginTop: 12 }}>/ 50</span>
+                  <span style={{ fontSize: 16, fontWeight: 500, color: '#64748b', marginTop: 12 }}>/ {maxTotal}</span>
                 </div>
               </div>
             ) : (
@@ -196,7 +197,7 @@ function StudentProjectDetail() {
                 textAlign: 'center', fontSize: 13, color: 'var(--color-on-surface-variant)',
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>lock</span>
-                Your final marks will be revealed once all 5 components are evaluated by their respective evaluators.
+                Your final marks will be revealed once all {components.length} components are evaluated by their respective evaluators.
               </div>
             )}
           </div>

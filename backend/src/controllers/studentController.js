@@ -82,7 +82,7 @@ exports.getMyGroups = async (req, res) => {
       include: {
         group: {
           include: {
-            supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+            supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
             academicYear: true,
             members: {
               include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } },
@@ -109,7 +109,7 @@ exports.getMyTheses = async (req, res) => {
       where: { studentId: req.user.id },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: true,
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
@@ -130,7 +130,7 @@ exports.getGroupById = async (req, res) => {
     const group = await prisma.projectGroup.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: true,
         members: {
           include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } },
@@ -157,7 +157,7 @@ exports.getThesisById = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: true,
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },

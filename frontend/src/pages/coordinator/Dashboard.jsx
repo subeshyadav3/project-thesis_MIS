@@ -29,6 +29,20 @@ function CoordinatorDashboard() {
         </div>
         <div className="stat-card bento-card">
           <div className="stat-icon">
+            <span className="material-symbols-outlined">star</span>
+          </div>
+          <div className="stat-number">{stats?.minorGroups || 0}</div>
+          <div className="stat-label">Minor Projects</div>
+        </div>
+        <div className="stat-card bento-card">
+          <div className="stat-icon">
+            <span className="material-symbols-outlined">stars</span>
+          </div>
+          <div className="stat-number">{stats?.majorGroups || 0}</div>
+          <div className="stat-label">Major Projects</div>
+        </div>
+        <div className="stat-card bento-card">
+          <div className="stat-icon">
             <span className="material-symbols-outlined">pending_actions</span>
           </div>
           <div className="stat-number">{stats?.pendingGroups || 0}</div>
@@ -47,30 +61,6 @@ function CoordinatorDashboard() {
           </div>
           <div className="stat-number">{stats?.completedGroups || 0}</div>
           <div className="stat-label">Completed</div>
-        </div>
-      </div>
-
-      <div className="stats-grid" style={{ marginTop: 24 }}>
-        <div className="stat-card bento-card" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/coordinator/bachelor-projects'}>
-          <div className="stat-icon">
-            <span className="material-symbols-outlined">school</span>
-          </div>
-          <div className="stat-number" style={{ fontSize: 18 }}>Manage Bachelor Projects</div>
-          <div className="stat-label">View groups, assign supervisors</div>
-        </div>
-        <div className="stat-card bento-card" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/coordinator/master-thesis'}>
-          <div className="stat-icon">
-            <span className="material-symbols-outlined">library_books</span>
-          </div>
-          <div className="stat-number" style={{ fontSize: 18 }}>Manage Master's Thesis</div>
-          <div className="stat-label">View theses, assign supervisors</div>
-        </div>
-        <div className="stat-card bento-card" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/coordinator/evaluations'}>
-          <div className="stat-icon">
-            <span className="material-symbols-outlined">grading</span>
-          </div>
-          <div className="stat-number" style={{ fontSize: 18 }}>Evaluations</div>
-          <div className="stat-label">View marks, forward to exam dept</div>
         </div>
       </div>
     </PageLayout>

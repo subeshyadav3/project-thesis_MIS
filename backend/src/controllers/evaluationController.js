@@ -83,12 +83,14 @@ exports.submitComponentMarks = async (req, res) => {
       where: { componentId: component.id },
     });
 
-    let evaluation;
-    if (existing) {
-      evaluation = await prisma.evaluation.update({ where: { id: existing.id }, data });
-    } else {
-      evaluation = await prisma.evaluation.create({ data });
+    // Prevent editing if already completed
+    if (existing && existing.status === 'COMPLETED') {
+      return res.status(400).json({ error: 'Evaluation is already completed and cannot be edited.' });
     }
+
+    const evaluation = await (existing
+      ? prisma.evaluation.update({ where: { id: existing.id }, data })
+      : prisma.evaluation.create({ data }));
 
     // Build the new summary so the caller doesn't have to refetch
     const components = await prisma.evaluationComponent.findMany({
@@ -102,7 +104,16 @@ exports.submitComponentMarks = async (req, res) => {
         : { thesisId: parseInt(thesisId) },
       include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
     });
-    const summary = computeSummary(evaluations, components);
+
+    // Determine project type for correct total
+    let projectType = 'MINOR';
+    if (groupId) {
+      const grp = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectType: true } });
+      if (grp) projectType = grp.projectType;
+    } else if (thesisId) {
+      projectType = 'MASTER';
+    }
+    const summary = computeSummary(evaluations, components, projectType);
 
     // In-app notification on marks submitted
     try {
@@ -160,7 +171,7 @@ exports.submitFeedback = async (req, res) => {
     if (groupId) {
       const group = await prisma.projectGroup.findUnique({
         where: { id: parseInt(groupId) },
-        include: { members: { include: { student: true } }, supervisor: { select: { firstName: true, lastName: true } } },
+        include: { members: { include: { student: true } }, supervisor: { select: { firstName: true, lastName: true, active: true } } },
       });
       if (group?.members) {
         const studentEmails = group.members.map(m => m.student.email).filter(Boolean);
@@ -173,7 +184,7 @@ exports.submitFeedback = async (req, res) => {
     } else if (thesisId) {
       const thesis = await prisma.thesis.findUnique({
         where: { id: parseInt(thesisId) },
-        include: { student: true, supervisor: { select: { firstName: true, lastName: true } } },
+        include: { student: true, supervisor: { select: { firstName: true, lastName: true, active: true } } },
       });
       if (thesis?.student) {
         const supName = thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'Supervisor';
@@ -195,7 +206,7 @@ exports.submitFeedback = async (req, res) => {
 exports.getGroupEvaluations = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [evaluations, components] = await Promise.all([
+    const [evaluations, components, group] = await Promise.all([
       prisma.evaluation.findMany({
         where: { groupId: id },
         include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
@@ -205,8 +216,10 @@ exports.getGroupEvaluations = async (req, res) => {
         where: { groupId: id },
         orderBy: { id: 'asc' },
       }),
+      prisma.projectGroup.findUnique({ where: { id }, select: { projectType: true } }),
     ]);
-    const summary = computeSummary(evaluations, components);
+    const projectType = group?.projectType || 'MINOR';
+    const summary = computeSummary(evaluations, components, projectType);
     res.json({ evaluations, components, summary });
   } catch (error) {
     console.error('getGroupEvaluations error:', error);
@@ -228,7 +241,7 @@ exports.getThesisEvaluations = async (req, res) => {
         orderBy: { id: 'asc' },
       }),
     ]);
-    const summary = computeSummary(evaluations, components);
+    const summary = computeSummary(evaluations, components, 'MASTER');
     res.json({ evaluations, components, summary });
   } catch (error) {
     console.error('getThesisEvaluations error:', error);
@@ -250,10 +263,48 @@ exports.getMarksSummary = async (req, res) => {
       }),
       prisma.evaluationComponent.findMany({ where }),
     ]);
-    const summary = computeSummary(evaluations, components);
+    let projectType = 'MINOR';
+    if (groupId) {
+      const grp = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectType: true } });
+      if (grp) projectType = grp.projectType;
+    } else {
+      projectType = 'MASTER';
+    }
+    const summary = computeSummary(evaluations, components, projectType);
     res.json({ evaluations, summary });
   } catch (error) {
-    console.error('getMarksSummary error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Mark an evaluation (component) as COMPLETED — evaluator cannot edit after
+exports.completeEvaluation = async (req, res) => {
+  try {
+    const componentId = parseInt(req.params.id);
+    const { groupId, thesisId } = req.body;
+
+    const evaluation = await prisma.evaluation.findUnique({
+      where: { componentId },
+      include: { component: true },
+    });
+    if (!evaluation) {
+      return res.status(404).json({ error: 'Evaluation not found. Submit marks first.' });
+    }
+    if (evaluation.status === 'COMPLETED') {
+      return res.status(400).json({ error: 'Evaluation already completed.' });
+    }
+    if (req.user.role !== evaluation.component.evaluatorRole) {
+      return res.status(403).json({ error: 'You cannot complete this evaluation.' });
+    }
+
+    await prisma.evaluation.update({
+      where: { id: evaluation.id },
+      data: { status: 'COMPLETED' },
+    });
+
+    res.json({ message: 'Evaluation completed successfully' });
+  } catch (error) {
+    console.error('completeEvaluation error:', error);
     res.status(500).json({ error: error.message });
   }
 };

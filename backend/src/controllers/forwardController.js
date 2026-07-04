@@ -8,7 +8,7 @@ exports.forwardToExamDept = async (req, res) => {
       include: {
         members: { include: { student: { select: { firstName: true, lastName: true, email: true } } } },
         evaluations: true,
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, active: true } },
       },
     });
     const theses = await prisma.thesis.findMany({
@@ -16,7 +16,7 @@ exports.forwardToExamDept = async (req, res) => {
       include: {
         student: { select: { firstName: true, lastName: true, email: true } },
         evaluations: true,
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, active: true } },
       },
     });
     const payload = {

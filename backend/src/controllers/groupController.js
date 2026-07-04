@@ -4,18 +4,19 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
+const { getDefaultComponents } = require('../config/evaluationScheme');
 
 exports.getGroups = async (req, res) => {
   try {
     const groups = await prisma.projectGroup.findMany({
       include: {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
     res.json(groups);
@@ -30,7 +31,7 @@ exports.getGroup = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
@@ -38,7 +39,7 @@ exports.getGroup = async (req, res) => {
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -50,7 +51,7 @@ exports.getGroup = async (req, res) => {
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, projectTitle, academicYearId, supervisorId, students } = req.body;
+    const { name, projectTitle, academicYearId, supervisorId, students, projectType } = req.body;
     if (!name || !projectTitle || !academicYearId) {
       return res.status(400).json({ error: 'name, projectTitle, and academicYearId are required' });
     }
@@ -61,6 +62,7 @@ exports.createGroup = async (req, res) => {
       data: {
         name,
         projectTitle,
+        projectType: projectType || 'MINOR',
         academicYearId: parseInt(academicYearId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         status: supervisorId ? 'ACTIVE' : 'PENDING',
@@ -86,14 +88,8 @@ exports.createGroup = async (req, res) => {
         });
       }
     }
-    // Create default evaluation components
-    const defaults = [
-      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
-      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
-      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-      { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
-    ];
+    // Create default evaluation components based on project type
+    const defaults = getDefaultComponents(projectType || 'MINOR');
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
         data: { ...comp, groupId: group.id, createdById: req.user.id },
@@ -117,8 +113,9 @@ exports.uploadExcel = async (req, res) => {
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(sheet);
-    const { academicYearId } = req.body;
+    const { academicYearId, projectType } = req.body;
     const created = [];
+    const schemeType = projectType || 'MINOR';
     for (const row of data) {
       const groupName = row['Group Name'] || row['groupName'];
       const projectTitle = row['Project Title'] || row['projectTitle'];
@@ -130,17 +127,12 @@ exports.uploadExcel = async (req, res) => {
         data: {
           name: groupName,
           projectTitle,
+          projectType: schemeType,
           academicYearId: parseInt(academicYearId),
         },
       });
-      // Create default evaluation components
-      const defaults = [
-        { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
-        { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-        { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
-        { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-        { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      ];
+      // Create default evaluation components based on project type
+      const defaults = getDefaultComponents(schemeType);
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
           data: { ...comp, groupId: group.id, createdById: req.user.id },
@@ -188,7 +180,7 @@ exports.assignSupervisor = async (req, res) => {
       data: { supervisorId: parseInt(supervisorId), status: 'ACTIVE' },
       include: {
         members: { include: { student: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
       },
     });
     // Send emails

@@ -24,7 +24,7 @@ function SupervisorList() {
   const loadData = () => {
     setLoading(true);
     Promise.all([
-      api.get('/users/role/supervisor').then(({ data }) => setSupervisors(data)),
+      api.get('/users/role/supervisor?all=true').then(({ data }) => setSupervisors(data)),
       api.get('/groups').then(({ data }) => setGroups(data)),
       api.get('/theses').then(({ data }) => setTheses(data)),
     ]).catch(() => {}).finally(() => setLoading(false));
@@ -294,10 +294,26 @@ function SupervisorList() {
                       <span className="stat-chip stat-chip-primary">{s.totalCount}</span>
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
-                        <span className="material-symbols-outlined">visibility</span>
-                        View
-                      </button>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
+                          <span className="material-symbols-outlined">visibility</span>
+                          View
+                        </button>
+                        <button className="btn btn-sm btn-outline" onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!window.confirm(`Toggle active status for ${s.firstName} ${s.lastName}?`)) return;
+                          try {
+                            await api.put(`/users/${s.id}/toggle-active`);
+                            toast.success('Supervisor status toggled');
+                            loadData();
+                          } catch (err) {
+                            toast.error(err.response?.data?.error || 'Toggle failed');
+                          }
+                        }}>
+                          <span className="material-symbols-outlined">edit</span>
+                          Edit
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

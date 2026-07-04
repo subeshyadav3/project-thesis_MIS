@@ -3,18 +3,19 @@ const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const notifSvc = require('../services/notificationService');
+const { getDefaultComponents } = require('../config/evaluationScheme');
 
 exports.getTheses = async (req, res) => {
   try {
     const theses = await prisma.thesis.findMany({
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
     res.json(theses);
@@ -29,13 +30,13 @@ exports.getThesis = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
@@ -54,19 +55,14 @@ exports.createThesis = async (req, res) => {
     const thesis = await prisma.thesis.create({
       data: {
         title,
+        projectType: 'MASTER',
         studentId: parseInt(studentId),
         academicYearId: parseInt(academicYearId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         status: supervisorId ? 'ACTIVE' : 'PENDING',
       },
     });
-    const defaults = [
-      { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
-      { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-      { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
-      { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-      { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
-    ];
+    const defaults = getDefaultComponents('MASTER');
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
         data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
@@ -108,15 +104,9 @@ exports.uploadExcel = async (req, res) => {
         });
       }
       const thesis = await prisma.thesis.create({
-        data: { title, studentId: student.id, academicYearId: parseInt(academicYearId) },
+        data: { title, projectType: 'MASTER', studentId: student.id, academicYearId: parseInt(academicYearId) },
       });
-      const defaults = [
-        { name: 'Supervisor', maxMarks: 25, evaluationType: 'SUPERVISOR', evaluatorRole: 'SUPERVISOR' },
-        { name: 'Proposal Defense', maxMarks: 5, evaluationType: 'PROPOSAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-        { name: 'Mid-Term Defense', maxMarks: 5, evaluationType: 'MIDTERM_DEFENSE', evaluatorRole: 'COORDINATOR' },
-        { name: 'Final Defense', maxMarks: 5, evaluationType: 'FINAL_DEFENSE', evaluatorRole: 'COORDINATOR' },
-        { name: 'Internal Examiner', maxMarks: 10, evaluationType: 'EXTERNAL_EXAMINER', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      ];
+      const defaults = getDefaultComponents('MASTER');
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
           data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
