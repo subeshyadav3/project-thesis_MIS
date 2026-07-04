@@ -46,15 +46,16 @@ function Evaluations() {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/groups').then(({ data }) => setGroups(data)),
-      api.get('/theses').then(({ data }) => setTheses(data)),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadData(); }, []);
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
   const coordinatorComponentTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE'];
 
@@ -537,11 +538,11 @@ function Evaluations() {
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                         <div className="form-group" style={{ width: 110, marginBottom: 0 }}>
                           <label style={{ fontSize: 11 }}>Marks (out of {c.maxMarks})</label>
-                          <input id={'marks-${c.id}'} type="number" defaultValue={evalRec?.marks ?? ''} min="0" max={c.maxMarks} step="0.5" placeholder={'0-${c.maxMarks}'} disabled={selectedItem.status === 'COMPLETED'} />
+                          <input id={`marks-${c.id}`} type="number" defaultValue={evalRec?.marks ?? ''} min="0" max={c.maxMarks} step="0.5" placeholder={`0-${c.maxMarks}`} disabled={selectedItem.status === 'COMPLETED'} />
                         </div>
                         <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                           <label style={{ fontSize: 11 }}>Comments</label>
-                          <input id={'comment-${c.id}'} type="text" defaultValue={evalRec?.comment ?? ''} placeholder={'Enter ${c.name.toLowerCase()} comments...'} disabled={selectedItem.status === 'COMPLETED'} />
+                          <input id={`comment-${c.id}`} type="text" defaultValue={evalRec?.comment ?? ''} placeholder={`Enter ${c.name.toLowerCase()} comments...`} disabled={selectedItem.status === 'COMPLETED'} />
                         </div>
                       </div>
                     </div>

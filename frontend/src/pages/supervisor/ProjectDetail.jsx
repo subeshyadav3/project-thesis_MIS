@@ -30,24 +30,28 @@ function ProjectDetail() {
   const isCoordinator = user.role === 'COORDINATOR';
   const isExternal = user.role === 'EXTERNAL_EXAMINER';
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback((signal) => {
     setLoading(true);
     const endpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
-    api.get(endpoint)
+    api.get(endpoint, { signal })
       .then(({ data }) => setItem(data))
-      .catch(() => {});
+      .catch((err) => { if (err.name !== 'CanceledError') console.error(err); });
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
-    api.get(evalEndpoint)
+    api.get(evalEndpoint, { signal })
       .then(({ data }) => {
         setSummary(data.summary || null);
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
       })
-      .catch(() => {})
+      .catch((err) => { if (err.name !== 'CanceledError') console.error(err); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
+  }, [loadData]);
 
   const componentByType = (evalType) => components.find(c => c.evaluationType === evalType);
   const evaluationForComponent = (compId) => evaluations.find(e => e.componentId === compId);

@@ -8,7 +8,12 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 
 exports.getGroups = async (req, res) => {
   try {
+    const where = {};
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
+      where.academicYear = { departmentId: req.user.departmentId };
+    }
     const groups = await prisma.projectGroup.findMany({
+      where,
       include: {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -21,7 +26,7 @@ exports.getGroups = async (req, res) => {
     });
     res.json(groups);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -43,9 +48,13 @@ exports.getGroup = async (req, res) => {
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
+    // Coordinator can only view groups in their department
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId && group.academicYear?.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Access denied. Group belongs to another department.' });
+    }
     res.json(group);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -106,7 +115,7 @@ exports.createGroup = async (req, res) => {
           const email = `${roll.toLowerCase() || `${fn.toLowerCase()}.${ln.toLowerCase()}`}@pcampus.edu.np`;
           student = await prisma.user.findFirst({ where: { email } });
           if (!student) {
-            const hash = await bcrypt.hash('subesh', 10);
+            const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
             student = await prisma.user.create({
               data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
             });
@@ -132,7 +141,7 @@ exports.createGroup = async (req, res) => {
     });
     res.status(201).json(created);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -142,9 +151,11 @@ exports.uploadExcel = async (req, res) => {
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(sheet);
-    const { academicYearId, projectType } = req.body;
+    const { academicYearId, projectType, programId: bodyProgramId } = req.body;
     const created = [];
     const schemeType = projectType || 'MINOR';
+    // Resolve group program
+    let resolvedProgramId = bodyProgramId ? parseInt(bodyProgramId) : null;
     for (const row of data) {
       const groupName = row['Group Name'] || row['groupName'];
       const projectTitle = row['Project Title'] || row['projectTitle'];
@@ -152,12 +163,24 @@ exports.uploadExcel = async (req, res) => {
       const rollNumbers = (row['Roll Numbers'] || row['rollNumbers'] || '').toString();
       const names = memberNames.split(',').map(s => s.trim()).filter(Boolean);
       const rolls = rollNumbers.split(',').map(s => s.trim()).filter(Boolean);
+      // Derive program from first existing student if not specified
+      if (!resolvedProgramId) {
+        for (const roll of rolls) {
+          const existing = await prisma.user.findFirst({ where: { email: `${roll.toLowerCase()}@pcampus.edu.np` }, select: { programId: true } });
+          if (existing?.programId) { resolvedProgramId = existing.programId; break; }
+        }
+      }
+      let groupProgram = null;
+      if (resolvedProgramId) {
+        groupProgram = await prisma.program.findUnique({ where: { id: resolvedProgramId } });
+      }
       const group = await prisma.projectGroup.create({
         data: {
           name: groupName,
           projectTitle,
           projectType: schemeType,
           academicYearId: parseInt(academicYearId),
+          programId: resolvedProgramId,
         },
       });
       // Create default evaluation components based on project type
@@ -177,14 +200,28 @@ exports.uploadExcel = async (req, res) => {
           where: { lastName: lastName, firstName: firstName, role: 'STUDENT' },
         });
         if (!student) {
-          student = await prisma.user.create({
-            data: {
-              email: `${roll.toLowerCase()}@university.edu`,
-              password: await bcrypt.hash('subesh', 10),
-              firstName,
-              lastName,
-              role: 'STUDENT',
-            },
+          const email = `${roll.toLowerCase()}@pcampus.edu.np`;
+          student = await prisma.user.findFirst({ where: { email } });
+          if (!student) {
+            const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
+            student = await prisma.user.create({
+              data: {
+                email,
+                password: hash,
+                firstName,
+                lastName,
+                role: 'STUDENT',
+                degreeType: 'BACHELOR',
+                programId: resolvedProgramId,
+                departmentId: req.user.departmentId,
+              },
+            });
+          }
+        }
+        // Validate same program
+        if (groupProgram && student.programId && student.programId !== groupProgram.id) {
+          return res.status(400).json({
+            error: `Student ${student.firstName} ${student.lastName} is from a different program. Same-program grouping required.`,
           });
         }
         await prisma.groupMember.create({
@@ -195,7 +232,7 @@ exports.uploadExcel = async (req, res) => {
     }
     res.status(201).json({ message: `${created.length} groups created`, groups: created });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -236,7 +273,7 @@ exports.assignSupervisor = async (req, res) => {
     } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
     res.json(group);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -258,7 +295,7 @@ exports.updateGroupStatus = async (req, res) => {
     }
     res.json(group);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -270,6 +307,6 @@ exports.updateEvaluationComponent = async (req, res) => {
     });
     res.json(component);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

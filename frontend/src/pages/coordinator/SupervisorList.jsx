@@ -18,20 +18,22 @@ function SupervisorList() {
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
-  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: 'subesh' });
+  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/users/role/supervisor?all=true').then(({ data }) => setSupervisors(data)),
-      api.get('/groups').then(({ data }) => setGroups(data)),
-      api.get('/theses').then(({ data }) => setTheses(data)),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
   const handleCreateSupervisor = async (e) => {
     e.preventDefault();
@@ -39,7 +41,7 @@ function SupervisorList() {
       await api.post('/users', { ...createForm, role: 'SUPERVISOR' });
       toast.success('Supervisor created successfully');
       setShowCreate(false);
-      setCreateForm({ firstName: '', lastName: '', email: '', password: 'subesh' });
+      setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };

@@ -25,7 +25,7 @@ exports.getUsers = async (req, res) => {
     });
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -58,7 +58,7 @@ exports.createUser = async (req, res) => {
     });
     res.status(201).json(user);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -78,6 +78,14 @@ exports.updateUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(existing.role)) {
       return res.status(403).json({ error: 'Cannot edit this user role' });
     }
+    // Coordinator cannot change role field
+    if (req.user.role === 'COORDINATOR' && req.body.role && req.body.role !== existing.role) {
+      return res.status(403).json({ error: 'Cannot change user role' });
+    }
+    // Coordinator cannot change degreeType for non-students
+    if (req.user.role === 'COORDINATOR' && req.body.degreeType && existing.role !== 'STUDENT') {
+      return res.status(403).json({ error: 'Cannot change degree type for this user' });
+    }
 
     const data = {};
     if (req.body.firstName !== undefined) data.firstName = req.body.firstName;
@@ -95,7 +103,7 @@ exports.updateUser = async (req, res) => {
     });
     res.json(user);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -111,7 +119,7 @@ exports.deleteUser = async (req, res) => {
     await prisma.user.delete({ where: { id: userId } });
     res.json({ message: 'User deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -120,6 +128,9 @@ exports.getUsersByRole = async (req, res) => {
     const where = { role: req.params.role.toUpperCase() };
     if (req.query.all !== 'true') {
       where.active = true;
+    }
+    if (req.query.degreeType) {
+      where.degreeType = req.query.degreeType.toUpperCase();
     }
     // Coordinator can only see users in their department
     if (req.user.role === 'COORDINATOR') {
@@ -131,7 +142,7 @@ exports.getUsersByRole = async (req, res) => {
     });
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -191,6 +202,6 @@ exports.toggleActive = async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

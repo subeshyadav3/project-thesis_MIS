@@ -25,7 +25,7 @@ exports.login = async (req, res) => {
     res.cookie('token', token, COOKIE_OPTS);
     res.json({ token, user: userData });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 

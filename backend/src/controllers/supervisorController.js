@@ -14,7 +14,7 @@ exports.getMyGroups = async (req, res) => {
     });
     res.json(groups);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -31,7 +31,7 @@ exports.getMyTheses = async (req, res) => {
     });
     res.json(theses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -87,6 +87,6 @@ exports.issueRecommendation = async (req, res) => {
     }
     res.status(201).json(recommendation);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

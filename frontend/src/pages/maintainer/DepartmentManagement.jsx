@@ -13,11 +13,13 @@ function DepartmentManagement() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const toast = useToast();
 
-  const loadData = () => {
-    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => {});
-    api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)).catch(() => {});
-  };
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    api.get('/departments', { signal }).then(({ data }) => setDepartments(data)).catch((err) => { if (err.name !== 'CanceledError') console.error(err); });
+    api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)).catch((err) => { if (err.name !== 'CanceledError') console.error(err); });
+    return () => controller.abort();
+  }, []);
 
   const handleCreateDept = async (e) => {
     e.preventDefault();

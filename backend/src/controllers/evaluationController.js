@@ -136,7 +136,7 @@ exports.submitComponentMarks = async (req, res) => {
     res.status(existing ? 200 : 201).json({ evaluation, summary });
   } catch (error) {
     console.error('submitComponentMarks error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -199,7 +199,7 @@ exports.submitFeedback = async (req, res) => {
     res.status(201).json(evaluation);
   } catch (error) {
     console.error('submitFeedback error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -223,7 +223,7 @@ exports.getGroupEvaluations = async (req, res) => {
     res.json({ evaluations, components, summary });
   } catch (error) {
     console.error('getGroupEvaluations error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -245,7 +245,7 @@ exports.getThesisEvaluations = async (req, res) => {
     res.json({ evaluations, components, summary });
   } catch (error) {
     console.error('getThesisEvaluations error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -273,7 +273,7 @@ exports.getMarksSummary = async (req, res) => {
     const summary = computeSummary(evaluations, components, projectType);
     res.json({ evaluations, summary });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -305,6 +305,6 @@ exports.completeEvaluation = async (req, res) => {
     res.json({ message: 'Evaluation completed successfully' });
   } catch (error) {
     console.error('completeEvaluation error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

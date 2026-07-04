@@ -24,7 +24,7 @@ exports.getAssignedGroups = async (req, res) => {
     });
     res.json(assignments.map(a => a.group).filter(Boolean));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -50,7 +50,7 @@ exports.getAssignedTheses = async (req, res) => {
     res.json(assignments.map(a => a.thesis).filter(Boolean));
   } catch (error) {
     console.error('getAssignedTheses error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -142,6 +142,6 @@ exports.submitEvaluation = async (req, res) => {
     res.status(existing ? 200 : 201).json({ evaluation, summary });
   } catch (error) {
     console.error('submitEvaluation error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

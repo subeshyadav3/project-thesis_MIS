@@ -71,7 +71,7 @@ exports.uploadDocument = async (req, res) => {
 
     res.json({ message: 'Document uploaded successfully', documentUrl, proposal });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -99,7 +99,7 @@ exports.getMyGroups = async (req, res) => {
     });
     res.json(members.map(m => ({ ...m.group, _memberRoll: m.rollNumber })));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -121,7 +121,7 @@ exports.getMyTheses = async (req, res) => {
     });
     res.json(theses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -147,7 +147,7 @@ exports.getGroupById = async (req, res) => {
     if (!isMember) return res.status(403).json({ error: 'You are not a member of this group' });
     res.json(group);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -170,7 +170,7 @@ exports.getThesisById = async (req, res) => {
     if (thesis.studentId !== req.user.id) return res.status(403).json({ error: 'This thesis does not belong to you' });
     res.json(thesis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -182,7 +182,7 @@ exports.getMyNotifications = async (req, res) => {
     });
     res.json(notifications);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -194,6 +194,6 @@ exports.markNotificationRead = async (req, res) => {
     });
     res.json({ message: 'Marked as read' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -34,7 +34,7 @@ exports.assignExaminerToGroup = async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'This examiner is already assigned to this group' });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -70,7 +70,7 @@ exports.assignExaminerToThesis = async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'This examiner is already assigned to this thesis' });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -85,7 +85,7 @@ exports.getAssignedExaminersForGroup = async (req, res) => {
     res.json(assignments);
   } catch (error) {
     console.error('getAssignedExaminersForGroup error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -100,7 +100,7 @@ exports.getAssignedExaminersForThesis = async (req, res) => {
     res.json(assignments);
   } catch (error) {
     console.error('getAssignedExaminersForThesis error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -111,6 +111,6 @@ exports.removeAssignment = async (req, res) => {
     res.json({ message: 'Assignment removed' });
   } catch (error) {
     console.error('removeAssignment error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -12,7 +12,7 @@ exports.getDepartments = async (req, res) => {
     });
     res.json(departments);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -23,7 +23,7 @@ exports.getPrograms = async (req, res) => {
     });
     res.json(programs);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -34,19 +34,23 @@ exports.createProgram = async (req, res) => {
     });
     res.status(201).json(program);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 exports.updateProgram = async (req, res) => {
   try {
+    const data = {};
+    if (req.body.name) data.name = req.body.name;
+    if (req.body.code) data.code = req.body.code;
+    if (req.body.departmentId) data.departmentId = parseInt(req.body.departmentId);
     const program = await prisma.program.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body,
+      data,
     });
     res.json(program);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -55,7 +59,7 @@ exports.deleteProgram = async (req, res) => {
     await prisma.program.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ message: 'Program deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -66,19 +70,23 @@ exports.createDepartment = async (req, res) => {
     });
     res.status(201).json(department);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 exports.updateDepartment = async (req, res) => {
   try {
+    const data = {};
+    if (req.body.name) data.name = req.body.name;
+    if (req.body.code) data.code = req.body.code;
+    if (req.body.coordinatorId !== undefined) data.coordinatorId = parseInt(req.body.coordinatorId) || null;
     const department = await prisma.department.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body,
+      data,
     });
     res.json(department);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -87,7 +95,7 @@ exports.deleteDepartment = async (req, res) => {
     await prisma.department.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ message: 'Department deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -98,7 +106,7 @@ exports.getAcademicYears = async (req, res) => {
     });
     res.json(years);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -113,6 +121,6 @@ exports.createAcademicYear = async (req, res) => {
     });
     res.status(201).json(year);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -56,17 +56,19 @@ function BachelorProjects() {
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/groups').then(({ data }) => setGroups(data)),
-      api.get('/users/role/supervisor?all=true').then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
-      api.get('/users/role/external_examiner?all=true').then(({ data }) => setExaminers(data)),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
-      api.get('/users').then(({ data }) => setAllStudents(data.filter(u => u.role === 'STUDENT'))),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+      api.get('/users', { signal }).then(({ data }) => setAllStudents(data.filter(u => u.role === 'STUDENT'))),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {

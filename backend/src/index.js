@@ -67,7 +67,7 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
     res.sendFile(filePath);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -90,7 +90,7 @@ app.get('/api/stats', authenticate, async (req, res) => {
       minorGroups, majorGroups,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

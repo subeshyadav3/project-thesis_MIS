@@ -49,17 +49,19 @@ function MasterThesis() {
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/theses').then(({ data }) => setTheses(data)),
-      api.get('/users/role/supervisor?all=true').then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
-      api.get('/users/role/external_examiner?all=true').then(({ data }) => setExaminers(data)),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
-      api.get('/users/role/STUDENT?all=true').then(({ data }) => setStudents(data.filter(s => s.degreeType === 'MASTER'))),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+      api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+      api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
 useEffect(() => {
     const handleClickOutside = (e) => {

@@ -20,14 +20,16 @@ function SupervisorBachelorProjects() {
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/supervisors/groups').then(({ data }) => setGroups(data)),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/supervisors/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
   const handleComplete = async (id) => {
     try {

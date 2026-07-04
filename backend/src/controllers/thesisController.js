@@ -7,7 +7,12 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 
 exports.getTheses = async (req, res) => {
   try {
+    const where = {};
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
+      where.academicYear = { departmentId: req.user.departmentId };
+    }
     const theses = await prisma.thesis.findMany({
+      where,
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -20,7 +25,7 @@ exports.getTheses = async (req, res) => {
     });
     res.json(theses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -40,9 +45,12 @@ exports.getThesis = async (req, res) => {
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId && thesis.academicYear?.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Access denied. Thesis belongs to another department.' });
+    }
     res.json(thesis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -70,7 +78,7 @@ exports.createThesis = async (req, res) => {
     }
     res.status(201).json(thesis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -116,7 +124,7 @@ exports.uploadExcel = async (req, res) => {
     }
     res.status(201).json({ message: `${created.length} theses created`, theses: created });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -137,7 +145,7 @@ exports.updateThesisStatus = async (req, res) => {
     }
     res.json(thesis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -168,6 +176,6 @@ exports.assignSupervisor = async (req, res) => {
     } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
     res.json(thesis);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
