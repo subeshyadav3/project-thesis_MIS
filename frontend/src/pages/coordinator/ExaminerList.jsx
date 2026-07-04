@@ -9,6 +9,7 @@ const PAGE_SIZE = 10;
 
 function ExaminerList() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [examiners, setExaminers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
@@ -16,10 +17,11 @@ function ExaminerList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState(null);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: 'subesh' });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const navigate = useNavigate();
 
   const loadData = () => {
     setLoading(true);
@@ -51,12 +53,33 @@ function ExaminerList() {
     } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
   };
 
-  // Build examiner assignments from group.thesis examinerAssignments lists
+  const handleEditExaminer = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email };
+      if (editForm.password) payload.password = editForm.password;
+      await api.put(`/users/${showEdit.id}`, payload);
+      toast.success('Examiner updated successfully');
+      setShowEdit(null);
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Update failed'); }
+  };
+
+  const handleToggleActive = async (ex) => {
+    if (!window.confirm(`Toggle active status for ${ex.firstName} ${ex.lastName}?`)) return;
+    try {
+      await api.put(`/users/${ex.id}/toggle-active`);
+      toast.success('Status toggled');
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Toggle failed'); }
+  };
+
+  const openEdit = (ex) => {
+    setEditForm({ firstName: ex.firstName, lastName: ex.lastName, email: ex.email, password: '' });
+    setShowEdit(ex);
+  };
+
   const enriched = useMemo(() => {
-    const assignmentFor = (exId) => [
-      ...groups.filter(g => (g.examinerAssignments || []).some(a => a.externalExaminerId === exId)),
-      ...theses.filter(t => (t.examinerAssignments || []).some(a => a.externalExaminerId === exId)),
-    ];
     return examiners.map(e => {
       const assignedGroups = groups.filter(g => (g.examinerAssignments || []).some(a => a.externalExaminerId === e.id));
       const assignedTheses = theses.filter(t => (t.examinerAssignments || []).some(a => a.externalExaminerId === e.id));
@@ -97,6 +120,7 @@ function ExaminerList() {
 
   return (
     <PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
+      {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -106,7 +130,7 @@ function ExaminerList() {
               </div>
               <div className="modal-header-text">
                 <h2>Add Internal Examiner</h2>
-                <p>Register a new internal examiner (evaluates the 10-mark component)</p>
+                <p>Register a new internal examiner</p>
               </div>
             </div>
             <form onSubmit={handleCreate}>
@@ -141,6 +165,7 @@ function ExaminerList() {
         </div>
       )}
 
+      {/* ── DETAIL MODAL ── */}
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
@@ -153,7 +178,6 @@ function ExaminerList() {
                 <p>{showDetail.email}</p>
               </div>
             </div>
-
             <div className="detail-section">
               <h4 className="detail-section-title">Assigned Projects ({showDetail.groupCount})</h4>
               {showDetail.assignedGroups.length === 0 ? (
@@ -180,7 +204,6 @@ function ExaminerList() {
                 </table>
               )}
             </div>
-
             <div className="detail-section">
               <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
               {showDetail.assignedTheses.length === 0 ? (
@@ -204,7 +227,6 @@ function ExaminerList() {
                 </table>
               )}
             </div>
-
             <div className="modal-actions">
               <button className="btn btn-danger" onClick={() => { handleDelete(showDetail.id); setShowDetail(null); }}>
                 <span className="material-symbols-outlined">delete</span>
@@ -215,6 +237,60 @@ function ExaminerList() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT MODAL ── */}
+      {showEdit && (
+        <div className="modal-overlay" onClick={() => setShowEdit(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-icon warning">
+                <span className="material-symbols-outlined">edit</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Edit Examiner</h2>
+                <p>{showEdit.firstName} {showEdit.lastName}</p>
+              </div>
+            </div>
+            <form onSubmit={handleEditExaminer}>
+              <div className="form-group">
+                <label>First Name</label>
+                <input value={editForm.firstName} onChange={e => setEditForm({...editForm, firstName: e.target.value})} required placeholder="Enter first name" />
+              </div>
+              <div className="form-group">
+                <label>Last Name</label>
+                <input value={editForm.lastName} onChange={e => setEditForm({...editForm, lastName: e.target.value})} required placeholder="Enter last name" />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} required placeholder="e.g. name@ioe.edu.np" />
+              </div>
+              <div className="form-group">
+                <label>Reset Password <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(leave blank to keep current)</span></label>
+                <input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="New password" />
+              </div>
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label style={{ margin: 0 }}>Active</label>
+                <button type="button" className={`toggle-switch ${showEdit.active ? 'active' : ''}`} onClick={() => handleToggleActive(showEdit)}>
+                  <span className="toggle-knob" />
+                </button>
+                <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                  {showEdit.active ? 'Active — can be assigned to projects' : 'Inactive — will not appear in assignment lists'}
+                </span>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setShowEdit(null)}>
+                  <span className="material-symbols-outlined">close</span>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <span className="material-symbols-outlined">save</span>
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -273,6 +349,7 @@ function ExaminerList() {
                 <tr>
                   <th>Examiner</th>
                   <th>Email</th>
+                  <th>Status</th>
                   <th>Bachelor Projects</th>
                   <th>Master Theses</th>
                   <th>Total</th>
@@ -281,7 +358,7 @@ function ExaminerList() {
               </thead>
               <tbody>
                 {paginated.map(s => (
-                  <tr key={s.id} className="clickable-row" onClick={() => setShowDetail(s)}>
+                  <tr key={s.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">{s.firstName?.[0]}{s.lastName?.[0]}</div>
@@ -289,26 +366,22 @@ function ExaminerList() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
+                    <td>
+                      <span className={`badge badge-${s.active ? 'active' : 'completed'}`} style={{ textTransform: 'none' }}>
+                        <span className="dot" />
+                        {s.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
                     <td><span className="stat-chip">{s.thesisCount}</span></td>
                     <td><span className="stat-chip stat-chip-primary">{s.totalCount}</span></td>
-                    <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                    <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
                           <span className="material-symbols-outlined">visibility</span>
                           View
                         </button>
-                        <button className="btn btn-sm btn-outline" onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!window.confirm(`Toggle active status for ${s.firstName} ${s.lastName}?`)) return;
-                          try {
-                            await api.put(`/users/${s.id}/toggle-active`);
-                            toast.success('Examiner status toggled');
-                            loadData();
-                          } catch (err) {
-                            toast.error(err.response?.data?.error || 'Toggle failed');
-                          }
-                        }}>
+                        <button className="btn btn-sm btn-outline" onClick={() => openEdit(s)}>
                           <span className="material-symbols-outlined">edit</span>
                           Edit
                         </button>

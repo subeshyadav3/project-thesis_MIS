@@ -10,4 +10,9 @@ router.delete('/:id', authenticate, authorize('MAINTAINER'), departmentControlle
 router.get('/academic-years', authenticate, departmentController.getAcademicYears);
 router.post('/academic-years', authenticate, authorize('MAINTAINER'), departmentController.createAcademicYear);
 
+router.get('/programs', authenticate, departmentController.getPrograms);
+router.post('/programs', authenticate, authorize('MAINTAINER'), departmentController.createProgram);
+router.put('/programs/:id', authenticate, authorize('MAINTAINER'), departmentController.updateProgram);
+router.delete('/programs/:id', authenticate, authorize('MAINTAINER'), departmentController.deleteProgram);
+
 module.exports = router;

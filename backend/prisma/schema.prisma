@@ -64,30 +64,51 @@ model User {
   lastName    String
   role        Role
   degreeType  DegreeType?
+  departmentId Int?
+  department  Department? @relation("UserDepartment", fields: [departmentId], references: [id])
+  programId   Int?
+  program     Program?    @relation("StudentProgram", fields: [programId], references: [id])
   active      Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  supervisedGroups             ProjectGroup[]         @relation("SupervisedGroups")
-  supervisedTheses             Thesis[]               @relation("SupervisedTheses")
-  thesis                       Thesis[]               @relation("StudentTheses")
-  groupMembers                 GroupMember[]
-  evaluationsSubmitted         Evaluation[]           @relation("EvaluationSubmitter")
-  componentsCreated            EvaluationComponent[]  @relation("ComponentCreator")
-  notifications                Notification[]
-  proposals                    Proposal[]
-  recommendations              Recommendation[]
-  examinerAssignments          ExaminerAssignment[]   @relation("ExternalExaminer")
-  examinerAssignmentsAssigned  ExaminerAssignment[]   @relation("AssignedBy")
+  coordinatorFor           Department?          @relation("CoordinatorDepartment")
+  supervisedGroups         ProjectGroup[]        @relation("SupervisedGroups")
+  supervisedTheses         Thesis[]              @relation("SupervisedTheses")
+  thesis                   Thesis[]              @relation("StudentTheses")
+  groupMembers             GroupMember[]
+  evaluationsSubmitted     Evaluation[]          @relation("EvaluationSubmitter")
+  componentsCreated        EvaluationComponent[] @relation("ComponentCreator")
+  notifications            Notification[]
+  proposals                Proposal[]
+  recommendations          Recommendation[]
+  examinerAssignments      ExaminerAssignment[]  @relation("ExternalExaminer")
+  examinerAssignmentsAssigned ExaminerAssignment[] @relation("AssignedBy")
 }
 
 model Department {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  code      String   @unique
-  createdAt DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  code          String   @unique
+  coordinatorId Int?    @unique
+  coordinator   User?    @relation("CoordinatorDepartment", fields: [coordinatorId], references: [id])
+  createdAt     DateTime @default(now())
 
-  academicYears AcademicYear[]
+  programs       Program[]
+  academicYears  AcademicYear[]
+  users          User[]         @relation("UserDepartment")
+}
+
+model Program {
+  id           Int      @id @default(autoincrement())
+  name         String
+  code         String   @unique
+  departmentId Int
+  department   Department  @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  students User[]        @relation("StudentProgram")
+  groups   ProjectGroup[]
 }
 
 model AcademicYear {
@@ -110,11 +131,13 @@ model ProjectGroup {
   projectType    BachelorProjectType @default(MINOR)
   status         GroupStatus         @default(PENDING)
   supervisorId   Int?
-  supervisor     User?        @relation("SupervisedGroups", fields: [supervisorId], references: [id])
+  supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])
+  programId      Int?
+  program        Program?            @relation(fields: [programId], references: [id])
   academicYearId Int
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  academicYear   AcademicYear        @relation(fields: [academicYearId], references: [id])
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   members              GroupMember[]
   evaluations          Evaluation[]           @relation("GroupEvaluations")

@@ -51,13 +51,24 @@ exports.getGroup = async (req, res) => {
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, projectTitle, academicYearId, supervisorId, students, projectType } = req.body;
+    const { name, projectTitle, academicYearId, supervisorId, students, projectType, programId } = req.body;
     if (!name || !projectTitle || !academicYearId) {
       return res.status(400).json({ error: 'name, projectTitle, and academicYearId are required' });
     }
     if (typeof name !== 'string' || name.length > 100) {
       return res.status(400).json({ error: 'name must be a string with max 100 characters' });
     }
+
+    // Resolve programId: if not provided, derive from first student's program
+    let resolvedProgramId = programId ? parseInt(programId) : null;
+    if (students && students.length > 0 && !resolvedProgramId) {
+      const firstStudentId = students.find(s => s.studentId);
+      if (firstStudentId) {
+        const firstUser = await prisma.user.findUnique({ where: { id: parseInt(firstStudentId.studentId) }, select: { programId: true } });
+        resolvedProgramId = firstUser?.programId;
+      }
+    }
+
     const group = await prisma.projectGroup.create({
       data: {
         name,
@@ -65,26 +76,44 @@ exports.createGroup = async (req, res) => {
         projectType: projectType || 'MINOR',
         academicYearId: parseInt(academicYearId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
+        programId: resolvedProgramId,
         status: supervisorId ? 'ACTIVE' : 'PENDING',
       },
     });
     // Create or find students and add as members
     if (students && students.length > 0) {
+      let groupProgram = null;
+      if (resolvedProgramId) {
+        groupProgram = await prisma.program.findUnique({ where: { id: resolvedProgramId } });
+      }
       for (const st of students) {
         const fn = (st.firstName || '').trim();
         const ln = (st.lastName || '').trim();
         const roll = (st.rollNumber || '').trim();
-        if (!fn && !roll) continue;
-        const email = `${roll.toLowerCase() || `${fn.toLowerCase()}.${ln.toLowerCase()}`}@pcampus.edu.np`;
-        let student = await prisma.user.findFirst({ where: { email } });
-        if (!student) {
-          const hash = await bcrypt.hash('subesh', 10);
-          student = await prisma.user.create({
-            data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT' },
-          });
+        if (!fn && !roll && !st.studentId) continue;
+
+        let student;
+        if (st.studentId) {
+          student = await prisma.user.findUnique({ where: { id: parseInt(st.studentId) } });
+          if (!student) return res.status(400).json({ error: `Student with id ${st.studentId} not found` });
+          // Validate same program
+          if (groupProgram && student.programId && student.programId !== groupProgram.id) {
+            return res.status(400).json({
+              error: `Student ${student.firstName} ${student.lastName} is from program ${student.programId} but group is from program ${groupProgram.code}. Same-program grouping required.`,
+            });
+          }
+        } else {
+          const email = `${roll.toLowerCase() || `${fn.toLowerCase()}.${ln.toLowerCase()}`}@pcampus.edu.np`;
+          student = await prisma.user.findFirst({ where: { email } });
+          if (!student) {
+            const hash = await bcrypt.hash('subesh', 10);
+            student = await prisma.user.create({
+              data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
+            });
+          }
         }
         await prisma.groupMember.create({
-          data: { studentId: student.id, groupId: group.id, rollNumber: roll || email },
+          data: { studentId: student.id, groupId: group.id, rollNumber: roll || `R${student.id}` },
         });
       }
     }

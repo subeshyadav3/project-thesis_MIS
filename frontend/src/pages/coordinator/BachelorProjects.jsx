@@ -50,6 +50,8 @@ function BachelorProjects() {
   const [newStudentSearch, setNewStudentSearch] = useState('');
   const [newStudentOpen, setNewStudentOpen] = useState(false);
   const newStudentRef = useRef(null);
+  const [programs, setPrograms] = useState([]);
+  const [selectedProgramId, setSelectedProgramId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = () => {
@@ -60,6 +62,7 @@ function BachelorProjects() {
       api.get('/users/role/external_examiner?all=true').then(({ data }) => setExaminers(data)),
       api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data.filter(s => s.degreeType === 'BACHELOR'))),
+      api.get('/departments/programs').then(({ data }) => setPrograms(data)),
     ]).catch(() => {}).finally(() => setLoading(false));
   };
   useEffect(() => { loadData(); }, []);
@@ -182,7 +185,8 @@ useEffect(() => {
     try {
       const payload = {
         ...createForm,
-        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber }))
+        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
+        programId: selectedProgramId || undefined,
       };
       const { data: group } = await api.post('/groups', payload);
       if (createForm.examinerId) {
@@ -191,6 +195,7 @@ useEffect(() => {
       toast.success('Group created successfully');
       setShowCreate(false);
       setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setSelectedProgramId('');
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -784,6 +789,13 @@ const filteredGroups = useMemo(() => {
                   <option value="MAJOR">Major Project</option>
                 </select>
               </div>
+              <div className="form-group">
+                <label>Program</label>
+                <select value={selectedProgramId} onChange={e => setSelectedProgramId(e.target.value)} required>
+                  <option value="">Select program...</option>
+                  {programs.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+                </select>
+              </div>
 
               <div className="form-group" ref={createSupRef}>
                 <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
@@ -930,6 +942,7 @@ const filteredGroups = useMemo(() => {
                 ) : (() => {
                   const filteredStudents = allStudents.filter(s => {
                     if (String(st.studentId) === String(s.id)) return false;
+                    if (selectedProgramId && String(s.programId) !== String(selectedProgramId)) return false;
                     const q = newStudentSearch.toLowerCase().trim();
                     if (!q) return true;
                     return `${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q);
