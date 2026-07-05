@@ -117,7 +117,7 @@ function ExternalExaminerEvaluationPage() {
     return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
   });
 
-  const currentUserComponent = components.find(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  const currentUserComponents = components.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
 
   if (loading) {
     return (
@@ -300,47 +300,41 @@ function ExternalExaminerEvaluationPage() {
       {/* ============ EVALUATION TAB ============ */}
       {activeTab === 'evaluation' && (
         <>
-          {currentUserComponent && (() => {
-            const e = evaluationForComponent(currentUserComponent.id);
-            const isCompleted = e?.status === 'COMPLETED';
-            return (
-              <div className="card" style={{ marginBottom: 24 }}>
-                <div className="card-header">
-                  <div>
-                    <h3 style={{ margin: 0 }}>{currentUserComponent.name} Evaluation</h3>
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                      Max {currentUserComponent.maxMarks} marks · You are the evaluator
-                    </p>
-                  </div>
-                  {isCompleted && (
-                    <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>lock</span> Completed
-                    </span>
-                  )}
-                </div>
-                {isCompleted ? (
-                  <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
-                    <p style={{ marginTop: 8 }}>This evaluation has been finalized and can no longer be edited.</p>
-                    <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
-                      Marks: {e?.marks ?? '—'} / {currentUserComponent.maxMarks}
+          {currentUserComponents.length > 0 && (
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+              {currentUserComponents.map(comp => {
+                const e = evaluationForComponent(comp.id);
+                const isCompleted = e?.status === 'COMPLETED';
+                return (
+                  <div key={comp.id} className="card" style={{ flex: '1 1 300px', opacity: isCompleted ? 0.85 : 1 }}>
+                    <div className="card-header">
+                      <h3>{comp.name}</h3>
+                      {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                     </div>
-                    {e?.comment && <p style={{ fontStyle: 'italic', marginTop: 4 }}>"{e.comment}"</p>}
+                    {isCompleted || item?.status === 'COMPLETED' ? (
+                      <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
+                        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
+                          Marks: {e?.marks ?? '—'} / {comp.maxMarks}
+                        </div>
+                        {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4 }}>"{e.comment}"</p>}
+                      </div>
+                    ) : (
+                      <ExaminerEvaluationForm
+                        component={comp}
+                        evaluation={e}
+                        onSave={(marks, comment) => handleSaveComponent(comp, marks, comment)}
+                        onComplete={() => handleComplete(comp.id)}
+                        completing={completing === comp.id}
+                      />
+                    )}
                   </div>
-                ) : (
-                  <ExaminerEvaluationForm
-                    component={currentUserComponent}
-                    evaluation={e}
-                    onSave={(marks, comment) => handleSaveComponent(currentUserComponent, marks, comment)}
-                    onComplete={() => handleComplete(currentUserComponent.id)}
-                    completing={completing === currentUserComponent.id}
-                  />
-                )}
-              </div>
-            );
-          })()}
+                );
+              })}
+            </div>
+          )}
 
-          {!currentUserComponent && (
+          {currentUserComponents.length === 0 && (
             <div className="card" style={{ marginBottom: 24, textAlign: 'center', padding: 32 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>info</span>
               <h3 style={{ marginTop: 12 }}>No evaluation component assigned</h3>

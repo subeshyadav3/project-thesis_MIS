@@ -7,8 +7,9 @@ function ResetPassword() {
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState('email'); // 'email' | 'reset'
   const [error, setError] = useState('');
   const toast = useToast();
   const navigate = useNavigate();
@@ -20,8 +21,12 @@ function ResetPassword() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/forgot-password', { email });
-      setSent(true);
-      toast.success('If the email exists, a reset link has been sent.');
+      if (data.resetToken) {
+        setToken(data.resetToken);
+        setStep('reset');
+      } else {
+        toast.success('If the email exists, a reset link has been sent.');
+      }
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed to send reset email';
       setError(msg);
@@ -34,13 +39,12 @@ function ResetPassword() {
   const handleReset = async (e) => {
     e.preventDefault();
     setError('');
-    if (!email) return toast.warning('Please enter your email');
     if (!newPassword) return toast.warning('Please enter a new password');
     if (newPassword.length < 6) return toast.warning('Password must be at least 6 characters');
     if (newPassword !== confirmPassword) return toast.warning('Passwords do not match');
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', { email, newPassword });
+      await api.post('/auth/reset-password', { email, newPassword, token });
       toast.success('Password reset successfully. Please login.');
       navigate('/login');
     } catch (err) {
@@ -57,7 +61,6 @@ function ResetPassword() {
       <div className="academic-mesh" style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }} />
 
       <div className="login-wrapper">
-        {/* Left: Branding (same as login) */}
         <div className="login-brand">
           <div className="login-brand-badge">
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>verified</span>
@@ -85,12 +88,8 @@ function ResetPassword() {
           </div>
         </div>
 
-        {/* Right: Reset Password Form */}
         <div className="login-card animate-fade-in-up">
           <h2>Reset Password</h2>
-          <p className="login-subtitle">
-            {!sent ? 'Enter your email to receive reset instructions.' : 'Check your email for reset instructions.'}
-          </p>
 
           {error && (
             <div className="login-error">
@@ -99,42 +98,89 @@ function ResetPassword() {
             </div>
           )}
 
-          {!sent ? (
-            <form className="login-form" onSubmit={handleRequest}>
-              <div className="login-field">
-                <label>EMAIL</label>
-                <div className="input-wrapper">
-                  <span className="material-symbols-outlined">badge</span>
-                  <input
-                    type="email"
-                    placeholder="e.g. name@ioe.edu"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                  />
+          {step === 'email' ? (
+            <>
+              <p className="login-subtitle">Enter your email to receive reset instructions.</p>
+              <form className="login-form" onSubmit={handleRequest}>
+                <div className="login-field">
+                  <label>EMAIL</label>
+                  <div className="input-wrapper">
+                    <span className="material-symbols-outlined">badge</span>
+                    <input
+                      type="email"
+                      placeholder="e.g. name@ioe.edu"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={loading}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <button type="submit" className="login-submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    Send Reset Link
-                    <span className="material-symbols-outlined">send</span>
-                  </>
-                )}
-              </button>
-            </form>
+                <button type="submit" className="login-submit" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      Send Reset Link
+                      <span className="material-symbols-outlined">send</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </>
           ) : (
-            <div style={{ textAlign: 'center', padding: 24 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-success)' }}>mark_email_read</span>
-              <p style={{ marginTop: 16, color: 'var(--color-on-surface-variant)', fontSize: 14 }}>Check your email for reset instructions.</p>
-            </div>
+            <>
+              <p className="login-subtitle">Enter your new password.</p>
+              <form className="login-form" onSubmit={handleReset}>
+                <div className="login-field">
+                  <label>NEW PASSWORD</label>
+                  <div className="input-wrapper">
+                    <span className="material-symbols-outlined">lock</span>
+                    <input
+                      type="password"
+                      placeholder="Min. 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="login-field">
+                  <label>CONFIRM PASSWORD</label>
+                  <div className="input-wrapper">
+                    <span className="material-symbols-outlined">lock</span>
+                    <input
+                      type="password"
+                      placeholder="Re-enter new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="login-submit" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      Reset Password
+                      <span className="material-symbols-outlined">key</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </>
           )}
 
           <div style={{ textAlign: 'center', marginTop: 12 }}>

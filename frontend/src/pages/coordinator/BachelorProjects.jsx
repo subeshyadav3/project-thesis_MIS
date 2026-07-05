@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -62,7 +62,7 @@ function BachelorProjects() {
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
@@ -76,6 +76,8 @@ function BachelorProjects() {
     ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
   
 useEffect(() => {
     const handleClickOutside = (e) => {

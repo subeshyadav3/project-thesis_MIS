@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -54,7 +54,7 @@ function MasterThesis() {
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
@@ -67,6 +67,8 @@ function MasterThesis() {
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
 useEffect(() => {
     const handleClickOutside = (e) => {

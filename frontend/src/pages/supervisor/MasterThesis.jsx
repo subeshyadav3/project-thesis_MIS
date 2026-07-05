@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -25,7 +25,7 @@ function SupervisorMasterThesis() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
@@ -35,6 +35,8 @@ function SupervisorMasterThesis() {
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleComplete = async (id) => {
     try {

@@ -68,23 +68,29 @@ function ExternalEvaluationsList() {
     setCompleting(id);
     try {
       const { data } = await api.get(`/evaluations/thesis/${id}`);
-      const extComp = (data.components || []).find(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-      if (!extComp) { toast.error('No examiner component found'); setCompleting(null); return; }
-      const evaluation = (data.evaluations || []).find(e => e.componentId === extComp.id);
-      if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
+      const extComps = (data.components || []).filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+      if (!extComps.length) { toast.error('No examiner component found'); setCompleting(null); return; }
+      const allHaveMarks = extComps.every(comp => {
+        const e = (data.evaluations || []).find(ev => ev.componentId === comp.id);
+        return e && e.marks !== null && e.marks !== undefined;
+      });
+      if (!allHaveMarks) {
         setCompleting(null);
         setConfirmDialog({
           open: true,
-          message: 'No marks submitted yet. Complete without marks?',
+          message: 'Some criteria have no marks. Complete without marks?',
           onConfirm: () => {
             setConfirmDialog({ open: false, message: '', onConfirm: null });
-            setCompleting(extComp.id);
-            finalizeEvaluation(extComp.id, { thesisId: id });
+            extComps.forEach(comp => {
+              finalizeEvaluation(comp.id, { thesisId: id });
+            });
           }
         });
         return;
       }
-      await finalizeEvaluation(extComp.id, { thesisId: id });
+      for (const comp of extComps) {
+        await finalizeEvaluation(comp.id, { thesisId: id });
+      }
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); setCompleting(null); }
   };
 
@@ -98,9 +104,12 @@ function ExternalEvaluationsList() {
 
   const thesesWithStatus = useMemo(() => {
     return theses.map(t => {
-      const comp = t.evaluationComponents?.find(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-      const evalRec = t.evaluations?.find(e => e.componentId === comp?.id);
-      return { ...t, evalStatus: evalRec?.status || 'DRAFT', hasMarks: evalRec?.marks != null };
+      const extComps = (t.evaluationComponents || []).filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+      const statuses = extComps.map(c => t.evaluations?.find(e => e.componentId === c.id)?.status || 'DRAFT');
+      const allCompleted = statuses.length > 0 && statuses.every(s => s === 'COMPLETED');
+      const hasMarks = extComps.some(c => t.evaluations?.find(e => e.componentId === c.id)?.marks != null);
+      const evalStatus = allCompleted ? 'COMPLETED' : 'DRAFT';
+      return { ...t, evalStatus, hasMarks };
     });
   }, [theses]);
 

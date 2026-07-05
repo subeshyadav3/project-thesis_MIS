@@ -14,8 +14,11 @@ exports.submitComponentMarks = async (req, res) => {
     if (!componentId || (groupId == null && thesisId == null)) {
       return res.status(400).json({ error: 'componentId and groupId/thesisId are required' });
     }
-    if (marks !== null && marks !== undefined && marks !== '' && (typeof marks !== 'number' || marks < 0)) {
-      return res.status(400).json({ error: 'marks must be a non-negative number' });
+    if (marks !== null && marks !== undefined && marks !== '') {
+      const parsed = Number(marks);
+      if (isNaN(parsed) || parsed < 0) {
+        return res.status(400).json({ error: 'marks must be a non-negative number' });
+      }
     }
 
     const component = await prisma.evaluationComponent.findUnique({

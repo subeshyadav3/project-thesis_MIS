@@ -64,9 +64,8 @@ exports.forgotPassword = async (req, res) => {
     if (!user) return res.status(200).json({ success: true, message: 'If the email exists, a reset link has been sent.' });
     const token = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 3600000); // 1 hour
-    // Store token in DB (add a resetToken and resetTokenExpires field to User schema)
-    // For now, return token in response (dev mode)
-    res.json({ success: true, message: 'If the email exists, a reset link has been sent.' });
+    await prisma.user.update({ where: { id: user.id }, data: { resetToken: token, resetTokenExpires: expires } });
+    res.json({ success: true, message: 'If the email exists, a reset link has been sent.', resetToken: token });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -74,11 +73,15 @@ exports.forgotPassword = async (req, res) => {
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) return res.status(400).json({ success: false, error: 'Email and new password are required' });
+    const { email, newPassword, token } = req.body;
+    if (!email || !newPassword || !token) return res.status(400).json({ success: false, error: 'Email, token, and new password are required' });
     if (newPassword.length < 6) return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(400).json({ success: false, error: 'Invalid reset request' });
+    if (user.resetToken !== token) return res.status(400).json({ success: false, error: 'Invalid or expired reset token' });
+    if (!user.resetTokenExpires || new Date() > user.resetTokenExpires) return res.status(400).json({ success: false, error: 'Reset token has expired' });
     const hash = await bcrypt.hash(newPassword, 10);
-    const updated = await prisma.user.update({ where: { email }, data: { password: hash } });
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { password: hash, resetToken: null, resetTokenExpires: null } });
     audit.log({ action: 'RESET_PASSWORD', entity: 'User', entityId: updated.id, details: `Password reset for ${email} via forgot-password flow`, performedById: req.user?.id || null });
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (error) {

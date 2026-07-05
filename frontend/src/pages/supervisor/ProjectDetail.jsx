@@ -150,7 +150,7 @@ function ProjectDetail() {
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('stage', uploadStage);
-      formData.append(type, id);
+      formData.append(type === 'group' ? 'groupId' : 'thesisId', id);
       await api.post('/upload/proposal', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Proposal uploaded');
       setUploadFile(null);
@@ -168,7 +168,7 @@ function ProjectDetail() {
   const backPath = isSupervisor
     ? (type === 'group' ? '/supervisor/bachelor' : '/supervisor/master')
     : isCoordinator
-      ? (type === 'group' ? '/coordinator/bachelor-projects' : '/coordinator/master-thesis')
+      ? (type === 'group' ? '/coordinator/bachelor' : '/coordinator/master')
       : '/external/evaluations';
 
   const orderedComponents = [...components].sort((a, b) => {
@@ -448,22 +448,6 @@ function ProjectDetail() {
               </div>
             );
           })()}
-
-          {/* Supervisor / Examiner: Finalize button */}
-          {!isCoordinator && currentUserComponents.length > 0 && item?.status !== 'COMPLETED' && (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <div className="card-header"><h3>Finalize Project</h3></div>
-              <div style={{ padding: 16 }}>
-                <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', marginBottom: 12 }}>
-                  Mark this project as completed. This will lock all assignments and prevent further edits.
-                </p>
-                <button className="btn btn-primary" onClick={handleFinalize} disabled={finalizing}>
-                  <span className="material-symbols-outlined">{finalizing ? 'progress_activity' : 'check_circle'}</span>
-                  {finalizing ? 'Finalizing...' : 'Finalize Project'}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Coordinator: defense evaluation forms (always show, read-only when done) */}
           {isCoordinator && (() => {
