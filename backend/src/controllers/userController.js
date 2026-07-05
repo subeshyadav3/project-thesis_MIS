@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const audit = require('../services/auditService');
+const notifSvc = require('../services/notificationService');
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
@@ -56,7 +58,9 @@ exports.createUser = async (req, res) => {
       data: { email, password: hash, firstName, lastName, role, degreeType, departmentId: targetDeptId, programId },
       select: USER_SELECT,
     });
-    res.status(201).json(user);
+  audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Created ${role} ${email}`, performedById: req.user.id });
+  try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+  res.status(201).json(user);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -101,7 +105,10 @@ exports.updateUser = async (req, res) => {
       data,
       select: USER_SELECT,
     });
-    res.json(user);
+    const changedFields = Object.keys(data).join(', ');
+  audit.log({ action: 'UPDATE', entity: 'User', entityId: user.id, details: `Updated fields: ${changedFields}`, performedById: req.user.id });
+  try { notifSvc.notify(user.id, 'USER_UPDATED', 'Your profile has been updated'); } catch (e) { console.error(e.message); }
+  res.json(user);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -200,8 +207,35 @@ exports.toggleActive = async (req, res) => {
       select: USER_SELECT,
     });
 
-    res.json(updated);
+    const action = activating ? 'ACTIVATE' : 'DEACTIVATE';
+  audit.log({ action: 'DEACTIVATE', entity: 'User', entityId: user.id, details: `${action}d user ${user.email}`, performedById: req.user.id });
+  try { notifSvc.notify(user.id, 'USER_STATUS_CHANGED', `Your account has been ${action.toLowerCase()}d`); } catch (e) { console.error(e.message); }
+  res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const where = {};
+    if (req.query.entity) where.entity = req.query.entity;
+    if (req.query.entityId) where.entityId = parseInt(req.query.entityId);
+    // Coordinator can only see logs for their department users
+    if (req.user.role === 'COORDINATOR') {
+      const deptUserIds = await prisma.user.findMany({ where: { departmentId: req.user.departmentId }, select: { id: true } });
+      where.performedById = { in: deptUserIds.map(u => u.id) };
+    }
+    const logs = await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(req.query.limit) || 100,
+      skip: parseInt(req.query.offset) || 0,
+      include: { performedBy: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    });
+    const total = await prisma.auditLog.count({ where });
+    res.json({ success: true, data: { logs, total } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

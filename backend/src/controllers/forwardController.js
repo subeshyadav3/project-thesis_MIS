@@ -1,3 +1,5 @@
+const audit = require('../services/auditService');
+const notifSvc = require('../services/notificationService');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -47,7 +49,10 @@ exports.forwardToExamDept = async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       timeout: 10000,
     });
-    res.json({ message: 'Results forwarded successfully', response: response.data });
+    audit.log({ action: 'FORWARD', entity: 'Results', details: 'Forwarded results to Examination Department', performedById: req.user.id });
+    const coordinatorIds = await notifSvc.getCoordinatorIds();
+  await notifSvc.notifyMany(coordinatorIds, 'RESULTS_FORWARDED', `Results have been forwarded to the Examination Department`);
+  res.json({ message: 'Results forwarded successfully', response: response.data });
   } catch (error) {
     res.status(500).json({ error: 'Failed to forward results' });
   }

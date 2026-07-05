@@ -9,5 +9,6 @@ router.put('/:id', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userCon
 router.delete('/:id', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.deleteUser);
 router.get('/role/:role', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getUsersByRole);
 router.put('/:id/toggle-active', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.toggleActive);
+router.get('/audit-logs', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getAuditLogs);
 
 module.exports = router;

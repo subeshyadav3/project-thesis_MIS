@@ -3,6 +3,10 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 function ExternalEvaluationsList() {
   const [groups, setGroups] = useState([]);
@@ -10,6 +14,8 @@ function ExternalEvaluationsList() {
   const [activeTab, setActiveTab] = useState('groups');
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: null });
   const toast = useToast();
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -26,22 +32,36 @@ function ExternalEvaluationsList() {
     return () => controller.abort();
   }, []);
 
+  const finalizeEvaluation = async (componentId, payload) => {
+    try {
+      await api.put(`/evaluations/${componentId}/complete`, payload);
+      toast.success('Evaluation finalized');
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); }
+    finally { setCompleting(null); }
+  };
+
   const handleCompleteGroup = async (id) => {
     setCompleting(id);
     try {
       const { data } = await api.get(`/evaluations/group/${id}`);
       const extComp = (data.components || []).find(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-      if (!extComp) { toast.error('No examiner component found'); return; }
+      if (!extComp) { toast.error('No examiner component found'); setCompleting(null); return; }
       const evaluation = (data.evaluations || []).find(e => e.componentId === extComp.id);
       if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
-        const confirmed = window.confirm('No marks submitted yet. Complete without marks?');
-        if (!confirmed) return;
+        setCompleting(null);
+        setConfirmDialog({
+          open: true,
+          message: 'No marks submitted yet. Complete without marks?',
+          onConfirm: () => {
+            setConfirmDialog({ open: false, message: '', onConfirm: null });
+            setCompleting(extComp.id);
+            finalizeEvaluation(extComp.id, { groupId: id });
+          }
+        });
+        return;
       }
-      await api.put(`/evaluations/${extComp.id}/complete`, { groupId: id });
-      toast.success('Evaluation finalized');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); }
-    finally { setCompleting(null); }
+      await finalizeEvaluation(extComp.id, { groupId: id });
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); setCompleting(null); }
   };
 
   const handleCompleteThesis = async (id) => {
@@ -49,17 +69,23 @@ function ExternalEvaluationsList() {
     try {
       const { data } = await api.get(`/evaluations/thesis/${id}`);
       const extComp = (data.components || []).find(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-      if (!extComp) { toast.error('No examiner component found'); return; }
+      if (!extComp) { toast.error('No examiner component found'); setCompleting(null); return; }
       const evaluation = (data.evaluations || []).find(e => e.componentId === extComp.id);
       if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
-        const confirmed = window.confirm('No marks submitted yet. Complete without marks?');
-        if (!confirmed) return;
+        setCompleting(null);
+        setConfirmDialog({
+          open: true,
+          message: 'No marks submitted yet. Complete without marks?',
+          onConfirm: () => {
+            setConfirmDialog({ open: false, message: '', onConfirm: null });
+            setCompleting(extComp.id);
+            finalizeEvaluation(extComp.id, { thesisId: id });
+          }
+        });
+        return;
       }
-      await api.put(`/evaluations/${extComp.id}/complete`, { thesisId: id });
-      toast.success('Evaluation finalized');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); }
-    finally { setCompleting(null); }
+      await finalizeEvaluation(extComp.id, { thesisId: id });
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); setCompleting(null); }
   };
 
   const groupsWithStatus = useMemo(() => {
@@ -78,10 +104,33 @@ function ExternalEvaluationsList() {
     });
   }, [theses]);
 
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery) return groupsWithStatus;
+    const q = searchQuery.toLowerCase();
+    return groupsWithStatus.filter(g =>
+      g.name?.toLowerCase().includes(q) ||
+      g.projectTitle?.toLowerCase().includes(q) ||
+      (g.members || []).some(m =>
+        `${m.student?.firstName} ${m.student?.lastName}`.toLowerCase().includes(q)
+      )
+    );
+  }, [groupsWithStatus, searchQuery]);
+
+  const filteredTheses = useMemo(() => {
+    if (!searchQuery) return thesesWithStatus;
+    const q = searchQuery.toLowerCase();
+    return thesesWithStatus.filter(t =>
+      t.title?.toLowerCase().includes(q) ||
+      `${t.student?.firstName} ${t.student?.lastName}`.toLowerCase().includes(q) ||
+      `${t.supervisor?.firstName} ${t.supervisor?.lastName}`.toLowerCase().includes(q)
+    );
+  }, [thesesWithStatus, searchQuery]);
+
   return (
+    <ErrorBoundary>
     <PageLayout title="Assigned Evaluations" subtitle="Projects and theses assigned for evaluation" user={user}>
       {loading ? (
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span></div>
+        <TableSkeleton rows={5} cols={6} />
       ) : (
         <>
           <div className="tabs" style={{ marginBottom: 24 }}>
@@ -91,6 +140,10 @@ function ExternalEvaluationsList() {
             <div className={`tab ${activeTab === 'theses' ? 'active' : ''}`} onClick={() => setActiveTab('theses')}>
               <span className="material-symbols-outlined">library_books</span> Master's Theses ({theses.length})
             </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by name, title, or member..." />
           </div>
 
           {activeTab === 'groups' ? (
@@ -113,7 +166,7 @@ function ExternalEvaluationsList() {
                     </tr>
                   </thead>
                   <tbody>
-                    {groupsWithStatus.map(g => (
+                    {filteredGroups.map(g => (
                       <tr key={g.id} onClick={() => navigate(`/external/evaluate/group/${g.id}`)} style={{ cursor: 'pointer' }}>
                         <td><div className="default-badge">{g.name?.slice(0, 2).toUpperCase()}</div><span style={{ fontWeight: 500 }}>{g.name}</span></td>
                         <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
@@ -165,7 +218,7 @@ function ExternalEvaluationsList() {
                     </tr>
                   </thead>
                   <tbody>
-                    {thesesWithStatus.map(t => (
+                    {filteredTheses.map(t => (
                       <tr key={t.id} onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)} style={{ cursor: 'pointer' }}>
                         <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
                         <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
@@ -198,7 +251,19 @@ function ExternalEvaluationsList() {
           )}
         </>
       )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Confirm"
+        message={confirmDialog.message}
+        onConfirm={() => {
+          const fn = confirmDialog.onConfirm;
+          setConfirmDialog({ open: false, message: '', onConfirm: null });
+          fn?.();
+        }}
+        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: null })}
+      />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

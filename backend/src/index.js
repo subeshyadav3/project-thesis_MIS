@@ -20,6 +20,8 @@ const departmentRoutes = require('./routes/departments');
 const studentRoutes = require('./routes/students');
 const externalExaminerRoutes = require('./routes/externalExaminers');
 const examinerAssignmentRoutes = require('./routes/examinerAssignments');
+const errorHandler = require('./middleware/errorHandler');
+const uploadController = require('./controllers/uploadController');
 
 const app = express();
 
@@ -30,6 +32,9 @@ app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -50,6 +55,7 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/external-examiners', externalExaminerRoutes);
 app.use('/api/examiner-assignments', examinerAssignmentRoutes);
+app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
@@ -98,10 +104,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Thesis Management API is running' });
 });
 
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

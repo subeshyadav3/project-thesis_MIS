@@ -4,6 +4,8 @@ import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -21,6 +23,7 @@ function ExternalExaminerEvaluationPage() {
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: null });
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -29,7 +32,7 @@ function ExternalExaminerEvaluationPage() {
     const endpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
     api.get(endpoint, { signal })
       .then(({ data }) => setItem(data))
-      .catch((err) => { if (err.name !== 'CanceledError') console.error(err); });
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); });
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint, { signal })
       .then(({ data }) => {
@@ -37,7 +40,7 @@ function ExternalExaminerEvaluationPage() {
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
       })
-      .catch((err) => { if (err.name !== 'CanceledError') console.error(err); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
@@ -75,12 +78,7 @@ function ExternalExaminerEvaluationPage() {
     }
   };
 
-  const handleComplete = async (componentId) => {
-    const e = evaluationForComponent(componentId);
-    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
-      const confirmed = window.confirm('Warning: The marks for this component are zero or not set. Do you still want to mark it as complete?');
-      if (!confirmed) return;
-    }
+  const doComplete = async (componentId) => {
     setCompleting(componentId);
     try {
       const payload = {};
@@ -93,6 +91,22 @@ function ExternalExaminerEvaluationPage() {
     } finally {
       setCompleting(null);
     }
+  };
+
+  const handleComplete = async (componentId) => {
+    const e = evaluationForComponent(componentId);
+    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
+      setConfirmDialog({
+        open: true,
+        message: 'Warning: The marks for this component are zero or not set. Do you still want to mark it as complete?',
+        onConfirm: () => {
+          setConfirmDialog({ open: false, message: '', onConfirm: null });
+          doComplete(componentId);
+        }
+      });
+      return;
+    }
+    await doComplete(componentId);
   };
 
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
@@ -122,6 +136,7 @@ function ExternalExaminerEvaluationPage() {
   }
 
   return (
+    <ErrorBoundary>
     <PageLayout title="Internal Examiner Evaluation" subtitle={title} user={user}
       actions={
         <button className="btn btn-outline btn-sm" onClick={() => navigate('/external/evaluations')}>
@@ -334,7 +349,19 @@ function ExternalExaminerEvaluationPage() {
           )}
         </>
       )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Confirm"
+        message={confirmDialog.message}
+        onConfirm={() => {
+          const fn = confirmDialog.onConfirm;
+          setConfirmDialog({ open: false, message: '', onConfirm: null });
+          fn?.();
+        }}
+        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: null })}
+      />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 
@@ -350,6 +377,15 @@ function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, com
   }, [evaluation?.id, evaluation?.marks, evaluation?.comment]);
 
   const submit = async () => {
+    if (marks === '' || marks === null || marks === undefined) {
+      toast.warning('Please enter marks');
+      return;
+    }
+    const m = parseFloat(marks);
+    if (Number.isNaN(m) || m < 0 || m > component.maxMarks) {
+      toast.warning(`Marks must be between 0 and ${component.maxMarks}`);
+      return;
+    }
     setSaving(true);
     try { await onSave(marks, comment); }
     finally { setSaving(false); }

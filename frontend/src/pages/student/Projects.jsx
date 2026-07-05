@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
+import { useToast } from '../../contexts/ToastContext';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 
 function StudentProjects() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const toast = useToast();
 
   useEffect(() => {
     setLoading(true);
@@ -17,21 +20,21 @@ function StudentProjects() {
         u.studentType = 'bachelor';
         localStorage.setItem('user', JSON.stringify(u));
       })
-      .catch(() => setGroups([]))
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load projects'); setGroups([]); })
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <PageLayout title="My Projects" user={user}>
+      <ErrorBoundary><PageLayout title="My Projects" user={user}>
         <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   if (groups.length === 0) {
     return (
-      <PageLayout title="My Projects" user={user}>
+      <ErrorBoundary><PageLayout title="My Projects" user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 16px', background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>group</span>
@@ -39,12 +42,12 @@ function StudentProjects() {
           <h3>No Projects</h3>
           <p style={{ color: 'var(--color-on-surface-variant)', marginTop: 8 }}>You have not been assigned to any bachelor project groups yet.</p>
         </div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   return (
-    <PageLayout title="My Projects" subtitle={`${groups.length} project${groups.length > 1 ? 's' : ''} found`} user={user}>
+    <ErrorBoundary><PageLayout title="My Projects" subtitle={`${groups.length} project${groups.length > 1 ? 's' : ''} found`} user={user}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {groups.map(g => (
           <Link key={g.id} to={`/student/project/${g.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -93,7 +96,7 @@ function StudentProjects() {
           </Link>
         ))}
       </div>
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 

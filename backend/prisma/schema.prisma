@@ -65,9 +65,9 @@ model User {
   role        Role
   degreeType  DegreeType?
   departmentId Int?
-  department  Department? @relation("UserDepartment", fields: [departmentId], references: [id])
+  department  Department? @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
   programId   Int?
-  program     Program?    @relation("StudentProgram", fields: [programId], references: [id])
+  program     Program?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: SetNull)
   active      Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -84,6 +84,12 @@ model User {
   recommendations          Recommendation[]
   examinerAssignments      ExaminerAssignment[]  @relation("ExternalExaminer")
   examinerAssignmentsAssigned ExaminerAssignment[] @relation("AssignedBy")
+  auditLogs                   AuditLog[]
+
+  @@index([role])
+  @@index([departmentId])
+  @@index([programId])
+  @@index([active])
 }
 
 model Department {
@@ -122,6 +128,9 @@ model AcademicYear {
 
   groups ProjectGroup[]
   theses Thesis[]
+
+  @@index([departmentId])
+  @@index([isActive])
 }
 
 model ProjectGroup {
@@ -145,6 +154,10 @@ model ProjectGroup {
   proposals            Proposal[]
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
+
+  @@index([status])
+  @@index([programId])
+  @@index([academicYearId])
 }
 
 model GroupMember {
@@ -178,6 +191,10 @@ model Thesis {
   proposals            Proposal[]
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
+
+  @@index([status])
+  @@index([studentId])
+  @@index([academicYearId])
 }
 
 model EvaluationComponent {
@@ -285,4 +302,20 @@ model Recommendation {
   thesisId   Int?
   thesis     Thesis?       @relation(fields: [thesisId], references: [id], onDelete: Cascade)
   createdAt  DateTime      @default(now())
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  action      String
+  entity      String
+  entityId    Int?
+  details     String?
+  performedById Int?
+  performedBy User?    @relation(fields: [performedById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([entity])
+  @@index([entityId])
+  @@index([performedById])
+  @@index([createdAt])
 }

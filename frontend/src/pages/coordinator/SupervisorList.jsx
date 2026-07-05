@@ -4,6 +4,10 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -14,7 +18,7 @@ function SupervisorList() {
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
@@ -22,6 +26,7 @@ function SupervisorList() {
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -31,9 +36,20 @@ function SupervisorList() {
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
       api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  const loadData = () => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoading(true);
+    Promise.all([
+      api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
+  };
 
   const handleCreateSupervisor = async (e) => {
     e.preventDefault();
@@ -59,12 +75,13 @@ function SupervisorList() {
   };
 
   const handleToggleActive = async (sup) => {
-    if (!window.confirm(`Toggle active status for ${sup.firstName} ${sup.lastName}?`)) return;
-    try {
-      await api.put(`/users/${sup.id}/toggle-active`);
-      toast.success('Status toggled');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Toggle failed'); }
+    setConfirmDialog({ open: true, title: 'Toggle Active Status', message: `Are you sure you want to toggle active status for ${sup.firstName} ${sup.lastName}?`, onConfirm: async () => {
+      try {
+        await api.put(`/users/${sup.id}/toggle-active`);
+        toast.success('Status toggled');
+        loadData();
+      } catch (err) { toast.error(err.response?.data?.error || 'Toggle failed'); }
+    }, danger: false });
   };
 
   const openEdit = (sup) => {
@@ -83,16 +100,16 @@ function SupervisorList() {
     }));
   }, [supervisors, groups, theses]);
 
-  const filtered = useMemo(() => {
-    if (!searchTerm) return enriched;
-    const q = searchTerm.toLowerCase();
+  const filteredSupervisors = useMemo(() => {
+    if (!searchQuery) return enriched;
+    const q = searchQuery.toLowerCase();
     return enriched.filter(s =>
       `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(q)
     );
-  }, [enriched, searchTerm]);
+  }, [enriched, searchQuery]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(filteredSupervisors.length / PAGE_SIZE);
+  const paginated = filteredSupervisors.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
@@ -111,6 +128,7 @@ function SupervisorList() {
   );
 
   return (
+    <ErrorBoundary>
     <PageLayout title="Supervisors" user={user} actions={actions}>
       {/* ── CREATE MODAL ── */}
       {showCreate && (
@@ -324,26 +342,20 @@ function SupervisorList() {
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search supervisors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search supervisors..." style={{ maxWidth: 320, marginBottom: 12 }} />
           </div>
           <div className="table-toolbar-right">
-            <span className="font-label text-xs font-semibold text-on-surface-variant">{filtered.length} supervisors</span>
+            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredSupervisors.length} supervisors</span>
           </div>
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading supervisors...</p>
-          </div>
-        ) : filtered.length === 0 ? (
+          <TableSkeleton rows={5} cols={5} />
+        ) : filteredSupervisors.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">supervisor_account</span>
             <h3>No supervisors found</h3>
-            <p>{searchTerm ? 'Try adjusting your search.' : 'No supervisors have been registered yet.'}</p>
+            <p>{searchQuery ? 'Try adjusting your search.' : 'No supervisors have been registered yet.'}</p>
           </div>
         ) : (
           <>
@@ -370,9 +382,8 @@ function SupervisorList() {
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
                     <td>
-                      <span className={`badge badge-${s.active ? 'active' : 'completed'}`} style={{ textTransform: 'none' }}>
-                        <span className="dot" />
-                        {s.active ? 'Active' : 'Inactive'}
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
+                        {s.active ? 'check_circle' : 'cancel'}
                       </span>
                     </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
@@ -396,8 +407,8 @@ function SupervisorList() {
             </table>
             <div className="table-footer">
               <span className="font-label text-xs text-on-surface-variant table-footer-info">
-                {filtered.length > 0
-                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} of ${filtered.length}`
+                {filteredSupervisors.length > 0
+                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredSupervisors.length)} of ${filteredSupervisors.length}`
                   : '0 results'}
               </span>
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -405,7 +416,17 @@ function SupervisorList() {
           </>
         )}
       </div>
+      <ConfirmDialog 
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="Confirm"
+        danger={confirmDialog.danger}
+        onConfirm={() => { confirmDialog.onConfirm?.(); setConfirmDialog({ ...confirmDialog, open: false }); }}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, open: false })}
+      />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

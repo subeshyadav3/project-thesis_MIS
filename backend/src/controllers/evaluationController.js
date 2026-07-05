@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 
 // Submit / update marks for a specific evaluation component.
 // The component decides who can evaluate it (`evaluatorRole`).
@@ -79,8 +80,9 @@ exports.submitComponentMarks = async (req, res) => {
       ...(thesisId ? { thesisId: parseInt(thesisId) } : {}),
     };
 
-    const existing = await prisma.evaluation.findUnique({
-      where: { componentId: component.id },
+    const scopeWhere = groupId ? { groupId: parseInt(groupId, 10) } : { thesisId: parseInt(thesisId, 10) };
+    const existing = await prisma.evaluation.findFirst({
+      where: { componentId: component.id, ...scopeWhere },
     });
 
     // Prevent editing if already completed
@@ -88,9 +90,15 @@ exports.submitComponentMarks = async (req, res) => {
       return res.status(400).json({ error: 'Evaluation is already completed and cannot be edited.' });
     }
 
-    const evaluation = await (existing
+    const isUpdate = !!existing;
+    const evaluation = await (isUpdate
       ? prisma.evaluation.update({ where: { id: existing.id }, data })
       : prisma.evaluation.create({ data }));
+    const auditAction = isUpdate ? 'UPDATE_MARKS' : 'SUBMIT_MARKS';
+    const auditDetails = isUpdate
+      ? `Updated ${component.evaluationType.replace('_', ' ').toLowerCase()} marks to ${data.marks ?? 'null'}/${component.maxMarks}`
+      : `Submitted ${data.marks ?? 'null'}/${component.maxMarks} marks for ${component.evaluationType.replace('_', ' ').toLowerCase()}`;
+    audit.log({ action: auditAction, entity: 'Evaluation', entityId: evaluation.id, details: auditDetails, performedById: req.user.id });
 
     // Build the new summary so the caller doesn't have to refetch
     const components = await prisma.evaluationComponent.findMany({
@@ -196,6 +204,7 @@ exports.submitFeedback = async (req, res) => {
         );
       }
     }
+    audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', details: `Submitted marks for component`, performedById: req.user.id });
     res.status(201).json(evaluation);
   } catch (error) {
     console.error('submitFeedback error:', error);
@@ -218,9 +227,10 @@ exports.getGroupEvaluations = async (req, res) => {
       }),
       prisma.projectGroup.findUnique({ where: { id }, select: { projectType: true } }),
     ]);
-    const projectType = group?.projectType || 'MINOR';
-    const summary = computeSummary(evaluations, components, projectType);
-    res.json({ evaluations, components, summary });
+  const projectType = group?.projectType || 'MINOR';
+  const summary = computeSummary(evaluations, components, projectType);
+  audit.log({ action: 'VIEW', entity: 'GroupEvaluations', details: `Retrieved evaluations for group ${id}`, performedById: req.user.id });
+  res.json({ evaluations, components, summary });
   } catch (error) {
     console.error('getGroupEvaluations error:', error);
     res.status(500).json({ error: 'Internal server error' });

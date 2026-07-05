@@ -3,6 +3,7 @@ const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 
 exports.getTheses = async (req, res) => {
@@ -76,6 +77,7 @@ exports.createThesis = async (req, res) => {
         data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
       });
     }
+    audit.log({ action: 'CREATE', entity: 'Thesis', entityId: thesis.id, details: `Created thesis "${thesis.title}"`, performedById: req.user.id });
     res.status(201).json(thesis);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -122,6 +124,7 @@ exports.uploadExcel = async (req, res) => {
       }
       created.push(thesis);
     }
+    audit.log({ action: 'CREATE', entity: 'Thesis', details: `Imported ${created.length} theses via Excel`, performedById: req.user.id });
     res.status(201).json({ message: `${created.length} theses created`, theses: created });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -143,6 +146,7 @@ exports.updateThesisStatus = async (req, res) => {
         });
       } catch (e) { console.error('notifyStatusChange:', e.message); }
     }
+    audit.log({ action: 'UPDATE_STATUS', entity: 'Thesis', entityId: thesis.id, details: `Status updated for thesis "${thesis.title}"`, performedById: req.user.id });
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -174,8 +178,44 @@ exports.assignSupervisor = async (req, res) => {
         studentIds: thesis.studentId ? [thesis.studentId] : [],
       });
     } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
+    audit.log({ action: 'ASSIGN_SUPERVISOR', entity: 'Thesis', entityId: thesis.id, details: `Assigned supervisor to "${thesis.title}"`, performedById: req.user.id });
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.exportTheses = async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    const where = {};
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
+      where.academicYear = { departmentId: req.user.departmentId };
+    }
+    const theses = await prisma.thesis.findMany({
+      where,
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        academicYear: true,
+      },
+    });
+    const rows = theses.map(t => ({
+      'Project Title': t.title,
+      'Project Type': t.projectType,
+      Status: t.status,
+      Student: `${t.student.firstName} ${t.student.lastName}`,
+      Supervisor: t.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : 'Not assigned',
+      'Academic Year': t.academicYear ? `${t.academicYear.year} ${t.academicYear.semester}` : '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Theses');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=theses.xlsx');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.send(buf);
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

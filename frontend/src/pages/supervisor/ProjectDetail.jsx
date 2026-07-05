@@ -5,6 +5,8 @@ import ProposalsSection from '../../components/ProposalsSection';
 import ExaminerAssignmentSection from '../../components/ExaminerAssignmentSection';
 import SupervisorAssignmentSection from '../../components/SupervisorAssignmentSection';
 import { useToast } from '../../contexts/ToastContext';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import api from '../../services/api';
 
 const ROLE_LABEL = {
@@ -24,18 +26,22 @@ function ProjectDetail() {
   const [completing, setCompleting] = useState(null);
   const [finalizing, setFinalizing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isSupervisor = user.role === 'SUPERVISOR';
   const isCoordinator = user.role === 'COORDINATOR';
   const isExternal = user.role === 'EXTERNAL_EXAMINER';
+  const [uploadStage, setUploadStage] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const loadData = useCallback((signal) => {
     setLoading(true);
     const endpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
     api.get(endpoint, { signal })
       .then(({ data }) => setItem(data))
-      .catch((err) => { if (err.name !== 'CanceledError') console.error(err); });
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load project'); });
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint, { signal })
       .then(({ data }) => {
@@ -43,7 +49,7 @@ function ProjectDetail() {
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
       })
-      .catch((err) => { if (err.name !== 'CanceledError') console.error(err); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load evaluations'); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
@@ -81,12 +87,7 @@ function ProjectDetail() {
     }
   };
 
-  const handleComplete = async (componentId) => {
-    const e = evaluationForComponent(componentId);
-    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
-      const confirmed = window.confirm('Warning: The marks for this component are zero or not set. Do you still want to mark it as complete?');
-      if (!confirmed) return;
-    }
+  const doComplete = async (componentId) => {
     setCompleting(componentId);
     try {
       const payload = {};
@@ -101,8 +102,23 @@ function ProjectDetail() {
     }
   };
 
-  const handleFinalize = async () => {
-    if (!window.confirm(`Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED? This will finalize it at the project level.`)) return;
+  const handleComplete = (componentId) => {
+    const e = evaluationForComponent(componentId);
+    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
+      setConfirmDialog({
+        open: true,
+        title: 'Complete Evaluation',
+        message: 'The marks for this component are zero or not set. Do you still want to mark it as complete?',
+        danger: true,
+        confirmLabel: 'Complete Anyway',
+        onConfirm: () => doComplete(componentId),
+      });
+      return;
+    }
+    doComplete(componentId);
+  };
+
+  const doFinalize = async () => {
     setFinalizing(true);
     try {
       const endpoint = type === 'group' ? `/groups/${id}/status` : `/theses/${id}/status`;
@@ -116,13 +132,44 @@ function ProjectDetail() {
     }
   };
 
+  const handleFinalize = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Finalize Project',
+      message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED? This will finalize it at the project level.`,
+      danger: true,
+      confirmLabel: 'Finalize',
+      onConfirm: () => doFinalize(),
+    });
+  };
+
+  const handleUploadProposal = async () => {
+    if (!uploadFile || !uploadStage) return toast.warning('Select a file and stage');
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('stage', uploadStage);
+      formData.append(type, id);
+      await api.post('/upload/proposal', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Proposal uploaded');
+      setUploadFile(null);
+      setUploadStage('');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
   const title = type === 'group' ? item?.projectTitle : item?.title;
   const backPath = isSupervisor
     ? (type === 'group' ? '/supervisor/bachelor' : '/supervisor/master')
     : isCoordinator
-    ? (type === 'group' ? '/coordinator/bachelor-projects' : '/coordinator/master-thesis')
-    : '/external/evaluations';
+      ? (type === 'group' ? '/coordinator/bachelor-projects' : '/coordinator/master-thesis')
+      : '/external/evaluations';
 
   const orderedComponents = [...components].sort((a, b) => {
     const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
@@ -132,7 +179,7 @@ function ProjectDetail() {
   const currentUserComponent = components.find(c => c.evaluatorRole === user.role);
 
   return (
-    <PageLayout title={title} subtitle={name || ''} user={user}
+    <ErrorBoundary><PageLayout title={title} subtitle={name || ''} user={user}
       actions={
         <button className="btn btn-outline btn-sm" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back
@@ -180,7 +227,7 @@ function ProjectDetail() {
                   <span>{item?.student?.email || '—'}</span>
                 </>
               )}
-<span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
+              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
               <span>{title}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Supervisor:</span>
               <span>{item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
@@ -188,10 +235,10 @@ function ProjectDetail() {
               <span>
                 {item?.examinerAssignments?.length > 0
                   ? item.examinerAssignments.map(a => (
-                      <span key={a.id} className="badge badge-info" style={{ fontSize: 12 }}>
-                        {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
-                      </span>
-                    ))
+                    <span key={a.id} className="badge badge-info" style={{ fontSize: 12 }}>
+                      {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                    </span>
+                  ))
                   : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                 }
               </span>
@@ -272,7 +319,7 @@ function ProjectDetail() {
                     </div>
                   );
                 })}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 14, borderRadius: 8, background: 'var(--color-primary-container)', border: '2px solid var(--color-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 14, borderRadius: 8, background: 'var(--color-primary-grand)', border: '2px solid var(--color-primary)' }}>
                   <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-on-primary)' }}>Grand Total</span>
                   <span style={{ fontWeight: 800, fontSize: 24, color: 'var(--color-on-primary)' }}>
                     {summary?.total ?? 0} <span style={{ fontWeight: 400, fontSize: 14 }}>/ {summary?.maxTotal ?? (type === 'group' ? 100 : 200)}</span>
@@ -310,6 +357,30 @@ function ProjectDetail() {
 
           {/* Submitted documents */}
           <div style={{ marginBottom: 24 }}>
+            {/* Proposal Upload — coordinator only */}
+            {isCoordinator && (item?.status === 'ACTIVE' || item?.status === 'PENDING') && (
+              <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+                <h4 style={{ margin: '0 0 12px' }}>Upload Proposal</h4>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                    <label style={{ fontSize: 11 }}>Stage</label>
+                    <select className="form-input" value={uploadStage} onChange={e => setUploadStage(e.target.value)}>
+                      <option value="">Select stage...</option>
+                      <option value="PROPOSAL">Proposal</option>
+                      <option value="MID_TERM">Mid Term</option>
+                      <option value="FINAL">Final</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                    <label style={{ fontSize: 11 }}>File</label>
+                    <input type="file" className="form-input" onChange={e => setUploadFile(e.target.files[0])} accept=".pdf,.doc,.docx" />
+                  </div>
+                  <button className="btn btn-primary" onClick={handleUploadProposal} disabled={!uploadFile || !uploadStage || uploading}>
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </button>
+                </div>
+              </div>
+            )}
             <ProposalsSection proposals={item?.proposals || []} />
           </div>
         </>
@@ -412,8 +483,6 @@ function ProjectDetail() {
                           onSave={(marks, comment) => handleSaveComponent(c, marks, comment)}
                           onComplete={() => handleComplete(c.id)}
                           completing={completing === c.id}
-                          onFinalize={item?.status !== 'COMPLETED' ? handleFinalize : undefined}
-                          finalizing={finalizing}
                         />
                       )}
                     </div>
@@ -452,6 +521,16 @@ function ProjectDetail() {
         </>
       )}
     </PageLayout>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={() => { confirmDialog.onConfirm?.(); setConfirmDialog({ open: false }); }}
+        onCancel={() => setConfirmDialog({ open: false })}
+        danger={confirmDialog.danger}
+        confirmLabel={confirmDialog.confirmLabel}
+      />
+    </ErrorBoundary>
   );
 }
 
@@ -523,7 +602,7 @@ function EvaluationForm({ component, evaluation, onSave, onComplete, completing,
   );
 }
 
-function DefenseCard({ component, evaluation, onSave, onComplete, completing, onFinalize, finalizing }) {
+function DefenseCard({ component, evaluation, onSave, onComplete, completing }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
   const [comment, setComment] = useState(evaluation?.comment ?? '');
   const [saving, setSaving] = useState(false);
@@ -563,24 +642,31 @@ function DefenseCard({ component, evaluation, onSave, onComplete, completing, on
         />
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" onClick={submit} disabled={saving} style={{ flex: 1 }}>
-          <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'save'}</span>
+        <button
+          className="btn btn-primary"
+          onClick={submit}
+          disabled={saving}
+          style={{ flex: 1 }}
+        >
+          <span className="material-symbols-outlined">
+            {saving ? 'progress_activity' : 'save'}
+          </span>
           {saving ? 'Saving...' : 'Save'}
         </button>
+
         <button
           className="btn"
-          style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}
+          style={{
+            background: 'var(--color-success-container)',
+            color: 'var(--color-on-success-container)',
+          }}
           onClick={onComplete}
           disabled={completing}
         >
-          <span className="material-symbols-outlined">{completing ? 'progress_activity' : 'lock'}</span>
+          <span className="material-symbols-outlined">
+            {completing ? 'progress_activity' : 'lock'}
+          </span>
         </button>
-        {onFinalize && (
-          <button className="btn btn-primary" onClick={onFinalize} disabled={finalizing}>
-            <span className="material-symbols-outlined">{finalizing ? 'progress_activity' : 'check_circle'}</span>
-            {finalizing ? 'Finalizing...' : 'Finalize'}
-          </button>
-        )}
       </div>
     </>
   );

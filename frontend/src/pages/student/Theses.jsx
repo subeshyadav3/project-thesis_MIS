@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
+import { useToast } from '../../contexts/ToastContext';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 
 function StudentTheses() {
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const toast = useToast();
 
   useEffect(() => {
     setLoading(true);
@@ -17,21 +20,21 @@ function StudentTheses() {
         u.studentType = 'master';
         localStorage.setItem('user', JSON.stringify(u));
       })
-      .catch(() => setTheses([]))
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); })
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <PageLayout title="My Theses" user={user}>
+      <ErrorBoundary><PageLayout title="My Theses" user={user}>
         <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   if (theses.length === 0) {
     return (
-      <PageLayout title="My Theses" user={user}>
+      <ErrorBoundary><PageLayout title="My Theses" user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 16px', background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>library_books</span>
@@ -39,12 +42,12 @@ function StudentTheses() {
           <h3>No Theses</h3>
           <p style={{ color: 'var(--color-on-surface-variant)', marginTop: 8 }}>You have no master's theses assigned.</p>
         </div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   return (
-    <PageLayout title="My Theses" subtitle={`${theses.length} thesis${theses.length > 1 ? 'es' : ''}`} user={user}>
+    <ErrorBoundary><PageLayout title="My Theses" subtitle={`${theses.length} thesis${theses.length > 1 ? 'es' : ''}`} user={user}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {theses.map(t => (
           <Link key={t.id} to={`/student/thesis/${t.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -92,7 +95,7 @@ function StudentTheses() {
           </Link>
         ))}
       </div>
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 

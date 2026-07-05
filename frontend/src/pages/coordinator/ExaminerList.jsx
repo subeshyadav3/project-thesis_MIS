@@ -4,6 +4,10 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -14,7 +18,8 @@ function ExaminerList() {
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
@@ -35,8 +40,23 @@ function ExaminerList() {
     return () => controller.abort();
   }, []);
 
+  const loadData = () => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoading(true);
+    Promise.all([
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!createForm.firstName.trim() || !createForm.lastName.trim()) {
+      toast.error('First name and last name are required');
+      return;
+    }
     try {
       await api.post('/users', { ...createForm, role: 'EXTERNAL_EXAMINER' });
       toast.success('Internal Examiner created successfully');
@@ -47,12 +67,20 @@ function ExaminerList() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Remove this Internal Examiner? Their assignments will also be cleared.')) return;
-    try {
-      await api.delete(`/users/${id}`);
-      toast.success('Internal Examiner removed');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+    setConfirmDialog({
+      open: true,
+      title: 'Remove Internal Examiner',
+      message: 'Remove this examiner? Their assignments will also be cleared.',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/users/${id}`);
+          toast.success('Internal Examiner removed');
+          loadData();
+        } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+      },
+    });
   };
 
   const handleEditExaminer = async (e) => {
@@ -67,13 +95,21 @@ function ExaminerList() {
     } catch (err) { toast.error(err.response?.data?.error || 'Update failed'); }
   };
 
-  const handleToggleActive = async (ex) => {
-    if (!window.confirm(`Toggle active status for ${ex.firstName} ${ex.lastName}?`)) return;
-    try {
-      await api.put(`/users/${ex.id}/toggle-active`);
-      toast.success('Status toggled');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Toggle failed'); }
+  const handleToggleActive = (ex) => {
+    setConfirmDialog({
+      open: true, title: 'Toggle Active Status',
+      message: `Are you sure you want to toggle active status for ${ex.firstName} ${ex.lastName}?`,
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.put(`/users/${ex.id}/toggle-active`);
+          toast.success(`User ${ex.active ? 'deactivated' : 'activated'} successfully`);
+          setShowEdit(null);
+          loadData();
+        } catch (err) { toast.error(err.response?.data?.error || 'Toggle failed'); }
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+      },
+    });
   };
 
   const openEdit = (ex) => {
@@ -96,16 +132,16 @@ function ExaminerList() {
     });
   }, [examiners, groups, theses]);
 
-  const filtered = useMemo(() => {
-    if (!searchTerm) return enriched;
-    const q = searchTerm.toLowerCase();
+  const filteredExaminers = useMemo(() => {
+    if (!searchQuery) return enriched;
+    const q = searchQuery.toLowerCase();
     return enriched.filter(s =>
       `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(q)
     );
-  }, [enriched, searchTerm]);
+  }, [enriched, searchQuery]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(filteredExaminers.length / PAGE_SIZE);
+  const paginated = filteredExaminers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(1); }, [totalPages, currentPage]);
 
   const totalAssigned = groups.reduce((s, g) => s + (g.examinerAssignments?.length || 0), 0)
@@ -121,7 +157,7 @@ function ExaminerList() {
   );
 
   return (
-    <PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
+    <ErrorBoundary><PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
       {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
@@ -320,29 +356,22 @@ function ExaminerList() {
         </div>
       </div>
 
+      <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search examiners..." style={{ maxWidth: 320, marginBottom: 12 }} />
       <div className="table-container">
         <div className="table-toolbar">
-          <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search examiners..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
-          </div>
+          <div className="table-toolbar-left" />
           <div className="table-toolbar-right">
-            <span className="font-label text-xs font-semibold text-on-surface-variant">{filtered.length} examiners</span>
+            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredExaminers.length} examiners</span>
           </div>
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading examiners...</p>
-          </div>
-        ) : filtered.length === 0 ? (
+          <TableSkeleton rows={5} cols={4} />
+        ) : filteredExaminers.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">person</span>
             <h3>No examiners found</h3>
-            <p>{searchTerm ? 'Try adjusting your search.' : 'No internal examiners have been registered yet.'}</p>
+            <p>{searchQuery ? 'Try adjusting your search.' : 'No internal examiners have been registered yet.'}</p>
           </div>
         ) : (
           <>
@@ -369,9 +398,8 @@ function ExaminerList() {
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
                     <td>
-                      <span className={`badge badge-${s.active ? 'active' : 'completed'}`} style={{ textTransform: 'none' }}>
-                        <span className="dot" />
-                        {s.active ? 'Active' : 'Inactive'}
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
+                        {s.active ? 'check_circle' : 'cancel'}
                       </span>
                     </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
@@ -395,8 +423,8 @@ function ExaminerList() {
             </table>
             <div className="table-footer">
               <span className="font-label text-xs text-on-surface-variant table-footer-info">
-                {filtered.length > 0
-                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} of ${filtered.length}`
+                {filteredExaminers.length > 0
+                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredExaminers.length)} of ${filteredExaminers.length}`
                   : '0 results'}
               </span>
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -404,7 +432,9 @@ function ExaminerList() {
           </>
         )}
       </div>
+      <ConfirmDialog open={confirmDialog.open} title={confirmDialog.title} message={confirmDialog.message} danger={confirmDialog.danger} onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))} />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

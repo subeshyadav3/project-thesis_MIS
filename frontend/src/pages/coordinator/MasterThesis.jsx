@@ -4,6 +4,10 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -23,7 +27,8 @@ function MasterThesis() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedYear, setSelectedYear] = useState('');
   const [createForm, setCreateForm] = useState({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
@@ -59,7 +64,7 @@ function MasterThesis() {
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -137,6 +142,16 @@ const handleComplete = async (id) => {
     } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
   };
 
+  const confirmComplete = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Mark Thesis Complete',
+      message: 'Are you sure you want to mark this thesis as completed? This action will change the thesis status.',
+      onConfirm: () => { handleComplete(id); setConfirmDialog(prev => ({ ...prev, open: false })); },
+      danger: false
+    });
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -187,12 +202,7 @@ const handleComplete = async (id) => {
 
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {
-      const searchStr = (
-        t.title + ' ' +
-        (t.student ? `${t.student.firstName} ${t.student.lastName} ${t.student.email}` : '') + ' ' +
-        (t.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : '')
-      ).toLowerCase();
-      const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
+      const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
       const matchesYear = yearFilter === 'ALL' || t.academicYearId?.toString() === yearFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
@@ -202,7 +212,7 @@ const handleComplete = async (id) => {
           : t.supervisor?.id?.toString() === supervisorFilter;
       return matchesSearch && matchesStatus && matchesYear && matchesSupervisor;
     });
-  }, [theses, searchTerm, statusFilter, yearFilter, supervisorFilter]);
+  }, [theses, searchQuery, statusFilter, yearFilter, supervisorFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -241,6 +251,19 @@ const handleComplete = async (id) => {
         <span className="material-symbols-outlined">add</span>
         Add Thesis
       </button>
+      <button className="btn btn-outline btn-sm" onClick={async () => {
+        try {
+          const { data } = await api.post('/theses/export', {}, { responseType: 'blob' });
+          const url = window.URL.createObjectURL(new Blob([data]));
+          const a = document.createElement('a'); a.href = url; a.download = 'theses.xlsx'; a.click();
+          window.URL.revokeObjectURL(url);
+          toast.success('Theses exported');
+        } catch (err) {
+          toast.error('Export failed');
+        }
+      }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Export
+      </button>
     </>
   );
 
@@ -275,6 +298,7 @@ const handleComplete = async (id) => {
   ];
 
 return (
+    <ErrorBoundary>
     <PageLayout title="Master's Thesis" user={user} actions={actions}>
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
@@ -464,7 +488,7 @@ return (
                 </button>
               )}
               {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
-                <button className="btn btn-success" onClick={() => handleComplete(showDetail.id)}>
+                <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
                   <span className="material-symbols-outlined">check_circle</span>
                   Mark Complete
                 </button>
@@ -495,10 +519,7 @@ return (
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search theses, students, supervisors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search theses, students, supervisors..." />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedTheses.length} theses</span>
@@ -512,15 +533,12 @@ return (
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading theses...</p>
-          </div>
+          <TableSkeleton rows={5} cols={5} />
         ) : sortedTheses.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">library_books</span>
             <h3>No theses found</h3>
-            <p>{searchTerm || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
+            <p>{searchQuery || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
           </div>
         ) : (
           <>
@@ -583,7 +601,7 @@ return (
                         {t.status !== 'COMPLETED' && (
                           <>
 
-                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleComplete(t.id); }}>
+                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }}>
                               <span className="material-symbols-outlined">check_circle</span>
                               Complete
                             </button>
@@ -848,7 +866,17 @@ return (
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+        confirmLabel="Confirm"
+        danger={confirmDialog.danger}
+      />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

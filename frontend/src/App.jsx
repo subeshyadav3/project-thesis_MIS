@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
 import MaintainerDashboard from './pages/maintainer/Dashboard';
 import UserManagement from './pages/maintainer/UserManagement';
@@ -12,6 +13,7 @@ import MasterThesis from './pages/coordinator/MasterThesis';
 import Evaluations from './pages/coordinator/Evaluations';
 import SupervisorList from './pages/coordinator/SupervisorList';
 import ExaminerList from './pages/coordinator/ExaminerList';
+import AuditLog from './pages/coordinator/AuditLog';
 import SupervisorDashboard from './pages/supervisor/Dashboard';
 import SupervisorBachelorProjects from './pages/supervisor/BachelorProjects';
 import SupervisorMasterThesis from './pages/supervisor/MasterThesis';
@@ -34,6 +36,7 @@ function App() {
       <ToastProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/maintainer/users" element={<PrivateRoute role="MAINTAINER"><UserManagement /></PrivateRoute>} />
           <Route path="/maintainer/departments" element={<PrivateRoute role="MAINTAINER"><DepartmentManagement /></PrivateRoute>} />
           <Route path="/maintainer/*" element={<PrivateRoute role="MAINTAINER"><MaintainerDashboard /></PrivateRoute>} />
@@ -43,6 +46,7 @@ function App() {
           <Route path="/coordinator/supervisors" element={<PrivateRoute role="COORDINATOR"><SupervisorList /></PrivateRoute>} />
           <Route path="/coordinator/examiners" element={<PrivateRoute role="COORDINATOR"><ExaminerList /></PrivateRoute>} />
           <Route path="/coordinator/project/:type/:id" element={<PrivateRoute role="COORDINATOR"><ProjectDetail /></PrivateRoute>} />
+          <Route path="/coordinator/audit-log" element={<PrivateRoute role="COORDINATOR"><AuditLog /></PrivateRoute>} />
           <Route path="/coordinator/notifications" element={<PrivateRoute role="COORDINATOR"><StudentNotifications /></PrivateRoute>} />
           <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
           <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />

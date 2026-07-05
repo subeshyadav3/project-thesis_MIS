@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PageLayout from '../../components/PageLayout';
 import DocumentViewer from '../../components/DocumentViewer';
 import { useToast } from '../../contexts/ToastContext';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
@@ -22,8 +23,8 @@ function StudentSubmissions() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.get('/students/groups').then(({ data }) => setGroups(data)).catch(() => setGroups([])),
-      api.get('/students/theses').then(({ data }) => setTheses(data)).catch(() => setTheses([])),
+      api.get('/students/groups').then(({ data }) => setGroups(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load groups'); setGroups([]); }),
+      api.get('/students/theses').then(({ data }) => setTheses(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); }),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -33,7 +34,7 @@ function StudentSubmissions() {
     const endpoint = isGroup ? `/students/groups/${selectedId}` : `/students/theses/${selectedId}`;
     api.get(endpoint)
       .then(({ data }) => setProposals(data.proposals || []))
-      .catch(() => setProposals([]));
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load proposals'); setProposals([]); });
   }, [selectedId, activeTab]);
 
   const items = activeTab === 'groups' ? groups : theses;
@@ -70,15 +71,15 @@ function StudentSubmissions() {
 
   if (loading) {
     return (
-      <PageLayout title="Submissions" user={user}>
+      <ErrorBoundary><PageLayout title="Submissions" user={user}>
         <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   if (groups.length === 0 && theses.length === 0) {
     return (
-      <PageLayout title="Document Submissions" user={user}>
+      <ErrorBoundary><PageLayout title="Document Submissions" user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 16px', background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>upload_file</span>
@@ -86,12 +87,12 @@ function StudentSubmissions() {
           <h3>No Assignments</h3>
           <p style={{ color: 'var(--color-on-surface-variant)', marginTop: 8 }}>You have no projects or theses to submit documents for.</p>
         </div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   return (
-    <PageLayout title="Document Submissions" subtitle="Upload and manage documents for each evaluation stage" user={user}>
+    <ErrorBoundary><PageLayout title="Document Submissions" subtitle="Upload and manage documents for each evaluation stage" user={user}>
       {/* Tab switcher: Projects / Theses */}
       {groups.length > 0 && theses.length > 0 && (
         <div className="tabs" style={{ marginBottom: 16 }}>
@@ -236,7 +237,7 @@ function StudentSubmissions() {
       {viewerDoc && (
         <DocumentViewer fileUrl={viewerDoc.url} fileName={viewerDoc.name} onClose={() => setViewerDoc(null)} />
       )}
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 

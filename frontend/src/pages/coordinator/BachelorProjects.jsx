@@ -4,6 +4,10 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -53,6 +57,10 @@ function BachelorProjects() {
   const [programs, setPrograms] = useState([]);
   const [selectedProgramId, setSelectedProgramId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [bulkSupervisorId, setBulkSupervisorId] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -135,6 +143,19 @@ useEffect(() => {
     } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
   };
 
+  const confirmComplete = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Mark as Complete',
+      message: 'Are you sure you want to mark this group as completed?',
+      onConfirm: () => {
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        handleComplete(id);
+      },
+      danger: false,
+    });
+  };
+
   const handleComplete = async (id) => {
     try {
       await api.put(`/groups/${id}/status`, { status: 'COMPLETED' });
@@ -183,6 +204,10 @@ useEffect(() => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!createForm.name.trim() || !createForm.projectTitle.trim()) {
+      toast.warning('Group name and project title are required');
+      return;
+    }
     const students = createForm.students.filter(s => s.studentId);
     try {
       const payload = {
@@ -245,7 +270,15 @@ const getMatchedStudent = (roll) => {
 };
 
 const filteredGroups = useMemo(() => {
-    return groups.filter(g => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return groups;
+    return groups.filter(g =>
+      g.name.toLowerCase().includes(q) || (g.projectTitle || '').toLowerCase().includes(q)
+    );
+  }, [groups, searchQuery]);
+
+  const filteredByAdvanced = useMemo(() => {
+    return filteredGroups.filter(g => {
       const searchStr = (
         g.name + ' ' +
         g.projectTitle + ' ' +
@@ -263,10 +296,10 @@ const filteredGroups = useMemo(() => {
           : g.supervisor?.id?.toString() === supervisorFilter;
       return matchesSearch && matchesStatus && matchesType && matchesYear && matchesSupervisor;
     });
-  }, [groups, searchTerm, statusFilter, typeFilter, yearFilter, supervisorFilter]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, yearFilter, supervisorFilter]);
 
   const sortedGroups = useMemo(() => {
-    return [...filteredGroups].sort((a, b) => {
+    return [...filteredByAdvanced].sort((a, b) => {
       const statusOrder = { ACTIVE: 0, COMPLETED: 1 };
       return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
     });
@@ -307,6 +340,19 @@ const filteredGroups = useMemo(() => {
         <span className="material-symbols-outlined">add</span>
         Add Group
       </button>
+      <button className="btn btn-outline btn-sm" onClick={async () => {
+        try {
+          const { data } = await api.post('/groups/export', {}, { responseType: 'blob' });
+          const url = window.URL.createObjectURL(new Blob([data]));
+          const a = document.createElement('a'); a.href = url; a.download = 'groups.xlsx'; a.click();
+          window.URL.revokeObjectURL(url);
+          toast.success('Groups exported');
+        } catch (err) {
+          toast.error('Export failed');
+        }
+      }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Export
+      </button>
     </>
   );
 
@@ -346,6 +392,7 @@ const filteredGroups = useMemo(() => {
   ];
 
   return (
+    <ErrorBoundary>
     <PageLayout title="Bachelor Projects" user={user} actions={actions}>
       {showDetail && (
         <div className="modal-overlay" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>
@@ -543,7 +590,7 @@ const filteredGroups = useMemo(() => {
                 </button>
               )}
               {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
-                <button className="btn btn-success" onClick={() => handleComplete(showDetail.id)}>
+                <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
                   <span className="material-symbols-outlined">check_circle</span>
                   Mark Complete
                 </button>
@@ -582,13 +629,33 @@ const filteredGroups = useMemo(() => {
         </div>
       </div>
 
+      {selectedGroups.length > 1 && (
+        <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Assign Supervisor ({selectedGroups.length} groups)</span>
+            <select className="form-input" style={{ width: 200 }} value={bulkSupervisorId} onChange={e => setBulkSupervisorId(e.target.value)}>
+              <option value="">Select supervisor...</option>
+              {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+            </select>
+            <button className="btn btn-primary btn-sm" onClick={async () => {
+              if (!bulkSupervisorId) return toast.warning('Select a supervisor');
+              try {
+                const ids = selectedGroups.map(g => g.id || g);
+                await api.post('/groups/bulk-assign-supervisor', { groupIds: ids, supervisorId: parseInt(bulkSupervisorId) });
+                toast.success(`Assigned supervisor to ${ids.length} groups`);
+                setSelectedGroups([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk assign failed');
+              }
+            }}>Assign</button>
+          </div>
+        </div>
+      )}
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search groups, members, supervisors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by group name or project title..." style={{ maxWidth: 320 }} />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
@@ -603,10 +670,7 @@ const filteredGroups = useMemo(() => {
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading groups...</p>
-          </div>
+          <TableSkeleton rows={5} cols={6} />
         ) : sortedGroups.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">school</span>
@@ -618,6 +682,7 @@ const filteredGroups = useMemo(() => {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 40 }}></th>
                   <th>Group</th>
                   <th>Project Title</th>
                   <th>Type</th>
@@ -629,8 +694,13 @@ const filteredGroups = useMemo(() => {
                 </tr>
               </thead>
               <tbody>
-                {paginatedGroups.map(g => (
+                  {paginatedGroups.map(g => (
                   <tr key={g.id} onClick={() => navigate(`/coordinator/project/group/${g.id}`)} style={{ cursor: 'pointer' }}>
+                    <td onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedGroups.includes(g)} onChange={() => {
+                        setSelectedGroups(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
+                      }} />
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">{g.name?.slice(0, 2).toUpperCase()}</div>
@@ -683,7 +753,7 @@ const filteredGroups = useMemo(() => {
                         {g.status !== 'COMPLETED' && (
                           <>
 
-                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleComplete(g.id); }}>
+                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }}>
                               <span className="material-symbols-outlined">check_circle</span>
                               Complete
                             </button>
@@ -1002,6 +1072,16 @@ const filteredGroups = useMemo(() => {
         </div>
       )}
     </PageLayout>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null, danger: false })}
+        confirmLabel="Confirm"
+        danger={confirmDialog.danger}
+      />
+    </ErrorBoundary>
   );
 }
 

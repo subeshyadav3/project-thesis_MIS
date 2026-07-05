@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -37,14 +41,13 @@ function Evaluations() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('bachelor');
   const [showForward, setShowForward] = useState(false);
-  const [showDefenseModal, setShowDefenseModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,11 +56,10 @@ function Evaluations() {
     Promise.all([
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
       api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.message || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
-  const coordinatorComponentTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE'];
 
   const handleForward = async () => {
     try {
@@ -71,66 +73,7 @@ function Evaluations() {
     }
   };
 
-  const handleOpenDefenseModal = (item) => { setSelectedItem(item); setShowDefenseModal(true); };
   const handleOpenSummaryModal = (item) => { setSelectedItem(item); setShowSummaryModal(true); };
-
-  const saveComponentMarks = async (component, marks, comment) => {
-    const payload = {
-      componentId: component.id,
-      marks: marks === '' || marks === null || marks === undefined ? null : parseFloat(marks),
-      comment: comment || null,
-    };
-    if (viewMode === 'bachelor') payload.groupId = selectedItem.id;
-    else payload.thesisId = selectedItem.id;
-    const { data } = await api.post('/evaluations/marks', payload);
-    return data;
-  };
-
-  const handleSaveAllDefenses = async () => {
-    const components = (selectedItem.evaluationComponents || []).filter(c =>
-      coordinatorComponentTypes.includes(c.evaluationType)
-    );
-    setSaving(true);
-    let ok = 0;
-    for (const c of components) {
-      try {
-        const marks = document.getElementById(`marks-${c.id}`)?.value ?? '';
-        const comment = document.getElementById(`comment-${c.id}`)?.value ?? '';
-        const val = marks === '' ? null : parseFloat(marks);
-        if (val !== null && (Number.isNaN(val) || val < 0 || val > c.maxMarks)) {
-          toast.warning(`${c.name}: marks must be between 0 and ${c.maxMarks}`);
-          continue;
-        }
-        await saveComponentMarks(c, marks, comment);
-        ok += 1;
-      } catch (err) {
-        toast.error(`${c.name}: ${err.response?.data?.error || 'Save failed'}`);
-      }
-    }
-    setSaving(false);
-    toast.success(`Saved ${ok}/${components.length} defense components`);
-    setShowDefenseModal(false);
-    loadData();
-  };
-
-  const handleFinalize = async () => {
-    if (!window.confirm('Are you sure you want to finalize this project? This will mark it as COMPLETED and no further changes can be made.')) return;
-    setSaving(true);
-    try {
-      const status = 'COMPLETED';
-      if (viewMode === 'bachelor') {
-        await api.put(`/groups/${selectedItem.id}/status`, { status });
-      } else {
-        await api.put(`/theses/${selectedItem.id}/status`, { status });
-      }
-      toast.success('Project finalized successfully');
-      setShowDefenseModal(false);
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Finalize failed');
-    }
-    setSaving(false);
-  };
 
   const findBreakdown = (item) => {
     const components = item.evaluationComponents || [];
@@ -270,7 +213,7 @@ function Evaluations() {
           <thead><tr><th>Component</th><th>Evaluated By</th><th style="text-align:right">Max</th><th style="text-align:right">Marks</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-          <div class="total"><span class="label">Grand Total</span><span class="value">${total.toFixed(1)} / ${getMaxTotal(item)}</span></div>
+          <div style="margin-top:14px;padding:0;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#1e293b 0%,#334155 100%);display:flex;align-items:stretch;"><div style="padding:14px 18px;flex:1;display:flex;flex-direction:column;justify-content:center;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:1px;"><span style="font-size:16px;color:#94a3b8">award_star</span><span style="font-weight:600;font-size:12px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">Grand Total</span></div></div><div style="padding:14px 24px;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);border-left:1px solid rgba(255,255,255,.08)"><span style="font-size:32px;font-weight:800;color:#f8fafc;line-height:1">${total.toFixed(1)}</span><span style="font-size:14px;font-weight:500;color:#64748b;margin-top:10px">/ ${getMaxTotal(item)}</span></div></div>
         <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:8px 16px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;">Print</button>
       </body></html>`);
   };
@@ -313,7 +256,7 @@ function Evaluations() {
             <thead><tr><th>Component</th><th>Evaluated By</th><th style="text-align:right">Max</th><th style="text-align:right">Marks</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
-        <div class="total"><span class="label">Grand Total</span><span class="value">${total.toFixed(1)} / ${getMaxTotal(item)}</span></div>
+        <div style="margin-top:14px;padding:0;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#1e293b 0%,#334155 100%);display:flex;align-items:stretch;"><div style="padding:14px 18px;flex:1;display:flex;flex-direction:column;justify-content:center;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:1px;"><span style="font-size:16px;color:#94a3b8">award_star</span><span style="font-weight:600;font-size:12px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">Grand Total</span></div></div><div style="padding:14px 24px;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);border-left:1px solid rgba(255,255,255,.08)"><span style="font-size:32px;font-weight:800;color:#f8fafc;line-height:1">${total.toFixed(1)}</span><span style="font-size:14px;font-weight:500;color:#64748b;margin-top:10px">/ ${getMaxTotal(item)}</span></div></div>
         </div>`;
     }).join('<div class="page-break"></div>');
 
@@ -354,6 +297,7 @@ function Evaluations() {
   const isCompleted = (item) => computeStatus(item) === 'COMPLETE';
 
   return (
+    <ErrorBoundary>
     <PageLayout title="Evaluations" user={user} actions={actions}>
 
       <div className="stats-grid" style={{ marginBottom: 16 }}>
@@ -423,10 +367,7 @@ function Evaluations() {
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading evaluations...</p>
-          </div>
+          <TableSkeleton rows={5} cols={4} />
         ) : filteredItems.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">grading</span>
@@ -483,15 +424,6 @@ function Evaluations() {
                           <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all components" style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
                           </button>
-                          <button className="btn btn-primary btn-sm" onClick={() => {
-                            if (completed) {
-                              toast.warning('Already complete, can\'t edit');
-                              return;
-                            }
-                            handleOpenDefenseModal(item);
-                          }} title="Enter defense marks" disabled={completed || item.status === 'COMPLETED'} style={{ minWidth: 32, padding: '6px 8px' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>edit_note</span>
-                          </button>
                           <button className="btn btn-outline btn-sm" onClick={() => handlePrintSingle(item)} title="Print / Save PDF" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>print</span>
                           </button>
@@ -505,93 +437,6 @@ function Evaluations() {
           </div>
         )}
       </div>
-
-      {/* Defense marks modal */}
-      {showDefenseModal && selectedItem && (
-        <div className="modal-overlay" onClick={() => setShowDefenseModal(false)}>
-          <div className="modal" style={{ maxWidth: 720, width: '90%' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-header-icon primary"><span className="material-symbols-outlined">edit_note</span></div>
-              <div className="modal-header-text">
-                <h2>Defense Marks</h2>
-                <p>Enter marks for the 3 defense components of <strong>{selectedItem.name}</strong>.</p>
-              </div>
-            </div>
-            <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-              <div style={{ padding: 10, borderRadius: 8, background: 'var(--color-surface-container-low)', marginBottom: 14, fontSize: 13 }}>
-                <strong>{selectedItem.project}</strong><br />
-                <span style={{ color: 'var(--color-on-surface-variant)' }}>Supervisor: {selectedItem.supervisorName}</span>
-              </div>
-              {(selectedItem.evaluationComponents || [])
-                .filter(c => coordinatorComponentTypes.includes(c.evaluationType))
-                .map(c => {
-                  const evalRec = (selectedItem.evaluations || []).find(e => e.componentId === c.id);
-                  return (
-                    <div key={c.id} className="card" style={{ padding: 12, marginBottom: 10, border: '1px solid var(--color-outline-variant)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <div>
-                          <h4 style={{ margin: 0 }}>{c.name}</h4>
-                          <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>{ROLE_LABEL[c.evaluatorRole]} evaluates this</span>
-                        </div>
-                        <span className="badge" style={{ background: 'var(--color-secondary-container)', color: 'var(--color-on-secondary-container)' }}>Max: {c.maxMarks}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                        <div className="form-group" style={{ width: 110, marginBottom: 0 }}>
-                          <label style={{ fontSize: 11 }}>Marks (out of {c.maxMarks})</label>
-                          <input id={`marks-${c.id}`} type="number" defaultValue={evalRec?.marks ?? ''} min="0" max={c.maxMarks} step="0.5" placeholder={`0-${c.maxMarks}`} disabled={selectedItem.status === 'COMPLETED'} />
-                        </div>
-                        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                          <label style={{ fontSize: 11 }}>Comments</label>
-                          <input id={`comment-${c.id}`} type="text" defaultValue={evalRec?.comment ?? ''} placeholder={`Enter ${c.name.toLowerCase()} comments...`} disabled={selectedItem.status === 'COMPLETED'} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              <div className="stats-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
-                {(selectedItem.evaluationComponents || [])
-                  .filter(c => c.evaluationType === 'SUPERVISOR' || c.evaluationType === 'EXTERNAL_EXAMINER')
-                  .map(c => {
-                    const e = (selectedItem.evaluations || []).find(ev => ev.componentId === c.id);
-                    return (
-                      <div key={c.id} style={{ padding: 12, background: 'var(--color-surface-container-low)', borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>{c.name} by {ROLE_LABEL[c.evaluatorRole]}</div>
-                        <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: e?.marks !== null && e?.marks !== undefined ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                          {e?.marks !== null && e?.marks !== undefined ? e.marks : '-'}
-                          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {c.maxMarks}</span>
-                        </div>
-                        {e?.comment && <div style={{ fontSize: 11, fontStyle: 'italic', marginTop: 4, color: 'var(--color-on-surface-variant)' }}>"{e.comment}"</div>}
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => setShowDefenseModal(false)} disabled={saving}>
-                <span className="material-symbols-outlined">close</span>Cancel
-              </button>
-              {selectedItem.status !== 'COMPLETED' && (
-                <>
-                  <button className="btn btn-primary" onClick={handleSaveAllDefenses} disabled={saving}>
-                    <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'check'}</span>
-                    {saving ? 'Saving...' : 'Save All Defenses'}
-                  </button>
-                  <button className="btn btn-success" onClick={handleFinalize} disabled={saving}>
-                    <span className="material-symbols-outlined">task_alt</span>
-                    Finalize
-                  </button>
-                </>
-              )}
-              {selectedItem.status === 'COMPLETED' && (
-                <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
-                  Completed
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Summary modal */}
       {showSummaryModal && selectedItem && (
@@ -671,7 +516,18 @@ function Evaluations() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog?.open || false}
+        title={confirmDialog?.title || 'Confirm'}
+        message={confirmDialog?.message || ''}
+        onConfirm={() => { confirmDialog?.onConfirm?.(); setConfirmDialog(null); }}
+        onCancel={() => setConfirmDialog(null)}
+        confirmLabel={confirmDialog?.confirmLabel}
+        danger={confirmDialog?.danger}
+      />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

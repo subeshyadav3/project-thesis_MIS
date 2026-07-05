@@ -13,5 +13,7 @@ router.post('/upload', authenticate, authorize('COORDINATOR'), upload.single('fi
 router.put('/:id/supervisor', authenticate, authorize('COORDINATOR'), groupController.assignSupervisor);
 router.put('/:id/status', authenticate, authorize('COORDINATOR'), groupController.updateGroupStatus);
 router.put('/components/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR'), groupController.updateEvaluationComponent);
+router.post('/export', authenticate, authorize('COORDINATOR', 'MAINTAINER'), groupController.exportGroups);
+router.post('/bulk-assign-supervisor', authenticate, authorize('COORDINATOR'), groupController.bulkAssignSupervisor);
 
 module.exports = router;

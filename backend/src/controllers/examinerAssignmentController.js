@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 
 exports.assignExaminerToGroup = async (req, res) => {
   try {
@@ -19,6 +20,7 @@ exports.assignExaminerToGroup = async (req, res) => {
         group: { select: { projectTitle: true } },
       },
     });
+    audit.log({ action: 'ASSIGN_EXAMINER', entity: 'ExaminerAssignment', entityId: assignment.id, details: 'Assigned examiner', performedById: req.user.id });
     // Notify examiner
     try {
       const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
@@ -108,6 +110,7 @@ exports.removeAssignment = async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.examinerAssignment.delete({ where: { id: parseInt(id) } });
+    audit.log({ action: 'REMOVE', entity: 'ExaminerAssignment', entityId: parseInt(req.params.id), details: 'Removed examiner assignment', performedById: req.user.id });
     res.json({ message: 'Assignment removed' });
   } catch (error) {
     console.error('removeAssignment error:', error);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 
 function StudentDashboard() {
@@ -15,9 +16,9 @@ function StudentDashboard() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.get('/students/groups').then(({ data }) => { setGroups(data); return data; }).catch(() => []),
-      api.get('/students/theses').then(({ data }) => { setTheses(data); return data; }).catch(() => []),
-      api.get('/students/notifications').then(({ data }) => setNotifications(data)).catch(() => {}),
+      api.get('/students/groups').then(({ data }) => { setGroups(data); return data; }).catch(err => { toast.error(err.response?.data?.error || 'Failed to load groups'); return []; }),
+      api.get('/students/theses').then(({ data }) => { setTheses(data); return data; }).catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); return []; }),
+      api.get('/students/notifications').then(({ data }) => setNotifications(data)).catch(err => toast.error(err.response?.data?.error || 'Failed to load notifications')),
     ]).then(([g, t]) => {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
       if (g.length > 0) u.studentType = 'bachelor';
@@ -35,7 +36,7 @@ function StudentDashboard() {
   const unread = notifications.filter(n => !n.read).length;
 
   return (
-    <PageLayout title="Student Dashboard" subtitle={`${all.length} assignment${all.length !== 1 ? 's' : ''} total`} user={user}>
+    <ErrorBoundary><PageLayout title="Student Dashboard" subtitle={`${all.length} assignment${all.length !== 1 ? 's' : ''} total`} user={user}>
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">assignment</span></div>
@@ -190,7 +191,7 @@ function StudentDashboard() {
           </div>
         </>
       )}
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 

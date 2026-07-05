@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 
 exports.getGroups = async (req, res) => {
@@ -139,6 +140,7 @@ exports.createGroup = async (req, res) => {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
+    audit.log({ action: 'CREATE', entity: 'ProjectGroup', entityId: group.id, details: `Created group "${group.name}"`, performedById: req.user.id });
     res.status(201).json(created);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -230,6 +232,7 @@ exports.uploadExcel = async (req, res) => {
       }
       created.push(group);
     }
+    audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Imported ${created.length} groups via Excel`, performedById: req.user.id });
     res.status(201).json({ message: `${created.length} groups created`, groups: created });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -271,6 +274,7 @@ exports.assignSupervisor = async (req, res) => {
         supervisorId: sup?.id, itemTitle: group.projectTitle, type: 'group', assignerName, studentIds,
       });
     } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
+    audit.log({ action: 'ASSIGN_SUPERVISOR', entity: 'ProjectGroup', entityId: group.id, details: `Assigned supervisor to "${group.projectTitle}"`, performedById: req.user.id });
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -293,6 +297,7 @@ exports.updateGroupStatus = async (req, res) => {
         });
       } catch (e) { console.error('notifyStatusChange:', e.message); }
     }
+    audit.log({ action: 'UPDATE_STATUS', entity: 'ProjectGroup', entityId: group.id, details: `Status ${oldGroup?.status} → ${group.status} for "${oldGroup?.projectTitle}"`, performedById: req.user.id });
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -305,8 +310,72 @@ exports.updateEvaluationComponent = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       data: { name: req.body.name, maxMarks: parseFloat(req.body.maxMarks) },
     });
+    audit.log({ action: 'UPDATE', entity: 'EvaluationComponent', entityId: component.id, details: `Updated component "${component.name}"`, performedById: req.user.id });
     res.json(component);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.exportGroups = async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    const where = {};
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
+      where.academicYear = { departmentId: req.user.departmentId };
+    }
+    const groups = await prisma.projectGroup.findMany({
+      where,
+      include: {
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        academicYear: true,
+      },
+    });
+    const rows = groups.map(g => ({
+      'Group Name': g.name,
+      'Project Title': g.projectTitle,
+      'Project Type': g.projectType,
+      Status: g.status,
+      Supervisor: g.supervisor ? `${g.supervisor.firstName} ${g.supervisor.lastName}` : 'Not assigned',
+      'Academic Year': g.academicYear ? `${g.academicYear.year} ${g.academicYear.semester}` : '',
+      Students: g.members.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', '),
+      RollNumbers: g.members.map(m => m.rollNumber).join(', '),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Groups');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=groups.xlsx');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.send(buf);
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+exports.bulkAssignSupervisor = async (req, res) => {
+  try {
+    const { groupIds, supervisorId } = req.body;
+    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'groupIds must be a non-empty array' });
+    }
+    if (!supervisorId) return res.status(400).json({ success: false, error: 'supervisorId is required' });
+    const ids = groupIds.map(id => parseInt(id));
+    const supId = parseInt(supervisorId);
+    const supervisor = await prisma.user.findUnique({ where: { id: supId } });
+    if (!supervisor || supervisor.role !== 'SUPERVISOR') {
+      return res.status(400).json({ success: false, error: 'Invalid supervisor' });
+    }
+    const result = await prisma.projectGroup.updateMany({
+      where: { id: { in: ids } },
+      data: { supervisorId: supId, status: 'ACTIVE' },
+    });
+const audit = require('../services/auditService');
+const notifSvc = require('../services/notificationService');
+    audit.log({ action: 'BULK_ASSIGN_SUPERVISOR', entity: 'ProjectGroup', details: `Assigned supervisor ${supId} to ${ids.length} groups`, performedById: req.user.id });
+    res.json({ success: true, data: { updated: result.count } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

@@ -7,11 +7,12 @@
     --color-primary-container: #dbeafe;
     --color-on-primary: #ffffff;
     --color-on-primary-container: #1e3a5f;
+    --color-primary-grand: #1e3a5f;
 
     --color-secondary: #d97706;
     --color-secondary-hover: #b45309;
     --color-secondary-container: #fef3c7;
-    --color-on-secondary: #ffffff;
+    --color-on-secondary: #351848;
     --color-on-secondary-container: #78350f;
 
     --color-tertiary: #0f766e;

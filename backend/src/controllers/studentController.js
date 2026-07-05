@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const path = require('path');
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 
 exports.uploadDocument = async (req, res) => {
   try {
@@ -69,6 +70,8 @@ exports.uploadDocument = async (req, res) => {
       console.error('notifyProposalUpload error:', e.message);
     }
 
+    const stageLabel = stage;
+  audit.log({ action: 'UPLOAD', entity: 'Document', details: `Uploaded ${stageLabel} document`, performedById: req.user.id });
     res.json({ message: 'Document uploaded successfully', documentUrl, proposal });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });

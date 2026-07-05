@@ -4,6 +4,10 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -18,6 +22,7 @@ function SupervisorBachelorProjects() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
@@ -27,7 +32,7 @@ function SupervisorBachelorProjects() {
     Promise.all([
       api.get('/supervisors/groups', { signal }).then(({ data }) => setGroups(data)),
       api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -114,7 +119,7 @@ function SupervisorBachelorProjects() {
   );
 
   return (
-    <PageLayout title="Bachelor Projects" subtitle="Your assigned project groups" user={user}>
+    <ErrorBoundary><PageLayout title="Bachelor Projects" subtitle="Your assigned project groups" user={user}>
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
@@ -225,10 +230,7 @@ function SupervisorBachelorProjects() {
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search groups, members, titles..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search groups, members, titles..." />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
@@ -241,10 +243,7 @@ function SupervisorBachelorProjects() {
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading groups...</p>
-          </div>
+          <TableSkeleton rows={5} cols={7} />
         ) : sortedGroups.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">school</span>
@@ -324,7 +323,7 @@ function SupervisorBachelorProjects() {
           </>
         )}
       </div>
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 
