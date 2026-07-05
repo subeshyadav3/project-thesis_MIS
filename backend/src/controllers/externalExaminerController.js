@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 
 exports.getAssignedGroups = async (req, res) => {
   try {
@@ -11,7 +12,7 @@ exports.getAssignedGroups = async (req, res) => {
         group: {
           include: {
             members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-            supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+            supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
             academicYear: true,
             evaluations: {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
@@ -24,7 +25,7 @@ exports.getAssignedGroups = async (req, res) => {
     });
     res.json(assignments.map(a => a.group).filter(Boolean));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -36,7 +37,7 @@ exports.getAssignedTheses = async (req, res) => {
         thesis: {
           include: {
             student: { select: { id: true, firstName: true, lastName: true, email: true } },
-            supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+            supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
             academicYear: true,
             evaluations: {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
@@ -50,7 +51,7 @@ exports.getAssignedTheses = async (req, res) => {
     res.json(assignments.map(a => a.thesis).filter(Boolean));
   } catch (error) {
     console.error('getAssignedTheses error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -109,11 +110,12 @@ exports.submitEvaluation = async (req, res) => {
     let evaluation;
     if (existing) {
       evaluation = await prisma.evaluation.update({ where: { id: existing.id }, data });
-    } else {
-      evaluation = await prisma.evaluation.create({ data });
-    }
+  } else {
+    evaluation = await prisma.evaluation.create({ data });
+  }
+  audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', entityId: evaluation.id, details: `Submitted ${component.name} marks`, performedById: req.user.id });
 
-    const components = await prisma.evaluationComponent.findMany({
+  const components = await prisma.evaluationComponent.findMany({
       where: groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) },
     });
     const evaluations = await prisma.evaluation.findMany({
@@ -142,6 +144,6 @@ exports.submitEvaluation = async (req, res) => {
     res.status(existing ? 200 : 201).json({ evaluation, summary });
   } catch (error) {
     console.error('submitEvaluation error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

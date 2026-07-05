@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import DocumentViewer from '../../components/DocumentViewer';
+import { useToast } from '../../contexts/ToastContext';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
@@ -20,6 +22,7 @@ function StudentProjectDetail() {
   const [feedbackTab, setFeedbackTab] = useState('PROPOSAL');
   const [viewerDoc, setViewerDoc] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const toast = useToast();
 
   const nameLabel = isGroup ? 'Project' : 'Thesis';
 
@@ -29,32 +32,32 @@ function StudentProjectDetail() {
     const endpoint = isGroup ? `/students/groups/${id}` : `/students/theses/${id}`;
     api.get(endpoint)
       .then(({ data }) => setAssignment(data))
-      .catch(() => setAssignment(null));
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load assignment'); setAssignment(null); });
 
     // Also pull the canonical component list + evaluations to show progress
     const evalEndpoint = isGroup ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint)
       .then(({ data }) => setEvaluationsData(data))
-      .catch(() => setEvaluationsData(null))
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load evaluations'); setEvaluationsData(null); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
   if (loading) {
     return (
-      <PageLayout title={nameLabel} user={user}>
+      <ErrorBoundary><PageLayout title={nameLabel} user={user}>
         <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
   if (!assignment) {
     return (
-      <PageLayout title={nameLabel} user={user}>
+      <ErrorBoundary><PageLayout title={nameLabel} user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>error_outline</span>
           <h3>{nameLabel} not found</h3>
         </div>
-      </PageLayout>
+      </PageLayout></ErrorBoundary>
     );
   }
 
@@ -94,12 +97,10 @@ function StudentProjectDetail() {
   const evalByComponent = new Map((evaluationsData?.evaluations || []).map(e => [e.componentId, e]));
   const breakdown = components.map(c => ({ component: c, evaluation: evalByComponent.get(c.id) }));
   const completedComponents = breakdown.filter(b => b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined).length;
-  const totalMarks = breakdown.reduce((s, b) => s + (b.evaluation?.marks ?? 0), 0);
   const isComplete = completedComponents === breakdown.length && breakdown.length > 0;
-  const showMarks = isComplete; // only show numeric marks once everything is graded
 
   return (
-    <PageLayout
+    <ErrorBoundary><PageLayout
       title={title}
       subtitle={
         <Link to={isGroup ? '/student/projects' : '/student/theses'}
@@ -110,98 +111,7 @@ function StudentProjectDetail() {
       }
       user={user}
     >
-      {/* Evaluation progress banner — shows 5 components and final total when ready */}
-      {breakdown.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }}>fact_check</span>
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 15 }}>Final Evaluation</h3>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                  {isComplete
-                    ? `All ${breakdown.length} components evaluated · Final result below`
-                    : `${completedComponents} of ${breakdown.length} components evaluated · Final result will appear when complete`}
-                </p>
-              </div>
-            </div>
-            <span className={`badge ${isComplete ? 'badge-completed' : 'badge-pending'}`}>
-              <span className="dot" />{isComplete ? 'Complete' : 'In Progress'}
-            </span>
-          </div>
 
-          <div style={{ padding: '0 16px 16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 12 }}>
-              {breakdown.map(b => {
-                const has = b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined;
-                return (
-                  <div key={b.component.id} style={{
-                    padding: 10, borderRadius: 8,
-                    background: has ? 'var(--color-surface-container-low)' : 'transparent',
-                    border: '1px solid var(--color-outline-variant)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <span className="material-symbols-outlined" style={{
-                        fontSize: 16,
-                        color: has ? 'var(--color-success)' : 'var(--color-outline-variant)',
-                      }}>{has ? 'check_circle' : 'pending'}</span>
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>{b.component.name}</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                      {ROLE_LABEL[b.component.evaluatorRole]}
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4, color: has ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                      {showMarks && has ? `${b.evaluation.marks} / ${b.component.maxMarks}` : `— / ${b.component.maxMarks}`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {showMarks ? (
-              <div style={{
-                padding: 0, borderRadius: 12, overflow: 'hidden',
-                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                display: 'flex', alignItems: 'stretch',
-              }}>
-                <div style={{
-                  padding: '16px 20px', flex: 1,
-                  display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#94a3b8' }}>award_star</span>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: '#94a3b8', letterSpacing: 0.5, textTransform: 'uppercase' }}>Grand Total</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginLeft: 26 }}>Sum of all 5 evaluation components</div>
-                </div>
-                <div style={{
-                  padding: '16px 28px',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'rgba(255,255,255,0.06)',
-                  borderLeft: '1px solid rgba(255,255,255,0.08)',
-                }}>
-                  <span style={{ fontSize: 38, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
-                    {totalMarks.toFixed(1)}
-                  </span>
-                  <span style={{ fontSize: 16, fontWeight: 500, color: '#64748b', marginTop: 12 }}>/ 50</span>
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                padding: 12, borderRadius: 8,
-                background: 'var(--color-surface-container-low)',
-                border: '1px dashed var(--color-outline-variant)',
-                textAlign: 'center', fontSize: 13, color: 'var(--color-on-surface-variant)',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>lock</span>
-                Your final marks will be revealed once all 5 components are evaluated by their respective evaluators.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
         <div className="card" style={{ flex: 1.5, minWidth: 300, marginBottom: 0 }}>
@@ -245,6 +155,14 @@ function StudentProjectDetail() {
               <div className="detail-item">
                 <span className="detail-label">Academic Year</span>
                 <span>{assignment.academicYear?.year || '—'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Department</span>
+                <span>{assignment.academicYear?.department?.name || assignment.department?.name || '—'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Program</span>
+                <span>{assignment.program?.name || assignment.programName || '—'}</span>
               </div>
             </div>
           </div>
@@ -439,7 +357,7 @@ function StudentProjectDetail() {
       </div>
 
       {viewerDoc && <DocumentViewer fileUrl={viewerDoc.url} fileName={viewerDoc.name} onClose={() => setViewerDoc(null)} />}
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 

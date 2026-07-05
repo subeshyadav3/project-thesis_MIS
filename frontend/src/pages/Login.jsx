@@ -121,7 +121,7 @@ function Login() {
                 <input type="checkbox" defaultChecked />
                 Remember me
               </label>
-              <a href="#">Forgot Password?</a>
+              <a href="/reset-password">Forgot Password?</a>
             </div>
 
             <button type="submit" className="login-submit" disabled={loading}>
@@ -138,6 +138,7 @@ function Login() {
               )}
             </button>
           </form>
+
 
           <div className="login-footer">
             <p>Institute of Engineering &copy; 2026</p>

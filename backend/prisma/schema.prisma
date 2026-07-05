@@ -7,12 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BachelorProjectType {
+  MINOR
+  MAJOR
+}
+
 enum Role {
   MAINTAINER
   COORDINATOR
   SUPERVISOR
   STUDENT
   EXTERNAL_EXAMINER
+}
+
+enum DegreeType {
+  BACHELOR
+  MASTER
 }
 
 enum GroupStatus {
@@ -24,6 +34,11 @@ enum GroupStatus {
 enum ThesisStatus {
   PENDING
   ACTIVE
+  COMPLETED
+}
+
+enum EvaluationStatus {
+  DRAFT
   COMPLETED
 }
 
@@ -42,35 +57,67 @@ enum EvaluationType {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role      Role
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int         @id @default(autoincrement())
+  email       String      @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        Role
+  degreeType  DegreeType?
+  departmentId Int?
+  department  Department? @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+  programId   Int?
+  program     Program?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: SetNull)
+  rollNumber       String?
+  resetToken       String?   @unique
+  resetTokenExpires DateTime?
+  active           Boolean   @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  supervisedGroups             ProjectGroup[]         @relation("SupervisedGroups")
-  supervisedTheses             Thesis[]               @relation("SupervisedTheses")
-  thesis                       Thesis[]               @relation("StudentTheses")
-  groupMembers                 GroupMember[]
-  evaluationsSubmitted         Evaluation[]           @relation("EvaluationSubmitter")
-  componentsCreated            EvaluationComponent[]  @relation("ComponentCreator")
-  notifications                Notification[]
-  proposals                    Proposal[]
-  recommendations              Recommendation[]
-  examinerAssignments          ExaminerAssignment[]   @relation("ExternalExaminer")
-  examinerAssignmentsAssigned  ExaminerAssignment[]   @relation("AssignedBy")
+  coordinatorFor           Department?          @relation("CoordinatorDepartment")
+  supervisedGroups         ProjectGroup[]        @relation("SupervisedGroups")
+  supervisedTheses         Thesis[]              @relation("SupervisedTheses")
+  thesis                   Thesis[]              @relation("StudentTheses")
+  groupMembers             GroupMember[]
+  evaluationsSubmitted     Evaluation[]          @relation("EvaluationSubmitter")
+  componentsCreated        EvaluationComponent[] @relation("ComponentCreator")
+  notifications            Notification[]
+  proposals                Proposal[]
+  recommendations          Recommendation[]
+  examinerAssignments      ExaminerAssignment[]  @relation("ExternalExaminer")
+  examinerAssignmentsAssigned ExaminerAssignment[] @relation("AssignedBy")
+  auditLogs                   AuditLog[]
+
+  @@index([role])
+  @@index([departmentId])
+  @@index([programId])
+  @@index([active])
 }
 
 model Department {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  code      String   @unique
-  createdAt DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  code          String   @unique
+  coordinatorId Int?    @unique
+  coordinator   User?    @relation("CoordinatorDepartment", fields: [coordinatorId], references: [id])
+  createdAt     DateTime @default(now())
 
-  academicYears AcademicYear[]
+  programs       Program[]
+  academicYears  AcademicYear[]
+  users          User[]         @relation("UserDepartment")
+}
+
+model Program {
+  id           Int      @id @default(autoincrement())
+  name         String
+  code         String   @unique
+  departmentId Int
+  department   Department  @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  students User[]        @relation("StudentProgram")
+  groups   ProjectGroup[]
 }
 
 model AcademicYear {
@@ -84,19 +131,25 @@ model AcademicYear {
 
   groups ProjectGroup[]
   theses Thesis[]
+
+  @@index([departmentId])
+  @@index([isActive])
 }
 
 model ProjectGroup {
-  id             Int          @id @default(autoincrement())
+  id             Int                 @id @default(autoincrement())
   name           String
   projectTitle   String
-  status         GroupStatus  @default(PENDING)
+  projectType    BachelorProjectType @default(MINOR)
+  status         GroupStatus         @default(PENDING)
   supervisorId   Int?
-  supervisor     User?        @relation("SupervisedGroups", fields: [supervisorId], references: [id])
+  supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])
+  programId      Int?
+  program        Program?            @relation(fields: [programId], references: [id])
   academicYearId Int
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  academicYear   AcademicYear        @relation(fields: [academicYearId], references: [id])
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   members              GroupMember[]
   evaluations          Evaluation[]           @relation("GroupEvaluations")
@@ -104,6 +157,10 @@ model ProjectGroup {
   proposals            Proposal[]
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
+
+  @@index([status])
+  @@index([programId])
+  @@index([academicYearId])
 }
 
 model GroupMember {
@@ -111,7 +168,7 @@ model GroupMember {
   studentId  Int
   student    User         @relation(fields: [studentId], references: [id])
   groupId    Int
-  group      ProjectGroup @relation(fields: [groupId], references: [id])
+  group      ProjectGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   rollNumber String
   createdAt  DateTime     @default(now())
 
@@ -121,6 +178,7 @@ model GroupMember {
 model Thesis {
   id             Int          @id @default(autoincrement())
   title          String
+  projectType    String       @default("MASTER")
   studentId      Int
   student        User         @relation("StudentTheses", fields: [studentId], references: [id])
   status         ThesisStatus @default(PENDING)
@@ -136,6 +194,10 @@ model Thesis {
   proposals            Proposal[]
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
+
+  @@index([status])
+  @@index([studentId])
+  @@index([academicYearId])
 }
 
 model EvaluationComponent {
@@ -167,6 +229,7 @@ model Evaluation {
   evaluationType EvaluationType
   marks          Float?
   comment        String?
+  status         EvaluationStatus   @default(DRAFT)
   submittedById  Int
   submittedBy    User               @relation("EvaluationSubmitter", fields: [submittedById], references: [id])
   groupId        Int?
@@ -186,9 +249,9 @@ model ExaminerAssignment {
   externalExaminerId Int
   externalExaminer   User          @relation("ExternalExaminer", fields: [externalExaminerId], references: [id])
   groupId            Int?
-  group              ProjectGroup? @relation(fields: [groupId], references: [id])
+  group              ProjectGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   thesisId           Int?
-  thesis             Thesis?       @relation(fields: [thesisId], references: [id])
+  thesis             Thesis?       @relation(fields: [thesisId], references: [id], onDelete: Cascade)
   assignedById       Int
   assignedBy         User          @relation("AssignedBy", fields: [assignedById], references: [id])
   createdAt          DateTime      @default(now())
@@ -204,9 +267,9 @@ model Proposal {
   supervisorComment String?
   studentFeedback   String?
   groupId           Int?
-  group             ProjectGroup? @relation(fields: [groupId], references: [id])
+  group             ProjectGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   thesisId          Int?
-  thesis            Thesis?       @relation(fields: [thesisId], references: [id])
+  thesis            Thesis?       @relation(fields: [thesisId], references: [id], onDelete: Cascade)
   submittedById     Int
   submittedBy       User          @relation(fields: [submittedById], references: [id])
   createdAt         DateTime      @default(now())
@@ -238,8 +301,24 @@ model Recommendation {
   issuedById Int
   issuedBy   User          @relation(fields: [issuedById], references: [id])
   groupId    Int?
-  group      ProjectGroup? @relation(fields: [groupId], references: [id])
+  group      ProjectGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
   thesisId   Int?
-  thesis     Thesis?       @relation(fields: [thesisId], references: [id])
+  thesis     Thesis?       @relation(fields: [thesisId], references: [id], onDelete: Cascade)
   createdAt  DateTime      @default(now())
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  action      String
+  entity      String
+  entityId    Int?
+  details     String?
+  performedById Int?
+  performedBy User?    @relation(fields: [performedById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([entity])
+  @@index([entityId])
+  @@index([performedById])
+  @@index([createdAt])
 }

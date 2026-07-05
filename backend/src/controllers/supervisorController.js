@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const audit = require('../services/auditService');
 
 exports.getMyGroups = async (req, res) => {
   try {
@@ -14,7 +15,7 @@ exports.getMyGroups = async (req, res) => {
     });
     res.json(groups);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -31,7 +32,7 @@ exports.getMyTheses = async (req, res) => {
     });
     res.json(theses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -85,8 +86,9 @@ exports.issueRecommendation = async (req, res) => {
         );
       }
     }
+    audit.log({ action: 'ISSUE_RECOMMENDATION', entity: 'Recommendation', entityId: recommendation.id, details: 'Issued recommendation letter', performedById: req.user.id });
     res.status(201).json(recommendation);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

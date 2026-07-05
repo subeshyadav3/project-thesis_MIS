@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const notifSvc = require('../services/notificationService');
+const audit = require('../services/auditService');
 
 exports.assignExaminerToGroup = async (req, res) => {
   try {
@@ -15,10 +16,11 @@ exports.assignExaminerToGroup = async (req, res) => {
         assignedById: req.user.id,
       },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         group: { select: { projectTitle: true } },
       },
     });
+    audit.log({ action: 'ASSIGN_EXAMINER', entity: 'ExaminerAssignment', entityId: assignment.id, details: 'Assigned examiner', performedById: req.user.id });
     // Notify examiner
     try {
       const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
@@ -34,7 +36,7 @@ exports.assignExaminerToGroup = async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'This examiner is already assigned to this group' });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -51,7 +53,7 @@ exports.assignExaminerToThesis = async (req, res) => {
         assignedById: req.user.id,
       },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         thesis: { select: { title: true } },
       },
     });
@@ -70,7 +72,7 @@ exports.assignExaminerToThesis = async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'This examiner is already assigned to this thesis' });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -79,13 +81,13 @@ exports.getAssignedExaminersForGroup = async (req, res) => {
     const assignments = await prisma.examinerAssignment.findMany({
       where: { groupId: parseInt(req.params.id) },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
       },
     });
     res.json(assignments);
   } catch (error) {
     console.error('getAssignedExaminersForGroup error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -94,13 +96,13 @@ exports.getAssignedExaminersForThesis = async (req, res) => {
     const assignments = await prisma.examinerAssignment.findMany({
       where: { thesisId: parseInt(req.params.id) },
       include: {
-        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
       },
     });
     res.json(assignments);
   } catch (error) {
     console.error('getAssignedExaminersForThesis error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -108,9 +110,10 @@ exports.removeAssignment = async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.examinerAssignment.delete({ where: { id: parseInt(id) } });
+    audit.log({ action: 'REMOVE', entity: 'ExaminerAssignment', entityId: parseInt(req.params.id), details: 'Removed examiner assignment', performedById: req.user.id });
     res.json({ message: 'Assignment removed' });
   } catch (error) {
     console.error('removeAssignment error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

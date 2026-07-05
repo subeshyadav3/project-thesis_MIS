@@ -20,6 +20,10 @@ const departmentRoutes = require('./routes/departments');
 const studentRoutes = require('./routes/students');
 const externalExaminerRoutes = require('./routes/externalExaminers');
 const examinerAssignmentRoutes = require('./routes/examinerAssignments');
+const printRoutes = require('./routes/print');
+const proposalRoutes = require('./routes/proposals');
+const errorHandler = require('./middleware/errorHandler');
+const uploadController = require('./controllers/uploadController');
 
 const app = express();
 
@@ -30,6 +34,9 @@ app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -50,6 +57,9 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/external-examiners', externalExaminerRoutes);
 app.use('/api/examiner-assignments', examinerAssignmentRoutes);
+app.use('/api/print', printRoutes);
+app.use('/api/proposals', proposalRoutes);
+app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
@@ -67,27 +77,41 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
     res.sendFile(filePath);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 app.get('/api/stats', authenticate, async (req, res) => {
   try {
-    const totalGroups = await prisma.projectGroup.count();
-    const totalTheses = await prisma.thesis.count();
-    const totalSupervisors = await prisma.user.count({ where: { role: 'SUPERVISOR' } });
+    let departmentId = null;
+    let academicYearIds = null;
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) {
+        departmentId = dept.id;
+        academicYearIds = (await prisma.academicYear.findMany({ where: { departmentId: dept.id }, select: { id: true } })).map(a => a.id);
+      }
+    }
+    const yearFilter = academicYearIds ? { academicYearId: { in: academicYearIds } } : {};
+    const deptUserFilter = departmentId ? { departmentId } : {};
+    const totalGroups = await prisma.projectGroup.count({ where: yearFilter });
+    const totalTheses = await prisma.thesis.count({ where: yearFilter });
+    const totalSupervisors = await prisma.user.count({ where: { role: 'SUPERVISOR', ...deptUserFilter } });
     const totalCoordinators = await prisma.user.count({ where: { role: 'COORDINATOR' } });
-    const totalStudents = await prisma.user.count({ where: { role: 'STUDENT' } });
-    const pendingGroups = await prisma.projectGroup.count({ where: { status: 'PENDING' } });
-    const activeGroups = await prisma.projectGroup.count({ where: { status: 'ACTIVE' } });
-    const completedGroups = await prisma.projectGroup.count({ where: { status: 'COMPLETED' } });
-    const pendingTheses = await prisma.thesis.count({ where: { status: 'PENDING' } });
+    const totalStudents = await prisma.user.count({ where: { role: 'STUDENT', ...deptUserFilter } });
+    const pendingGroups = await prisma.projectGroup.count({ where: { ...yearFilter, status: 'PENDING' } });
+    const activeGroups = await prisma.projectGroup.count({ where: { ...yearFilter, status: 'ACTIVE' } });
+    const completedGroups = await prisma.projectGroup.count({ where: { ...yearFilter, status: 'COMPLETED' } });
+    const pendingTheses = await prisma.thesis.count({ where: { ...yearFilter, status: 'PENDING' } });
+    const minorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, projectType: 'MINOR' } });
+    const majorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, projectType: 'MAJOR' } });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
       pendingGroups, activeGroups, completedGroups, pendingTheses,
+      minorGroups, majorGroups,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -95,10 +119,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Thesis Management API is running' });
 });
 
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

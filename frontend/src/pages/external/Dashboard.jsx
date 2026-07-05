@@ -82,7 +82,7 @@ function ExternalDashboard() {
                   </Link>
                 ))}
                 {groups.length > 5 && (
-                  <Link to="/external/groups" style={{
+                  <Link to="/external/evaluations" style={{
                     fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none', textAlign: 'center', padding: 8
                   }}>View all {groups.length} projects →</Link>
                 )}
@@ -128,7 +128,7 @@ function ExternalDashboard() {
                   </Link>
                 ))}
                 {theses.length > 5 && (
-                  <Link to="/external/theses" style={{
+                  <Link to="/external/evaluations" style={{
                     fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none', textAlign: 'center', padding: 8
                   }}>View all {theses.length} theses →</Link>
                 )}

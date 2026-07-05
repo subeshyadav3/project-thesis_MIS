@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -18,87 +20,104 @@ function ExternalExaminerEvaluationPage() {
   const [summary, setSummary] = useState(null);
   const [components, setComponents] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
-  const [marks, setMarks] = useState('');
-  const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [completing, setCompleting] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: null });
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  useEffect(() => {
+  const loadData = useCallback((signal) => {
     setLoading(true);
     const endpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
-    api.get(endpoint)
-      .then(({ data }) => { setItem(data); })
-      .catch(() => { toast.error('Failed to load details'); });
-
+    api.get(endpoint, { signal })
+      .then(({ data }) => setItem(data))
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); });
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
-    api.get(evalEndpoint)
+    api.get(evalEndpoint, { signal })
       .then(({ data }) => {
-        if (data.summary) setSummary(data.summary);
+        setSummary(data.summary || null);
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
-        // Find the Internal Examiner (EXTERNAL_EXAMINER) component
-        const intComp = (data.components || []).find(c => c.evaluationType === 'EXTERNAL_EXAMINER');
-        if (intComp) {
-          const existing = (data.evaluations || []).find(e => e.componentId === intComp.id);
-          if (existing && existing.marks !== null && existing.marks !== undefined) {
-            setMarks(existing.marks.toString());
-            setComment(existing.comment || '');
-          }
-        }
       })
-      .catch(() => {})
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
-  // Get the Internal Examiner component (the one this user evaluates)
-  const internalExaminerComponent = components.find(c => c.evaluationType === 'EXTERNAL_EXAMINER');
-  const existingEvaluation = internalExaminerComponent
-    ? evaluations.find(e => e.componentId === internalExaminerComponent.id)
-    : null;
+  useEffect(() => {
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
+  }, [loadData]);
 
-  const handleSubmit = async () => {
-    if (!internalExaminerComponent) {
-      toast.error('No Internal Examiner component assigned for this project');
+  const componentByType = (evalType) => components.find(c => c.evaluationType === evalType);
+  const evaluationForComponent = (compId) => evaluations.find(e => e.componentId === compId);
+
+  const handleSaveComponent = async (component, marksValue, comment) => {
+    if (marksValue === '' || marksValue === null || marksValue === undefined) {
+      toast.warning('Please enter marks');
       return;
     }
-    if (!marks && !comment.trim()) {
-      toast.warning('Please enter marks or a comment');
+    const m = parseFloat(marksValue);
+    if (Number.isNaN(m) || m < 0 || m > component.maxMarks) {
+      toast.warning(`Marks must be between 0 and ${component.maxMarks}`);
       return;
     }
-    const marksNum = parseFloat(marks);
-    if (Number.isNaN(marksNum) || marksNum < 0 || marksNum > internalExaminerComponent.maxMarks) {
-      toast.warning(`Please enter valid marks between 0 and ${internalExaminerComponent.maxMarks}`);
-      return;
-    }
-    setSubmitting(true);
     try {
       const payload = {
-        componentId: internalExaminerComponent.id,
-        marks: marksNum,
-        comment,
+        componentId: component.id,
+        marks: m,
+        comment: comment || null,
       };
-      if (type === 'group') payload.groupId = parseInt(id);
-      else payload.thesisId = parseInt(id);
-      await api.post('/external-examiners/evaluation', payload);
-      toast.success('Internal Examiner marks submitted');
-      navigate('/external/evaluations');
+      if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
+      await api.post('/evaluations/marks', payload);
+      toast.success(`${component.name} marks saved`);
+      loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to submit evaluation');
-    } finally {
-      setSubmitting(false);
+      toast.error(err.response?.data?.error || `Failed to save ${component.name}`);
     }
+  };
+
+  const doComplete = async (componentId) => {
+    setCompleting(componentId);
+    try {
+      const payload = {};
+      if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
+      await api.put(`/evaluations/${componentId}/complete`, payload);
+      toast.success('Evaluation marked as complete');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to complete evaluation');
+    } finally {
+      setCompleting(null);
+    }
+  };
+
+  const handleComplete = async (componentId) => {
+    const e = evaluationForComponent(componentId);
+    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
+      setConfirmDialog({
+        open: true,
+        message: 'Warning: The marks for this component are zero or not set. Do you still want to mark it as complete?',
+        onConfirm: () => {
+          setConfirmDialog({ open: false, message: '', onConfirm: null });
+          doComplete(componentId);
+        }
+      });
+      return;
+    }
+    await doComplete(componentId);
   };
 
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
   const title = type === 'group' ? item?.projectTitle : item?.title;
 
-  // Order components for display
   const orderedComponents = [...components].sort((a, b) => {
-    const order = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
+    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
     return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
   });
+
+  const currentUserComponents = components.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
 
   if (loading) {
     return (
@@ -117,200 +136,297 @@ function ExternalExaminerEvaluationPage() {
   }
 
   return (
-    <PageLayout
-      title="Internal Examiner Evaluation"
-      subtitle={title}
-      user={user}
+    <ErrorBoundary>
+    <PageLayout title="Internal Examiner Evaluation" subtitle={title} user={user}
       actions={
         <button className="btn btn-outline btn-sm" onClick={() => navigate('/external/evaluations')}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
-          Back to List
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back to List
         </button>
       }
     >
-      {/* Project info card */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-header">
-          <h3>Project Details</h3>
+      {/* Horizontal tab bar */}
+      <div className="tabs" style={{ marginBottom: 24 }}>
+        <div className={`tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+          <span className="material-symbols-outlined">overview</span> Overview
         </div>
-        <div className="detail-grid">
-          <div className="detail-item">
-            <span className="detail-label">{type === 'group' ? 'Group' : 'Student'}</span>
-            <span style={{ fontWeight: 600 }}>{name}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">{type === 'group' ? 'Project' : 'Thesis'} Title</span>
-            <span>{title}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Supervisor</span>
-            <span>{item.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Academic Year</span>
-            <span>{item.academicYear?.year || '—'}</span>
-          </div>
+        <div className={`tab ${activeTab === 'evaluation' ? 'active' : ''}`} onClick={() => setActiveTab('evaluation')}>
+          <span className="material-symbols-outlined">grading</span> Evaluation
         </div>
       </div>
 
-      {/* Two-column layout: marks form + breakdown sidebar */}
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        {/* LEFT: Internal Examiner Marks + Proposals */}
-        <div style={{ flex: 1, minWidth: 320 }}>
-          {internalExaminerComponent ? (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <div className="card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 10,
-                    background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span className="material-symbols-outlined">grading</span>
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0 }}>Internal Examiner Marks</h3>
-                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                      You are evaluating the <strong>{internalExaminerComponent.name}</strong> component.
-                    </p>
-                  </div>
-                </div>
-                <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
-                  Max: {internalExaminerComponent.maxMarks}
-                </span>
-              </div>
-
-              {/* Existing evaluation info bar */}
-              {existingEvaluation && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  margin: '0 16px', padding: '10px 14px', borderRadius: 8,
-                  background: 'var(--color-surface-container-low)', fontSize: 12,
-                  color: 'var(--color-on-surface-variant)',
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
-                  <span>
-                    Last updated {new Date(existingEvaluation.updatedAt).toLocaleString()}
-                    {existingEvaluation.marks !== null && existingEvaluation.marks !== undefined && (
-                      <> · Currently <strong style={{ color: 'var(--color-primary)' }}>{existingEvaluation.marks} / {internalExaminerComponent.maxMarks}</strong></>
-                    )}
-                  </span>
-                </div>
-              )}
-
-              {/* Marks + Comment form - aligned in a grid */}
-              <div style={{ padding: 16 }}>
-                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ width: 180, marginBottom: 0 }}>
-                    <label style={{ fontWeight: 600, fontSize: 14 }}>
-                      Marks (out of {internalExaminerComponent.maxMarks})
-                    </label>
-                    <input
-                      type="number"
-                      className="marks-input"
-                      value={marks}
-                      onChange={e => setMarks(e.target.value)}
-                      max={internalExaminerComponent.maxMarks}
-                      min="0"
-                      step="0.5"
-                      placeholder={`0 – ${internalExaminerComponent.maxMarks}`}
-                      style={{ fontSize: 20, fontWeight: 700, textAlign: 'center' }}
-                    />
-                  </div>
-                  <div className="form-group" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
-                    <label style={{ fontWeight: 600, fontSize: 14 }}>Comment (optional)</label>
-                    <textarea
-                      value={comment}
-                      onChange={e => setComment(e.target.value)}
-                      placeholder="Enter your evaluation comment..."
-                      style={{ minHeight: 52, width: '100%', resize: 'vertical' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Submit button */}
-                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-                    <span className="material-symbols-outlined">{submitting ? 'progress_activity' : 'save'}</span>
-                    {submitting ? 'Submitting...' : existingEvaluation ? 'Update Internal Examiner Marks' : 'Submit Internal Examiner Marks'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <div className="empty-state" style={{ padding: 24 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }}>error</span>
-                <h3 style={{ fontSize: 14 }}>No Internal Examiner component found</h3>
-                <p style={{ fontSize: 13 }}>Please contact the coordinator.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Submitted documents */}
-          <ProposalsSection proposals={item?.proposals || []} title="Submitted Documents" />
-        </div>
-
-        {/* RIGHT: breakdown sidebar */}
-        <div style={{ width: 360, minWidth: 280 }}>
+      {/* ============ OVERVIEW TAB ============ */}
+      {activeTab === 'overview' && (
+        <>
+          {/* Project Overview */}
           <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-header">
-              <h3>Evaluation Breakdown</h3>
-              <span className="badge" style={{ background: 'var(--color-surface-container)' }}>
-                {summary?.completedCount || 0} / {summary?.totalCount || 5} done
-              </span>
+            <div className="card-header"><h3>Project Overview</h3></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 24px', padding: '12px 16px', fontSize: 14 }}>
+              {type === 'group' && (
+                <>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Group:</span>
+                  <span>{item?.name}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Group Members:</span>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {item?.members?.length > 0 ? item.members.map(m => (
+                      <span key={m.id} className="badge badge-info" style={{ fontSize: 12 }}>
+                        {m.student?.firstName} {m.student?.lastName}
+                      </span>
+                    )) : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}
+                  </div>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Project Type:</span>
+                  <span><span className={`badge badge-${item?.projectType === 'MAJOR' ? 'warning' : 'info'}`}>{item?.projectType || 'MINOR'}</span></span>
+                </>
+              )}
+              {type === 'thesis' && (
+                <>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Student:</span>
+                  <span>{item?.student?.firstName} {item?.student?.lastName}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Email:</span>
+                  <span>{item?.student?.email || '—'}</span>
+                </>
+              )}
+              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
+              <span>{title}</span>
+              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Supervisor:</span>
+              <span>{item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
+              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Status:</span>
+              <span><span className={`badge badge-${item?.status?.toLowerCase() || 'pending'}`}>{item?.status || 'PENDING'}</span></span>
+              {item?.examinerAssignments?.length > 0 && (
+                <>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Internal Examiner:</span>
+                  <span>
+                    {item.examinerAssignments.map(a => (
+                      <span key={a.id} className="badge badge-info" style={{ fontSize: 12 }}>
+                        {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                      </span>
+                    ))}
+                  </span>
+                </>
+              )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16 }}>
-              {orderedComponents.map(c => {
-                const e = evaluations.find(ev => ev.componentId === c.id);
-                const hasMarks = e && e.marks !== null && e.marks !== undefined;
-                const isMine = c.evaluatorRole === 'EXTERNAL_EXAMINER';
-                return (
-                  <div key={c.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 8,
-                    background: isMine ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
-                    border: isMine ? '1px solid var(--color-primary)' : '1px solid var(--color-outline-variant)',
-                  }}>
-                    <span className="material-symbols-outlined" style={{
-                      fontSize: 18,
-                      color: hasMarks ? (isMine ? 'var(--color-on-primary-container)' : 'var(--color-success)') : 'var(--color-on-surface-variant)',
+          </div>
+
+          {/* Stats Summary */}
+          <div className="stats-grid" style={{ marginBottom: 24 }}>
+            <div className="stat-card bento-card">
+              <div className="stat-icon"><span className="material-symbols-outlined">score</span></div>
+              <div className="stat-number">{summary ? summary.total : 0}</div>
+              <div className="stat-label">Total Marks / {summary?.maxTotal || (type === 'group' ? 100 : 200)}</div>
+            </div>
+            <div className="stat-card bento-card">
+              <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+              <div className="stat-number">{summary?.completedCount || 0}<span style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>/{summary?.totalCount || components.length}</span></div>
+              <div className="stat-label">Components Evaluated</div>
+            </div>
+          </div>
+
+          {/* Evaluation Breakdown (read-only) */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header"><h3>Evaluation Breakdown</h3></div>
+            {orderedComponents.length === 0 ? (
+              <p style={{ color: 'var(--color-on-surface-variant)' }}>No evaluation components yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {orderedComponents.map(c => {
+                  const e = evaluationForComponent(c.id);
+                  const hasMarks = e && e.marks !== null && e.marks !== undefined;
+                  const isCompleted = e?.status === 'COMPLETED';
+                  const isMine = c.evaluatorRole === 'EXTERNAL_EXAMINER';
+                  return (
+                    <div key={c.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: 12,
+                      borderRadius: 8,
+                      background: isCompleted ? 'var(--color-surface-container-low)' : isMine ? 'var(--color-primary-container)' : 'transparent',
+                      border: `1px solid ${isCompleted ? 'var(--color-success)' : isMine ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
+                      opacity: isCompleted ? 0.85 : 1,
                     }}>
-                      {hasMarks ? 'check_circle' : 'pending'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: isMine ? 700 : 500 }}>{c.name}</div>
-                      <div style={{ fontSize: 10, color: isMine ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)' }}>
-                        {ROLE_LABEL[c.evaluatorRole]}
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: isCompleted ? 'var(--color-success-container)' : hasMarks ? 'var(--color-tertiary-container)' : 'var(--color-surface-container)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: isCompleted ? 'var(--color-on-success-container)' : hasMarks ? 'var(--color-on-tertiary-container)' : 'var(--color-on-surface-variant)',
+                        flexShrink: 0,
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+                          {isCompleted ? 'lock' : hasMarks ? 'check_circle' : 'pending'}
+                        </span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>
+                          {c.name}
+                          {isMine && !isCompleted && <span className="badge" style={{ marginLeft: 8, fontSize: 10, background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>Your Evaluation</span>}
+                          {isCompleted && <span className="badge" style={{ marginLeft: 8, fontSize: 10, background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                          Evaluated by {ROLE_LABEL[c.evaluatorRole]} · Max {c.maxMarks} marks
+                        </div>
+                        {e?.comment && (
+                          <div style={{ fontSize: 12, fontStyle: 'italic', marginTop: 4, color: 'var(--color-on-surface-variant)' }}>
+                            "{e.comment}"
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', minWidth: 70 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                          {hasMarks ? e.marks : '—'}
+                          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {c.maxMarks}</span>
+                        </div>
+                        {e?.submittedBy && (
+                          <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>
+                            by {e.submittedBy.firstName} {e.submittedBy.lastName}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <span style={{ fontWeight: 700, color: hasMarks ? (isMine ? 'var(--color-on-primary-container)' : 'var(--color-primary)') : 'var(--color-on-surface-variant)' }}>
-                      {hasMarks ? e.marks : '—'}
-                      <span style={{ fontSize: 11, fontWeight: 400 }}> / {c.maxMarks}</span>
-                    </span>
+                  );
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 14, borderRadius: 8, background: 'var(--color-primary-container)', border: '2px solid var(--color-primary)' }}>
+                  <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-on-primary)' }}>Grand Total</span>
+                  <span style={{ fontWeight: 800, fontSize: 24, color: 'var(--color-on-primary)' }}>
+                    {summary?.total ?? 0} <span style={{ fontWeight: 400, fontSize: 14 }}>/ {summary?.maxTotal ?? (type === 'group' ? 100 : 200)}</span>
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Submitted documents */}
+          <div style={{ marginBottom: 24 }}>
+            <ProposalsSection proposals={item?.proposals || []} title="Submitted Documents" user={user} />
+          </div>
+        </>
+      )}
+
+      {/* ============ EVALUATION TAB ============ */}
+      {activeTab === 'evaluation' && (
+        <>
+          {currentUserComponents.length > 0 && (
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+              {currentUserComponents.map(comp => {
+                const e = evaluationForComponent(comp.id);
+                const isCompleted = e?.status === 'COMPLETED';
+                return (
+                  <div key={comp.id} className="card" style={{ flex: '1 1 300px', opacity: isCompleted ? 0.85 : 1 }}>
+                    <div className="card-header">
+                      <h3>{comp.name}</h3>
+                      {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
+                    </div>
+                    {isCompleted || item?.status === 'COMPLETED' ? (
+                      <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
+                        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
+                          Marks: {e?.marks ?? '—'} / {comp.maxMarks}
+                        </div>
+                        {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4 }}>"{e.comment}"</p>}
+                      </div>
+                    ) : (
+                      <ExaminerEvaluationForm
+                        component={comp}
+                        evaluation={e}
+                        onSave={(marks, comment) => handleSaveComponent(comp, marks, comment)}
+                        onComplete={() => handleComplete(comp.id)}
+                        completing={completing === comp.id}
+                      />
+                    )}
                   </div>
                 );
               })}
             </div>
-          </div>
+          )}
 
-          <div className="card" style={{ marginBottom: 0 }}>
-            <div className="card-header"><h3>Grand Total</h3></div>
-            <div style={{ padding: 20, textAlign: 'center', background: 'var(--color-surface-container-low)', borderRadius: 12 }}>
-              <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--color-primary)' }}>
-                {summary?.total || 0}
-                <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {summary?.maxTotal || 50}</span>
-              </div>
-              {summary?.isComplete && (
-                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>verified</span> All components evaluated
-                </div>
-              )}
+          {currentUserComponents.length === 0 && (
+            <div className="card" style={{ marginBottom: 24, textAlign: 'center', padding: 32 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>info</span>
+              <h3 style={{ marginTop: 12 }}>No evaluation component assigned</h3>
+              <p style={{ color: 'var(--color-on-surface-variant)' }}>You don't have an evaluation component assigned for this project.</p>
             </div>
-          </div>
+          )}
+        </>
+      )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Confirm"
+        message={confirmDialog.message}
+        onConfirm={() => {
+          const fn = confirmDialog.onConfirm;
+          setConfirmDialog({ open: false, message: '', onConfirm: null });
+          fn?.();
+        }}
+        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: null })}
+      />
+    </PageLayout>
+    </ErrorBoundary>
+  );
+}
+
+function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, completing }) {
+  const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
+  const [comment, setComment] = useState(evaluation?.comment ?? '');
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    setMarks(evaluation?.marks?.toString() ?? '');
+    setComment(evaluation?.comment ?? '');
+  }, [evaluation?.id, evaluation?.marks, evaluation?.comment]);
+
+  const submit = async () => {
+    if (marks === '' || marks === null || marks === undefined) {
+      toast.warning('Please enter marks');
+      return;
+    }
+    const m = parseFloat(marks);
+    if (Number.isNaN(m) || m < 0 || m > component.maxMarks) {
+      toast.warning(`Marks must be between 0 and ${component.maxMarks}`);
+      return;
+    }
+    setSaving(true);
+    try { await onSave(marks, comment); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16, alignItems: 'start', padding: '0 16px 12px' }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label style={{ fontSize: 12 }}>Marks (out of {component.maxMarks})</label>
+          <input
+            type="number"
+            value={marks}
+            onChange={e => setMarks(e.target.value)}
+            max={component.maxMarks}
+            min="0"
+            step="0.5"
+            placeholder="0"
+            style={{ fontSize: 20, fontWeight: 700, textAlign: 'center' }}
+          />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label style={{ fontSize: 12 }}>Comment (optional)</label>
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder="Enter your evaluation comment..."
+            style={{ minHeight: 80, width: '100%' }}
+          />
         </div>
       </div>
-    </PageLayout>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '0 16px 16px' }}>
+        <button className="btn btn-primary" onClick={submit} disabled={saving}>
+          <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'save'}</span>
+          {saving ? 'Saving...' : 'Save Marks'}
+        </button>
+        <button
+          className="btn"
+          style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}
+          onClick={onComplete}
+          disabled={completing}
+        >
+          <span className="material-symbols-outlined">{completing ? 'progress_activity' : 'lock'}</span>
+          {completing ? 'Completing...' : 'Complete'}
+        </button>
+      </div>
+    </>
   );
 }
 

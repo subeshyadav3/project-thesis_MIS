@@ -4,59 +4,115 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
 function ExaminerList() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [examiners, setExaminers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: 'subesh' });
+  const [showEdit, setShowEdit] = useState(null);
+  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const navigate = useNavigate();
 
-  const loadData = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/users/role/external_examiner').then(({ data }) => setExaminers(data)),
-      api.get('/groups').then(({ data }) => setGroups(data)),
-      api.get('/theses').then(({ data }) => setTheses(data)),
-    ]).catch(() => {}).finally(() => setLoading(false));
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
+
+  const loadData = () => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoading(true);
+    Promise.all([
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
-  useEffect(() => { loadData(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!createForm.firstName.trim() || !createForm.lastName.trim()) {
+      toast.error('First name and last name are required');
+      return;
+    }
     try {
       await api.post('/users', { ...createForm, role: 'EXTERNAL_EXAMINER' });
       toast.success('Internal Examiner created successfully');
       setShowCreate(false);
-      setCreateForm({ firstName: '', lastName: '', email: '', password: 'subesh' });
+      setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Remove this Internal Examiner? Their assignments will also be cleared.')) return;
-    try {
-      await api.delete(`/users/${id}`);
-      toast.success('Internal Examiner removed');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+    setConfirmDialog({
+      open: true,
+      title: 'Remove Internal Examiner',
+      message: 'Remove this examiner? Their assignments will also be cleared.',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/users/${id}`);
+          toast.success('Internal Examiner removed');
+          loadData();
+        } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+      },
+    });
   };
 
-  // Build examiner assignments from group.thesis examinerAssignments lists
+  const handleEditExaminer = async (e) => {
+    e.preventDefault();
+    const needsDeactivate = editForm.active !== showEdit.active && !editForm.active;
+    if (needsDeactivate) {
+      const nonCompletedGroups = (showEdit.assignedGroups || []).filter(g => g.status !== 'COMPLETED').length;
+      const nonCompletedTheses = (showEdit.assignedTheses || []).filter(t => t.status !== 'COMPLETED').length;
+      if (nonCompletedGroups + nonCompletedTheses > 0) {
+        toast.error('Cannot mark as inactive: this examiner still has active non-completed projects/theses. All assigned work must be completed first.');
+        return;
+      }
+    }
+    try {
+      const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email };
+      if (editForm.password) payload.password = editForm.password;
+      await api.put(`/users/${showEdit.id}`, payload);
+      if (editForm.active !== showEdit.active) {
+        await api.put(`/users/${showEdit.id}/toggle-active`);
+      }
+      toast.success('Examiner updated successfully');
+      setShowEdit(null);
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Update failed'); }
+  };
+
+  const openEdit = (ex) => {
+    setEditForm({ firstName: ex.firstName, lastName: ex.lastName, email: ex.email, password: '', active: ex.active });
+    setShowEdit(ex);
+  };
+
   const enriched = useMemo(() => {
-    const assignmentFor = (exId) => [
-      ...groups.filter(g => (g.examinerAssignments || []).some(a => a.externalExaminerId === exId)),
-      ...theses.filter(t => (t.examinerAssignments || []).some(a => a.externalExaminerId === exId)),
-    ];
     return examiners.map(e => {
       const assignedGroups = groups.filter(g => (g.examinerAssignments || []).some(a => a.externalExaminerId === e.id));
       const assignedTheses = theses.filter(t => (t.examinerAssignments || []).some(a => a.externalExaminerId === e.id));
@@ -71,16 +127,16 @@ function ExaminerList() {
     });
   }, [examiners, groups, theses]);
 
-  const filtered = useMemo(() => {
-    if (!searchTerm) return enriched;
-    const q = searchTerm.toLowerCase();
+  const filteredExaminers = useMemo(() => {
+    if (!searchQuery) return enriched;
+    const q = searchQuery.toLowerCase();
     return enriched.filter(s =>
       `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(q)
     );
-  }, [enriched, searchTerm]);
+  }, [enriched, searchQuery]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(filteredExaminers.length / PAGE_SIZE);
+  const paginated = filteredExaminers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(1); }, [totalPages, currentPage]);
 
   const totalAssigned = groups.reduce((s, g) => s + (g.examinerAssignments?.length || 0), 0)
@@ -96,7 +152,8 @@ function ExaminerList() {
   );
 
   return (
-    <PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
+    <ErrorBoundary><PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
+      {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -106,7 +163,7 @@ function ExaminerList() {
               </div>
               <div className="modal-header-text">
                 <h2>Add Internal Examiner</h2>
-                <p>Register a new internal examiner (evaluates the 10-mark component)</p>
+                <p>Register a new internal examiner</p>
               </div>
             </div>
             <form onSubmit={handleCreate}>
@@ -141,6 +198,7 @@ function ExaminerList() {
         </div>
       )}
 
+      {/* ── DETAIL MODAL ── */}
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
@@ -153,7 +211,6 @@ function ExaminerList() {
                 <p>{showDetail.email}</p>
               </div>
             </div>
-
             <div className="detail-section">
               <h4 className="detail-section-title">Assigned Projects ({showDetail.groupCount})</h4>
               {showDetail.assignedGroups.length === 0 ? (
@@ -180,7 +237,6 @@ function ExaminerList() {
                 </table>
               )}
             </div>
-
             <div className="detail-section">
               <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
               {showDetail.assignedTheses.length === 0 ? (
@@ -204,7 +260,6 @@ function ExaminerList() {
                 </table>
               )}
             </div>
-
             <div className="modal-actions">
               <button className="btn btn-danger" onClick={() => { handleDelete(showDetail.id); setShowDetail(null); }}>
                 <span className="material-symbols-outlined">delete</span>
@@ -215,6 +270,63 @@ function ExaminerList() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT MODAL ── */}
+      {showEdit && (
+        <div className="modal-overlay" onClick={() => setShowEdit(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-icon warning">
+                <span className="material-symbols-outlined">edit</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Edit Examiner</h2>
+                <p>{showEdit.firstName} {showEdit.lastName}</p>
+              </div>
+            </div>
+            <form onSubmit={handleEditExaminer}>
+              <div className="form-group">
+                <label>First Name</label>
+                <input value={editForm.firstName} onChange={e => setEditForm({...editForm, firstName: e.target.value})} required placeholder="Enter first name" />
+              </div>
+              <div className="form-group">
+                <label>Last Name</label>
+                <input value={editForm.lastName} onChange={e => setEditForm({...editForm, lastName: e.target.value})} required placeholder="Enter last name" />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} required placeholder="e.g. name@ioe.edu.np" />
+              </div>
+              <div className="form-group">
+                <label>Reset Password <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(leave blank to keep current)</span></label>
+                <input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="New password" />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: editForm.active ? 'var(--color-success)' : 'var(--color-error)' }}>
+                    {editForm.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <button type="button" className="btn btn-sm" style={{ background: editForm.active ? 'var(--color-error-container)' : 'var(--color-success-container)', color: editForm.active ? 'var(--color-on-error-container)' : 'var(--color-on-success-container)' }} onClick={() => setEditForm({ ...editForm, active: !editForm.active })}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{editForm.active ? 'cancel' : 'check_circle'}</span>
+                    {editForm.active ? 'Mark as Inactive' : 'Mark as Active'}
+                  </button>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setShowEdit(null)}>
+                  <span className="material-symbols-outlined">close</span>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <span className="material-symbols-outlined">save</span>
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -242,29 +354,22 @@ function ExaminerList() {
         </div>
       </div>
 
+      <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search examiners..." style={{ maxWidth: 320, marginBottom: 12 }} />
       <div className="table-container">
         <div className="table-toolbar">
-          <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search examiners..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
-          </div>
+          <div className="table-toolbar-left" />
           <div className="table-toolbar-right">
-            <span className="font-label text-xs font-semibold text-on-surface-variant">{filtered.length} examiners</span>
+            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredExaminers.length} examiners</span>
           </div>
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading examiners...</p>
-          </div>
-        ) : filtered.length === 0 ? (
+          <TableSkeleton rows={5} cols={4} />
+        ) : filteredExaminers.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">person</span>
             <h3>No examiners found</h3>
-            <p>{searchTerm ? 'Try adjusting your search.' : 'No internal examiners have been registered yet.'}</p>
+            <p>{searchQuery ? 'Try adjusting your search.' : 'No internal examiners have been registered yet.'}</p>
           </div>
         ) : (
           <>
@@ -273,6 +378,7 @@ function ExaminerList() {
                 <tr>
                   <th>Examiner</th>
                   <th>Email</th>
+                  <th>Status</th>
                   <th>Bachelor Projects</th>
                   <th>Master Theses</th>
                   <th>Total</th>
@@ -281,7 +387,7 @@ function ExaminerList() {
               </thead>
               <tbody>
                 {paginated.map(s => (
-                  <tr key={s.id} className="clickable-row" onClick={() => setShowDetail(s)}>
+                  <tr key={s.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">{s.firstName?.[0]}{s.lastName?.[0]}</div>
@@ -289,14 +395,25 @@ function ExaminerList() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
+                    <td>
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
+                        {s.active ? 'check_circle' : 'cancel'}
+                      </span>
+                    </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
                     <td><span className="stat-chip">{s.thesisCount}</span></td>
                     <td><span className="stat-chip stat-chip-primary">{s.totalCount}</span></td>
-                    <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
-                        <span className="material-symbols-outlined">visibility</span>
-                        View
-                      </button>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
+                          <span className="material-symbols-outlined">visibility</span>
+                          View
+                        </button>
+                        <button className="btn btn-sm btn-outline" onClick={() => openEdit(s)}>
+                          <span className="material-symbols-outlined">edit</span>
+                          Edit
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -304,8 +421,8 @@ function ExaminerList() {
             </table>
             <div className="table-footer">
               <span className="font-label text-xs text-on-surface-variant table-footer-info">
-                {filtered.length > 0
-                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} of ${filtered.length}`
+                {filteredExaminers.length > 0
+                  ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredExaminers.length)} of ${filteredExaminers.length}`
                   : '0 results'}
               </span>
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -313,7 +430,9 @@ function ExaminerList() {
           </>
         )}
       </div>
+      <ConfirmDialog open={confirmDialog.open} title={confirmDialog.title} message={confirmDialog.message} danger={confirmDialog.danger} onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))} />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

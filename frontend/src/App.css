@@ -7,11 +7,12 @@
     --color-primary-container: #dbeafe;
     --color-on-primary: #ffffff;
     --color-on-primary-container: #1e3a5f;
+    --color-primary-grand: #1e3a5f;
 
     --color-secondary: #d97706;
     --color-secondary-hover: #b45309;
     --color-secondary-container: #fef3c7;
-    --color-on-secondary: #ffffff;
+    --color-on-secondary: #351848;
     --color-on-secondary-container: #78350f;
 
     --color-tertiary: #0f766e;
@@ -1240,6 +1241,20 @@
     border-color: var(--color-outline);
   }
   .badge-inactive .dot { background: var(--color-outline); }
+
+  .badge-info {
+    background: var(--color-secondary-container);
+    color: var(--color-on-secondary-container);
+    border-color: var(--color-secondary-container);
+  }
+  .badge-info .dot { background: var(--color-secondary); }
+
+  .badge-warning {
+    background: var(--color-tertiary-container);
+    color: var(--color-on-tertiary-container);
+    border-color: var(--color-tertiary-container);
+  }
+  .badge-warning .dot { background: var(--color-tertiary); }
 
   /* ─── Upload Zone ────────────────────────── */
   .upload-zone {

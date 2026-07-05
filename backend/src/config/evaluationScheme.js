@@ -1,68 +1,45 @@
-// Single source of truth for the 5 evaluation components of the minor project.
-// Total = 50 marks. This mirrors the academic regulation table exactly:
-//   Supervisor (25) + Proposal Defense (5) + Mid-Term Defense (5)
-//   + Final Defense (5) + Internal Examiner (10)
-
-const EVALUATION_SCHEME = [
-  {
-    type: 'SUPERVISOR',
-    name: 'Supervisor',
-    label: 'Supervisor',
-    shortLabel: 'Supervisor',
-    maxMarks: 25,
-    stage: 'FINAL',
-    evaluatorRole: 'SUPERVISOR',
-    description: 'Continuous assessment of progress, quality of work and engagement throughout the project.',
-    evaluatorDescription: 'Supervisor',
+const SCHEMES = {
+  MINOR: {
+    name: 'Minor Project',
+    totalMaxMarks: 50,
+    components: [
+      { type: 'SUPERVISOR', name: 'Supervisor', maxMarks: 25, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'PROPOSAL_DEFENSE', name: 'Proposal Defense', maxMarks: 5, stage: 'PROPOSAL', evaluatorRole: 'COORDINATOR' },
+      { type: 'MIDTERM_DEFENSE', name: 'Mid-Term Defense', maxMarks: 5, stage: 'MID_TERM', evaluatorRole: 'COORDINATOR' },
+      { type: 'FINAL_DEFENSE', name: 'Final Defense', maxMarks: 5, stage: 'FINAL', evaluatorRole: 'COORDINATOR' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Internal Examiner', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+    ],
   },
-  {
-    type: 'PROPOSAL_DEFENSE',
-    name: 'Proposal Defense',
-    label: 'Proposal Defense',
-    shortLabel: 'Proposal',
-    maxMarks: 5,
-    stage: 'PROPOSAL',
-    evaluatorRole: 'COORDINATOR',
-    description: 'Evaluation of the proposal defense presentation by the project coordinator.',
-    evaluatorDescription: 'Coordinator',
+  MAJOR: {
+    name: 'Major Project',
+    totalMaxMarks: 100,
+    components: [
+      { type: 'SUPERVISOR', name: 'Supervisor', maxMarks: 50, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'PROPOSAL_DEFENSE', name: 'Proposal Defense', maxMarks: 10, stage: 'PROPOSAL', evaluatorRole: 'COORDINATOR' },
+      { type: 'MIDTERM_DEFENSE', name: 'Mid-Term Defense', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'COORDINATOR' },
+      { type: 'FINAL_DEFENSE', name: 'Final Defense', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'COORDINATOR' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Internal Examiner', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+    ],
   },
-  {
-    type: 'MIDTERM_DEFENSE',
-    name: 'Mid-Term Defense',
-    label: 'Mid-Term Defense',
-    shortLabel: 'Mid-Term',
-    maxMarks: 5,
-    stage: 'MID_TERM',
-    evaluatorRole: 'COORDINATOR',
-    description: 'Evaluation of mid-semester progress and demonstration by the project coordinator.',
-    evaluatorDescription: 'Coordinator',
+  MASTER: {
+    name: 'Master Thesis',
+    totalMaxMarks: 200,
+    components: [
+      // Supervisor criteria (5 × 20 = 100)
+      { type: 'SUPERVISOR', name: 'Regularity of works (regular reporting of the progress report)', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Degree of Completeness of thesis', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Understanding of thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Student effort and performance', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Organization of study', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      // External examiner criteria (5 × 20 = 100)
+      { type: 'EXTERNAL_EXAMINER', name: 'Presentation Skills and Flow of Slides', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Defense & Question Handling', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Understanding of Thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Research Quality & Originality', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Report Writing', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+    ],
   },
-  {
-    type: 'FINAL_DEFENSE',
-    name: 'Final Defense',
-    label: 'Final Defense',
-    shortLabel: 'Final Def.',
-    maxMarks: 5,
-    stage: 'FINAL',
-    evaluatorRole: 'COORDINATOR',
-    description: 'Evaluation of the final defense / viva by the project coordinator.',
-    evaluatorDescription: 'Coordinator',
-  },
-  {
-    type: 'EXTERNAL_EXAMINER',
-    name: 'Internal Examiner',
-    label: 'Internal Examiner',
-    shortLabel: 'Int. Examiner',
-    maxMarks: 10,
-    stage: 'FINAL',
-    evaluatorRole: 'EXTERNAL_EXAMINER',
-    description: 'Independent assessment of the final deliverable by the appointed internal examiner.',
-    evaluatorDescription: 'Internal Examiner',
-  },
-];
-
-const TOTAL_MAX_MARKS = EVALUATION_SCHEME.reduce((s, c) => s + c.maxMarks, 0); // 50
-const SCHEME_BY_TYPE = Object.fromEntries(EVALUATION_SCHEME.map(c => [c.type, c]));
+};
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -72,7 +49,14 @@ const ROLE_LABEL = {
   MAINTAINER: 'Maintainer',
 };
 
-function getComponentByType(type) { return SCHEME_BY_TYPE[type] || null; }
+function getScheme(projectType) {
+  return SCHEMES[projectType] || SCHEMES.MINOR;
+}
+
+function getComponentByType(projectType, type) {
+  const scheme = getScheme(projectType);
+  return scheme.components.find(c => c.type === type) || null;
+}
 
 function validateMarks(marks, maxMarks) {
   if (marks === null || marks === undefined || marks === '') return { valid: true };
@@ -83,10 +67,9 @@ function validateMarks(marks, maxMarks) {
   return { valid: true };
 }
 
-// Build the canonical component list to seed for a new group/thesis.
-// Each component is linked to an evaluator role.
-function getDefaultComponents() {
-  return EVALUATION_SCHEME.map(c => ({
+function getDefaultComponents(projectType) {
+  const scheme = getScheme(projectType);
+  return scheme.components.map(c => ({
     name: c.name,
     evaluationType: c.type,
     evaluatorRole: c.evaluatorRole,
@@ -94,20 +77,20 @@ function getDefaultComponents() {
   }));
 }
 
-// Compute the per-component + total summary used by every UI.
-function computeSummary(evaluations, components) {
-  const componentMap = new Map((components || []).map(c => [c.id, c]));
+function getTotalMaxMarks(projectType) {
+  return getScheme(projectType).totalMaxMarks;
+}
+
+function computeSummary(evaluations, components, projectType) {
+  const maxTotal = projectType ? getTotalMaxMarks(projectType)
+    : (components || []).reduce((s, c) => s + c.maxMarks, 0);
   const breakdown = (components || []).map(c => {
     const evalRec = (evaluations || []).find(e => e.componentId === c.id);
     return {
       componentId: c.id,
       evaluationType: c.evaluationType,
       name: c.name,
-      label: c.name,
-      shortLabel: c.shortLabel,
-      description: c.description,
       evaluatorRole: c.evaluatorRole,
-      evaluatorDescription: ROLE_LABEL[c.evaluatorRole] || c.evaluatorRole,
       stage: c.evaluationType === 'SUPERVISOR' || c.evaluationType === 'EXTERNAL_EXAMINER' || c.evaluationType === 'FINAL_DEFENSE' ? 'FINAL'
         : c.evaluationType === 'MIDTERM_DEFENSE' ? 'MID_TERM' : 'PROPOSAL',
       maxMarks: c.maxMarks,
@@ -125,7 +108,7 @@ function computeSummary(evaluations, components) {
   return {
     breakdown,
     total,
-    maxTotal: TOTAL_MAX_MARKS,
+    maxTotal,
     completedCount,
     totalCount: breakdown.length,
     isComplete: completedCount === breakdown.length,
@@ -133,12 +116,12 @@ function computeSummary(evaluations, components) {
 }
 
 module.exports = {
-  EVALUATION_SCHEME,
-  SCHEME_BY_TYPE,
-  TOTAL_MAX_MARKS,
+  SCHEMES,
   ROLE_LABEL,
+  getScheme,
   getComponentByType,
-  getDefaultComponents,
   validateMarks,
+  getDefaultComponents,
+  getTotalMaxMarks,
   computeSummary,
 };

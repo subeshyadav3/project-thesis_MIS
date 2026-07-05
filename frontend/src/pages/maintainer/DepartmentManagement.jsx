@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 function DepartmentManagement() {
   const [departments, setDepartments] = useState([]);
@@ -12,15 +16,37 @@ function DepartmentManagement() {
   const [yearForm, setYearForm] = useState({ year: '', semester: '', departmentId: '' });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
-  const loadData = () => {
-    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => {});
-    api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)).catch(() => {});
-  };
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setLoading(true);
+    Promise.all([
+      api.get('/departments', { signal }).then(({ data }) => setDepartments(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+    ]).catch((err) => {
+      if (err.name !== 'CanceledError') toast.error('Failed to load data');
+    }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
+
+  const filteredDepartments = useMemo(() =>
+    departments.filter(d =>
+      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.code.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [departments, searchQuery]
+  );
 
   const handleCreateDept = async (e) => {
     e.preventDefault();
+    if (!deptForm.name.trim() || !deptForm.code.trim()) {
+      toast.error('Department name and code are required');
+      return;
+    }
     try {
       await api.post('/departments', deptForm);
       toast.success('Department created successfully');
@@ -34,6 +60,10 @@ function DepartmentManagement() {
 
   const handleCreateYear = async (e) => {
     e.preventDefault();
+    if (!yearForm.year.trim() || !yearForm.semester.trim() || !yearForm.departmentId) {
+      toast.error('All academic year fields are required');
+      return;
+    }
     try {
       await api.post('/departments/academic-years', yearForm);
       toast.success('Academic year created successfully');
@@ -59,7 +89,8 @@ function DepartmentManagement() {
   );
 
   return (
-    <PageLayout title="Departments" user={user} actions={actions}>
+    <ErrorBoundary>
+      <PageLayout title="Departments" user={user} actions={actions}>
       <div className="page-header">
         <h1>
           <span className="material-symbols-outlined">account_balance</span>
@@ -88,38 +119,43 @@ function DepartmentManagement() {
       <div className="card">
         <div className="card-header">
           <h3>Departments</h3>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search departments..." style={{ width: 240 }} />
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Code</th>
-              <th>Academic Years</th>
-            </tr>
-          </thead>
-          <tbody>
-            {departments.length === 0 ? (
+        {loading ? (
+          <TableSkeleton rows={5} cols={3} />
+        ) : (
+          <table>
+            <thead>
               <tr>
-                <td colSpan="3" style={{ textAlign: 'center', color: 'var(--color-on-surface-variant)', padding: 40 }}>
-                  No departments found. Create one to get started.
-                </td>
+                <th>Name</th>
+                <th>Code</th>
+                <th>Academic Years</th>
               </tr>
-            ) : (
-              departments.map(d => (
-                <tr key={d.id}>
-                  <td style={{ fontWeight: 500 }}>{d.name}</td>
-                  <td>
-                    <span className="badge badge-inactive">
-                      <span className="dot" />
-                      {d.code}
-                    </span>
+            </thead>
+            <tbody>
+              {filteredDepartments.length === 0 ? (
+                <tr>
+                  <td colSpan="3" style={{ textAlign: 'center', color: 'var(--color-on-surface-variant)', padding: 40 }}>
+                    {searchQuery ? 'No departments match your search.' : 'No departments found. Create one to get started.'}
                   </td>
-                  <td style={{ color: 'var(--color-on-surface-variant)' }}>{d.academicYears?.length || 0} years</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredDepartments.map(d => (
+                  <tr key={d.id}>
+                    <td style={{ fontWeight: 500 }}>{d.name}</td>
+                    <td>
+                      <span className="badge badge-inactive">
+                        <span className="dot" />
+                        {d.code}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--color-on-surface-variant)' }}>{d.academicYears?.length || 0} years</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card">
@@ -239,7 +275,9 @@ function DepartmentManagement() {
           </div>
         </div>
       )}
-    </PageLayout>
+      <ConfirmDialog open={confirmDialog.open} title={confirmDialog.title} message={confirmDialog.message} danger={confirmDialog.danger} onConfirm={() => { confirmDialog.onConfirm?.(); setConfirmDialog({ ...confirmDialog, open: false }); }} onCancel={() => setConfirmDialog({ ...confirmDialog, open: false })} />
+      </PageLayout>
+    </ErrorBoundary>
   );
 }
 

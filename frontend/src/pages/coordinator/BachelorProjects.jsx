@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -21,42 +25,61 @@ function BachelorProjects() {
   const [detailMode, setDetailMode] = useState('view');
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedYear, setSelectedYear] = useState('');
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', academicYearId: '', supervisorId: '', students: [{ firstName: '', lastName: '', rollNumber: '' }] });
+  const [selectedProjectType, setSelectedProjectType] = useState('MINOR');
+  const [uploadProjectType, setUploadProjectType] = useState('MINOR');
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [examiners, setExaminers] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
-  const [assignSup, setAssignSup] = useState('');
-  const [supSearch, setSupSearch] = useState('');
-  const [supDropdownOpen, setSupDropdownOpen] = useState(false);
-  const supRef = useRef(null);
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
+  const [examSearch, setExamSearch] = useState('');
+  const [examOpen, setExamOpen] = useState(false);
+  const examRef = useRef(null);
+  const [editSupId, setEditSupId] = useState('');
+  const [editExamId, setEditExamId] = useState('');
+  const [editSupSearch, setEditSupSearch] = useState('');
+  const [editExamSearch, setEditExamSearch] = useState('');
+  const [editSupOpen, setEditSupOpen] = useState(false);
+  const [editExamOpen, setEditExamOpen] = useState(false);
+  const editSupRef = useRef(null);
+  const editExamRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [editingStudentIdx, setEditingStudentIdx] = useState(null);
+  const [newStudentSearch, setNewStudentSearch] = useState('');
+  const [newStudentOpen, setNewStudentOpen] = useState(false);
+  const newStudentRef = useRef(null);
+  const [programs, setPrograms] = useState([]);
+  const [selectedProgramId, setSelectedProgramId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [bulkSupervisorId, setBulkSupervisorId] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/groups').then(({ data }) => setGroups(data)),
-      api.get('/users/role/supervisor').then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+      api.get('/users/role/STUDENT?all=true&degreeType=BACHELOR', { signal }).then(({ data }) => setAllStudents(data)),
+      api.get('/departments/programs', { signal }).then(({ data }) => setPrograms(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (supRef.current && !supRef.current.contains(e.target)) {
-        setSupDropdownOpen(false);
-      }
-    };
-    if (supDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [supDropdownOpen]);
-
-  useEffect(() => {
+  useEffect(() => { loadData(); }, [loadData]);
+  
+useEffect(() => {
     const handleClickOutside = (e) => {
       if (createSupRef.current && !createSupRef.current.contains(e.target)) {
         setCreateSupOpen(false);
@@ -66,12 +89,53 @@ function BachelorProjects() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [createSupOpen]);
 
+  useEffect(() => {
+    const handleEditSupOutside = (e) => {
+      if (editSupRef.current && !editSupRef.current.contains(e.target)) {
+        setEditSupOpen(false);
+      }
+    };
+    if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
+    return () => document.removeEventListener('mousedown', handleEditSupOutside);
+  }, [editSupOpen]);
+
+  useEffect(() => {
+    const handleEditExamOutside = (e) => {
+      if (editExamRef.current && !editExamRef.current.contains(e.target)) {
+        setEditExamOpen(false);
+      }
+    };
+    if (editExamOpen) document.addEventListener('mousedown', handleEditExamOutside);
+    return () => document.removeEventListener('mousedown', handleEditExamOutside);
+  }, [editExamOpen]);
+
+  useEffect(() => {
+    const handleExamOutside = (e) => {
+      if (examRef.current && !examRef.current.contains(e.target)) {
+        setExamOpen(false);
+      }
+    };
+    if (examOpen) document.addEventListener('mousedown', handleExamOutside);
+    return () => document.removeEventListener('mousedown', handleExamOutside);
+  }, [examOpen]);
+
+  useEffect(() => {
+    const handleStudentOutside = (e) => {
+      if (newStudentRef.current && !newStudentRef.current.contains(e.target)) {
+        setNewStudentOpen(false);
+      }
+    };
+    if (newStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
+    return () => document.removeEventListener('mousedown', handleStudentOutside);
+  }, [newStudentOpen]);
+
   const handleFileUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile || !selectedYear) { toast.warning('Select file and academic year'); return; }
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('academicYearId', selectedYear);
+    formData.append('projectType', uploadProjectType);
     try {
       await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Groups imported successfully');
@@ -81,14 +145,17 @@ function BachelorProjects() {
     } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
   };
 
-  const handleAssign = async (groupId, supervisorId) => {
-    if (!supervisorId) { toast.warning('Select a supervisor'); return; }
-    try {
-      await api.put(`/groups/${groupId}/supervisor`, { supervisorId });
-      toast.success('Supervisor assigned successfully');
-      setShowDetail(null);
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Assignment failed'); }
+  const confirmComplete = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Mark as Complete',
+      message: 'Are you sure you want to mark this group as completed?',
+      onConfirm: () => {
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        handleComplete(id);
+      },
+      danger: false,
+    });
   };
 
   const handleComplete = async (id) => {
@@ -100,35 +167,120 @@ function BachelorProjects() {
     } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
   };
 
+  const handleEditSave = async (groupId) => {
+    try {
+      const promises = [];
+      if (editSupId !== undefined) {
+        const currentSup = showDetail?.supervisorId?.toString();
+        if (editSupId !== currentSup) {
+          promises.push(api.put(`/groups/${groupId}/supervisor`, { supervisorId: parseInt(editSupId) || null }));
+        }
+      }
+      if (editExamId !== undefined) {
+        const currentExam = showDetail?.examinerAssignments?.[0]?.externalExaminerId?.toString();
+        if (editExamId !== currentExam) {
+          if (editExamId) {
+            if (currentExam) {
+              const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
+              if (assignmentId) {
+                promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
+              }
+            }
+            promises.push(api.post('/examiner-assignments/group', { groupId, externalExaminerId: parseInt(editExamId) }));
+          } else if (currentExam) {
+            const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
+            if (assignmentId) {
+              promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
+            }
+          }
+        }
+      }
+      await Promise.all(promises);
+      toast.success('Changes saved successfully');
+      setShowDetail(null);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Save failed');
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
-    const students = createForm.students.filter(s => s.firstName.trim() || s.rollNumber.trim());
+    if (!createForm.name.trim() || !createForm.projectTitle.trim()) {
+      toast.warning('Group name and project title are required');
+      return;
+    }
+    const students = createForm.students.filter(s => s.studentId);
     try {
-      await api.post('/groups', { ...createForm, students });
+      const payload = {
+        ...createForm,
+        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
+        programId: selectedProgramId || undefined,
+      };
+      const { data: group } = await api.post('/groups', payload);
+      if (createForm.examinerId) {
+        await api.post('/examiner-assignments/group', { groupId: group.id, externalExaminerId: parseInt(createForm.examinerId) });
+      }
       toast.success('Group created successfully');
       setShowCreate(false);
-      setCreateForm({ name: '', projectTitle: '', academicYearId: '', supervisorId: '', students: [{ firstName: '', lastName: '', rollNumber: '' }] });
+      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setSelectedProgramId('');
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
 
   const addStudentField = () => {
     if (createForm.students.length >= 4) return;
-    setCreateForm({ ...createForm, students: [...createForm.students, { firstName: '', lastName: '', rollNumber: '' }] });
+    setCreateForm({ ...createForm, students: [...createForm.students, { firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   };
 
   const removeStudentField = (idx) => {
     setCreateForm({ ...createForm, students: createForm.students.filter((_, i) => i !== idx) });
   };
 
-  const updateStudent = (idx, field, value) => {
-    const updated = [...createForm.students];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setCreateForm({ ...createForm, students: updated });
-  };
+const updateStudent = (idx, field, value) => {
+  const updated = [...createForm.students];
+  updated[idx] = { ...updated[idx], [field]: value };
+  setCreateForm({ ...createForm, students: updated });
+};
 
-  const filteredGroups = useMemo(() => {
-    return groups.filter(g => {
+const startEditStudent = (idx) => {
+  setEditingStudentIdx(idx);
+  setNewStudentSearch('');
+  setNewStudentOpen(true);
+};
+
+const selectStudent = (idx, student) => {
+  const updated = [...createForm.students];
+  updated[idx] = { firstName: student.firstName, lastName: student.lastName, rollNumber: student.rollNumber || '', studentId: Number(student.id) };
+  setCreateForm({ ...createForm, students: updated });
+  setEditingStudentIdx(null);
+  setNewStudentSearch('');
+  setNewStudentOpen(false);
+};
+
+const clearStudent = (idx) => {
+  const updated = [...createForm.students];
+  updated[idx] = { firstName: '', lastName: '', rollNumber: '', studentId: '' };
+  setCreateForm({ ...createForm, students: updated });
+  setEditingStudentIdx(null);
+};
+
+const getMatchedStudent = (roll) => {
+  if (!roll) return null;
+  return allStudents.find(s => s.rollNumber && s.rollNumber.toLowerCase() === roll.toLowerCase());
+};
+
+const filteredGroups = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return groups;
+    return groups.filter(g =>
+      g.name.toLowerCase().includes(q) || (g.projectTitle || '').toLowerCase().includes(q)
+    );
+  }, [groups, searchQuery]);
+
+  const filteredByAdvanced = useMemo(() => {
+    return filteredGroups.filter(g => {
       const searchStr = (
         g.name + ' ' +
         g.projectTitle + ' ' +
@@ -137,21 +289,21 @@ function BachelorProjects() {
       ).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
+      const matchesType = typeFilter === 'ALL' || g.projectType === typeFilter;
       const matchesYear = yearFilter === 'ALL' || g.academicYearId?.toString() === yearFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
         : supervisorFilter === 'NONE'
           ? !g.supervisor
           : g.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesYear && matchesSupervisor;
+      return matchesSearch && matchesStatus && matchesType && matchesYear && matchesSupervisor;
     });
-  }, [groups, searchTerm, statusFilter, yearFilter, supervisorFilter]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, yearFilter, supervisorFilter]);
 
   const sortedGroups = useMemo(() => {
-    return [...filteredGroups].sort((a, b) => {
-      if (a.supervisor && !b.supervisor) return -1;
-      if (!a.supervisor && b.supervisor) return 1;
-      return 0;
+    return [...filteredByAdvanced].sort((a, b) => {
+      const statusOrder = { ACTIVE: 0, COMPLETED: 1 };
+      return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
     });
   }, [filteredGroups]);
 
@@ -164,12 +316,12 @@ function BachelorProjects() {
 
   const pendingCount = groups.filter(g => !g.supervisor).length;
   const assignedCount = groups.filter(g => g.supervisor).length;
+  const minorCount = groups.filter(g => g.projectType === 'MINOR').length;
+  const majorCount = groups.filter(g => g.projectType === 'MAJOR').length;
 
   const openDetail = (g, mode) => {
     setShowDetail(g);
-    setDetailMode(mode);
-    setAssignSup(g.supervisorId ? g.supervisorId.toString() : '');
-    setSupSearch('');
+    setDetailMode(mode || 'view');
   };
 
   const safeMembers = (g) => (g.members || []).filter(m => m.student);
@@ -190,6 +342,19 @@ function BachelorProjects() {
         <span className="material-symbols-outlined">add</span>
         Add Group
       </button>
+      <button className="btn btn-outline btn-sm" onClick={async () => {
+        try {
+          const { data } = await api.post('/groups/export', {}, { responseType: 'blob' });
+          const url = window.URL.createObjectURL(new Blob([data]));
+          const a = document.createElement('a'); a.href = url; a.download = 'groups.xlsx'; a.click();
+          window.URL.revokeObjectURL(url);
+          toast.success('Groups exported');
+        } catch (err) {
+          toast.error('Export failed');
+        }
+      }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Export
+      </button>
     </>
   );
 
@@ -205,8 +370,12 @@ function BachelorProjects() {
     </div>
   );
 
+  const typeOptions = [
+    { value: 'MINOR', label: 'Minor' },
+    { value: 'MAJOR', label: 'Major' },
+  ];
+
   const statusOptions = [
-    { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
@@ -224,14 +393,11 @@ function BachelorProjects() {
     })),
   ];
 
-  const filteredSupOptions = allSupervisors.filter(s =>
-    `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(supSearch.toLowerCase())
-  );
-
   return (
+    <ErrorBoundary>
     <PageLayout title="Bachelor Projects" user={user} actions={actions}>
       {showDetail && (
-        <div className="modal-overlay" onClick={() => setShowDetail(null)}>
+        <div className="modal-overlay" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
@@ -246,10 +412,10 @@ function BachelorProjects() {
             <div className="detail-section">
               <div className="detail-grid">
                 <div className="detail-item">
-                  <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
+                  <span className="detail-label">Type</span>
+                  <span className={`badge badge-${showDetail.projectType === 'MAJOR' ? 'warning' : 'info'}`}>
                     <span className="dot" />
-                    {showDetail.status || 'PENDING'}
+                    {showDetail.projectType === 'MAJOR' ? 'Major' : 'Minor'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -261,11 +427,18 @@ function BachelorProjects() {
                   <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Assigned</span>
+                  <span className="detail-label">Supervisor</span>
                   <span>{showDetail.supervisor
                     ? `${showDetail.supervisor.firstName} ${showDetail.supervisor.lastName}`
                     : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
                   }</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Status</span>
+                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
+                    <span className="dot" />
+                    {showDetail.status || 'PENDING'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -303,76 +476,128 @@ function BachelorProjects() {
               </table>
             </div>
 
+
+
             {detailMode === 'edit' && (
-              <div className="detail-section" ref={supRef}>
-                <h4 className="detail-section-title">Supervisor</h4>
-                <div className="sup-dropdown-trigger">
-                  <div className="sup-search-wrapper" onClick={() => setSupDropdownOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
-                    <input
-                      type="text"
-                      placeholder={assignSup ? allSupervisors.find(s => s.id.toString() === assignSup)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === assignSup)?.lastName || 'Search supervisor...' : 'Search supervisor...'}
-                      value={supSearch}
-                      onChange={e => { setSupSearch(e.target.value); setSupDropdownOpen(true); }}
-                      onFocus={() => setSupDropdownOpen(true)}
-                    />
-                    {assignSup && (
-                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setAssignSup(''); setSupSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
-                      </button>
-                    )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{supDropdownOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
-                  </div>
-                  {supDropdownOpen && (
-                    <div className="sup-dropdown">
-                      {filteredSupOptions.length === 0 ? (
-                        <div className="sup-dropdown-empty">No supervisors found</div>
-                      ) : (
-                        filteredSupOptions.map(s => {
-                          const selected = assignSup === s.id.toString();
-                          return (
-                            <div
-                              key={s.id}
-                              className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                              onClick={() => { setAssignSup(s.id.toString()); setSupSearch(''); setSupDropdownOpen(false); }}
-                            >
-                              <div className="sup-dropdown-item-avatar">
-                                {s.firstName?.[0]}{s.lastName?.[0]}
-                              </div>
-                              <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
-                                <div className="sup-dropdown-item-email">{s.email}</div>
-                              </div>
-                              {selected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
-                              )}
-                            </div>
-                          );
-                        })
+              <div className="detail-section">
+                <h4 className="detail-section-title">Edit Assignments</h4>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>Supervisor</label>
+                    <div className="sup-dropdown-trigger">
+                      <div className="sup-search-wrapper" onClick={() => setEditSupOpen(true)}>
+                        <span className="material-symbols-outlined">search</span>
+                        <input
+                          type="text"
+                          placeholder={editSupId ? allSupervisors.find(s => s.id.toString() === editSupId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === editSupId)?.lastName || 'Search supervisor...' : 'No supervisor'}
+                          value={editSupSearch}
+                          onChange={e => { setEditSupSearch(e.target.value); setEditSupOpen(true); }}
+                          onFocus={() => setEditSupOpen(true)}
+                        />
+                        {editSupId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditSupId(''); setEditSupSearch(''); }}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                      </div>
+                      {editSupOpen && (
+                        <div className="sup-dropdown">
+                          {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
+                            <div className="sup-dropdown-empty">No supervisors found</div>
+                          ) : (
+                            allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
+                              const selected = editSupId === s.id.toString();
+                              return (
+                                <div
+                                  key={s.id}
+                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                  onClick={() => { setEditSupId(s.id.toString()); setEditSupSearch(''); setEditSupOpen(false); }}
+                                >
+                                  <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                                  <div className="sup-dropdown-item-info">
+                                    <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                    <div className="sup-dropdown-item-email">{s.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: s.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: s.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                    {s.active ? 'Active' : 'Inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                  <div className="form-group" ref={editExamRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>Internal Examiner</label>
+                    <div className="sup-dropdown-trigger">
+                      <div className="sup-search-wrapper" onClick={() => setEditExamOpen(true)}>
+                        <span className="material-symbols-outlined">search</span>
+                        <input
+                          type="text"
+                          placeholder={editExamId ? examiners.find(e => e.id.toString() === editExamId)?.firstName + ' ' + examiners.find(e => e.id.toString() === editExamId)?.lastName || 'Search examiner...' : 'No examiner'}
+                          value={editExamSearch}
+                          onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
+                          onFocus={() => setEditExamOpen(true)}
+                        />
+                        {editExamId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditExamId(''); setEditExamSearch(''); }}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                      </div>
+                      {editExamOpen && (
+                        <div className="sup-dropdown">
+                          {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                            <div className="sup-dropdown-empty">No examiners found</div>
+                          ) : (
+                            examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                              const selected = editExamId === e.id.toString();
+                              return (
+                                <div
+                                  key={e.id}
+                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                  onClick={() => { setEditExamId(e.id.toString()); setEditExamSearch(''); setEditExamOpen(false); }}
+                                >
+                                  <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
+                                  <div className="sup-dropdown-item-info">
+                                    <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-email">{e.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                    {e.active ? 'Active' : 'Inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
-
             <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => setShowDetail(null)}>
-                <span className="material-symbols-outlined">close</span>
+              <button className="btn btn-outline" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>                <span className="material-symbols-outlined">close</span>
                 Close
               </button>
-              {showDetail.status !== 'COMPLETED' && (
-                <button className="btn btn-success" onClick={() => handleComplete(showDetail.id)}>
+              {detailMode === 'edit' && (
+                <button className="btn btn-primary" onClick={() => handleEditSave(showDetail.id)}>
+                  <span className="material-symbols-outlined">save</span>
+                  Save Changes
+                </button>
+              )}
+              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+                <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
                   <span className="material-symbols-outlined">check_circle</span>
                   Mark Complete
                 </button>
               )}
-              {detailMode === 'edit' && (
-                <button className="btn btn-primary" onClick={() => handleAssign(showDetail.id, assignSup)}>
-                  <span className="material-symbols-outlined">save</span>
-                  Update Supervisor
-                </button>
-              )}
+
             </div>
           </div>
         </div>
@@ -394,15 +619,45 @@ function BachelorProjects() {
           <div className="stat-number">{pendingCount}</div>
           <div className="stat-label">Needs Supervisor</div>
         </div>
+        <div className="stat-card bento-card">
+          <div className="stat-icon"><span className="material-symbols-outlined">star</span></div>
+          <div className="stat-number">{minorCount}</div>
+          <div className="stat-label">Minor</div>
+        </div>
+        <div className="stat-card bento-card">
+          <div className="stat-icon"><span className="material-symbols-outlined">stars</span></div>
+          <div className="stat-number">{majorCount}</div>
+          <div className="stat-label">Major</div>
+        </div>
       </div>
 
+      {selectedGroups.length > 1 && (
+        <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Assign Supervisor ({selectedGroups.length} groups)</span>
+            <select className="form-input" style={{ width: 200 }} value={bulkSupervisorId} onChange={e => setBulkSupervisorId(e.target.value)}>
+              <option value="">Select supervisor...</option>
+              {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+            </select>
+            <button className="btn btn-primary btn-sm" onClick={async () => {
+              if (!bulkSupervisorId) return toast.warning('Select a supervisor');
+              try {
+                const ids = selectedGroups.map(g => g.id || g);
+                await api.post('/groups/bulk-assign-supervisor', { groupIds: ids, supervisorId: parseInt(bulkSupervisorId) });
+                toast.success(`Assigned supervisor to ${ids.length} groups`);
+                setSelectedGroups([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk assign failed');
+              }
+            }}>Assign</button>
+          </div>
+        </div>
+      )}
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search groups, members, supervisors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by group name or project title..." style={{ maxWidth: 320 }} />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
@@ -411,15 +666,13 @@ function BachelorProjects() {
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
+          <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={typeOptions} allLabel="All Types" />
           <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading groups...</p>
-          </div>
+          <TableSkeleton rows={5} cols={6} />
         ) : sortedGroups.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">school</span>
@@ -431,8 +684,10 @@ function BachelorProjects() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 40 }}></th>
                   <th>Group</th>
                   <th>Project Title</th>
+                  <th>Type</th>
                   <th>Members</th>
                   <th>Supervisor</th>
                   <th>Status</th>
@@ -441,8 +696,13 @@ function BachelorProjects() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedGroups.map(g => (
+                  {paginatedGroups.map(g => (
                   <tr key={g.id} onClick={() => navigate(`/coordinator/project/group/${g.id}`)} style={{ cursor: 'pointer' }}>
+                    <td onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedGroups.includes(g)} onChange={() => {
+                        setSelectedGroups(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
+                      }} />
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">{g.name?.slice(0, 2).toUpperCase()}</div>
@@ -450,6 +710,12 @@ function BachelorProjects() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
+                    <td>
+                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 11 }}>
+                        <span className="dot" />
+                        {g.projectType === 'MAJOR' ? 'Major' : 'Minor'}
+                      </span>
+                    </td>
                     <td>
                       <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                         {safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(', ') || '—'}
@@ -483,16 +749,29 @@ function BachelorProjects() {
                           View
                         </button>
                         {g.status !== 'COMPLETED' && (
-                          <>
-                            <button className="btn btn-sm btn-outline-primary" onClick={() => openDetail(g, 'edit')}>
-                              <span className="material-symbols-outlined">edit</span>
-                              Edit
-                            </button>
-                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleComplete(g.id); }}>
-                              <span className="material-symbols-outlined">check_circle</span>
-                              Complete
-                            </button>
-                          </>
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
+                            <span className="material-symbols-outlined">edit</span>
+                            Edit
+                          </button>
+                        )}
+                        {g.status === 'COMPLETED' && (
+                          <button className="btn btn-sm btn-outline" onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = `/api/print/group/${g.id}`;
+                            a.download = `evaluation_${g.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }}>
+                            <span className="material-symbols-outlined">download</span>
+                            PDF
+                          </button>
+                        )}
+                        {g.status !== 'COMPLETED' && (
+                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }}>
+                            <span className="material-symbols-outlined">check_circle</span>
+                            Complete
+                          </button>
                         )}
                       </div>
                     </td>
@@ -533,13 +812,20 @@ function BachelorProjects() {
                 </select>
               </div>
               <div className="form-group">
+                <label>Project Type</label>
+                <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
+                  <option value="MINOR">Minor Project</option>
+                  <option value="MAJOR">Major Project</option>
+                </select>
+              </div>
+              <div className="form-group">
                 <label>Excel File (.xlsx)</label>
                 <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
               </div>
               <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginBottom: 8 }}>
                 Required columns: Group Name, Project Title, Member Names, Roll Numbers
               </p>
-              <div className="modal-actions">
+            <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
                   <span className="material-symbols-outlined">close</span>
                   Cancel
@@ -580,6 +866,20 @@ function BachelorProjects() {
                 <select value={createForm.academicYearId} onChange={e => setCreateForm({...createForm, academicYearId: e.target.value})} required>
                   <option value="">Select academic year...</option>
                   {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Project Type</label>
+                <select value={createForm.projectType} onChange={e => setCreateForm({...createForm, projectType: e.target.value})}>
+                  <option value="MINOR">Minor Project</option>
+                  <option value="MAJOR">Major Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Program</label>
+                <select value={selectedProgramId} onChange={e => setSelectedProgramId(e.target.value)} required>
+                  <option value="">Select program...</option>
+                  {programs.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
                 </select>
               </div>
 
@@ -634,6 +934,57 @@ function BachelorProjects() {
                 </div>
               </div>
 
+              <div className="form-group" ref={examRef}>
+                <label>Internal Examiner <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <div className="sup-dropdown-trigger">
+                  <div className="sup-search-wrapper" onClick={() => setExamOpen(true)}>
+                    <span className="material-symbols-outlined">search</span>
+                    <input
+                      type="text"
+                      placeholder={createForm.examinerId ? examiners.find(e => e.id.toString() === createForm.examinerId)?.firstName + ' ' + examiners.find(e => e.id.toString() === createForm.examinerId)?.lastName || 'Search examiner...' : 'Search examiner...'}
+                      value={examSearch}
+                      onChange={e => { setExamSearch(e.target.value); setExamOpen(true); }}
+                      onFocus={() => setExamOpen(true)}
+                    />
+                    {createForm.examinerId && (
+                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, examinerId: ''}); setExamSearch(''); }}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    )}
+                    <span className="material-symbols-outlined sup-dropdown-arrow">{examOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                  </div>
+                  {examOpen && (
+                    <div className="sup-dropdown">
+                      {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
+                        <div className="sup-dropdown-empty">No examiners found</div>
+                      ) : (
+                        examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
+                          const selected = createForm.examinerId === e.id.toString();
+                          return (
+                            <div
+                              key={e.id}
+                              className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                              onClick={() => { setCreateForm({...createForm, examinerId: e.id.toString()}); setExamSearch(''); setExamOpen(false); }}
+                            >
+                              <div className="sup-dropdown-item-avatar">
+                                {e.firstName?.[0]}{e.lastName?.[0]}
+                              </div>
+                              <div className="sup-dropdown-item-info">
+                                <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                <div className="sup-dropdown-item-email">{e.email}</div>
+                              </div>
+                              {selected && (
+                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="detail-section">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <h4 className="detail-section-title" style={{ margin: 0, border: 'none', padding: 0 }}>Students (max 4)</h4>
@@ -644,35 +995,83 @@ function BachelorProjects() {
                     </button>
                   )}
                 </div>
-                {createForm.students.map((st, idx) => (
-                  <div key={idx} className="student-row">
-                    <div className="student-row-fields">
-                      <input
-                        value={st.firstName}
-                        onChange={e => updateStudent(idx, 'firstName', e.target.value)}
-                        placeholder="First name"
-                      />
-                      <input
-                        value={st.lastName}
-                        onChange={e => updateStudent(idx, 'lastName', e.target.value)}
-                        placeholder="Last name"
-                      />
-                      <input
-                        value={st.rollNumber}
-                        onChange={e => updateStudent(idx, 'rollNumber', e.target.value)}
-                        placeholder="Roll no (e.g. 080BCT084)"
-                      />
-                    </div>
-                    {createForm.students.length > 1 && (
-                      <button type="button" className="btn btn-xs btn-ghost" onClick={() => removeStudentField(idx)} style={{ color: 'var(--color-error)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
+{createForm.students.map((st, idx) => {
+  const selectedStudent = allStudents.find(s => s.id === st.studentId);
+  const isEditing = editingStudentIdx === idx;
+  return (
+    <div key={idx} className="student-row">
+      <div className="student-row-fields">
+        <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Student {idx + 1}</label>
+          <div className="sup-dropdown-trigger" ref={isEditing ? newStudentRef : undefined}>
+            <div className="sup-search-wrapper" onClick={() => startEditStudent(idx)}>
+              <span className="material-symbols-outlined">search</span>
+              <input
+                type="text"
+                placeholder={st.studentId ? `${st.firstName} ${st.lastName} (${st.rollNumber || 'no roll'})` : 'Click to select student...'}
+                value={isEditing ? newStudentSearch : (st.studentId ? `${st.firstName} ${st.lastName}` : '')}
+                onChange={e => { setNewStudentSearch(e.target.value); setNewStudentOpen(true); if (editingStudentIdx !== idx) setEditingStudentIdx(idx); }}
+                onFocus={() => { if (editingStudentIdx !== idx) setEditingStudentIdx(idx); }}
+                readOnly={!!st.studentId && !isEditing}
+              />
+              {st.studentId && isEditing && (
+                <button className="sup-clear" onClick={(e) => { e.stopPropagation(); clearStudent(idx); setEditingStudentIdx(null); }}>
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              )}
+              <span className="material-symbols-outlined sup-dropdown-arrow">{isEditing && newStudentOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+            </div>
+            {isEditing && newStudentOpen && (
+              <div className="sup-dropdown">
+                {allStudents.length === 0 ? (
+                  <div className="sup-dropdown-empty">Loading students...</div>
+                ) : (() => {
+                  const filteredStudents = allStudents.filter(s => {
+                    if (String(st.studentId) === String(s.id)) return false;
+                    if (selectedProgramId && String(s.programId) !== String(selectedProgramId)) return false;
+                    const q = newStudentSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    return `${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q);
+                  });
+                  if (filteredStudents.length === 0) {
+                    return <div className="sup-dropdown-empty">No students found</div>;
+                  }
+                  return filteredStudents.map(s => {
+                    const isSelected = String(st.studentId) === String(s.id);
+                    return (
+                      <div
+                        key={s.id}
+                        className={`sup-dropdown-item ${isSelected ? 'sup-dropdown-item-selected' : ''}`}
+                        onClick={() => selectStudent(idx, s)}
+                      >
+                        <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                        <div className="sup-dropdown-item-info">
+                          <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                          <div className="sup-dropdown-item-email">{s.email || ''}</div>
+                        </div>
+                        {isSelected && (
+                          <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {createForm.students.length > 1 && (
+        <button type="button" className="btn btn-xs btn-ghost" onClick={() => removeStudentField(idx)} style={{ color: 'var(--color-error)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+        </button>
+      )}
+    </div>
+  );
+})}
               </div>
 
-              <div className="modal-actions">
+            <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
                   <span className="material-symbols-outlined">close</span>
                   Cancel
@@ -687,6 +1086,16 @@ function BachelorProjects() {
         </div>
       )}
     </PageLayout>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null, danger: false })}
+        confirmLabel="Confirm"
+        danger={confirmDialog.danger}
+      />
+    </ErrorBoundary>
   );
 }
 

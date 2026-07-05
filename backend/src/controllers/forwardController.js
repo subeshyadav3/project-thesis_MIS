@@ -1,3 +1,5 @@
+const audit = require('../services/auditService');
+const notifSvc = require('../services/notificationService');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -8,7 +10,7 @@ exports.forwardToExamDept = async (req, res) => {
       include: {
         members: { include: { student: { select: { firstName: true, lastName: true, email: true } } } },
         evaluations: true,
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, active: true } },
       },
     });
     const theses = await prisma.thesis.findMany({
@@ -16,7 +18,7 @@ exports.forwardToExamDept = async (req, res) => {
       include: {
         student: { select: { firstName: true, lastName: true, email: true } },
         evaluations: true,
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, active: true } },
       },
     });
     const payload = {
@@ -47,8 +49,11 @@ exports.forwardToExamDept = async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       timeout: 10000,
     });
-    res.json({ message: 'Results forwarded successfully', response: response.data });
+    audit.log({ action: 'FORWARD', entity: 'Results', details: 'Forwarded results to Examination Department', performedById: req.user.id });
+    const coordinatorIds = await notifSvc.getCoordinatorIds();
+  await notifSvc.notifyMany(coordinatorIds, 'RESULTS_FORWARDED', `Results have been forwarded to the Examination Department`);
+  res.json({ message: 'Results forwarded successfully', response: response.data });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to forward results: ' + error.message });
+    res.status(500).json({ error: 'Failed to forward results' });
   }
 };

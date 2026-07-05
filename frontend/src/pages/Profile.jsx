@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
+import ErrorBoundary from '../components/ErrorBoundary';
+import { useToast } from '../contexts/ToastContext';
+import api from '../services/api';
 
 function Profile() {
   const navigate = useNavigate();
+  const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetForm, setResetForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [resetting, setResetting] = useState(false);
 
   const roleLabel = user.role?.replace('_', ' ') || 'USER';
   const initials = `${user?.firstName?.[0] || 'U'}${user?.lastName?.[0] || ''}`;
@@ -13,19 +20,30 @@ function Profile() {
     year: 'numeric', month: 'long', day: 'numeric'
   }) : '—';
 
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!resetForm.currentPassword) return toast.warning('Enter your current password');
+    if (!resetForm.newPassword) return toast.warning('Enter a new password');
+    if (resetForm.newPassword.length < 6) return toast.warning('Password must be at least 6 characters');
+    if (resetForm.newPassword !== resetForm.confirmPassword) return toast.warning('Passwords do not match');
+    setResetting(true);
+    try {
+      await api.post('/auth/change-password', { currentPassword: resetForm.currentPassword, newPassword: resetForm.newPassword });
+      toast.success('Password updated successfully');
+      setShowResetForm(false);
+      setResetForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update password');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
-    <PageLayout title="Profile" user={user}>
+    <ErrorBoundary><PageLayout title="Profile" user={user}>
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         {/* Left: Main Profile Card */}
         <div className="card" style={{ flex: 2, minWidth: 280, marginBottom: 0 }}>
-          <div className="card-header">
-            <h3>Profile</h3>
-            <span className={`badge badge-${user?.role?.toLowerCase() || 'pending'}`}>
-              <span className="dot" />
-              {roleLabel}
-            </span>
-          </div>
-
           {/* Avatar + Name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 0 16px', borderBottom: '1px solid var(--color-outline-variant)', marginBottom: 20 }}>
             <div style={{
@@ -61,14 +79,15 @@ function Profile() {
                 <span>{roleLabel}</span>
               </div>
               <div className="detail-item">
-                <span className="detail-label">User ID</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{user?.id || '—'}</span>
+                <span className="detail-label">Degree Type</span>
+                <span>{user?.degreeType}</span>
               </div>
+
             </div>
           </div>
 
           {/* Account Details */}
-          <div>
+          <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-on-surface-variant)', marginBottom: 16 }}>
               Account Details
             </div>
@@ -92,33 +111,64 @@ function Profile() {
           </div>
         </div>
 
-        {/* Right: Summary Card */}
-        <div style={{ width: 280, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Right: Account Status + Reset Password */}
+        <div style={{ width: 300, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Reset Password Card */}
+          <div className="card">
+            <div className="card-header">
+              <h3>Reset Password</h3>
+            </div>
+            {!showResetForm ? (
+              <div style={{ padding: '0 4px' }}>
+                <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', margin: '0 0 12px' }}>
+                  Update your account password. You'll need your current password.
+                </p>
+                <button className="btn btn-primary btn-block" onClick={() => setShowResetForm(true)}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>lock_reset</span>
+                  Change Password
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPassword}>
+                <div className="form-group">
+                  <label>Current Password</label>
+                  <input type="password" className="form-input" value={resetForm.currentPassword} onChange={e => setResetForm(f => ({ ...f, currentPassword: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label>New Password</label>
+                  <input type="password" className="form-input" value={resetForm.newPassword} onChange={e => setResetForm(f => ({ ...f, newPassword: e.target.value }))} minLength={6} required />
+                </div>
+                <div className="form-group">
+                  <label>Confirm New Password</label>
+                  <input type="password" className="form-input" value={resetForm.confirmPassword} onChange={e => setResetForm(f => ({ ...f, confirmPassword: e.target.value }))} minLength={6} required />
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button type="submit" className="btn btn-primary" disabled={resetting} style={{ flex: 1 }}>
+                    {resetting ? 'Updating...' : 'Update'}
+                  </button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowResetForm(false); setResetForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
           {/* Account Status */}
-          <div className="card" style={{ marginBottom: 0 }}>
-            <div className="card-header" style={{ paddingBottom: 12 }}>
+          <div className="card">
+            <div className="card-header">
               <h3>Account Status</h3>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: '50%', background: 'var(--color-success-container)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-success)' }}>check_circle</span>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 8, background: 'var(--color-surface-container-low)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-success)' }}>check_circle</span>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>Active</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Your account is active</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Account is active</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: '50%', background: 'var(--color-primary-container)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-primary)' }}>verified</span>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 8, background: 'var(--color-surface-container-low)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-primary)' }}>verified</span>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>Verified</div>
                   <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Email verified</div>
@@ -127,31 +177,9 @@ function Profile() {
             </div>
           </div>
 
-          {/* Role Info */}
-          <div className="card" style={{ marginBottom: 0 }}>
-            <div className="card-header" style={{ paddingBottom: 12 }}>
-              <h3>Role & Permissions</h3>
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', lineHeight: 1.6 }}>
-              <p style={{ margin: '0 0 8px' }}><strong style={{ color: 'var(--color-on-surface)' }}>{roleLabel}</strong></p>
-              {user.role === 'SUPERVISOR' ? (
-                <p style={{ margin: 0 }}>You can evaluate student projects and theses, provide feedback, and issue recommendation letters.</p>
-              ) : user.role === 'COORDINATOR' ? (
-                <p style={{ margin: 0 }}>You can manage student groups, assign supervisors, track evaluations, and forward results to the Examination Department.</p>
-              ) : user.role === 'MAINTAINER' ? (
-                <p style={{ margin: 0 }}>You have full system access to manage users, departments, and system configurations.</p>
-              ) : user.role === 'STUDENT' ? (
-                <p style={{ margin: 0 }}>You can view your project/thesis details, submit documents, and track evaluations and feedback.</p>
-              ) : user.role === 'EXTERNAL_EXAMINER' ? (
-                <p style={{ margin: 0 }}>You can view assigned projects and theses, and submit evaluation marks and comments.</p>
-              ) : (
-                <p style={{ margin: 0 }}>Standard user access.</p>
-              )}
-            </div>
-          </div>
         </div>
       </div>
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 

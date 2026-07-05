@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -23,42 +27,50 @@ function MasterThesis() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedYear, setSelectedYear] = useState('');
   const [createForm, setCreateForm] = useState({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
-  const [assignSup, setAssignSup] = useState('');
-  const [supSearch, setSupSearch] = useState('');
-  const [supDropdownOpen, setSupDropdownOpen] = useState(false);
-  const supRef = useRef(null);
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
+  const [examiners, setExaminers] = useState([]);
+  const [editSupId, setEditSupId] = useState('');
+  const [editExamId, setEditExamId] = useState('');
+  const [editSupSearch, setEditSupSearch] = useState('');
+  const [editExamSearch, setEditExamSearch] = useState('');
+  const [editSupOpen, setEditSupOpen] = useState(false);
+  const [editExamOpen, setEditExamOpen] = useState(false);
+  const editSupRef = useRef(null);
+  const editExamRef = useRef(null);
+  const [examSearch, setExamSearch] = useState('');
+  const [examOpen, setExamOpen] = useState(false);
+  const examRef = useRef(null);
+  // Student search dropdown
+  const [createStudentSearch, setCreateStudentSearch] = useState('');
+  const [createStudentOpen, setCreateStudentOpen] = useState(false);
+  const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/theses').then(({ data }) => setTheses(data)),
-      api.get('/users/role/supervisor').then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
-      api.get('/users').then(({ data }) => setStudents(data.filter(u => u.role === 'STUDENT'))),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
+      api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
+      api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+      api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (supRef.current && !supRef.current.contains(e.target)) {
-        setSupDropdownOpen(false);
-      }
-    };
-    if (supDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [supDropdownOpen]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  useEffect(() => {
+useEffect(() => {
     const handleClickOutside = (e) => {
       if (createSupRef.current && !createSupRef.current.contains(e.target)) {
         setCreateSupOpen(false);
@@ -67,6 +79,46 @@ function MasterThesis() {
     if (createSupOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [createSupOpen]);
+
+  useEffect(() => {
+    const handleEditSupOutside = (e) => {
+      if (editSupRef.current && !editSupRef.current.contains(e.target)) {
+        setEditSupOpen(false);
+      }
+    };
+    if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
+    return () => document.removeEventListener('mousedown', handleEditSupOutside);
+  }, [editSupOpen]);
+
+  useEffect(() => {
+    const handleEditExamOutside = (e) => {
+      if (editExamRef.current && !editExamRef.current.contains(e.target)) {
+        setEditExamOpen(false);
+      }
+    };
+    if (editExamOpen) document.addEventListener('mousedown', handleEditExamOutside);
+    return () => document.removeEventListener('mousedown', handleEditExamOutside);
+  }, [editExamOpen]);
+
+  useEffect(() => {
+    const handleExamOutside = (e) => {
+      if (examRef.current && !examRef.current.contains(e.target)) {
+        setExamOpen(false);
+      }
+    };
+    if (examOpen) document.addEventListener('mousedown', handleExamOutside);
+    return () => document.removeEventListener('mousedown', handleExamOutside);
+  }, [examOpen]);
+
+  useEffect(() => {
+    const handleStudentOutside = (e) => {
+      if (createStudentRef.current && !createStudentRef.current.contains(e.target)) {
+        setCreateStudentOpen(false);
+      }
+    };
+    if (createStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
+    return () => document.removeEventListener('mousedown', handleStudentOutside);
+  }, [createStudentOpen]);
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
@@ -83,23 +135,23 @@ function MasterThesis() {
     } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
   };
 
-  const handleAssign = async (thesisId, supervisorId) => {
-    if (!supervisorId) { toast.warning('Select a supervisor'); return; }
-    try {
-      await api.put(`/theses/${thesisId}/supervisor`, { supervisorId });
-      toast.success('Supervisor assigned successfully');
-      setShowDetail(null);
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Assignment failed'); }
-  };
-
-  const handleComplete = async (id) => {
+const handleComplete = async (id) => {
     try {
       await api.put(`/theses/${id}/status`, { status: 'COMPLETED' });
       toast.success('Thesis marked as completed');
       setShowDetail(null);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+  };
+
+  const confirmComplete = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Mark Thesis Complete',
+      message: 'Are you sure you want to mark this thesis as completed? This action will change the thesis status.',
+      onConfirm: () => { handleComplete(id); setConfirmDialog(prev => ({ ...prev, open: false })); },
+      danger: false
+    });
   };
 
   const handleCreate = async (e) => {
@@ -113,14 +165,46 @@ function MasterThesis() {
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
 
+  const handleEditSave = async (thesisId) => {
+    try {
+      const promises = [];
+      if (editSupId !== undefined) {
+        const currentSup = showDetail?.supervisorId?.toString();
+        if (editSupId !== currentSup) {
+          promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: parseInt(editSupId) || null }));
+        }
+      }
+      if (editExamId !== undefined) {
+        const currentExam = showDetail?.examinerAssignments?.[0]?.externalExaminerId?.toString();
+        if (editExamId !== currentExam) {
+          if (editExamId) {
+            if (currentExam) {
+              const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
+              if (assignmentId) {
+                promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
+              }
+            }
+            promises.push(api.post('/examiner-assignments/thesis', { thesisId, externalExaminerId: parseInt(editExamId) }));
+          } else if (currentExam) {
+            const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
+            if (assignmentId) {
+              promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
+            }
+          }
+        }
+      }
+      await Promise.all(promises);
+      toast.success('Changes saved successfully');
+      setShowDetail(null);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Save failed');
+    }
+  };
+
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {
-      const searchStr = (
-        t.title + ' ' +
-        (t.student ? `${t.student.firstName} ${t.student.lastName} ${t.student.email}` : '') + ' ' +
-        (t.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : '')
-      ).toLowerCase();
-      const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
+      const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
       const matchesYear = yearFilter === 'ALL' || t.academicYearId?.toString() === yearFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
@@ -130,13 +214,12 @@ function MasterThesis() {
           : t.supervisor?.id?.toString() === supervisorFilter;
       return matchesSearch && matchesStatus && matchesYear && matchesSupervisor;
     });
-  }, [theses, searchTerm, statusFilter, yearFilter, supervisorFilter]);
+  }, [theses, searchQuery, statusFilter, yearFilter, supervisorFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
-      if (a.supervisor && !b.supervisor) return -1;
-      if (!a.supervisor && b.supervisor) return 1;
-      return 0;
+      const statusOrder = { ACTIVE: 0, COMPLETED: 1 };
+      return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
     });
   }, [filteredTheses]);
 
@@ -152,9 +235,7 @@ function MasterThesis() {
 
   const openDetail = (t, mode) => {
     setShowDetail(t);
-    setDetailMode(mode);
-    setAssignSup(t.supervisorId ? t.supervisorId.toString() : '');
-    setSupSearch('');
+    setDetailMode(mode || 'view');
   };
 
   const formatAcademicYear = (ay) => {
@@ -172,6 +253,19 @@ function MasterThesis() {
         <span className="material-symbols-outlined">add</span>
         Add Thesis
       </button>
+      <button className="btn btn-outline btn-sm" onClick={async () => {
+        try {
+          const { data } = await api.post('/theses/export', {}, { responseType: 'blob' });
+          const url = window.URL.createObjectURL(new Blob([data]));
+          const a = document.createElement('a'); a.href = url; a.download = 'theses.xlsx'; a.click();
+          window.URL.revokeObjectURL(url);
+          toast.success('Theses exported');
+        } catch (err) {
+          toast.error('Export failed');
+        }
+      }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Export
+      </button>
     </>
   );
 
@@ -188,7 +282,6 @@ function MasterThesis() {
   );
 
   const statusOptions = [
-    { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
@@ -206,11 +299,8 @@ function MasterThesis() {
     })),
   ];
 
-  const filteredSupOptions = allSupervisors.filter(s =>
-    `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(supSearch.toLowerCase())
-  );
-
-  return (
+return (
+    <ErrorBoundary>
     <PageLayout title="Master's Thesis" user={user} actions={actions}>
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
@@ -228,10 +318,10 @@ function MasterThesis() {
             <div className="detail-section">
               <div className="detail-grid">
                 <div className="detail-item">
-                  <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
+                  <span className="detail-label">Type</span>
+                  <span className="badge badge-info">
                     <span className="dot" />
-                    {showDetail.status || 'PENDING'}
+                    Thesis
                   </span>
                 </div>
                 <div className="detail-item">
@@ -248,6 +338,13 @@ function MasterThesis() {
                     ? `${showDetail.supervisor.firstName} ${showDetail.supervisor.lastName}`
                     : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
                   }</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Status</span>
+                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
+                    <span className="dot" />
+                    {showDetail.status || 'PENDING'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -278,73 +375,124 @@ function MasterThesis() {
             </div>
 
             {detailMode === 'edit' && (
-              <div className="detail-section" ref={supRef}>
-                <h4 className="detail-section-title">Supervisor</h4>
-                <div className="sup-dropdown-trigger">
-                  <div className="sup-search-wrapper" onClick={() => setSupDropdownOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
-                    <input
-                      type="text"
-                      placeholder={assignSup ? allSupervisors.find(s => s.id.toString() === assignSup)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === assignSup)?.lastName || 'Search supervisor...' : 'Search supervisor...'}
-                      value={supSearch}
-                      onChange={e => { setSupSearch(e.target.value); setSupDropdownOpen(true); }}
-                      onFocus={() => setSupDropdownOpen(true)}
-                    />
-                    {assignSup && (
-                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setAssignSup(''); setSupSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
-                      </button>
-                    )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{supDropdownOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
-                  </div>
-                  {supDropdownOpen && (
-                    <div className="sup-dropdown">
-                      {filteredSupOptions.length === 0 ? (
-                        <div className="sup-dropdown-empty">No supervisors found</div>
-                      ) : (
-                        filteredSupOptions.map(s => {
-                          const selected = assignSup === s.id.toString();
-                          return (
-                            <div
-                              key={s.id}
-                              className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                              onClick={() => { setAssignSup(s.id.toString()); setSupSearch(''); setSupDropdownOpen(false); }}
-                            >
-                              <div className="sup-dropdown-item-avatar">
-                                {s.firstName?.[0]}{s.lastName?.[0]}
-                              </div>
-                              <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
-                                <div className="sup-dropdown-item-email">{s.email}</div>
-                              </div>
-                              {selected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
-                              )}
-                            </div>
-                          );
-                        })
+              <div className="detail-section">
+                <h4 className="detail-section-title">Edit Assignments</h4>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>Supervisor</label>
+                    <div className="sup-dropdown-trigger">
+                      <div className="sup-search-wrapper" onClick={() => setEditSupOpen(true)}>
+                        <span className="material-symbols-outlined">search</span>
+                        <input
+                          type="text"
+                          placeholder={editSupId ? allSupervisors.find(s => s.id.toString() === editSupId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === editSupId)?.lastName || 'Search supervisor...' : 'No supervisor'}
+                          value={editSupSearch}
+                          onChange={e => { setEditSupSearch(e.target.value); setEditSupOpen(true); }}
+                          onFocus={() => setEditSupOpen(true)}
+                        />
+                        {editSupId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditSupId(''); setEditSupSearch(''); }}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                      </div>
+                      {editSupOpen && (
+                        <div className="sup-dropdown">
+                          {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
+                            <div className="sup-dropdown-empty">No supervisors found</div>
+                          ) : (
+                            allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
+                              const selected = editSupId === s.id.toString();
+                              return (
+                                <div
+                                  key={s.id}
+                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                  onClick={() => { setEditSupId(s.id.toString()); setEditSupSearch(''); setEditSupOpen(false); }}
+                                >
+                                  <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                                  <div className="sup-dropdown-item-info">
+                                    <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                    <div className="sup-dropdown-item-email">{s.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: s.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: s.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                    {s.active ? 'Active' : 'Inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                  <div className="form-group" ref={editExamRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>Internal Examiner</label>
+                    <div className="sup-dropdown-trigger">
+                      <div className="sup-search-wrapper" onClick={() => setEditExamOpen(true)}>
+                        <span className="material-symbols-outlined">search</span>
+                        <input
+                          type="text"
+                          placeholder={editExamId ? examiners.find(e => e.id.toString() === editExamId)?.firstName + ' ' + examiners.find(e => e.id.toString() === editExamId)?.lastName || 'Search examiner...' : 'No examiner'}
+                          value={editExamSearch}
+                          onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
+                          onFocus={() => setEditExamOpen(true)}
+                        />
+                        {editExamId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditExamId(''); setEditExamSearch(''); }}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                      </div>
+                      {editExamOpen && (
+                        <div className="sup-dropdown">
+                          {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                            <div className="sup-dropdown-empty">No examiners found</div>
+                          ) : (
+                            examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                              const selected = editExamId === e.id.toString();
+                              return (
+                                <div
+                                  key={e.id}
+                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                  onClick={() => { setEditExamId(e.id.toString()); setEditExamSearch(''); setEditExamOpen(false); }}
+                                >
+                                  <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
+                                  <div className="sup-dropdown-item-info">
+                                    <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-email">{e.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                    {e.active ? 'Active' : 'Inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
             <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => setShowDetail(null)}>
+              <button className="btn btn-outline" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>
                 <span className="material-symbols-outlined">close</span>
                 Close
               </button>
-              {showDetail.status !== 'COMPLETED' && (
-                <button className="btn btn-success" onClick={() => handleComplete(showDetail.id)}>
-                  <span className="material-symbols-outlined">check_circle</span>
-                  Mark Complete
+              {detailMode === 'edit' && (
+                <button className="btn btn-primary" onClick={() => handleEditSave(showDetail.id)}>
+                  <span className="material-symbols-outlined">save</span>
+                  Save Changes
                 </button>
               )}
-              {detailMode === 'edit' && (
-                <button className="btn btn-primary" onClick={() => handleAssign(showDetail.id, assignSup)}>
-                  <span className="material-symbols-outlined">save</span>
-                  Update Supervisor
+              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+                <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
+                  <span className="material-symbols-outlined">check_circle</span>
+                  Mark Complete
                 </button>
               )}
             </div>
@@ -373,10 +521,7 @@ function MasterThesis() {
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search theses, students, supervisors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search theses, students, supervisors..." />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedTheses.length} theses</span>
@@ -390,15 +535,12 @@ function MasterThesis() {
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading theses...</p>
-          </div>
+          <TableSkeleton rows={5} cols={5} />
         ) : sortedTheses.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">library_books</span>
             <h3>No theses found</h3>
-            <p>{searchTerm || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
+            <p>{searchQuery || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
           </div>
         ) : (
           <>
@@ -455,16 +597,29 @@ function MasterThesis() {
                           View
                         </button>
                         {t.status !== 'COMPLETED' && (
-                          <>
-                            <button className="btn btn-sm btn-outline-primary" onClick={() => openDetail(t, 'edit')}>
-                              <span className="material-symbols-outlined">edit</span>
-                              Edit
-                            </button>
-                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleComplete(t.id); }}>
-                              <span className="material-symbols-outlined">check_circle</span>
-                              Complete
-                            </button>
-                          </>
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
+                            <span className="material-symbols-outlined">edit</span>
+                            Edit
+                          </button>
+                        )}
+                        {t.status === 'COMPLETED' && (
+                          <button className="btn btn-sm btn-outline" onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = `/api/print/thesis/${t.id}`;
+                            a.download = `evaluation_${t.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }}>
+                            <span className="material-symbols-outlined">download</span>
+                            PDF
+                          </button>
+                        )}
+                        {t.status !== 'COMPLETED' && (
+                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }}>
+                            <span className="material-symbols-outlined">check_circle</span>
+                            Complete
+                          </button>
                         )}
                       </div>
                     </td>
@@ -545,10 +700,64 @@ function MasterThesis() {
               </div>
               <div className="form-group">
                 <label>Student</label>
-                <select value={createForm.studentId} onChange={e => setCreateForm({...createForm, studentId: e.target.value})} required>
-                  <option value="">Select a student...</option>
-                  {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.email})</option>)}
-                </select>
+                <div className="sup-dropdown-trigger" ref={createStudentRef}>
+                  <div className="sup-search-wrapper" onClick={() => setCreateStudentOpen(true)}>
+                    <span className="material-symbols-outlined">search</span>
+                    <input
+                      type="text"
+                      placeholder={createForm.studentId ? students.find(s => String(s.id) === String(createForm.studentId))?.firstName + ' ' + students.find(s => String(s.id) === String(createForm.studentId))?.lastName || 'Search student...' : 'Search student...'}
+                      value={createStudentSearch}
+                      onChange={e => { setCreateStudentSearch(e.target.value); setCreateStudentOpen(true); }}
+                      onFocus={() => setCreateStudentOpen(true)}
+                    />
+                    {createForm.studentId && (
+                      <button className="sup-clear" onClick={e => { e.stopPropagation(); setCreateForm({...createForm, studentId: ''}); setCreateStudentSearch(''); }}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    )}
+                    <span className="material-symbols-outlined sup-dropdown-arrow">{createStudentOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                  </div>
+                  {createStudentOpen && (
+                    <div className="sup-dropdown">
+                      {students.length === 0 ? (
+                        <div className="sup-dropdown-empty">Loading students...</div>
+                      ) : (() => {
+                        const filteredStudents = students.filter(s => {
+                          if (String(createForm.studentId) === String(s.id)) return false;
+                          const q = createStudentSearch.toLowerCase().trim();
+                          if (!q) return true;
+                          return `${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q);
+                        });
+                        if (filteredStudents.length === 0) {
+                          return <div className="sup-dropdown-empty">No students found</div>;
+                        }
+                        return filteredStudents.map(s => {
+                          const isSelected = String(createForm.studentId) === String(s.id);
+                          return (
+                            <div
+                              key={s.id}
+                              className={`sup-dropdown-item ${isSelected ? 'sup-dropdown-item-selected' : ''}`}
+                              onClick={() => {
+                                setCreateForm({...createForm, studentId: Number(s.id)});
+                                setCreateStudentSearch('');
+                                setCreateStudentOpen(false);
+                              }}
+                            >
+                              <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                              <div className="sup-dropdown-item-info">
+                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-email">{s.email || ''}</div>
+                              </div>
+                              {isSelected && (
+                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="form-group">
                 <label>Academic Year</label>
@@ -607,6 +816,56 @@ function MasterThesis() {
                   )}
                 </div>
               </div>
+              <div className="form-group" ref={examRef}>
+                <label>Internal Examiner <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <div className="sup-dropdown-trigger">
+                  <div className="sup-search-wrapper" onClick={() => setExamOpen(true)}>
+                    <span className="material-symbols-outlined">search</span>
+                    <input
+                      type="text"
+                      placeholder={createForm.examinerId ? examiners.find(e => e.id.toString() === createForm.examinerId)?.firstName + ' ' + examiners.find(e => e.id.toString() === createForm.examinerId)?.lastName || 'Search examiner...' : 'Search examiner...'}
+                      value={examSearch}
+                      onChange={e => { setExamSearch(e.target.value); setExamOpen(true); }}
+                      onFocus={() => setExamOpen(true)}
+                    />
+                    {createForm.examinerId && (
+                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, examinerId: ''}); setExamSearch(''); }}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    )}
+                    <span className="material-symbols-outlined sup-dropdown-arrow">{examOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                  </div>
+                  {examOpen && (
+                    <div className="sup-dropdown">
+                      {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
+                        <div className="sup-dropdown-empty">No examiners found</div>
+                      ) : (
+                        examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
+                          const selected = createForm.examinerId === e.id.toString();
+                          return (
+                            <div
+                              key={e.id}
+                              className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                              onClick={() => { setCreateForm({...createForm, examinerId: e.id.toString()}); setExamSearch(''); setExamOpen(false); }}
+                            >
+                              <div className="sup-dropdown-item-avatar">
+                                {e.firstName?.[0]}{e.lastName?.[0]}
+                              </div>
+                              <div className="sup-dropdown-item-info">
+                                <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                <div className="sup-dropdown-item-email">{e.email}</div>
+                              </div>
+                              {selected && (
+                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
                   <span className="material-symbols-outlined">close</span>
@@ -621,7 +880,17 @@ function MasterThesis() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+        confirmLabel="Confirm"
+        danger={confirmDialog.danger}
+      />
     </PageLayout>
+    </ErrorBoundary>
   );
 }
 

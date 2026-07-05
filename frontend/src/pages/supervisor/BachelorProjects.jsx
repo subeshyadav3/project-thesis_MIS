@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ErrorBoundary from '../../components/ErrorBoundary';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import SearchInput from '../../components/SearchInput';
+import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
@@ -18,24 +22,41 @@ function SupervisorBachelorProjects() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
     setLoading(true);
     Promise.all([
-      api.get('/supervisors/groups').then(({ data }) => setGroups(data)),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
-    ]).catch(() => {}).finally(() => setLoading(false));
-  };
-  useEffect(() => { loadData(); }, []);
+      api.get('/supervisors/groups', { signal }).then(({ data }) => setGroups(data)),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleComplete = async (id) => {
     try {
-      await api.put(`/groups/${id}/status`, { status: 'COMPLETED' });
-      toast.success('Group marked as completed');
+      // Find the supervisor component for this group
+      const { data } = await api.get(`/evaluations/group/${id}`);
+      const supervisorComp = (data.components || []).find(c => c.evaluatorRole === 'SUPERVISOR');
+      if (!supervisorComp) {
+        toast.error('No supervisor evaluation component found');
+        return;
+      }
+      const evaluation = (data.evaluations || []).find(e => e.componentId === supervisorComp.id);
+      if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
+        const confirmed = window.confirm('No marks submitted yet. Complete without marks?');
+        if (!confirmed) return;
+      }
+      await api.put(`/evaluations/${supervisorComp.id}/complete`, { groupId: id });
+      toast.success('Supervisor evaluation finalized');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete evaluation'); }
   };
 
   const filteredGroups = useMemo(() => {
@@ -100,7 +121,7 @@ function SupervisorBachelorProjects() {
   );
 
   return (
-    <PageLayout title="Bachelor Projects" subtitle="Your assigned project groups" user={user}>
+    <ErrorBoundary><PageLayout title="Bachelor Projects" subtitle="Your assigned project groups" user={user}>
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
@@ -121,6 +142,13 @@ function SupervisorBachelorProjects() {
                   <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
                     <span className="dot" />
                     {showDetail.status || 'PENDING'}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Type</span>
+                  <span className={`badge badge-${showDetail.projectType === 'MAJOR' ? 'warning' : 'info'}`}>
+                    <span className="dot" />
+                    {showDetail.projectType === 'MAJOR' ? 'Major' : 'Minor'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -204,10 +232,7 @@ function SupervisorBachelorProjects() {
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
-              <input type="text" placeholder="Search groups, members, titles..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
+            <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search groups, members, titles..." />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
@@ -220,10 +245,7 @@ function SupervisorBachelorProjects() {
         </div>
 
         {loading ? (
-          <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
-            <p>Loading groups...</p>
-          </div>
+          <TableSkeleton rows={5} cols={7} />
         ) : sortedGroups.length === 0 ? (
           <div className="empty-state">
             <span className="material-symbols-outlined">school</span>
@@ -237,6 +259,7 @@ function SupervisorBachelorProjects() {
                 <tr>
                   <th>Group</th>
                   <th>Project Title</th>
+                  <th>Type</th>
                   <th>Members</th>
                   <th>Status</th>
                   <th>Year</th>
@@ -253,6 +276,12 @@ function SupervisorBachelorProjects() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
+                    <td>
+                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 11 }}>
+                        <span className="dot" />
+                        {g.projectType === 'MAJOR' ? 'Major' : 'Minor'}
+                      </span>
+                    </td>
                     <td>
                       <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                         {safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(', ') || '—'}
@@ -296,7 +325,7 @@ function SupervisorBachelorProjects() {
           </>
         )}
       </div>
-    </PageLayout>
+    </PageLayout></ErrorBoundary>
   );
 }
 
