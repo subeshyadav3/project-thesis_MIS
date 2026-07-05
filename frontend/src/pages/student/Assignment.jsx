@@ -111,27 +111,7 @@ function StudentProjectDetail() {
       }
       user={user}
     >
-      {/* Evaluation progress banner — shows count and final result when ready */}
-      {breakdown.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }}>fact_check</span>
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 15 }}>Evaluation Progress</h3>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                  {completedComponents} of {breakdown.length} components evaluated
-                </p>
-              </div>
-            </div>
-            <span className={`badge ${isComplete ? 'badge-completed' : 'badge-pending'}`}>
-              <span className="dot" />{isComplete ? 'Complete' : 'In Progress'}
-            </span>
-          </div>
-        </div>
-      )}
+
 
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
         <div className="card" style={{ flex: 1.5, minWidth: 300, marginBottom: 0 }}>

@@ -25,8 +25,18 @@ const SCHEMES = {
     name: 'Master Thesis',
     totalMaxMarks: 200,
     components: [
-      { type: 'SUPERVISOR', name: 'Supervisor Evaluation', maxMarks: 100, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
-      { type: 'EXTERNAL_EXAMINER', name: 'External Examiner Evaluation', maxMarks: 100, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      // Supervisor criteria (5 × 20 = 100)
+      { type: 'SUPERVISOR', name: 'Regularity of works (regular reporting of the progress report)', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Degree of Completeness of thesis', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Understanding of thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Student effort and performance', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      { type: 'SUPERVISOR', name: 'Organization of study', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
+      // External examiner criteria (5 × 20 = 100)
+      { type: 'EXTERNAL_EXAMINER', name: 'Presentation Skills and Flow of Slides', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Defense & Question Handling', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Understanding of Thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Research Quality & Originality', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_EXAMINER', name: 'Report Writing', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ],
   },
 };

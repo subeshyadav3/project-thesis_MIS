@@ -68,6 +68,7 @@ model User {
   department  Department? @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
   programId   Int?
   program     Program?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: SetNull)
+  rollNumber  String?
   active      Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

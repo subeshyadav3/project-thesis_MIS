@@ -371,8 +371,6 @@ exports.bulkAssignSupervisor = async (req, res) => {
       where: { id: { in: ids } },
       data: { supervisorId: supId, status: 'ACTIVE' },
     });
-const audit = require('../services/auditService');
-const notifSvc = require('../services/notificationService');
     audit.log({ action: 'BULK_ASSIGN_SUPERVISOR', entity: 'ProjectGroup', details: `Assigned supervisor ${supId} to ${ids.length} groups`, performedById: req.user.id });
     res.json({ success: true, data: { updated: result.count } });
   } catch (error) {

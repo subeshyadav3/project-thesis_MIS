@@ -594,18 +594,30 @@ return (
                           <span className="material-symbols-outlined">visibility</span>
                           View
                         </button>
-                        <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
-                          <span className="material-symbols-outlined">edit</span>
-                          Edit
-                        </button>
                         {t.status !== 'COMPLETED' && (
-                          <>
-
-                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }}>
-                              <span className="material-symbols-outlined">check_circle</span>
-                              Complete
-                            </button>
-                          </>
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
+                            <span className="material-symbols-outlined">edit</span>
+                            Edit
+                          </button>
+                        )}
+                        {t.status === 'COMPLETED' && (
+                          <button className="btn btn-sm btn-outline" onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = `/api/print/thesis/${t.id}`;
+                            a.download = `evaluation_${t.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }}>
+                            <span className="material-symbols-outlined">download</span>
+                            PDF
+                          </button>
+                        )}
+                        {t.status !== 'COMPLETED' && (
+                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }}>
+                            <span className="material-symbols-outlined">check_circle</span>
+                            Complete
+                          </button>
                         )}
                       </div>
                     </td>

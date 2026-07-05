@@ -64,6 +64,18 @@ exports.submitComponentMarks = async (req, res) => {
       }
     }
 
+    // Prevent editing if parent project/thesis is COMPLETED
+    const groupIdNum = groupId ? parseInt(groupId) : null;
+    const thesisIdNum = thesisId ? parseInt(thesisId) : null;
+    if (groupIdNum) {
+      const grp = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { status: true } });
+      if (grp?.status === 'COMPLETED') return res.status(400).json({ error: 'Cannot edit marks: project is already completed.' });
+    }
+    if (thesisIdNum) {
+      const th = await prisma.thesis.findUnique({ where: { id: thesisIdNum }, select: { status: true } });
+      if (th?.status === 'COMPLETED') return res.status(400).json({ error: 'Cannot edit marks: thesis is already completed.' });
+    }
+
     // Validate marks (allow null to clear)
     const marksValidation = validateMarks(marks, component.maxMarks);
     if (!marksValidation.valid) return res.status(400).json({ error: marksValidation.error });
@@ -123,11 +135,11 @@ exports.submitComponentMarks = async (req, res) => {
     }
     const summary = computeSummary(evaluations, components, projectType);
 
-    // In-app notification on marks submitted
+    // In-app + email notification on marks submitted
     try {
-      const submitter = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+      const submitter = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true, email: true } });
       const itemTitle = groupId
-        ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true } }))?.projectTitle
+        ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true, name: true } }))?.projectTitle
         : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { title: true } }))?.title;
       await notifSvc.notifyMarksSubmitted({
         groupId: groupId ? parseInt(groupId) : undefined,
@@ -139,6 +151,28 @@ exports.submitComponentMarks = async (req, res) => {
         itemTitle: itemTitle || 'project',
         submitterId: req.user.id,
       });
+      // Email notification to students
+      try {
+        const emailService = require('../services/emailService');
+        if (groupId) {
+          const grp = await prisma.projectGroup.findUnique({
+            where: { id: parseInt(groupId) },
+            include: { members: { include: { student: { select: { email: true } } } } },
+          });
+          const studentEmails = grp?.members?.map(m => m.student.email).filter(Boolean) || [];
+          if (studentEmails.length) {
+            emailService.notifyEvaluationSubmitted(studentEmails, grp.name, itemTitle, `${submitter.firstName} ${submitter.lastName}`, component.evaluationType, `${data.marks ?? '-'}/${component.maxMarks}`);
+          }
+        } else if (thesisId) {
+          const th = await prisma.thesis.findUnique({
+            where: { id: parseInt(thesisId) },
+            include: { student: { select: { email: true } } },
+          });
+          if (th?.student?.email) {
+            emailService.notifyEvaluationSubmitted([th.student.email], `${th.student.firstName} ${th.student.lastName} (Thesis)`, itemTitle, `${submitter.firstName} ${submitter.lastName}`, component.evaluationType, `${data.marks ?? '-'}/${component.maxMarks}`);
+          }
+        }
+      } catch (e) { console.error('email notification error:', e.message); }
     } catch (e) { console.error('notifyMarksSubmitted:', e.message); }
 
     res.status(existing ? 200 : 201).json({ evaluation, summary });
@@ -204,7 +238,7 @@ exports.submitFeedback = async (req, res) => {
         );
       }
     }
-    audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', details: `Submitted marks for component`, performedById: req.user.id });
+    audit.log({ action: 'SUBMIT_FEEDBACK', entity: 'Evaluation', details: `Supervisor provided feedback for ${stage} stage`, performedById: req.user.id });
     res.status(201).json(evaluation);
   } catch (error) {
     console.error('submitFeedback error:', error);

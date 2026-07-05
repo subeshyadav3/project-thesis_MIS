@@ -180,6 +180,7 @@ async function main() {
         lastName: s.ln,
         role: 'STUDENT',
         degreeType: s.degreeType,
+        rollNumber: s.roll,
         departmentId: program.departmentId,
         programId: program.id,
       },
@@ -363,8 +364,8 @@ async function main() {
   // ============================================================
   const testSup = await prisma.user.create({ data: { email: 'supervisor@test.com', password: hash, firstName: 'Test', lastName: 'Supervisor', role: 'SUPERVISOR', departmentId: ceeDept.id } });
   const testExaminer = await prisma.user.create({ data: { email: 'examiner@test.com', password: hash, firstName: 'Test', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER', departmentId: ceeDept.id } });
-  const testBachelorStu = await prisma.user.create({ data: { email: 'bachelor@test.com', password: hash, firstName: 'Bach', lastName: 'Student', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: ceeDept.id, programId: programs.BCT.id } });
-  const testMasterStu = await prisma.user.create({ data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER', departmentId: ceeDept.id, programId: programs.BCT.id } });
+  const testBachelorStu = await prisma.user.create({ data: { email: 'bachelor@test.com', password: hash, firstName: 'Bach', lastName: 'Student', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: ceeDept.id, programId: programs.BCT.id, rollNumber: 'TEST001' } });
+  const testMasterStu = await prisma.user.create({ data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER', departmentId: ceeDept.id, programId: programs.BCT.id, rollNumber: '080MSNCS001' } });
 
   // MAJOR project group
   const majorGroup = await prisma.projectGroup.create({
@@ -385,10 +386,72 @@ async function main() {
 
   // Sample evaluations
   await prisma.evaluation.create({ data: { componentId: majorComponents.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 42, comment: 'Good progress on the major project.', status: 'COMPLETED', submittedById: testSup.id, groupId: majorGroup.id } });
-  const masterComponents = await prisma.evaluationComponent.findMany({ where: { thesisId: testThesis.id } });
-  const masterSupComp = masterComponents.find(c => c.evaluatorRole === 'SUPERVISOR');
-  if (masterSupComp) {
-    await prisma.evaluation.create({ data: { componentId: masterSupComp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 85, comment: 'Excellent thesis work with thorough research.', status: 'COMPLETED', submittedById: testSup.id, thesisId: testThesis.id } });
+
+  // Per-criteria evaluations for test master thesis
+  const masterComps = await prisma.evaluationComponent.findMany({
+    where: { thesisId: testThesis.id },
+    orderBy: { id: 'asc' },
+  });
+  const supCritNames = ['Regularity of works', 'Degree of Completeness', 'Understanding of thesis work', 'Student effort and performance', 'Organization of study'];
+  const supCritMarks = [18, 17, 18, 16, 16]; // total = 85
+  for (let i = 0; i < 5 && i < masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR').length; i++) {
+    const comp = masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR')[i];
+    if (comp) {
+      await prisma.evaluation.create({
+        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: supCritMarks[i], comment: supCritNames[i] === 'Degree of Completeness' ? 'All chapters completed well.' : '', status: 'COMPLETED', submittedById: testSup.id, thesisId: testThesis.id },
+      });
+    }
+  }
+  const extCritMarks = [16, 15, 16, 16, 15]; // total = 78
+  for (let i = 0; i < 5 && i < masterComps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER').length; i++) {
+    const comp = masterComps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER')[i];
+    if (comp) {
+      await prisma.evaluation.create({
+        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: extCritMarks[i], comment: i === 0 ? 'Good presentation.' : '', status: 'COMPLETED', submittedById: testExaminer.id, thesisId: testThesis.id },
+      });
+    }
+  }
+
+  // Per-criteria sample evaluations for other master theses (mix of states)
+  // Thesis 0: fully evaluated
+  // Thesis 1: partially evaluated (only supervisor done)
+  // Thesis 2: partially evaluated (only some criteria)
+  // Thesis 3-5: no evaluations
+  const thesisEvalPatterns = [
+    { sup: [16, 15, 17, 15, 16], ext: [15, 14, 15, 14, 15] }, // total = 79 + 73 = 152
+    { sup: [14, 13, 15, 14, 13], ext: null }, // only supervisor, total = 69
+    { sup: [12, 11, null, null, null], ext: null }, // partial supervisor
+    { sup: null, ext: null }, // no evaluations
+    { sup: null, ext: null },
+    { sup: null, ext: null },
+  ];
+  for (let i = 0; i < createdTheses.length; i++) {
+    const thesis = createdTheses[i];
+    const comps = await prisma.evaluationComponent.findMany({
+      where: { thesisId: thesis.id },
+      orderBy: { id: 'asc' },
+    });
+    const supComps = comps.filter(c => c.evaluatorRole === 'SUPERVISOR');
+    const extComps = comps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+    const pattern = thesisEvalPatterns[i];
+    if (pattern.sup) {
+      for (let j = 0; j < supComps.length; j++) {
+        const marks = pattern.sup[j];
+        if (marks !== null) {
+          await prisma.evaluation.create({
+            data: { componentId: supComps[j].id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks, comment: '', status: 'COMPLETED', submittedById: supervisors[i % supervisors.length].id, thesisId: thesis.id },
+          });
+        }
+      }
+    }
+    if (pattern.ext) {
+      const examiner = externalExaminers[i % externalExaminers.length];
+      for (let j = 0; j < extComps.length; j++) {
+        await prisma.evaluation.create({
+          data: { componentId: extComps[j].id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: pattern.ext[j], comment: '', status: 'COMPLETED', submittedById: examiner.id, thesisId: thesis.id },
+        });
+      }
+    }
   }
 
   console.log('\n=== SEED COMPLETE ===');

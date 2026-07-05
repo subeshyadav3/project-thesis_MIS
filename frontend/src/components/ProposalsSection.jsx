@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { downloadFile } from '../utils/download';
 import DocumentViewer from './DocumentViewer';
+import { useToast } from '../contexts/ToastContext';
+import api from '../services/api';
 
 const STAGE_LABEL = {
   PROPOSAL: 'Proposal',
@@ -14,16 +16,14 @@ const STAGE_ICON = {
   FINAL: 'flag',
 };
 
-/**
- * Displays submitted proposal documents grouped by stage, with version history.
- * Works for any role viewing a group or thesis detail.
- *
- * @param {Array} proposals - list of Proposal records (newest first)
- */
-function ProposalsSection({ proposals = [], title = 'Submitted Documents' }) {
+function ProposalsSection({ proposals = [], title = 'Submitted Documents', user }) {
   const [viewerDoc, setViewerDoc] = useState(null);
+  const [commentInputs, setCommentInputs] = useState({});
+  const [savingComments, setSavingComments] = useState({});
+  const toast = useToast();
 
-  // Group proposals by stage, keep newest first within each stage
+  const canComment = user && ['SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'].includes(user.role);
+
   const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const byStage = stages.reduce((acc, stage) => {
     acc[stage] = (proposals || []).filter(p => p.stage === stage);
@@ -31,6 +31,21 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents' }) {
   }, {});
 
   const hasAny = Object.values(byStage).some(arr => arr.length > 0);
+
+  const handleSaveComment = async (proposalId) => {
+    const comment = commentInputs[proposalId]?.trim();
+    if (!comment) return;
+    setSavingComments(prev => ({ ...prev, [proposalId]: true }));
+    try {
+      await api.put(`/proposals/${proposalId}/comment`, { comment });
+      toast.success('Feedback saved');
+      setCommentInputs(prev => ({ ...prev, [proposalId]: '' }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save feedback');
+    } finally {
+      setSavingComments(prev => ({ ...prev, [proposalId]: false }));
+    }
+  };
 
   if (!hasAny) {
     return (
@@ -64,7 +79,6 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents' }) {
               border: '1px solid var(--color-outline-variant)',
               overflow: 'hidden',
             }}>
-              {/* Stage header */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 12px',
@@ -84,7 +98,6 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents' }) {
                 </span>
               </div>
 
-              {/* Version list */}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {docs.map((doc, idx) => {
                   const ext = doc.documentUrl?.match(/\.(\w+)$/)?.[1] || 'pdf';
@@ -92,58 +105,94 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents' }) {
                   const isLatest = idx === 0;
                   return (
                     <div key={doc.id} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '10px 12px',
                       borderBottom: idx < docs.length - 1 ? '1px solid var(--color-surface-container-low)' : 'none',
-                      background: isLatest ? 'var(--color-primary-container)' : 'transparent',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: 8,
-                          background: isLatest ? 'var(--color-primary)' : 'var(--color-surface-container)',
-                          color: isLatest ? '#fff' : 'var(--color-on-surface-variant)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0,
-                        }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>description</span>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        background: isLatest ? 'var(--color-primary-container)' : 'transparent',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            width: 36, height: 36, borderRadius: 8,
+                            background: isLatest ? 'var(--color-primary)' : 'var(--color-surface-container)',
+                            color: isLatest ? '#fff' : 'var(--color-on-surface-variant)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>description</span>
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontWeight: isLatest ? 600 : 500, fontSize: 13, color: isLatest ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)' }}>
+                                {fileName}
+                              </span>
+                              {isLatest && (
+                                <span className="badge badge-sm" style={{
+                                  background: 'var(--color-success-container)',
+                                  color: 'var(--color-on-success-container)',
+                                  fontSize: 9,
+                                  padding: '2px 6px',
+                                }}>LATEST</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
+                              {doc.submittedBy ? `${doc.submittedBy.firstName} ${doc.submittedBy.lastName}` : 'Student'}
+                              {' · '}{new Date(doc.createdAt).toLocaleDateString()} {new Date(doc.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontWeight: isLatest ? 600 : 500, fontSize: 13, color: isLatest ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)' }}>
-                              {fileName}
-                            </span>
-                            {isLatest && (
-                              <span className="badge badge-sm" style={{
-                                background: 'var(--color-success-container)',
-                                color: 'var(--color-on-success-container)',
-                                fontSize: 9,
-                                padding: '2px 6px',
-                              }}>LATEST</span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
-                            {doc.submittedBy ? `${doc.submittedBy.firstName} ${doc.submittedBy.lastName}` : 'Student'}
-                            {' · '}{new Date(doc.createdAt).toLocaleDateString()} {new Date(doc.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button className="btn btn-sm btn-outline-primary" style={{ padding: '4px 8px', fontSize: 12 }}
+                            onClick={() => setViewerDoc({ url: doc.documentUrl, name: fileName })}
+                            title="Preview">
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
+                          </button>
+                          <button className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
+                            onClick={() => downloadFile(doc.documentUrl, fileName)}
+                            title="Download">
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                          </button>
+                          <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer"
+                            className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                            title="Open in new tab">
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
+                          </a>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button className="btn btn-sm btn-outline-primary" style={{ padding: '4px 8px', fontSize: 12 }}
-                          onClick={() => setViewerDoc({ url: doc.documentUrl, name: fileName })}
-                          title="Preview">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
-                        </button>
-                        <button className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
-                          onClick={() => downloadFile(doc.documentUrl, fileName)}
-                          title="Download">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
-                        </button>
-                        <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer"
-                          className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                          title="Open in new tab">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
-                        </a>
-                      </div>
+
+                      {/* Existing feedback */}
+                      {doc.supervisorComment && (
+                        <div style={{ padding: '8px 12px 8px 58px', background: 'var(--color-tertiary-container)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-on-tertiary-container)', marginBottom: 2 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>chat</span>
+                            Feedback
+                          </div>
+                          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-on-tertiary-container)' }}>{doc.supervisorComment}</p>
+                        </div>
+                      )}
+
+                      {/* Comment input for supervisors/coordinators/examiners */}
+                      {canComment && isLatest && (
+                        <div style={{ padding: '8px 12px 12px 58px', background: 'var(--color-surface-container-low)' }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <textarea
+                              value={commentInputs[doc.id] ?? ''}
+                              onChange={e => setCommentInputs(prev => ({ ...prev, [doc.id]: e.target.value }))}
+                              placeholder={doc.supervisorComment ? 'Update your feedback...' : 'Add feedback on this document...'}
+                              style={{ flex: 1, minHeight: 40, fontSize: 12, padding: '6px 8px', resize: 'vertical' }}
+                            />
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleSaveComment(doc.id)}
+                              disabled={!commentInputs[doc.id]?.trim() || savingComments[doc.id]}
+                              style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}
+                            >
+                              {savingComments[doc.id] ? 'Saving...' : 'Send'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

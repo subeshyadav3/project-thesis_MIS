@@ -123,6 +123,7 @@ exports.deleteUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && existing.departmentId !== req.user.departmentId) {
       return res.status(403).json({ error: 'Cannot delete users outside your department' });
     }
+    audit.log({ action: 'DELETE', entity: 'User', entityId: userId, details: `Deleted ${existing.role} ${existing.email}`, performedById: req.user.id });
     await prisma.user.delete({ where: { id: userId } });
     res.json({ message: 'User deleted' });
   } catch (error) {
@@ -221,11 +222,7 @@ exports.getAuditLogs = async (req, res) => {
     const where = {};
     if (req.query.entity) where.entity = req.query.entity;
     if (req.query.entityId) where.entityId = parseInt(req.query.entityId);
-    // Coordinator can only see logs for their department users
-    if (req.user.role === 'COORDINATOR') {
-      const deptUserIds = await prisma.user.findMany({ where: { departmentId: req.user.departmentId }, select: { id: true } });
-      where.performedById = { in: deptUserIds.map(u => u.id) };
-    }
+    // Coordinator sees all audit logs for full oversight
     const logs = await prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },

@@ -746,18 +746,30 @@ const filteredGroups = useMemo(() => {
                           <span className="material-symbols-outlined">visibility</span>
                           View
                         </button>
-                        <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
-                          <span className="material-symbols-outlined">edit</span>
-                          Edit
-                        </button>
                         {g.status !== 'COMPLETED' && (
-                          <>
-
-                            <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }}>
-                              <span className="material-symbols-outlined">check_circle</span>
-                              Complete
-                            </button>
-                          </>
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
+                            <span className="material-symbols-outlined">edit</span>
+                            Edit
+                          </button>
+                        )}
+                        {g.status === 'COMPLETED' && (
+                          <button className="btn btn-sm btn-outline" onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = `/api/print/group/${g.id}`;
+                            a.download = `evaluation_${g.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }}>
+                            <span className="material-symbols-outlined">download</span>
+                            PDF
+                          </button>
+                        )}
+                        {g.status !== 'COMPLETED' && (
+                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }}>
+                            <span className="material-symbols-outlined">check_circle</span>
+                            Complete
+                          </button>
                         )}
                       </div>
                     </td>

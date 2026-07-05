@@ -165,134 +165,40 @@ function Evaluations() {
     </>
   );
 
-  // Print single result (opens a new window with formatted HTML)
+  // Download single evaluation as PDF
   const handlePrintSingle = (item) => {
-    const breakdown = findBreakdown(item);
-    const name = viewMode === 'bachelor' ? item.name : `${item.student?.firstName} ${item.student?.lastName}`;
-    const title = viewMode === 'bachelor' ? item.projectTitle : item.title;
-    const sup = item.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—';
-    const total = totalMarks(item);
-    const membersList = viewMode === 'bachelor'
-      ? (item.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName} (${m.rollNumber})`).join(', ')
-      : `${item.student?.firstName} ${item.student?.lastName}`;
-    const rows = breakdown.map(b => {
-      const e = b.evaluation;
-      const marks = e && e.marks !== null && e.marks !== undefined ? e.marks : '—';
-      return `<tr><td>${b.component.name}</td><td>${ROLE_LABEL[b.component.evaluatorRole]}</td><td style="text-align:right">${b.component.maxMarks}</td><td style="text-align:right;font-weight:700">${marks}</td></tr>`;
-    }).join('');
-    printHtml(`
-      <html><head><title>Evaluation Result — ${escapeHtml(name)}</title>
-      <style>
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#222;padding:32px;}
-        h1{font-size:20px;margin:0 0 4px;}
-        h2{font-size:14px;font-weight:600;color:#666;margin:0 0 16px;}
-        table{width:100%;border-collapse:collapse;margin-top:12px;}
-        th,td{padding:8px 10px;border-bottom:1px solid #ddd;text-align:left;font-size:13px;}
-        th{background:#f5f5f5;text-transform:uppercase;font-size:11px;letter-spacing:.4px;}
-        .info{display:flex;gap:24px;margin-bottom:12px;}
-        .info div{font-size:13px;}
-        .info span{display:block;color:#888;font-size:11px;text-transform:uppercase;letter-spacing:.4px;}
-        .total{margin-top:16px;padding:12px 16px;background:#e3f2fd;border-radius:8px;display:flex;justify-content:space-between;align-items:center;}
-        .total .label{font-weight:600;}
-        .total .value{font-size:22px;font-weight:700;}
-        @media print{.no-print{display:none;}}
-      </style></head>
-      <body>
-        <h1>Minor Project Evaluation Result</h1>
-        <h2>Thesis / Project Management System</h2>
-        <div class="info">
-          <div><span>${viewMode === 'bachelor' ? 'Group' : 'Student'}</span>${escapeHtml(name)}</div>
-          <div><span>Title</span>${escapeHtml(title)}</div>
-          <div><span>Supervisor</span>${escapeHtml(sup)}</div>
-          <div><span>Academic Year</span>${escapeHtml(item.academicYear?.year || '—')}</div>
-        </div>
-        <div class="info">
-          <div><span>${viewMode === 'bachelor' ? 'Members' : 'Student'}</span>${escapeHtml(membersList)}</div>
-        </div>
-        <table>
-          <thead><tr><th>Component</th><th>Evaluated By</th><th style="text-align:right">Max</th><th style="text-align:right">Marks</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-          <div style="margin-top:14px;padding:0;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#1e293b 0%,#334155 100%);display:flex;align-items:stretch;"><div style="padding:14px 18px;flex:1;display:flex;flex-direction:column;justify-content:center;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:1px;"><span style="font-size:16px;color:#94a3b8">award_star</span><span style="font-weight:600;font-size:12px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">Grand Total</span></div></div><div style="padding:14px 24px;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);border-left:1px solid rgba(255,255,255,.08)"><span style="font-size:32px;font-weight:800;color:#f8fafc;line-height:1">${total.toFixed(1)}</span><span style="font-size:14px;font-weight:500;color:#64748b;margin-top:10px">/ ${getMaxTotal(item)}</span></div></div>
-        <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:8px 16px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;">Print</button>
-      </body></html>`);
+    const endpoint = viewMode === 'bachelor'
+      ? `/api/print/group/${item.id}`
+      : `/api/print/thesis/${item.id}`;
+    const a = document.createElement('a');
+    a.href = endpoint;
+    a.download = `evaluation_${item.id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  // Print all evaluated results (one page per group/thesis)
+  // Download all evaluated results (one by one)
   const handlePrintAll = () => {
     const evaluated = filteredItems.filter(i => computeStatus(i) === 'COMPLETE' || computeStatus(i) === 'PARTIAL');
     if (evaluated.length === 0) {
       toast.warning('No evaluated items to print');
       return;
     }
-    const pages = evaluated.map(item => {
-      const breakdown = findBreakdown(item);
-      const name = viewMode === 'bachelor' ? item.name : `${item.student?.firstName} ${item.student?.lastName}`;
-      const title = viewMode === 'bachelor' ? item.projectTitle : item.title;
-      const sup = item.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—';
-      const total = totalMarks(item);
-      const membersList = viewMode === 'bachelor'
-        ? (item.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName} (${m.rollNumber})`).join(', ')
-        : `${item.student?.firstName} ${item.student?.lastName}`;
-      const rows = breakdown.map(b => {
-        const e = b.evaluation;
-        const marks = e && e.marks !== null && e.marks !== undefined ? e.marks : '—';
-        return `<tr><td>${b.component.name}</td><td>${ROLE_LABEL[b.component.evaluatorRole]}</td><td style="text-align:right">${b.component.maxMarks}</td><td style="text-align:right;font-weight:700">${marks}</td></tr>`;
-      }).join('');
-      return `
-        <div class="print-page">
-          <h1>Minor Project Evaluation Result</h1>
-          <h2>Thesis / Project Management System</h2>
-          <div class="info">
-            <div><span>${viewMode === 'bachelor' ? 'Group' : 'Student'}</span>${escapeHtml(name)}</div>
-            <div><span>Title</span>${escapeHtml(title)}</div>
-            <div><span>Supervisor</span>${escapeHtml(sup)}</div>
-            <div><span>Academic Year</span>${escapeHtml(item.academicYear?.year || '—')}</div>
-          </div>
-          <div class="info">
-            <div><span>${viewMode === 'bachelor' ? 'Members' : 'Student'}</span>${escapeHtml(membersList)}</div>
-          </div>
-          <table>
-            <thead><tr><th>Component</th><th>Evaluated By</th><th style="text-align:right">Max</th><th style="text-align:right">Marks</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        <div style="margin-top:14px;padding:0;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#1e293b 0%,#334155 100%);display:flex;align-items:stretch;"><div style="padding:14px 18px;flex:1;display:flex;flex-direction:column;justify-content:center;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:1px;"><span style="font-size:16px;color:#94a3b8">award_star</span><span style="font-weight:600;font-size:12px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase">Grand Total</span></div></div><div style="padding:14px 24px;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);border-left:1px solid rgba(255,255,255,.08)"><span style="font-size:32px;font-weight:800;color:#f8fafc;line-height:1">${total.toFixed(1)}</span><span style="font-size:14px;font-weight:500;color:#64748b;margin-top:10px">/ ${getMaxTotal(item)}</span></div></div>
-        </div>`;
-    }).join('<div class="page-break"></div>');
-
-    printHtml(`
-      <html><head><title>Evaluation Results — Batch Print</title>
-      <style>
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#222;padding:32px;}
-        h1{font-size:20px;margin:0 0 4px;}
-        h2{font-size:14px;font-weight:600;color:#666;margin:0 0 16px;}
-        table{width:100%;border-collapse:collapse;margin-top:12px;}
-        th,td{padding:8px 10px;border-bottom:1px solid #ddd;text-align:left;font-size:13px;}
-        th{background:#f5f5f5;text-transform:uppercase;font-size:11px;letter-spacing:.4px;}
-        .info{display:flex;gap:24px;margin-bottom:12px;flex-wrap:wrap;}
-        .info div{font-size:13px;}
-        .info span{display:block;color:#888;font-size:11px;text-transform:uppercase;letter-spacing:.4px;}
-        .total{margin-top:16px;padding:12px 16px;background:#e3f2fd;border-radius:8px;display:flex;justify-content:space-between;align-items:center;}
-        .total .label{font-weight:600;}
-        .total .value{font-size:22px;font-weight:700;}
-        .page-break{page-break-after:always;height:0;}
-        .print-page{page-break-after:always;}
-        .print-page:last-child{page-break-after:auto;}
-        @media print{.no-print{display:none;}}
-      </style></head>
-      <body>
-        ${pages}
-        <button class="no-print" onclick="window.print()" style="position:fixed;bottom:20px;right:20px;padding:10px 20px;background:#1a73e8;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print All</button>
-      </body></html>`);
+    evaluated.forEach((item, idx) => {
+      const endpoint = viewMode === 'bachelor'
+        ? `/api/print/group/${item.id}`
+        : `/api/print/thesis/${item.id}`;
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = endpoint;
+        a.download = `evaluation_${item.id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }, idx * 800);
+    });
   };
-
-  function printHtml(html) {
-    const w = window.open('', '_blank', 'width=900,height=700');
-    if (!w) { toast.error('Please allow popups to print'); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-  }
 
   const isCompleted = (item) => computeStatus(item) === 'COMPLETE';
 
@@ -493,7 +399,7 @@ function Evaluations() {
             </div>
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowSummaryModal(false)}><span className="material-symbols-outlined">close</span>Close</button>
-              <button className="btn btn-primary" onClick={() => handlePrintSingle(selectedItem)}><span className="material-symbols-outlined">print</span>Print / Save PDF</button>
+              <button className="btn btn-primary" onClick={() => handlePrintSingle(selectedItem)}><span className="material-symbols-outlined">download</span>Download PDF</button>
             </div>
           </div>
         </div>
@@ -529,11 +435,6 @@ function Evaluations() {
     </PageLayout>
     </ErrorBoundary>
   );
-}
-
-function escapeHtml(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 export default Evaluations;

@@ -85,35 +85,30 @@ function ExaminerList() {
 
   const handleEditExaminer = async (e) => {
     e.preventDefault();
+    const needsDeactivate = editForm.active !== showEdit.active && !editForm.active;
+    if (needsDeactivate) {
+      const nonCompletedGroups = (showEdit.assignedGroups || []).filter(g => g.status !== 'COMPLETED').length;
+      const nonCompletedTheses = (showEdit.assignedTheses || []).filter(t => t.status !== 'COMPLETED').length;
+      if (nonCompletedGroups + nonCompletedTheses > 0) {
+        toast.error('Cannot mark as inactive: this examiner still has active non-completed projects/theses. All assigned work must be completed first.');
+        return;
+      }
+    }
     try {
       const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email };
       if (editForm.password) payload.password = editForm.password;
       await api.put(`/users/${showEdit.id}`, payload);
+      if (editForm.active !== showEdit.active) {
+        await api.put(`/users/${showEdit.id}/toggle-active`);
+      }
       toast.success('Examiner updated successfully');
       setShowEdit(null);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Update failed'); }
   };
 
-  const handleToggleActive = (ex) => {
-    setConfirmDialog({
-      open: true, title: 'Toggle Active Status',
-      message: `Are you sure you want to toggle active status for ${ex.firstName} ${ex.lastName}?`,
-      danger: true,
-      onConfirm: async () => {
-        try {
-          await api.put(`/users/${ex.id}/toggle-active`);
-          toast.success(`User ${ex.active ? 'deactivated' : 'activated'} successfully`);
-          setShowEdit(null);
-          loadData();
-        } catch (err) { toast.error(err.response?.data?.error || 'Toggle failed'); }
-        setConfirmDialog(prev => ({ ...prev, open: false }));
-      },
-    });
-  };
-
   const openEdit = (ex) => {
-    setEditForm({ firstName: ex.firstName, lastName: ex.lastName, email: ex.email, password: '' });
+    setEditForm({ firstName: ex.firstName, lastName: ex.lastName, email: ex.email, password: '', active: ex.active });
     setShowEdit(ex);
   };
 
@@ -309,14 +304,17 @@ function ExaminerList() {
                 <label>Reset Password <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(leave blank to keep current)</span></label>
                 <input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="New password" />
               </div>
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <label style={{ margin: 0 }}>Active</label>
-                <button type="button" className={`toggle-switch ${showEdit.active ? 'active' : ''}`} onClick={() => handleToggleActive(showEdit)}>
-                  <span className="toggle-knob" />
-                </button>
-                <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
-                  {showEdit.active ? 'Active — can be assigned to projects' : 'Inactive — will not appear in assignment lists'}
-                </span>
+              <div className="form-group">
+                <label>Status</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: editForm.active ? 'var(--color-success)' : 'var(--color-error)' }}>
+                    {editForm.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <button type="button" className="btn btn-sm" style={{ background: editForm.active ? 'var(--color-error-container)' : 'var(--color-success-container)', color: editForm.active ? 'var(--color-on-error-container)' : 'var(--color-on-success-container)' }} onClick={() => setEditForm({ ...editForm, active: !editForm.active })}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{editForm.active ? 'cancel' : 'check_circle'}</span>
+                    {editForm.active ? 'Mark as Inactive' : 'Mark as Active'}
+                  </button>
+                </div>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowEdit(null)}>

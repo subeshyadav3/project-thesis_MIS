@@ -40,10 +40,26 @@ export default function AuditLog() {
   const actionColors = {
     CREATE: 'var(--color-success)',
     UPDATE: 'var(--color-primary)',
+    DELETE: 'var(--color-error)',
     DEACTIVATE: 'var(--color-error)',
     ACTIVATE: 'var(--color-success)',
     UPLOAD: 'var(--color-tertiary)',
+    LOGIN: 'var(--color-primary)',
+    LOGIN_FAILED: 'var(--color-error)',
+    LOGOUT: 'var(--color-secondary)',
+    CHANGE_PASSWORD: 'var(--color-warning)',
+    RESET_PASSWORD: 'var(--color-warning)',
+    SUBMIT_MARKS: 'var(--color-success)',
+    UPDATE_MARKS: 'var(--color-primary)',
+    SUBMIT_FEEDBACK: 'var(--color-tertiary)',
+    VIEW: 'var(--color-secondary)',
+    FORWARD: 'var(--color-success)',
+    ASSIGN_SUPERVISOR: 'var(--color-primary)',
     BULK_ASSIGN_SUPERVISOR: 'var(--color-secondary)',
+    ASSIGN_EXAMINER: 'var(--color-primary)',
+    REMOVE: 'var(--color-error)',
+    UPDATE_STATUS: 'var(--color-warning)',
+    ISSUE_RECOMMENDATION: 'var(--color-tertiary)',
   };
 
   return (

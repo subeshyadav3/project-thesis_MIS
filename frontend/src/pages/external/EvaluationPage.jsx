@@ -292,7 +292,7 @@ function ExternalExaminerEvaluationPage() {
 
           {/* Submitted documents */}
           <div style={{ marginBottom: 24 }}>
-            <ProposalsSection proposals={item?.proposals || []} title="Submitted Documents" />
+            <ProposalsSection proposals={item?.proposals || []} title="Submitted Documents" user={user} />
           </div>
         </>
       )}
