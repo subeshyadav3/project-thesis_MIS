@@ -12,17 +12,29 @@ function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isBachelor = user.degreeType === 'BACHELOR';
+  const isMaster = user.degreeType === 'MASTER';
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api.get('/students/groups').then(({ data }) => { setGroups(data); return data; }).catch(err => { toast.error(err.response?.data?.error || 'Failed to load groups'); return []; }),
-      api.get('/students/theses').then(({ data }) => { setTheses(data); return data; }).catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); return []; }),
-      api.get('/students/notifications').then(({ data }) => setNotifications(data)).catch(err => toast.error(err.response?.data?.error || 'Failed to load notifications')),
-    ]).then(([g, t]) => {
+    const promises = [];
+    if (!isMaster) {
+      promises.push(
+        api.get('/students/groups').then(({ data }) => { setGroups(data); return data; }).catch(() => [])
+      );
+    }
+    if (!isBachelor) {
+      promises.push(
+        api.get('/students/theses').then(({ data }) => { setTheses(data); return data; }).catch(() => [])
+      );
+    }
+    promises.push(
+      api.get('/students/notifications').then(({ data }) => setNotifications(data)).catch(() => {})
+    );
+    Promise.all(promises).then(() => {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
-      if (g.length > 0) u.studentType = 'bachelor';
-      else if (t.length > 0) u.studentType = 'master';
+      if (isBachelor) u.studentType = 'bachelor';
+      else if (isMaster) u.studentType = 'master';
       else u.studentType = 'unassigned';
       localStorage.setItem('user', JSON.stringify(u));
     }).catch(() => {

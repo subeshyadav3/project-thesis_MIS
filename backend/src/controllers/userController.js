@@ -8,6 +8,7 @@ const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
   role: true, degreeType: true, active: true,
   departmentId: true, programId: true,
+  rollNumber: true,
   createdAt: true, updatedAt: true,
 };
 
@@ -23,7 +24,10 @@ exports.getUsers = async (req, res) => {
     }
     const users = await prisma.user.findMany({
       where,
-      select: USER_SELECT,
+      select: {
+        ...USER_SELECT,
+        program: { select: { id: true, name: true, code: true } },
+      },
     });
     res.json(users);
   } catch (error) {
@@ -123,6 +127,9 @@ exports.deleteUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && existing.departmentId !== req.user.departmentId) {
       return res.status(403).json({ error: 'Cannot delete users outside your department' });
     }
+    if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(existing.role)) {
+      return res.status(403).json({ error: 'Cannot delete this user role' });
+    }
     audit.log({ action: 'DELETE', entity: 'User', entityId: userId, details: `Deleted ${existing.role} ${existing.email}`, performedById: req.user.id });
     await prisma.user.delete({ where: { id: userId } });
     res.json({ message: 'User deleted' });
@@ -140,13 +147,19 @@ exports.getUsersByRole = async (req, res) => {
     if (req.query.degreeType) {
       where.degreeType = req.query.degreeType.toUpperCase();
     }
+    if (req.query.programId) {
+      where.programId = parseInt(req.query.programId);
+    }
     // Coordinator can only see users in their department
     if (req.user.role === 'COORDINATOR') {
       where.departmentId = req.user.departmentId;
     }
     const users = await prisma.user.findMany({
       where,
-      select: USER_SELECT,
+      select: {
+        ...USER_SELECT,
+        program: { select: { id: true, name: true, code: true } },
+      },
     });
     res.json(users);
   } catch (error) {
@@ -165,14 +178,13 @@ exports.toggleActive = async (req, res) => {
       return res.status(403).json({ error: 'Cannot toggle users outside your department' });
     }
 
-    if (!['SUPERVISOR', 'EXTERNAL_EXAMINER'].includes(user.role)) {
-      return res.status(400).json({ error: 'Can only toggle active status for supervisors and external examiners' });
+    if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(user.role)) {
+      return res.status(400).json({ error: 'Can only toggle active status for supervisors, external examiners, and students' });
     }
 
     const activating = !user.active;
 
-    if (!activating) {
-      // Check for non-completed groups (PENDING or ACTIVE status)
+    if (!activating && ['SUPERVISOR', 'EXTERNAL_EXAMINER'].includes(user.role)) {
       const activeGroups = await prisma.projectGroup.count({
         where: {
           supervisorId: userId,

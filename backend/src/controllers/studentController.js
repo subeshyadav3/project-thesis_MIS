@@ -202,3 +202,28 @@ exports.markNotificationRead = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.deleteThesis = async (req, res) => {
+  try {
+    const thesisId = Number(req.params.id);
+    const thesis = await prisma.thesis.findUnique({
+      where: { id: thesisId },
+      include: { evaluationComponents: true, proposals: true },
+    });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (thesis.studentId !== req.user.id) return res.status(403).json({ error: 'This thesis does not belong to you' });
+    if (thesis.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Only pending theses can be deleted' });
+    }
+
+    await prisma.proposal.deleteMany({ where: { thesisId } });
+    await prisma.evaluationComponent.deleteMany({ where: { thesisId } });
+    await prisma.thesis.delete({ where: { id: thesisId } });
+
+    audit.log({ action: 'DELETE', entity: 'Thesis', entityId: thesisId, details: `Student deleted thesis "${thesis.title}"`, performedById: req.user.id });
+    res.json({ message: 'Thesis deleted' });
+  } catch (e) {
+    console.error('deleteThesis error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

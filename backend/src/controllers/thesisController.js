@@ -9,8 +9,9 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 exports.getTheses = async (req, res) => {
   try {
     const where = {};
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-      where.academicYear = { departmentId: req.user.departmentId };
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) where.academicYear = { departmentId: dept.id };
     }
     const theses = await prisma.thesis.findMany({
       where,
@@ -46,8 +47,11 @@ exports.getThesis = async (req, res) => {
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId && thesis.academicYear?.departmentId !== req.user.departmentId) {
-      return res.status(403).json({ error: 'Access denied. Thesis belongs to another department.' });
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept && thesis.academicYear?.departmentId !== dept.id) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another department.' });
+      }
     }
     res.json(thesis);
   } catch (error) {
@@ -189,8 +193,9 @@ exports.exportTheses = async (req, res) => {
   try {
     const XLSX = require('xlsx');
     const where = {};
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-      where.academicYear = { departmentId: req.user.departmentId };
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) where.academicYear = { departmentId: dept.id };
     }
     const theses = await prisma.thesis.findMany({
       where,

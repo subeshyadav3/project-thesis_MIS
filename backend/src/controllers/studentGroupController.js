@@ -27,7 +27,7 @@ ctrl.create = async (req, res) => {
   try {
     if (req.user.role !== 'STUDENT') return res.status(403).json({ error: 'Only students can create groups' });
 
-    const { announcementId, name, projectTitle, programId } = req.body;
+    const { announcementId, name, projectTitle, programId, memberIds } = req.body;
 
     const ann = await prisma.announcement.findUnique({ where: { id: Number(announcementId) } });
     if (!ann) return res.status(404).json({ error: 'Announcement not found' });
@@ -43,6 +43,13 @@ ctrl.create = async (req, res) => {
     const projectType = ann.type === 'MINOR' ? 'MINOR' : ann.type === 'MAJOR' ? 'MAJOR' : 'MINOR';
     const resolvedProgramId = programId ? Number(programId) : req.user.programId;
     if (!resolvedProgramId) return res.status(400).json({ error: 'Program ID required' });
+
+    // Validate group size
+    const maxMembers = ann.groupSizeMax || 4;
+    const invitedIds = Array.isArray(memberIds) ? memberIds : [];
+    if (invitedIds.length > maxMembers - 1) {
+      return res.status(400).json({ error: `Maximum ${maxMembers} members allowed for this announcement` });
+    }
 
     const group = await prisma.projectGroup.create({
       data: {
@@ -61,6 +68,19 @@ ctrl.create = async (req, res) => {
     await prisma.groupMember.create({
       data: { studentId: req.user.id, groupId: group.id, rollNumber: req.user.rollNumber || `R${req.user.id}` },
     });
+
+    // Add invited members
+    if (invitedIds.length > 0) {
+      const students = await prisma.user.findMany({
+        where: { id: { in: invitedIds }, role: 'STUDENT', programId: resolvedProgramId, active: true },
+        select: { id: true, rollNumber: true },
+      });
+      for (const s of students) {
+        await prisma.groupMember.create({
+          data: { studentId: s.id, groupId: group.id, rollNumber: s.rollNumber || `R${s.id}` },
+        });
+      }
+    }
 
     const defaults = getDefaultComponents(projectType);
     for (const comp of defaults) {
@@ -305,3 +325,58 @@ ctrl.myInvitations = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+ctrl.deleteGroup = async (req, res) => {
+  try {
+    const groupId = Number(req.params.id);
+    const group = await prisma.projectGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true, announcement: true },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    // Only allow deletion if group is in PENDING status and user is the creator (first member)
+    if (group.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Only pending groups can be deleted' });
+    }
+    if (group.members[0]?.studentId !== req.user.id) {
+      return res.status(403).json({ error: 'Only the group creator can delete the group' });
+    }
+
+    await prisma.groupInvitation.deleteMany({ where: { groupId } });
+    await prisma.groupMember.deleteMany({ where: { groupId } });
+    await prisma.projectGroup.delete({ where: { id: groupId } });
+
+    res.json({ message: 'Group deleted' });
+  } catch (e) {
+    console.error('deleteGroup error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+ctrl.getStudentsByProgram = async (req, res) => {
+  try {
+    const { programId, year } = req.query;
+    if (!programId) return res.status(400).json({ error: 'programId required' });
+
+    const where = { role: 'STUDENT', programId: Number(programId), active: true };
+    if (year) {
+      where.rollNumber = { startsWith: String(year) };
+    }
+
+    const students = await prisma.user.findMany({
+      where,
+      select: {
+        id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true,
+        program: { select: { id: true, name: true, code: true } }
+      },
+      orderBy: { firstName: 'asc' }
+    });
+    res.json(students);
+  } catch (e) {
+    console.error('getStudentsByProgram error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+module.exports = ctrl;

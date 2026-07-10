@@ -1,0 +1,17 @@
+{
+  "id": "019f4b99-a70e-722e-8c94-42cc300971da",
+  "name": "Fix student group submission workflow",
+  "description": "Fix the whole workflow of students submitting a group, coordinator approving it, and it showing in projects section. Currently a student submitted from there but it's not showing in bachelor projects or anywhere to coordinator. It should show in bachelor projects for bachelor and master for thesis with status pending. Need to trace the full flow: student group submission → coordinator view → approval → projects section display, and fix where the data is not being routed/filtered correctly.",
+  "status": "draft",
+  "worktree": {
+    "path": "/mnt/f/projects/clz/se",
+    "branch": "feature/coordinator-announcements-and-student-groups",
+    "commit": "20d35cebc8fa9346833c18fe96ebc850ede2c745"
+  },
+  "scoping": {},
+  "phases": [],
+  "decisions": [],
+  "memories": [],
+  "createdAt": "2026-07-10T10:36:28.813Z",
+  "updatedAt": "2026-07-10T10:36:28.813Z"
+}

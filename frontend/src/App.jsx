@@ -50,6 +50,7 @@ function App() {
           <Route path="/coordinator/project/:type/:id" element={<PrivateRoute role="COORDINATOR"><ProjectDetail /></PrivateRoute>} />
           <Route path="/coordinator/audit-log" element={<PrivateRoute role="COORDINATOR"><AuditLog /></PrivateRoute>} />
           <Route path="/coordinator/announcements" element={<PrivateRoute role="COORDINATOR"><CoordinatorAnnouncements /></PrivateRoute>} />
+          <Route path="/coordinator/users" element={<PrivateRoute role="COORDINATOR"><UserManagement /></PrivateRoute>} />
           <Route path="/coordinator/notifications" element={<PrivateRoute role="COORDINATOR"><StudentNotifications /></PrivateRoute>} />
           <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
           <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />

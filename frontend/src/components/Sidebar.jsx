@@ -28,6 +28,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
     { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },
+    { path: '/coordinator/users', label: 'Users', icon: 'groups' },
     { path: '/coordinator/announcements', label: 'Announcements', icon: 'campaign' },
     { path: '/coordinator/audit-log', label: 'Audit Log', icon: 'history' },
     { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
@@ -41,7 +42,7 @@ function Sidebar({ user, isOpen, onClose }) {
   ];
 
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const sType = storedUser?.studentType;
+  const sType = storedUser?.degreeType === 'BACHELOR' ? 'bachelor' : storedUser?.degreeType === 'MASTER' ? 'master' : storedUser?.studentType;
 
   const studentLinks = [
     { path: '/student', label: 'Dashboard', icon: 'dashboard' },
