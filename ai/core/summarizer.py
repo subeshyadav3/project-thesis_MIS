@@ -27,7 +27,7 @@ def build_summarizer(custom_prompt: str = None):
         "Respond ONLY with valid JSON using this shape: "
         "{{ \"executive_summary\": \"...\", \"objectives\": [\"...\"], "
         "\"methodology\": \"...\", \"expected_outcomes\": [\"...\"], "
-        "\"strengths\": [\"...\"], \"weaknesses_or_risks\": [\"...\"] }."
+        "\"strengths\": [\"...\"], \"weaknesses_or_risks\": [\"...\"] }}."
     )
 
     template = (
@@ -39,22 +39,29 @@ def build_summarizer(custom_prompt: str = None):
     prompt = ChatPromptTemplate.from_messages([("human", template)])
     chain = prompt | llm
 
-    def summarize_node(state: SummarizeState) -> dict:
+    async def summarize_node(state: SummarizeState) -> dict:
         raw = state.get("document_text", "")
         if not raw:
             return {"summary": {"error": "No document text"}, "error": "No document text"}
-        try:
-            result = chain.invoke({"document_text": raw[:30000], "custom_prompt": custom_prompt or ""})
-            import json
-            text = result.content if hasattr(result, "content") else str(result)
-            text = text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[-1]
-                text = text.rsplit("```", 1)[0]
-            summary = json.loads(text)
-            return {"summary": summary, "error": None}
-        except Exception as e:
-            return {"summary": {}, "error": str(e)}
+        import json
+        last_err = None
+        for attempt in range(3):
+            try:
+                result = await chain.ainvoke({"document_text": raw[:30000], "custom_prompt": custom_prompt or ""})
+                text = (result.content if hasattr(result, "content") else str(result)) or ""
+                text = text.strip()
+                if not text:
+                    last_err = "Empty LLM response"
+                    continue
+                if text.startswith("```"):
+                    text = text.split("\n", 1)[-1]
+                    text = text.rsplit("```", 1)[0]
+                summary = json.loads(text.strip())
+                return {"summary": summary, "error": None}
+            except Exception as e:
+                last_err = str(e)
+                continue
+        return {"summary": {}, "error": last_err or "Summarization failed"}
 
     builder = StateGraph(SummarizeState)
     builder.add_node("summarize", summarize_node)

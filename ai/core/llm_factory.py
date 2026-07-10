@@ -17,7 +17,8 @@ def get_llm():
             model=settings.llm_model,
             nvidia_api_key=settings.nvidia_api_key,
             temperature=0.2,
-            max_tokens=4096,
+            max_completion_tokens=4096,
+            timeout=120,
         )
     return _llm
 

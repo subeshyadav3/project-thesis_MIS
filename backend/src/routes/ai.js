@@ -13,7 +13,7 @@ const aiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many AI requests. Please slow down.' },
-  keyGenerator: (req) => `ai:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `ai:${req.user?.id || 'anon'}`,
 });
 router.use(aiLimiter);
 

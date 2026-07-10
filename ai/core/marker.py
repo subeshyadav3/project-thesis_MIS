@@ -29,7 +29,7 @@ def build_evaluator(custom_instructions: str = None):
     prompt = ChatPromptTemplate.from_messages([("human", template)])
     chain = prompt | llm
 
-    def evaluate_node(state: EvaluateState) -> dict:
+    async def evaluate_node(state: EvaluateState) -> dict:
         raw = state.get("document_text", "")
         criteria = state.get("criteria", [])
         if not raw or not criteria:
@@ -40,20 +40,27 @@ def build_evaluator(custom_instructions: str = None):
             for c in criteria
         )
 
-        try:
-            result = chain.invoke({"document_text": raw[:30000], "criteria_text": criteria_text})
-            import json
-            text = result.content if hasattr(result, "content") else str(result)
-            text = text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[-1]
-                text = text.rsplit("```", 1)[0]
-            scores = json.loads(text)
-            total = sum(s.get("marks", 0) for s in scores)
-            max_total = sum(s.get("max_marks", 0) for s in scores)
-            return {"scores": scores, "total_marks": total, "max_marks": max_total, "error": None}
-        except Exception as e:
-            return {"scores": [], "total_marks": 0, "max_marks": 0, "error": str(e)}
+        import json
+        last_err = None
+        for attempt in range(3):
+            try:
+                result = await chain.ainvoke({"document_text": raw[:30000], "criteria_text": criteria_text})
+                text = result.content if hasattr(result, "content") else str(result)
+                text = (text or "").strip()
+                if not text:
+                    last_err = "Empty LLM response"
+                    continue
+                if text.startswith("```"):
+                    text = text.split("\n", 1)[-1]
+                    text = text.rsplit("```", 1)[0]
+                scores = json.loads(text.strip())
+                total = sum(s.get("marks", 0) for s in scores)
+                max_total = sum(s.get("max_marks", 0) for s in scores)
+                return {"scores": scores, "total_marks": total, "max_marks": max_total, "error": None}
+            except Exception as e:
+                last_err = str(e)
+                continue
+        return {"scores": [], "total_marks": 0, "max_marks": 0, "error": last_err or "Evaluation failed"}
 
     builder = StateGraph(EvaluateState)
     builder.add_node("evaluate", evaluate_node)
