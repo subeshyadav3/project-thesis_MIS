@@ -111,7 +111,7 @@ exports.uploadExcel = async (req, res) => {
       if (!student) {
         student = await prisma.user.create({
           data: {
-            email: `${rollNumber.toLowerCase()}@university.edu`,
+            email: `${rollNumber.toLowerCase()}@pcampus.edu.np`,
             password: await bcrypt.hash('student123', 10),
             firstName,
             lastName,

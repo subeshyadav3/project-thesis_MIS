@@ -35,6 +35,8 @@ function ProjectDetail() {
   const [uploadStage, setUploadStage] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [recommendationContent, setRecommendationContent] = useState('');
+  const [issuingRecommendation, setIssuingRecommendation] = useState(false);
 
   const loadData = useCallback((signal) => {
     setLoading(true);
@@ -143,6 +145,26 @@ function ProjectDetail() {
     });
   };
 
+  const handleIssueRecommendation = async () => {
+    const content = recommendationContent.trim();
+    if (!content) return toast.warning('Write the recommendation letter first');
+    setIssuingRecommendation(true);
+    try {
+      const payload = { content };
+      if (type === 'group') payload.groupId = parseInt(id);
+      else payload.thesisId = parseInt(id);
+      await api.post('/supervisors/recommendation', payload);
+      toast.success('Recommendation issued');
+      setRecommendationContent('');
+      // Reload to show the new entry
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to issue recommendation');
+    } finally {
+      setIssuingRecommendation(false);
+    }
+  };
+
   const handleUploadProposal = async () => {
     if (!uploadFile || !uploadStage) return toast.warning('Select a file and stage');
     setUploading(true);
@@ -207,6 +229,9 @@ function ProjectDetail() {
         </div>
         <div className={`tab ${activeTab === 'evaluation' ? 'active' : ''}`} onClick={() => setActiveTab('evaluation')}>
           <span className="material-symbols-outlined">grading</span> Evaluation
+        </div>
+        <div className={`tab ${activeTab === 'recommendations' ? 'active' : ''}`} onClick={() => setActiveTab('recommendations')}>
+          <span className="material-symbols-outlined">verified</span> Recommendations
         </div>
       </div>
 
@@ -598,6 +623,18 @@ function ProjectDetail() {
           )}
         </>
       )}
+
+      {/* ============ RECOMMENDATIONS TAB ============ */}
+      {activeTab === 'recommendations' && (
+        <RecommendationsTab
+          item={item}
+          isSupervisor={isSupervisor}
+          recommendationContent={recommendationContent}
+          setRecommendationContent={setRecommendationContent}
+          issuingRecommendation={issuingRecommendation}
+          onIssue={handleIssueRecommendation}
+        />
+      )}
     </PageLayout>
       <ConfirmDialog
         open={confirmDialog.open}
@@ -692,6 +729,81 @@ function DefenseCard({ component, evaluation, onSave, onComplete, completing, di
         </button>
       </div>
     </>
+  );
+}
+
+function RecommendationsTab({ item, isSupervisor, recommendationContent, setRecommendationContent, issuingRecommendation, onIssue }) {
+  const list = item?.recommendations || [];
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isSupervisor ? '1.4fr 1fr' : '1fr', gap: 16 }}>
+      <div className="card">
+        <div className="card-header">
+          <h3>Issued Recommendations</h3>
+          {list.length > 0 && <span className="badge" style={{ background: 'var(--color-tertiary-container)', color: 'var(--color-on-tertiary-container)' }}>{list.length}</span>}
+        </div>
+        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {list.length === 0 ? (
+            <div className="empty-state" style={{ padding: 24 }}>
+              <span className="material-symbols-outlined">verified</span>
+              <h3>No recommendations yet</h3>
+              <p>Recommendations you issue will appear here and be visible to the student.</p>
+            </div>
+          ) : (
+            list.map((r) => (
+              <div key={r.id} style={{
+                display: 'flex', gap: 12, padding: 14,
+                border: '1px solid var(--color-outline-variant)',
+                borderRadius: 10,
+                background: 'var(--color-surface-container-low)',
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                  background: 'var(--color-primary)', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>{r.content}</p>
+                  <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 6 }}>
+                    Issued {new Date(r.createdAt).toLocaleDateString()} at {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {isSupervisor && (
+        <div className="card">
+          <div className="card-header">
+            <h3>Issue New Recommendation</h3>
+          </div>
+          <div style={{ padding: 12 }}>
+            <div className="form-group">
+              <label>Letter of Recommendation</label>
+              <textarea
+                className="form-input"
+                rows={8}
+                placeholder="Write the recommendation letter or short note for this group/thesis..."
+                value={recommendationContent}
+                onChange={(e) => setRecommendationContent(e.target.value)}
+                style={{ minHeight: 160, resize: 'vertical', fontSize: 13 }}
+              />
+            </div>
+            <button
+              className="btn btn-primary btn-block"
+              onClick={onIssue}
+              disabled={!recommendationContent.trim() || issuingRecommendation}
+            >
+              <span className="material-symbols-outlined">send</span>
+              {issuingRecommendation ? 'Issuing...' : 'Issue Recommendation'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

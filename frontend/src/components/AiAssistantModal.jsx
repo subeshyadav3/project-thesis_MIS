@@ -45,11 +45,19 @@ export default function AiAssistantModal({ proposal, onClose }) {
   const [criteriaList, setCriteriaList] = useState([]);
   const [preset, setPreset] = useState('');
   const [showCopied, setShowCopied] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [useCustomInstructions, setUseCustomInstructions] = useState(false);
+  const [similarityScope, setSimilarityScope] = useState('all');
+  const [similarityTopK, setSimilarityTopK] = useState(5);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0);
   const resultRef = useRef(null);
   const toast = useToast();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isNonStudent = ['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'].includes(user.role);
+  const canUseSimilarity = ['COORDINATOR', 'SUPERVISOR'].includes(user.role);
   if (!isNonStudent) return null;
 
   const callAI = async (endpoint, payload) => {
@@ -67,8 +75,10 @@ export default function AiAssistantModal({ proposal, onClose }) {
   };
 
   const handleSummarize = async () => {
-    const data = await callAI(`/ai/summarize/${proposal.id}`, {});
-    if (data) setResult({ type: 'summary', data: data.summary });
+    const payload = {};
+    if (useCustomPrompt && customPrompt.trim()) payload.custom_prompt = customPrompt.trim();
+    const data = await callAI(`/ai/summarize/${proposal.id}`, payload);
+    if (data) setResult({ type: 'summary', data: data.summary, custom: data.custom });
   };
 
   const handleAsk = async () => {
@@ -79,8 +89,19 @@ export default function AiAssistantModal({ proposal, onClose }) {
 
   const handleEvaluate = async () => {
     if (criteriaList.length === 0) { toast.warning('Add at least one criterion'); return; }
-    const data = await callAI(`/ai/evaluate/${proposal.id}`, { criteria: criteriaList });
+    const payload = { criteria: criteriaList };
+    if (useCustomInstructions && customInstructions.trim()) payload.custom_instructions = customInstructions.trim();
+    const data = await callAI(`/ai/evaluate/${proposal.id}`, payload);
     if (data) setResult({ type: 'evaluation', data });
+  };
+
+  const handleSimilarity = async () => {
+    const data = await callAI(`/ai/similarity/${proposal.id}`, {
+      scope: similarityScope,
+      top_k: Number(similarityTopK) || 5,
+      threshold: Number(similarityThreshold) || 0,
+    });
+    if (data) setResult({ type: 'similarity', data });
   };
 
   const addCriterion = (name = '', maxMarks = 10) => {
@@ -113,6 +134,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
     summarize: { icon: 'summarize', label: 'Summarize', desc: 'Get a structured summary of this document — objectives, methodology, outcomes, strengths, and risks.' },
     ask: { icon: 'question_answer', label: 'Ask Questions', desc: 'Ask anything about the document content. The AI answers based on what it reads.' },
     evaluate: { icon: 'grading', label: 'Evaluate', desc: 'Score the document against custom criteria with AI-powered assessment.' },
+    similarity: { icon: 'compare', label: 'Similarity', desc: 'Compare this document against other project/thesis documents to detect overlap or related work.' },
   };
 
   return (
@@ -137,16 +159,19 @@ export default function AiAssistantModal({ proposal, onClose }) {
           </div>
 
           <div className="ai-tabs">
-            {Object.entries(tabMeta).map(([key, meta]) => (
-              <button
-                key={key}
-                className={`ai-tab ${tab === key ? 'active' : ''}`}
-                onClick={() => { setTab(key); setResult(null); setQuestion(''); }}
-              >
-                <span className="material-symbols-outlined">{meta.icon}</span>
-                <span>{meta.label}</span>
-              </button>
-            ))}
+            {Object.entries(tabMeta).map(([key, meta]) => {
+              if (key === 'similarity' && !canUseSimilarity) return null;
+              return (
+                <button
+                  key={key}
+                  className={`ai-tab ${tab === key ? 'active' : ''}`}
+                  onClick={() => { setTab(key); setResult(null); setQuestion(''); }}
+                >
+                  <span className="material-symbols-outlined">{meta.icon}</span>
+                  <span>{meta.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="ai-body">
@@ -162,9 +187,31 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   <div className="ai-preview-item"><span className="material-symbols-outlined">flag</span> Expected Outcomes</div>
                   <div className="ai-preview-item"><span className="material-symbols-outlined">check_circle</span> Strengths & Weaknesses</div>
                 </div>
-                <button className="btn btn-primary ai-cta" onClick={handleSummarize}>
+
+                <div className="ai-custom-prompt">
+                  <label className="ai-toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={useCustomPrompt}
+                      onChange={(e) => setUseCustomPrompt(e.target.checked)}
+                    />
+                    <span>Use my own summarization prompt</span>
+                  </label>
+                  {useCustomPrompt && (
+                    <textarea
+                      className="form-input"
+                      rows={4}
+                      placeholder="e.g. Focus on technical feasibility, novelty, and deliverable scope. Skip background section."
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      style={{ minHeight: 80, resize: 'vertical', fontSize: 13 }}
+                    />
+                  )}
+                </div>
+
+                <button className="btn btn-primary ai-cta" onClick={handleSummarize} disabled={useCustomPrompt && !customPrompt.trim()}>
                   <span className="material-symbols-outlined">auto_awesome</span>
-                  Generate Summary
+                  {useCustomPrompt ? 'Summarize with my prompt' : 'Generate Summary'}
                 </button>
               </div>
             )}
@@ -251,10 +298,81 @@ export default function AiAssistantModal({ proposal, onClose }) {
                 <button
                   className="btn btn-primary ai-cta"
                   onClick={handleEvaluate}
-                  disabled={criteriaList.length === 0}
+                  disabled={criteriaList.length === 0 || (useCustomInstructions && !customInstructions.trim())}
                 >
                   <span className="material-symbols-outlined">grading</span>
                   Run Evaluation ({criteriaList.length} criteria)
+                </button>
+
+                <div className="ai-custom-prompt">
+                  <label className="ai-toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={useCustomInstructions}
+                      onChange={(e) => setUseCustomInstructions(e.target.checked)}
+                    />
+                    <span>Add my own evaluator instructions</span>
+                  </label>
+                  {useCustomInstructions && (
+                    <textarea
+                      className="form-input"
+                      rows={4}
+                      placeholder="e.g. Be stricter on real-world impact. Reward cost-aware engineering. Penalize vague objectives."
+                      value={customInstructions}
+                      onChange={(e) => setCustomInstructions(e.target.value)}
+                      style={{ minHeight: 80, resize: 'vertical', fontSize: 13 }}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ─── SIMILARITY TAB ─── */}
+            {tab === 'similarity' && !result && !loading && canUseSimilarity && (
+              <div className="ai-action-area">
+                <div className="ai-similarity-options">
+                  <div className="form-group">
+                    <label>Compare against</label>
+                    <select
+                      className="form-input"
+                      value={similarityScope}
+                      onChange={(e) => setSimilarityScope(e.target.value)}
+                    >
+                      <option value="all">All documents</option>
+                      <option value="year">Same academic year</option>
+                      <option value="department">Same department</option>
+                      <option value="year_department">Same year & department</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Top matches</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        className="form-input"
+                        value={similarityTopK}
+                        onChange={(e) => setSimilarityTopK(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Min similarity (0–1)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        className="form-input"
+                        value={similarityThreshold}
+                        onChange={(e) => setSimilarityThreshold(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <button className="btn btn-primary ai-cta" onClick={handleSimilarity}>
+                  <span className="material-symbols-outlined">compare_arrows</span>
+                  Find similar documents
                 </button>
               </div>
             )}
@@ -282,10 +400,10 @@ export default function AiAssistantModal({ proposal, onClose }) {
                 <div className="ai-result-header">
                   <div className="ai-result-title">
                     <span className="material-symbols-outlined">
-                      {result.type === 'summary' ? 'summarize' : result.type === 'answer' ? 'psychology' : 'grading'}
+                      {result.type === 'summary' ? 'summarize' : result.type === 'answer' ? 'psychology' : result.type === 'similarity' ? 'compare_arrows' : 'grading'}
                     </span>
                     <span>
-                      {result.type === 'summary' ? 'Summary' : result.type === 'answer' ? 'Answer' : 'Evaluation Results'}
+                      {result.type === 'summary' ? 'Summary' : result.type === 'answer' ? 'Answer' : result.type === 'similarity' ? 'Similar Documents' : 'Evaluation Results'}
                     </span>
                   </div>
                   <button className="ai-copy-btn" onClick={copyResult} title="Copy to clipboard">
@@ -294,14 +412,15 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   </button>
                 </div>
                 <div className="ai-result-body">
-                  {result.type === 'summary' && <SummaryView data={result.data} />}
+                  {result.type === 'summary' && <SummaryView data={result.data} custom={result.custom} />}
                   {result.type === 'answer' && <AnswerView data={result.data} question={result.question} />}
                   {result.type === 'evaluation' && <EvaluationView data={result.data} />}
+                  {result.type === 'similarity' && <SimilarityView data={result.data} />}
                 </div>
                 <div className="ai-result-actions">
                   <button className="btn btn-outline btn-sm" onClick={() => setResult(null)}>
                     <span className="material-symbols-outlined">refresh</span>
-                    {tab === 'ask' ? 'Ask Another' : 'Re-run'}
+                    {tab === 'ask' ? 'Ask Another' : tab === 'similarity' ? 'Re-scan' : 'Re-run'}
                   </button>
                 </div>
               </div>
@@ -320,7 +439,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
 
 /* ─── SUB-COMPONENTS ─── */
 
-function SummaryView({ data }) {
+function SummaryView({ data, custom }) {
   if (!data || data.error) return <p className="ai-error">Failed to generate summary.</p>;
 
   const sections = [
@@ -334,6 +453,11 @@ function SummaryView({ data }) {
 
   return (
     <div className="ai-summary">
+      {custom && (
+        <div className="ai-pill">
+          <span className="material-symbols-outlined">auto_awesome</span> Custom prompt summary
+        </div>
+      )}
       {sections.map(sec => {
         const val = data[sec.key];
         if (!val || (Array.isArray(val) && val.length === 0)) return null;
@@ -379,6 +503,7 @@ function EvaluationView({ data }) {
   const pct = data.max_marks ? Math.round((data.total_marks / data.max_marks) * 100) : 0;
   const grade = pct >= 80 ? 'A' : pct >= 65 ? 'B' : pct >= 50 ? 'C' : pct >= 35 ? 'D' : 'F';
   const gradeColor = pct >= 80 ? 'var(--color-success)' : pct >= 65 ? 'var(--color-tertiary)' : pct >= 50 ? 'var(--color-secondary)' : 'var(--color-error)';
+  return (
 
   return (
     <div className="ai-evaluation">
@@ -407,6 +532,40 @@ function EvaluationView({ data }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function SimilarityView({ data }) {
+  const matches = data?.matches || [];
+  return (
+    <div className="ai-similarity">
+      <div className="ai-pill">
+        <span className="material-symbols-outlined">filter_alt</span> Scope: {data?.scope || 'all'} · {matches.length} matches from {data?.compared ?? 0} documents
+      </div>
+      {matches.length === 0 ? (
+        <p className="ai-similarity-empty">No similar documents matched the current threshold.</p>
+      ) : (
+        <div className="ai-similarity-list">
+          {matches.map((m, i) => {
+            const pct = Math.round((m.similarity || 0) * 100);
+            return (
+              <div key={m.id || i} className="ai-similarity-item">
+                <div className="ai-similarity-score">{pct}%</div>
+                <div className="ai-similarity-info">
+                  <div className="ai-similarity-title">{m.title || '(untitled)'}</div>
+                  <div className="ai-similarity-meta">
+                    {m.year && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>calendar_today</span> {m.year}</span>}
+                    {m.department && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>apartment</span> {m.department}</span>}
+                    {m.documentType && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>description</span> {m.documentType}</span>}
+                    {m.submittedBy && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>person</span> {m.submittedBy}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -824,4 +983,64 @@ const aiStyles = `
 }
 
 .ai-error { color: var(--color-error); font-size: 13px; }
+
+/* Custom prompt */
+.ai-custom-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--color-outline-variant);
+  border-radius: 10px;
+  background: var(--color-surface-container-low);
+}
+.ai-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
+}
+.ai-pill .material-symbols-outlined { font-size: 14px; }
+
+/* Similarity */
+.ai-similarity-options { display: flex; flex-direction: column; gap: 10px; }
+.ai-similarity-list { display: flex; flex-direction: column; gap: 10px; }
+.ai-similarity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.ai-similarity-score {
+  flex-shrink: 0;
+  width: 56px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+}
+.ai-similarity-info { flex: 1; min-width: 0; }
+.ai-similarity-title { font-weight: 600; font-size: 13px; }
+.ai-similarity-meta { font-size: 11px; color: var(--color-on-surface-variant); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-similarity-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.ai-similarity-empty { font-size: 13px; color: var(--color-on-surface-variant); padding: 16px 0; text-align: center; }
 `;

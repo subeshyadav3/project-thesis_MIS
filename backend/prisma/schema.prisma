@@ -354,6 +354,7 @@ model Proposal {
   id                Int           @id @default(autoincrement())
   stage             EvaluationStage
   documentUrl       String?
+  documentType      String        @default("PROPOSAL")
   supervisorComment String?
   studentFeedback   String?
   groupId           Int?
@@ -364,6 +365,33 @@ model Proposal {
   submittedBy       User          @relation(fields: [submittedById], references: [id])
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
+  embedding         DocumentEmbedding?
+}
+
+enum DocumentType {
+  PROPOSAL
+  PROGRESS_REPORT
+  MID_TERM_REPORT
+  FINAL_REPORT
+  THESIS_DRAFT
+  THESIS_FINAL
+  OTHER
+}
+
+model DocumentEmbedding {
+  id              Int          @id @default(autoincrement())
+  proposalId      Int          @unique
+  proposal        Proposal     @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  documentType    DocumentType @default(PROPOSAL)
+  vector          Float[]      @default([])
+  model           String
+  chunkCount      Int          @default(0)
+  charCount       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([documentType])
 }
 
 model Notification {

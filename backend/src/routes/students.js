@@ -33,6 +33,7 @@ router.get('/theses', authenticate, authorize('STUDENT'), studentController.getM
 router.get('/groups/:id', authenticate, authorize('STUDENT'), studentController.getGroupById);
 router.get('/theses/:id', authenticate, authorize('STUDENT'), studentController.getThesisById);
 router.delete('/theses/:id', authenticate, authorize('STUDENT'), studentController.deleteThesis);
+router.delete('/groups/:groupId/members/:studentId', authenticate, authorize('STUDENT', 'COORDINATOR', 'MAINTAINER'), studentController.removeMember);
 router.get('/notifications', authenticate, authorize('STUDENT'), studentController.getMyNotifications);
 router.put('/notifications/:id/read', authenticate, authorize('STUDENT'), studentController.markNotificationRead);
 router.post('/upload', authenticate, authorize('STUDENT'), (req, res, next) => {

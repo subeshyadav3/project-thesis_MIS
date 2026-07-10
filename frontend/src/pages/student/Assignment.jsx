@@ -357,6 +357,41 @@ function StudentProjectDetail() {
       </div>
 
       {viewerDoc && <DocumentViewer fileUrl={viewerDoc.url} fileName={viewerDoc.name} onClose={() => setViewerDoc(null)} />}
+
+      {assignment?.recommendations?.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <h3>Recommendations from Supervisor</h3>
+            <span className="badge" style={{ background: 'var(--color-tertiary-container)', color: 'var(--color-on-tertiary-container)' }}>
+              {assignment.recommendations.length}
+            </span>
+          </div>
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {assignment.recommendations.map((r) => (
+              <div key={r.id} style={{
+                display: 'flex', gap: 12, padding: 14,
+                border: '1px solid var(--color-outline-variant)',
+                borderRadius: 10,
+                background: 'var(--color-surface-container-low)',
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                  background: 'var(--color-primary)', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>{r.content}</p>
+                  <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 6 }}>
+                    Issued {new Date(r.createdAt).toLocaleDateString()} at {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </PageLayout></ErrorBoundary>
   );
 }

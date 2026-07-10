@@ -1,29 +1,32 @@
-"""LangGraph evaluator agent using Gemini."""
+"""LangGraph evaluator agent."""
 from langgraph.graph import StateGraph
 from langchain_core.prompts import ChatPromptTemplate
 from .state import EvaluateState
 from .llm_factory import get_llm
 
 
-def build_evaluator() -> StateGraph:
+def build_evaluator(custom_instructions: str = None):
     llm = get_llm()
 
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "human",
-            "You are an academic evaluator. Given a proposal document and evaluation criteria, "
-            "score each criterion with a mark out of its maxMarks and provide brief reasoning.\n\n"
-            "Proposal text:\n{document_text}\n\n"
-            "Criteria:\n{criteria_text}\n\n"
-            "Respond ONLY with a JSON array of objects, each with:\n"
-            "- criterion_name: string\n"
-            "- marks: number (0 to maxMarks)\n"
-            "- max_marks: number\n"
-            "- reasoning: string\n\n"
-            "Be objective and fair."
-        )
-    ])
+    base_instructions = (
+        "You are an academic evaluator. Given a document and evaluation criteria, "
+        "score each criterion with a mark out of its maxMarks and provide brief reasoning."
+    )
+    extras = f"\n\nAdditional instructions from evaluator:\n{custom_instructions}" if custom_instructions and custom_instructions.strip() else ""
 
+    template = (
+        f"{base_instructions}{extras}\n\n"
+        "Document text:\n{{document_text}}\n\n"
+        "Criteria:\n{{criteria_text}}\n\n"
+        "Respond ONLY with a JSON array of objects, each with:\n"
+        "- criterion_name: string\n"
+        "- marks: number (0 to maxMarks)\n"
+        "- max_marks: number\n"
+        "- reasoning: string\n\n"
+        "Be objective and fair."
+    )
+
+    prompt = ChatPromptTemplate.from_messages([("human", template)])
     chain = prompt | llm
 
     def evaluate_node(state: EvaluateState) -> dict:
