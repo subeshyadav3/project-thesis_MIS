@@ -360,45 +360,44 @@ async function main() {
   await prisma.externalExaminer.create({ data: { name: 'Prof. Suman Bhattarai', email: 'suman.bhattarai@ioe.edu.np', phone: '9845566778', department: 'Computer Engineering' } });
 
   // ============================================================
-  // TEST USERS
+  // TEST USERS (2 supervisors, 2 examiners, bachelor + master students)
   // ============================================================
-  const testSup = await prisma.user.create({ data: { email: 'supervisor@test.com', password: hash, firstName: 'Test', lastName: 'Supervisor', role: 'SUPERVISOR', departmentId: ceeDept.id } });
-  const testExaminer = await prisma.user.create({ data: { email: 'examiner@test.com', password: hash, firstName: 'Test', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER', departmentId: ceeDept.id } });
+  const testSup1 = await prisma.user.create({ data: { email: 'supervisor@test.com', password: hash, firstName: 'Test', lastName: 'Supervisor', role: 'SUPERVISOR', departmentId: ceeDept.id } });
+  const testSup2 = await prisma.user.create({ data: { email: 'supervisor2@test.com', password: hash, firstName: 'Second', lastName: 'Supervisor', role: 'SUPERVISOR', departmentId: ceeDept.id } });
+  const testExaminer1 = await prisma.user.create({ data: { email: 'examiner@test.com', password: hash, firstName: 'Test', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER', departmentId: ceeDept.id } });
+  const testExaminer2 = await prisma.user.create({ data: { email: 'examiner2@test.com', password: hash, firstName: 'Second', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER', departmentId: ceeDept.id } });
   const testBachelorStu = await prisma.user.create({ data: { email: 'bachelor@test.com', password: hash, firstName: 'Bach', lastName: 'Student', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: ceeDept.id, programId: programs.BCT.id, rollNumber: 'TEST001' } });
   const testMasterStu = await prisma.user.create({ data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER', departmentId: ceeDept.id, programId: programs.BCT.id, rollNumber: '080MSNCS001' } });
 
-  // MAJOR project group
+  // ---- SUPERVISOR 1 ────────────────────────────────────
+  // Bachelor group (MAJOR) — sup1 + bachelorStu → examiner1
   const majorGroup = await prisma.projectGroup.create({
-    data: { name: 'MajorTest', projectTitle: 'Major Project Test — Advanced ML System', projectType: 'MAJOR', status: 'ACTIVE', supervisorId: testSup.id, programId: programs.BCT.id, academicYearId: ay['2080'].id },
+    data: { name: 'MajorTest', projectTitle: 'Major Project Test — Advanced ML System', projectType: 'MAJOR', status: 'ACTIVE', supervisorId: testSup1.id, programId: programs.BCT.id, academicYearId: ay['2080'].id },
   });
   for (const s of [testBachelorStu, students[students.length - 1]]) {
     await prisma.groupMember.create({ data: { studentId: s.id, groupId: majorGroup.id, rollNumber: s === testBachelorStu ? 'TEST001' : 'TEST002' } });
   }
   const majorComponents = await attachComponents({ groupId: majorGroup.id, projectType: 'MAJOR' });
-  await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer.id, groupId: majorGroup.id, assignedById: coordCEE.id } });
+  await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer1.id, groupId: majorGroup.id, assignedById: coordCEE.id } });
+  await prisma.evaluation.create({ data: { componentId: majorComponents.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 42, comment: 'Good progress on the major project.', status: 'COMPLETED', submittedById: testSup1.id, groupId: majorGroup.id } });
 
-  // Test master thesis
+  // Master thesis — sup1 + masterStu → examiner1
   const testThesis = await prisma.thesis.create({
-    data: { title: 'Test Master Thesis — AI in Healthcare', projectType: 'MASTER', studentId: testMasterStu.id, status: 'ACTIVE', supervisorId: testSup.id, academicYearId: ay['2080'].id },
+    data: { title: 'Test Master Thesis — AI in Healthcare', projectType: 'MASTER', studentId: testMasterStu.id, status: 'ACTIVE', supervisorId: testSup1.id, academicYearId: ay['2080'].id },
   });
   await attachComponents({ thesisId: testThesis.id, projectType: 'MASTER' });
-  await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer.id, thesisId: testThesis.id, assignedById: coordCEE.id } });
-
-  // Sample evaluations
-  await prisma.evaluation.create({ data: { componentId: majorComponents.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 42, comment: 'Good progress on the major project.', status: 'COMPLETED', submittedById: testSup.id, groupId: majorGroup.id } });
-
-  // Per-criteria evaluations for test master thesis
+  await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer1.id, thesisId: testThesis.id, assignedById: coordCEE.id } });
+  // Per-criteria evaluations for test master thesis (sup1 + examiner1)
   const masterComps = await prisma.evaluationComponent.findMany({
     where: { thesisId: testThesis.id },
     orderBy: { id: 'asc' },
   });
-  const supCritNames = ['Regularity of works', 'Degree of Completeness', 'Understanding of thesis work', 'Student effort and performance', 'Organization of study'];
   const supCritMarks = [18, 17, 18, 16, 16]; // total = 85
   for (let i = 0; i < 5 && i < masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR').length; i++) {
     const comp = masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR')[i];
     if (comp) {
       await prisma.evaluation.create({
-        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: supCritMarks[i], comment: supCritNames[i] === 'Degree of Completeness' ? 'All chapters completed well.' : '', status: 'COMPLETED', submittedById: testSup.id, thesisId: testThesis.id },
+        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: supCritMarks[i], comment: i === 1 ? 'All chapters completed well.' : '', status: 'COMPLETED', submittedById: testSup1.id, thesisId: testThesis.id },
       });
     }
   }
@@ -407,10 +406,28 @@ async function main() {
     const comp = masterComps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER')[i];
     if (comp) {
       await prisma.evaluation.create({
-        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: extCritMarks[i], comment: i === 0 ? 'Good presentation.' : '', status: 'COMPLETED', submittedById: testExaminer.id, thesisId: testThesis.id },
+        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: extCritMarks[i], comment: i === 0 ? 'Good presentation.' : '', status: 'COMPLETED', submittedById: testExaminer1.id, thesisId: testThesis.id },
       });
     }
   }
+
+  // ---- SUPERVISOR 2 ────────────────────────────────────
+  // Bachelor group (MINOR) — sup2 + leftover bachelor student → examiner2
+  const sup2bachelor = students.find(s => s.rollNumber === '081BCT010') || students[students.length - 1];
+  const sup2Group = await prisma.projectGroup.create({
+    data: { name: 'Sup2Group', projectTitle: 'IoT-Enabled Smart Campus System', projectType: 'MINOR', status: 'ACTIVE', supervisorId: testSup2.id, programId: programs.BCT.id, academicYearId: ay['2080'].id },
+  });
+  await prisma.groupMember.create({ data: { studentId: sup2bachelor.id, groupId: sup2Group.id, rollNumber: sup2bachelor.rollNumber || 'TEST003' } });
+  await attachComponents({ groupId: sup2Group.id, projectType: 'MINOR' });
+  await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer2.id, groupId: sup2Group.id, assignedById: coordCEE.id } });
+
+  // Master thesis — sup2 + new master student from seed → examiner2
+  const sup2masterStu = students[32]; // Dinesh Parajuli (081BCT003, MASTER)
+  const sup2Thesis = await prisma.thesis.create({
+    data: { title: 'Blockchain-based Academic Credential Verification', projectType: 'MASTER', studentId: sup2masterStu.id, status: 'ACTIVE', supervisorId: testSup2.id, academicYearId: ay['2080'].id },
+  });
+  await attachComponents({ thesisId: sup2Thesis.id, projectType: 'MASTER' });
+  await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer2.id, thesisId: sup2Thesis.id, assignedById: coordCEE.id } });
 
   // Per-criteria sample evaluations for other master theses (mix of states)
   // Thesis 0: fully evaluated
@@ -459,8 +476,10 @@ async function main() {
   console.log('  MAINTAINER:          subeshgaming@gmail.com');
   console.log('  COORDINATOR (CEE):   coordinator@pcampus.edu.np');
   console.log('  COORDINATOR (BEL):   coord.bel@pcampus.edu.np');
-  console.log('  SUPERVISOR:          supervisor@test.com');
-  console.log('  EXAMINER:            examiner@test.com');
+  console.log('  SUPERVISOR 1:        supervisor@test.com');
+  console.log('  SUPERVISOR 2:        supervisor2@test.com');
+  console.log('  EXAMINER 1:          examiner@test.com');
+  console.log('  EXAMINER 2:          examiner2@test.com');
   console.log('  BACHELOR STUDENT:    bachelor@test.com');
   console.log('  MASTER STUDENT:      master@test.com');
   console.log(`\nDepartments: CEE (BCT, BEI), BEL (BEL)`);

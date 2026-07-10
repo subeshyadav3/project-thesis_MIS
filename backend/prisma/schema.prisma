@@ -56,6 +56,78 @@ enum EvaluationType {
   EXTERNAL_EXAMINER
 }
 
+enum AnnouncementType {
+  GENERAL
+  MINOR
+  MAJOR
+  THESIS
+}
+
+enum AnnouncementAudience {
+  ALL
+  PROGRAMS
+  DEGREE
+  STUDENTS
+}
+
+model Announcement {
+  id              Int                 @id @default(autoincrement())
+  title           String
+  message         String
+  type            AnnouncementType    @default(GENERAL)
+  audience        AnnouncementAudience @default(ALL)
+  degreeType      DegreeType?
+  programIds      Int[]               @default([])
+  studentIds      Int[]               @default([])
+  academicYearId  Int
+  academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id])
+  departmentId    Int
+  department      Department          @relation(fields: [departmentId], references: [id])
+  allowGroupFormation Boolean          @default(false)
+  groupSizeMin    Int                 @default(1)
+  groupSizeMax    Int                 @default(4)
+  expiresAt       DateTime?
+  createdById     Int
+  createdBy       User                @relation("AnnouncementCreator", fields: [createdById], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  groups          ProjectGroup[]
+  invitations     GroupInvitation[]
+
+  @@index([type])
+  @@index([audience])
+  @@index([departmentId])
+  @@index([academicYearId])
+  @@index([allowGroupFormation])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model GroupInvitation {
+  id          Int              @id @default(autoincrement())
+  groupId     Int
+  group       ProjectGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  announcementId Int?
+  announcement  Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
+  inviterId   Int
+  inviter     User             @relation("GroupInviter", fields: [inviterId], references: [id])
+  inviteeId   Int
+  invitee     User             @relation("GroupInvitee", fields: [inviteeId], references: [id])
+  status      InvitationStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+
+  @@unique([groupId, inviteeId])
+  @@index([inviteeId])
+  @@index([status])
+}
+
 model User {
   id          Int         @id @default(autoincrement())
   email       String      @unique
@@ -88,6 +160,10 @@ model User {
   examinerAssignments      ExaminerAssignment[]  @relation("ExternalExaminer")
   examinerAssignmentsAssigned ExaminerAssignment[] @relation("AssignedBy")
   auditLogs                   AuditLog[]
+  announcementsCreated        Announcement[]           @relation("AnnouncementCreator")
+  invitationsSent             GroupInvitation[]        @relation("GroupInviter")
+  invitationsReceived         GroupInvitation[]        @relation("GroupInvitee")
+  groupsFormed                ProjectGroup[]           @relation("GroupFormer")
 
   @@index([role])
   @@index([departmentId])
@@ -106,6 +182,7 @@ model Department {
   programs       Program[]
   academicYears  AcademicYear[]
   users          User[]         @relation("UserDepartment")
+  announcements  Announcement[]
 }
 
 model Program {
@@ -131,6 +208,7 @@ model AcademicYear {
 
   groups ProjectGroup[]
   theses Thesis[]
+  announcements Announcement[]
 
   @@index([departmentId])
   @@index([isActive])
@@ -148,6 +226,11 @@ model ProjectGroup {
   program        Program?            @relation(fields: [programId], references: [id])
   academicYearId Int
   academicYear   AcademicYear        @relation(fields: [academicYearId], references: [id])
+  announcementId Int?
+  announcement   Announcement?       @relation(fields: [announcementId], references: [id], onDelete: SetNull)
+  formedById     Int?
+  formedBy       User?               @relation("GroupFormer", fields: [formedById], references: [id], onDelete: SetNull)
+  joinPolicy     String              @default("INVITE_ONLY")
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -157,10 +240,12 @@ model ProjectGroup {
   proposals            Proposal[]
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
+  invitations          GroupInvitation[]
 
   @@index([status])
   @@index([programId])
   @@index([academicYearId])
+  @@index([announcementId])
 }
 
 model GroupMember {

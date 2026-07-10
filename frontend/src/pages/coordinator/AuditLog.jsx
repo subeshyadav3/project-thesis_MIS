@@ -13,6 +13,7 @@ export default function AuditLog() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [entityFilter, setEntityFilter] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
   const limit = 50;
   const toast = useToast();
 
@@ -20,6 +21,7 @@ export default function AuditLog() {
     setLoading(true);
     const params = { limit, offset: (page - 1) * limit };
     if (entityFilter) params.entity = entityFilter;
+    if (actionFilter) params.action = actionFilter;
     api.get('/users/audit-logs', { params })
       .then(({ data }) => {
         if (data.success) {
@@ -35,7 +37,7 @@ export default function AuditLog() {
     const c = new AbortController();
     loadLogs();
     return () => c.abort();
-  }, [page, entityFilter]);
+  }, [page, entityFilter, actionFilter]);
 
   const actionColors = {
     CREATE: 'var(--color-success)',
@@ -60,6 +62,7 @@ export default function AuditLog() {
     REMOVE: 'var(--color-error)',
     UPDATE_STATUS: 'var(--color-warning)',
     ISSUE_RECOMMENDATION: 'var(--color-tertiary)',
+    COMPLETE_EVALUATION: 'var(--color-success)',
   };
 
   return (
@@ -68,6 +71,10 @@ export default function AuditLog() {
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <SearchInput value={entityFilter} onChange={setEntityFilter} placeholder="Filter by entity..." style={{ maxWidth: 240 }} />
+            <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(1); }} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-outline)', background: 'var(--color-surface)', color: 'var(--color-on-surface)', fontSize: 13, maxWidth: 180 }}>
+              <option value="">All actions</option>
+              {Object.keys(actionColors).map(a => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
+            </select>
             <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>{total} entries</span>
           </div>
           {loading ? (

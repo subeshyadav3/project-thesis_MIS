@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { downloadFile } from '../utils/download';
 import DocumentViewer from './DocumentViewer';
+import AiAssistantModal from './AiAssistantModal';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 
@@ -18,6 +19,7 @@ const STAGE_ICON = {
 
 function ProposalsSection({ proposals = [], title = 'Submitted Documents', user }) {
   const [viewerDoc, setViewerDoc] = useState(null);
+  const [aiProposal, setAiProposal] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
   const [savingComments, setSavingComments] = useState({});
   const toast = useToast();
@@ -158,6 +160,20 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                             title="Open in new tab">
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
                           </a>
+                          {canComment && (
+                            <button
+                              className="btn btn-sm"
+                              style={{
+                                padding: '4px 8px', fontSize: 12,
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                color: '#fff', border: 'none',
+                              }}
+                              onClick={() => setAiProposal({ id: doc.id, documentUrl: doc.documentUrl })}
+                              title="AI Assistant"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>psychology</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -204,6 +220,9 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
 
       {viewerDoc && (
         <DocumentViewer fileUrl={viewerDoc.url} fileName={viewerDoc.name} onClose={() => setViewerDoc(null)} />
+      )}
+      {aiProposal && (
+        <AiAssistantModal proposal={aiProposal} onClose={() => setAiProposal(null)} />
       )}
     </div>
   );
