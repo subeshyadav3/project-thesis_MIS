@@ -93,6 +93,7 @@ model Announcement {
   updatedAt       DateTime            @updatedAt
 
   groups          ProjectGroup[]
+  theses          Thesis[]
   invitations     GroupInvitation[]
 
   @@index([type])
@@ -272,6 +273,8 @@ model Thesis {
   supervisor     User?        @relation("SupervisedTheses", fields: [supervisorId], references: [id])
   academicYearId Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  announcementId Int?
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -284,6 +287,7 @@ model Thesis {
   @@index([status])
   @@index([studentId])
   @@index([academicYearId])
+  @@index([announcementId])
 }
 
 model EvaluationComponent {

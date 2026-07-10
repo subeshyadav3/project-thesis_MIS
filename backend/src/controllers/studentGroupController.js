@@ -40,15 +40,52 @@ ctrl.create = async (req, res) => {
     const alreadyIn = await isStudentAlreadyInAGroupAnnouncement(req.user, ann);
     if (alreadyIn) return res.status(400).json({ error: 'You are already in a group/thesis for this announcement type' });
 
-    const projectType = ann.type === 'MINOR' ? 'MINOR' : ann.type === 'MAJOR' ? 'MAJOR' : 'MINOR';
+    const isThesisAnnouncement = ann.type === 'THESIS';
+    const projectType = ann.type === 'MAJOR' ? 'MAJOR' : 'MINOR';
     const resolvedProgramId = programId ? Number(programId) : req.user.programId;
     if (!resolvedProgramId) return res.status(400).json({ error: 'Program ID required' });
 
     // Validate group size
     const maxMembers = ann.groupSizeMax || 4;
     const invitedIds = Array.isArray(memberIds) ? memberIds : [];
-    if (invitedIds.length > maxMembers - 1) {
+    if (!isThesisAnnouncement && invitedIds.length > maxMembers - 1) {
       return res.status(400).json({ error: `Maximum ${maxMembers} members allowed for this announcement` });
+    }
+
+    if (isThesisAnnouncement) {
+      // Master thesis: single student, no group members/invitations
+      const thesis = await prisma.thesis.create({
+        data: {
+          title: projectTitle?.trim() || ann.title,
+          projectType: 'MASTER',
+          status: 'PENDING',
+          studentId: req.user.id,
+          academicYearId: ann.academicYearId,
+          announcementId: ann.id,
+        },
+      });
+
+      const defaults = getDefaultComponents('MASTER');
+      for (const comp of defaults) {
+        await prisma.evaluationComponent.create({
+          data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
+        });
+      }
+
+      const created = await prisma.thesis.findUnique({
+        where: { id: thesis.id },
+        include: {
+          student: { select: { id: true, firstName: true, lastName: true, email: true } },
+          supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+          academicYear: { include: { department: true } },
+          evaluationComponents: true,
+          announcement: { select: { id: true, title: true, type: true } },
+        },
+      });
+
+      audit.log({ action: 'CREATE', entity: 'Thesis', entityId: thesis.id, details: `Student submitted thesis "${created.title}" via announcement #${ann.id}`, performedById: req.user.id });
+
+      return res.status(201).json({ ...created, _type: 'THESIS' });
     }
 
     const group = await prisma.projectGroup.create({
@@ -93,7 +130,7 @@ ctrl.create = async (req, res) => {
 
     audit.log({ action: 'CREATE', entity: 'ProjectGroup', entityId: group.id, details: `Student formed group "${created.name}" via announcement #${ann.id}`, performedById: req.user.id });
 
-    res.status(201).json(created);
+    res.status(201).json({ ...created, _type: 'GROUP' });
   } catch (e) {
     console.error('student create group error:', e);
     res.status(500).json({ error: 'Internal server error' });

@@ -14,6 +14,8 @@ exports.getGroups = async (req, res) => {
       const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
       if (dept) where.academicYear = { departmentId: dept.id };
     }
+    if (req.query.announcementId) where.announcementId = Number(req.query.announcementId);
+    if (req.query.status) where.status = req.query.status;
     const groups = await prisma.projectGroup.findMany({
       where,
       include: {

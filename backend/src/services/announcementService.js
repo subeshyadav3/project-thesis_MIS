@@ -48,7 +48,7 @@ async function isStudentAlreadyInAGroupAnnouncement(user, announcement) {
     return !!member;
   }
   const thesis = await prisma.thesis.findFirst({
-    where: { studentId: user.id, status: { in: ['PENDING', 'ACTIVE'] } },
+    where: { studentId: user.id, announcementId: announcement.id, status: { in: ['PENDING', 'ACTIVE'] } },
   });
   return !!thesis;
 }

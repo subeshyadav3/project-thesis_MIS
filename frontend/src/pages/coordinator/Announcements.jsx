@@ -25,6 +25,9 @@ function CoordinatorAnnouncements() {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentOpen, setStudentOpen] = useState(false);
+  const [viewAnnouncement, setViewAnnouncement] = useState(null);
+  const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
+  const [subLoading, setSubLoading] = useState(false);
   const studentRef = useRef(null);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -81,6 +84,35 @@ function CoordinatorAnnouncements() {
       toast.success('Announcement deactivated');
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+  };
+
+  const loadSubmissions = async (ann) => {
+    setSubLoading(true);
+    try {
+      if (ann.type === 'THESIS') {
+        const { data } = await api.get(`/theses?announcementId=${ann.id}&status=PENDING`);
+        setSubmissions({ groups: [], theses: data });
+      } else {
+        const { data } = await api.get(`/groups?announcementId=${ann.id}&status=PENDING`);
+        setSubmissions({ groups: data, theses: [] });
+      }
+    } catch (err) {
+      toast.error('Failed to load submissions');
+      setSubmissions({ groups: [], theses: [] });
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  const handleApprove = async (item, type) => {
+    try {
+      const endpoint = type === 'thesis' ? `/theses/${item.id}/status` : `/groups/${item.id}/status`;
+      await api.put(endpoint, { status: 'ACTIVE' });
+      toast.success('Submission approved');
+      loadSubmissions(viewAnnouncement);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to approve');
+    }
   };
 
   const actions = (
@@ -151,6 +183,11 @@ function CoordinatorAnnouncements() {
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>
+                          {hasGF && (
+                            <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
+                              <span className="material-symbols-outlined">visibility</span> View Submissions
+                            </button>
+                          )}
                           {active && (
                             <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)}>
                               <span className="material-symbols-outlined">cancel</span> Deactivate
@@ -320,6 +357,71 @@ function CoordinatorAnnouncements() {
             </div>
           </div>
         )}
+
+        {viewAnnouncement && (
+          <div className="modal-overlay" onClick={() => setViewAnnouncement(null)}>
+            <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-header-icon info"><span className="material-symbols-outlined">groups</span></div>
+                <div className="modal-header-text"><h2>Submissions: {viewAnnouncement.title}</h2><p>{TYPE_LABELS[viewAnnouncement.type] || viewAnnouncement.type}</p></div>
+              </div>
+              <div className="modal-body">
+                {subLoading ? (
+                  <div className="loading-state"><span className="material-symbols-outlined spin">progress_activity</span><p>Loading submissions...</p></div>
+                ) : (
+                  <div className="table-container">
+                    <table className="table">
+                      <thead>
+                        <tr><th>Title</th><th>Student(s)</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
+                      </thead>
+                      <tbody>
+                        {viewAnnouncement.type === 'THESIS' ? (
+                          submissions.theses.length === 0 ? (
+                            <tr><td colSpan={4} className="empty-cell">No pending thesis submissions</td></tr>
+                          ) : (
+                            submissions.theses.map(t => (
+                              <tr key={t.id}>
+                                <td>{t.title}</td>
+                                <td>{t.student ? `${t.student.firstName} ${t.student.lastName}` : '—'}</td>
+                                <td><span className="badge badge-pending">{t.status}</span></td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button className="btn btn-sm btn-primary" onClick={() => handleApprove(t, 'thesis')}>
+                                    <span className="material-symbols-outlined">check_circle</span> Approve
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )
+                        ) : (
+                          submissions.groups.length === 0 ? (
+                            <tr><td colSpan={4} className="empty-cell">No pending group submissions</td></tr>
+                          ) : (
+                            submissions.groups.map(g => (
+                              <tr key={g.id}>
+                                <td>{g.projectTitle || g.name}</td>
+                                <td>{g.members?.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}</td>
+                                <td><span className="badge badge-pending">{g.status}</span></td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button className="btn btn-sm btn-primary" onClick={() => handleApprove(g, 'group')}>
+                                    <span className="material-symbols-outlined">check_circle</span> Approve
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setViewAnnouncement(null)}><span className="material-symbols-outlined">close</span> Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </PageLayout>
     </ErrorBoundary>
   );

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "fermentId": "019f4b99-a70e-722e-8c94-42cc300971da",
+  "phaseId": "phase-1",
+  "phaseName": "Backend schema and creation flow",
+  "attempt": 1,
+  "timestamp": "2026-07-10T10:49:03.390Z",
+  "goal": "Make the backend store thesis submissions in the Thesis table and link both groups and theses to their announcement.",
+  "summary": "Phase 1 completed: added announcementId to Thesis, synced the database, refactored student group creation to produce Thesis records for THESIS announcements and ProjectGroup records for MINOR/MAJOR, scoped the thesis duplicate check by announcement, and confirmed stats already exposes pendingTheses.",
+  "stepSummaries": "  1. Update schema.prisma: add optional announcementId and relation on Thesis; add inverse theses relation on Announcement. [verified]\n  2. Generate and apply Prisma migration. [verified]\n  3. Refactor studentGroupController.create to create a Thesis for THESIS announcements and ProjectGroup for MINOR/MAJOR, both with status PENDING and announcementId set. [verified]\n  4. Update announcementService.isStudentAlreadyInAGroupAnnouncement to scope THESIS checks by announcementId. [verified]\n  5. Update /api/stats to include pendingTheses count. [verified]",
+  "diffAvailable": false,
+  "diffFilesChanged": "(git unavailable)",
+  "flags": [],
+  "derivedGrade": "A",
+  "reviewerRationale": "All gates pass; project checks validate.",
+  "gateVerdicts": [
+    {
+      "id": "F1",
+      "verdict": "pass",
+      "rationale": "All steps verified: schema grep, db push with validate, controller syntax load, service grep, and stats grep. Step 2 actually touched the database; remaining verifications are syntactic but cover the load-bearing changes.",
+      "evidence": "Step 1: grep OK; Step 2: prisma db push + validate + client has announcementId; Step 3: node require OK; Step 4: grep OK; Step 5: grep OK."
+    },
+    {
+      "id": "F2",
+      "verdict": "pass",
+      "rationale": "The combined output delivers the phase goal: Thesis can now be linked to an announcement, and the student creation endpoint correctly routes THESIS announcements to Thesis and bachelor announcements to ProjectGroup.",
+      "evidence": "schema.prisma has Thesis.announcementId; studentGroupController.js has isThesisAnnouncement branch creating prisma.thesis; announcementService.js scopes thesis duplicate check by announcementId."
+    },
+    {
+      "id": "F3",
+      "verdict": "pass",
+      "rationale": "Nothing deferred in this phase. Note: prisma generate encountered a Windows file-permission rename error on WSL, but the generated client was updated and contains the new field.",
+      "evidence": "node_modules/.prisma/client/index.d.ts contains announcementId references."
+    }
+  ],
+  "projectChecks": {
+    "discovered": false,
+    "anyFailed": false,
+    "commands": []
+  }
+}
