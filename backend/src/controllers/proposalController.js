@@ -27,3 +27,22 @@ exports.updateComment = async (req, res) => {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
+
+exports.getProposal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const proposal = await prisma.proposal.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        submittedBy: { select: { id: true, firstName: true, lastName: true } },
+        group: { select: { id: true, name: true, projectTitle: true, projectType: true } },
+        thesis: { select: { id: true, title: true } },
+      },
+    });
+    if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
+    res.json(proposal);
+  } catch (error) {
+    console.error('getProposal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

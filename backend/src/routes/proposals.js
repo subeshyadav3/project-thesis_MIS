@@ -3,6 +3,7 @@ const router = express.Router();
 const proposalController = require('../controllers/proposalController');
 const { authenticate } = require('../middleware/auth');
 
+router.get('/:id', authenticate, proposalController.getProposal);
 router.put('/:id/comment', authenticate, proposalController.updateComment);
 
 module.exports = router;

@@ -22,6 +22,9 @@ const externalExaminerRoutes = require('./routes/externalExaminers');
 const examinerAssignmentRoutes = require('./routes/examinerAssignments');
 const printRoutes = require('./routes/print');
 const proposalRoutes = require('./routes/proposals');
+const announcementRoutes = require('./routes/announcements');
+const studentGroupRoutes = require('./routes/studentGroups');
+const aiRoutes = require('./routes/ai');
 const errorHandler = require('./middleware/errorHandler');
 const uploadController = require('./controllers/uploadController');
 
@@ -59,6 +62,9 @@ app.use('/api/external-examiners', externalExaminerRoutes);
 app.use('/api/examiner-assignments', examinerAssignmentRoutes);
 app.use('/api/print', printRoutes);
 app.use('/api/proposals', proposalRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/student-groups', studentGroupRoutes);
+app.use('/api/ai', aiRoutes);
 app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
 
 const { PrismaClient } = require('@prisma/client');

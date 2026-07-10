@@ -8,6 +8,11 @@ const TYPE_ICON = {
   EXAMINER_ASSIGNMENT: 'person_apron',
   SUPERVISOR_ASSIGNMENT: 'supervisor_account',
   STATUS_CHANGE: 'swap_horiz',
+  BULK_ANNOUNCEMENT: 'campaign',
+  GROUP_FORMATION_OPENED: 'group_add',
+  GROUP_INVITATION: 'person_add',
+  GROUP_INVITATION_ACCEPTED: 'check',
+  GROUP_MEMBER_JOINED: 'group_add',
 };
 
 function NotificationBell() {

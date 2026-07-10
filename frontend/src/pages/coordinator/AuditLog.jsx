@@ -62,6 +62,7 @@ export default function AuditLog() {
     REMOVE: 'var(--color-error)',
     UPDATE_STATUS: 'var(--color-warning)',
     ISSUE_RECOMMENDATION: 'var(--color-tertiary)',
+    COMPLETE_EVALUATION: 'var(--color-success)',
   };
 
   return (

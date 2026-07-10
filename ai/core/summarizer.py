@@ -1,0 +1,50 @@
+"""LangGraph summarization agent using Gemini."""
+from langgraph.graph import StateGraph
+from langchain_core.prompts import ChatPromptTemplate
+from .state import SummarizeState
+from .llm_factory import get_llm
+
+
+def build_summarizer() -> StateGraph:
+    llm = get_llm()
+
+    prompt = ChatPromptTemplate.from_messages([
+        (
+            "human",
+            "You are an academic document assistant. Analyze the following project/thesis "
+            "proposal and produce a structured summary in JSON format with these keys:\n"
+            "- executive_summary (2-3 sentences)\n"
+            "- objectives (bullet list)\n"
+            "- methodology (brief description)\n"
+            "- expected_outcomes (bullet list)\n"
+            "- strengths (2-3 points)\n"
+            "- weaknesses_or_risks (2-3 points)\n\n"
+            "Proposal text:\n{document_text}\n\n"
+            "Respond ONLY with valid JSON."
+        )
+    ])
+
+    chain = prompt | llm
+
+    def summarize_node(state: SummarizeState) -> dict:
+        raw = state.get("document_text", "")
+        if not raw:
+            return {"summary": {"error": "No document text"}, "error": "No document text"}
+        try:
+            result = chain.invoke({"document_text": raw[:30000]})
+            import json
+            text = result.content if hasattr(result, "content") else str(result)
+            text = text.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[-1]
+                text = text.rsplit("```", 1)[0]
+            summary = json.loads(text)
+            return {"summary": summary, "error": None}
+        except Exception as e:
+            return {"summary": {}, "error": str(e)}
+
+    builder = StateGraph(SummarizeState)
+    builder.add_node("summarize", summarize_node)
+    builder.set_entry_point("summarize")
+    builder.set_finish_point("summarize")
+    return builder.compile()

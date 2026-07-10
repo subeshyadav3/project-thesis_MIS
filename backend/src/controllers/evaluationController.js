@@ -266,7 +266,6 @@ exports.getGroupEvaluations = async (req, res) => {
     ]);
   const projectType = group?.projectType || 'MINOR';
   const summary = computeSummary(evaluations, components, projectType);
-  audit.log({ action: 'VIEW', entity: 'GroupEvaluations', details: `Retrieved evaluations for group ${id}`, performedById: req.user.id });
   res.json({ evaluations, components, summary });
   } catch (error) {
     console.error('getGroupEvaluations error:', error);
@@ -348,6 +347,7 @@ exports.completeEvaluation = async (req, res) => {
       where: { id: evaluation.id },
       data: { status: 'COMPLETED' },
     });
+    audit.log({ action: 'COMPLETE_EVALUATION', entity: 'Evaluation', entityId: evaluation.id, details: `Completed ${evaluation.component.name} evaluation`, performedById: req.user.id });
 
     res.json({ message: 'Evaluation completed successfully' });
   } catch (error) {

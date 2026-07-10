@@ -28,6 +28,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
     { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },
+    { path: '/coordinator/announcements', label: 'Announcements', icon: 'campaign' },
     { path: '/coordinator/audit-log', label: 'Audit Log', icon: 'history' },
     { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
   ];
@@ -53,6 +54,7 @@ function Sidebar({ user, isOpen, onClose }) {
             { path: '/student/theses', label: 'Theses', icon: 'library_books' },
           ]
     ),
+    { path: '/student/groups', label: 'Groups', icon: 'group_add' },
     { path: '/student/submissions', label: 'Submissions', icon: 'upload_file' },
     { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
   ];
