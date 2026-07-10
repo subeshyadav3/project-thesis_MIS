@@ -222,6 +222,7 @@ exports.getAuditLogs = async (req, res) => {
     const where = {};
     if (req.query.entity) where.entity = req.query.entity;
     if (req.query.entityId) where.entityId = parseInt(req.query.entityId);
+    if (req.query.action) where.action = req.query.action;
     // Coordinator sees all audit logs for full oversight
     const logs = await prisma.auditLog.findMany({
       where,
