@@ -121,10 +121,18 @@ exports.createGroup = async (req, res) => {
           const email = `${roll.toLowerCase() || `${fn.toLowerCase()}.${ln.toLowerCase()}`}@pcampus.edu.np`;
           student = await prisma.user.findFirst({ where: { email } });
           if (!student) {
-            const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
-            student = await prisma.user.create({
-              data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
-            });
+            // Tie-break by program to avoid collision across departments.
+            const nameWhere = { firstName: fn, lastName: ln, role: 'STUDENT', active: true };
+            if (groupProgram) nameWhere.programId = groupProgram.id;
+            const matched = await prisma.user.findFirst({ where: nameWhere, orderBy: { createdAt: 'asc' } });
+            if (matched) {
+              student = matched;
+            } else {
+              const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
+              student = await prisma.user.create({
+                data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
+              });
+            }
           }
         }
         await prisma.groupMember.create({

@@ -110,13 +110,20 @@ ctrl.create = async (req, res) => {
     if (invitedIds.length > 0) {
       const students = await prisma.user.findMany({
         where: { id: { in: invitedIds }, role: 'STUDENT', programId: resolvedProgramId, active: true },
-        select: { id: true, rollNumber: true },
+        select: { id: true, rollNumber: true, email: true, firstName: true, lastName: true },
       });
       for (const s of students) {
         await prisma.groupMember.create({
           data: { studentId: s.id, groupId: group.id, rollNumber: s.rollNumber || `R${s.id}` },
         });
       }
+      // Notify each directly added student so their dashboard reflects the change.
+      const titleMsg = `${req.user.firstName} ${req.user.lastName} added you to "${group.name}".`;
+      await notifSvc.notifyMany(
+        students.map((s) => s.id),
+        'GROUP_MEMBER_JOINED',
+        titleMsg,
+      );
     }
 
     const defaults = getDefaultComponents(projectType);

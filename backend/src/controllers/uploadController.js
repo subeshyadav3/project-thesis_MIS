@@ -33,7 +33,6 @@ exports.uploadProposal = async (req, res) => {
     const proposal = await prisma.proposal.create({
       data: {
         stage,
-        documentType: 'PROPOSAL',
         documentUrl: `/api/files/${entityType}/${filename}`,
         groupId: groupId ? parseInt(groupId) : null,
         thesisId: thesisId ? parseInt(thesisId) : null,

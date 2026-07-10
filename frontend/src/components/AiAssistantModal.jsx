@@ -504,8 +504,6 @@ function EvaluationView({ data }) {
   const grade = pct >= 80 ? 'A' : pct >= 65 ? 'B' : pct >= 50 ? 'C' : pct >= 35 ? 'D' : 'F';
   const gradeColor = pct >= 80 ? 'var(--color-success)' : pct >= 65 ? 'var(--color-tertiary)' : pct >= 50 ? 'var(--color-secondary)' : 'var(--color-error)';
   return (
-
-  return (
     <div className="ai-evaluation">
       <div className="ai-eval-summary">
         <div className="ai-eval-grade" style={{ background: gradeColor }}>{grade}</div>

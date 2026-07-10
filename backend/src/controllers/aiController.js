@@ -47,7 +47,7 @@ async function callAI(endpoint, payload) {
   return response.json();
 }
 
-async function loadCandidates(proposalId, scope) {
+async function loadCandidates(req, proposalId, scope) {
   const proposal = await prisma.proposal.findUnique({
     where: { id: proposalId },
     include: {
@@ -56,6 +56,21 @@ async function loadCandidates(proposalId, scope) {
     },
   });
   if (!proposal) return { scope, candidates: [] };
+
+  // Determine department of the user: supervisors are bound to their own
+  // departmentId, coordinators to the department they manage.
+  let userDeptId = null;
+  if (req.user.role === 'SUPERVISOR') {
+    userDeptId = req.user.departmentId || null;
+  } else if (req.user.role === 'COORDINATOR' || req.user.role === 'MAINTAINER') {
+    const dept = await prisma.department.findFirst({
+      where: req.user.role === 'COORDINATOR' ? { coordinatorId: req.user.id } : { users: { some: { id: req.user.id } } },
+      select: { id: true },
+    });
+    userDeptId = dept?.id || null;
+  } else if (req.user.role === 'EXTERNAL_EXAMINER') {
+    userDeptId = req.user.departmentId || null;
+  }
 
   const where = { NOT: { proposalId } };
   let scopedYearId = null;
@@ -68,6 +83,12 @@ async function loadCandidates(proposalId, scope) {
     scopedDeptId = proposal.thesis.academicYear?.departmentId;
   }
 
+  // If user is scoped to a department (supervisor/examiner), force-scope.
+  if (userDeptId && (scope === 'all' || scope === 'department' || scope === 'year')) {
+    scope = scope === 'all' ? 'department_scope' : scope === 'year' ? 'year_department' : scope;
+    if (!scopedDeptId || scopedDeptId !== userDeptId) scopedDeptId = userDeptId;
+  }
+
   if ((scope === 'year' || scope === 'year_department') && scopedYearId) {
     where.proposal = {
       OR: [
@@ -76,7 +97,7 @@ async function loadCandidates(proposalId, scope) {
       ],
     };
   }
-  if ((scope === 'department' || scope === 'year_department') && scopedDeptId) {
+  if ((scope === 'department' || scope === 'year_department' || scope === 'department_scope') && scopedDeptId) {
     const deptFilter = {
       OR: [
         { group: { academicYear: { departmentId: scopedDeptId } } },
@@ -226,27 +247,37 @@ exports.embed = async (req, res) => {
     const filePath = getStoragePath(proposal.documentUrl);
     if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Document file not found' });
 
-    const text = await extractText(filePath);
-    const data = await callAI('/api/ai/embed', {
-      proposal_id: proposalId,
-      document_text: text,
-      document_type: proposal.documentType || 'PROPOSAL',
+    await prisma.documentEmbedding.upsert({
+      where: { proposalId },
+      update: { status: 'PENDING', error: null },
+      create: { proposalId, status: 'PENDING', model: 'ai-service', documentType: proposal.documentType || 'PROPOSAL' },
     });
 
-    const stored = await prisma.documentEmbedding.upsert({
+    let data;
+    try {
+      const text = await extractText(filePath);
+      data = await callAI('/api/ai/embed', {
+        proposal_id: proposalId,
+        document_text: text,
+        document_type: proposal.documentType || 'PROPOSAL',
+      });
+    } catch (e) {
+      await prisma.documentEmbedding.update({
+        where: { proposalId },
+        data: { status: 'FAILED', error: String(e.message || e).slice(0, 250) },
+      });
+      throw e;
+    }
+
+    const stored = await prisma.documentEmbedding.update({
       where: { proposalId },
-      update: {
+      data: {
+        status: 'OK',
         vector: data.vector || [],
         model: 'ai-service',
-        charCount: data.char_count || text.length,
+        charCount: data.char_count || 0,
         documentType: proposal.documentType || 'PROPOSAL',
-      },
-      create: {
-        proposalId,
-        vector: data.vector || [],
-        model: 'ai-service',
-        charCount: data.char_count || text.length,
-        documentType: proposal.documentType || 'PROPOSAL',
+        error: null,
       },
     });
 
@@ -254,6 +285,7 @@ exports.embed = async (req, res) => {
       vector_dim: data.vector_dim,
       char_count: stored.charCount,
       embedding_id: stored.id,
+      status: stored.status,
     });
   } catch (e) {
     console.error('AI embed error:', e.message);
@@ -265,7 +297,7 @@ exports.listCandidates = async (req, res) => {
   try {
     const proposalId = parseInt(req.params.id);
     const scope = (req.query.scope || 'all').toString();
-    const result = await loadCandidates(proposalId, scope);
+    const result = await loadCandidates(req, proposalId, scope);
     res.json(result);
   } catch (e) {
     console.error('listCandidates error:', e.message);
@@ -284,7 +316,7 @@ exports.similarity = async (req, res) => {
     if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Document file not found' });
     const text = await extractText(filePath);
 
-    const loaded = await loadCandidates(proposalId, scope);
+    const loaded = await loadCandidates(req, proposalId, scope);
     let candidates = loaded.candidates || [];
     if (Array.isArray(candidate_ids) && candidate_ids.length > 0) {
       const set = new Set(candidate_ids.map(Number));

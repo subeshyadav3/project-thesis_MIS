@@ -47,3 +47,14 @@ exports.getUnreadCount = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.archiveRead = async (req, res) => {
+  try {
+    const result = await prisma.notification.deleteMany({
+      where: { userId: req.user.id, read: true },
+    });
+    res.json({ message: `Archived ${result.count} read notifications`, count: result.count });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
