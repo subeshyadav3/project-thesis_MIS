@@ -10,9 +10,12 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 exports.getGroups = async (req, res) => {
   try {
     const where = {};
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-      where.academicYear = { departmentId: req.user.departmentId };
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) where.academicYear = { departmentId: dept.id };
     }
+    if (req.query.announcementId) where.announcementId = Number(req.query.announcementId);
+    if (req.query.status) where.status = req.query.status;
     const groups = await prisma.projectGroup.findMany({
       where,
       include: {
@@ -49,9 +52,11 @@ exports.getGroup = async (req, res) => {
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
-    // Coordinator can only view groups in their department
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId && group.academicYear?.departmentId !== req.user.departmentId) {
-      return res.status(403).json({ error: 'Access denied. Group belongs to another department.' });
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept && group.academicYear?.departmentId !== dept.id) {
+        return res.status(403).json({ error: 'Access denied. Group belongs to another department.' });
+      }
     }
     res.json(group);
   } catch (error) {
@@ -116,10 +121,18 @@ exports.createGroup = async (req, res) => {
           const email = `${roll.toLowerCase() || `${fn.toLowerCase()}.${ln.toLowerCase()}`}@pcampus.edu.np`;
           student = await prisma.user.findFirst({ where: { email } });
           if (!student) {
-            const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
-            student = await prisma.user.create({
-              data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
-            });
+            // Tie-break by program to avoid collision across departments.
+            const nameWhere = { firstName: fn, lastName: ln, role: 'STUDENT', active: true };
+            if (groupProgram) nameWhere.programId = groupProgram.id;
+            const matched = await prisma.user.findFirst({ where: nameWhere, orderBy: { createdAt: 'asc' } });
+            if (matched) {
+              student = matched;
+            } else {
+              const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
+              student = await prisma.user.create({
+                data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
+              });
+            }
           }
         }
         await prisma.groupMember.create({
@@ -321,8 +334,9 @@ exports.exportGroups = async (req, res) => {
   try {
     const XLSX = require('xlsx');
     const where = {};
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-      where.academicYear = { departmentId: req.user.departmentId };
+    if (req.user.role === 'COORDINATOR') {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) where.academicYear = { departmentId: dept.id };
     }
     const groups = await prisma.projectGroup.findMany({
       where,

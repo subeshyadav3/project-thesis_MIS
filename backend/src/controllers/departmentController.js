@@ -31,9 +31,9 @@ exports.getPrograms = async (req, res) => {
 
 exports.createProgram = async (req, res) => {
   try {
-    const program = await prisma.program.create({
-      data: { name: req.body.name, code: req.body.code, departmentId: parseInt(req.body.departmentId) },
-    });
+    const data = { name: req.body.name, code: req.body.code, departmentId: parseInt(req.body.departmentId) };
+    if (req.body.degreeType) data.degreeType = req.body.degreeType;
+    const program = await prisma.program.create({ data });
     audit.log({ action: 'CREATE', entity: 'Program', entityId: program.id, details: `Created program "${program.name}"`, performedById: req.user.id });
     res.status(201).json(program);
   } catch (error) {
@@ -46,6 +46,7 @@ exports.updateProgram = async (req, res) => {
     const data = {};
     if (req.body.name) data.name = req.body.name;
     if (req.body.code) data.code = req.body.code;
+    if (req.body.degreeType) data.degreeType = req.body.degreeType;
     if (req.body.departmentId) data.departmentId = parseInt(req.body.departmentId);
     const program = await prisma.program.update({
       where: { id: parseInt(req.params.id) },

@@ -37,8 +37,13 @@ function NotificationBell() {
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000); // poll every 30s
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchUnread, 15000); // poll every 15s
+    const onFocus = () => fetchUnread();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -123,7 +128,7 @@ function NotificationBell() {
                 <div
                   key={n.id}
                   className={`notification-item ${n.read ? 'read' : 'unread'}`}
-                  onClick={() => { handleMarkRead(n.id, { stopPropagation: () => {} }); }}
+                  onClick={() => { if (!n.read) handleMarkRead(n.id, { stopPropagation: () => {} }); }}
                 >
                   <div className="notification-item-icon">
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>

@@ -40,6 +40,18 @@ exports.uploadProposal = async (req, res) => {
       },
     });
 
+    // Background embedding generation so the user doesn't wait.
+    setImmediate(async () => {
+      try {
+        const aiController = require('./aiController');
+        const aiReq = { params: { id: proposal.id }, headers: req.headers };
+        const aiRes = { json: () => {}, status: () => aiRes };
+        await aiController.embed(aiReq, aiRes);
+      } catch (e) {
+        console.error('background embed error:', e.message);
+      }
+    });
+
     audit.log({ action: 'UPLOAD', entity: 'Proposal', entityId: proposal.id, details: `Proposal uploaded for ${entityType}/${entityId}`, performedById: req.user.id });
 
     res.status(201).json({ success: true, data: proposal });

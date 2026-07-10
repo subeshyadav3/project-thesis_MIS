@@ -26,8 +26,8 @@ exports.create = async (req, res) => {
     if (!['GENERAL', 'MINOR', 'MAJOR', 'THESIS'].includes(type)) {
       return res.status(400).json({ error: 'invalid type' });
     }
-    if (!['ALL', 'PROGRAMS', 'DEGREE', 'STUDENTS'].includes(audience)) {
-      return res.status(400).json({ error: 'invalid audience' });
+    if (!degreeType && ['MINOR', 'MAJOR', 'THESIS'].includes(type)) {
+      return res.status(400).json({ error: 'degreeType is required' });
     }
     if (allowGroupFormation) {
       if (!['MINOR', 'MAJOR', 'THESIS'].includes(type)) {
@@ -44,18 +44,8 @@ exports.create = async (req, res) => {
     const departmentId = req.user.role === 'COORDINATOR' ? req.user.departmentId : body.departmentId;
     if (!departmentId) return res.status(400).json({ error: 'departmentId required' });
 
-    if (audience === 'PROGRAMS' && (!programIds.length)) {
-      return res.status(400).json({ error: 'audience=PROGRAMS requires programIds' });
-    }
-    if (audience === 'STUDENTS' && (!studentIds.length)) {
-      return res.status(400).json({ error: 'audience=STUDENTS requires studentIds' });
-    }
-    if (audience === 'DEGREE' && !degreeType) {
-      return res.status(400).json({ error: 'audience=DEGREE requires degreeType' });
-    }
-
     const recipients = await resolveAudience({
-      type, audience, degreeType, programIds, studentIds,
+      type, degreeType, programIds, studentIds,
       departmentId, academicYearId: Number(academicYearId),
     });
 
@@ -64,10 +54,10 @@ exports.create = async (req, res) => {
         title: title.trim(),
         message: message.trim(),
         type,
-        audience,
-        degreeType: audience === 'DEGREE' ? degreeType : null,
-        programIds: audience === 'PROGRAMS' ? programIds.map(Number) : [],
-        studentIds: audience === 'STUDENTS' ? studentIds.map(Number) : [],
+        audience: audience || 'ALL',
+        degreeType: degreeType || null,
+        programIds: programIds?.length ? programIds.map(Number) : [],
+        studentIds: studentIds?.length ? studentIds.map(Number) : [],
         academicYearId: Number(academicYearId),
         departmentId,
         allowGroupFormation: !!allowGroupFormation,

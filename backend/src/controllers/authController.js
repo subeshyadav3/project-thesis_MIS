@@ -65,7 +65,35 @@ exports.forgotPassword = async (req, res) => {
     const token = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 3600000); // 1 hour
     await prisma.user.update({ where: { id: user.id }, data: { resetToken: token, resetTokenExpires: expires } });
-    res.json({ success: true, message: 'If the email exists, a reset link has been sent.', resetToken: token });
+    audit.log({ action: 'FORGOT_PASSWORD', entity: 'User', entityId: user.id, details: `Password reset requested for ${email}`, performedById: user.id });
+
+    // Try to send the reset email. The token is NEVER returned again in
+    // production; for development we also include it so the testing flow works.
+    const isProd = process.env.NODE_ENV === 'production';
+    try {
+      const emailService = require('../services/emailService');
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+      await emailService.sendEmail({
+        to: user.email,
+        subject: 'Password Reset Request',
+        title: 'Password Reset',
+        contentLines: [
+          `Dear ${user.firstName},`,
+          `We received a request to reset your account password.`,
+          `Click the link below to choose a new password (valid for 1 hour):`,
+          `<a href="${resetUrl}">${resetUrl}</a>`,
+          `If you didn't request this, you can safely ignore this email.`,
+        ],
+      });
+    } catch (e) {
+      console.error('forgotPassword email error:', e.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'If the email exists, a reset link has been sent.',
+      ...(isProd ? {} : { resetToken: token }),
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }

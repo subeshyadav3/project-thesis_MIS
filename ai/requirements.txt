@@ -2,6 +2,7 @@ langchain==0.3.17
 langgraph==0.2.66
 langchain-community==0.3.16
 langchain-google-genai==2.0.11
+langchain-nvidia-ai-endpoints==0.3.5
 fastapi==0.115.6
 uvicorn==0.34.0
 pypdf2==3.0.1

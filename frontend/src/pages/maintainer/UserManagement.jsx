@@ -3,37 +3,51 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 
+const COORDINATOR_ALLOWED_ROLES = ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
+
 function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT' });
+  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({ degreeType: '', departmentId: '', programId: '', year: '' });
+  const [programs, setPrograms] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isCoordinator = user.role === 'COORDINATOR';
   const toast = useToast();
+
+  const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
 
   const loadUsers = () => {
     setLoading(true);
     api.get('/users').then(({ data }) => setUsers(data)).catch(() => {}).finally(() => setLoading(false));
   };
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    loadUsers();
+    api.get('/departments/programs').then(({ data }) => setPrograms(data)).catch(() => {});
+    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = { ...form };
+      if (!payload.password) delete payload.password;
+      if (!payload.programId) delete payload.programId;
+      if (!payload.rollNumber) delete payload.rollNumber;
       if (editUser) {
-        const payload = { ...form };
-        if (!payload.password) delete payload.password;
         await api.put(`/users/${editUser.id}`, payload);
         toast.success('User updated successfully');
       } else {
-        await api.post('/users', form);
+        await api.post('/users', payload);
         toast.success('User created successfully');
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT' });
+      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '' });
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.error || 'An error occurred');
@@ -53,19 +67,28 @@ function UserManagement() {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role });
+    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '' });
     setShowModal(true);
   };
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '' });
     setShowModal(true);
   };
 
-  const filteredUsers = users.filter(u =>
-    `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const extractYear = (roll) => roll?.match(/^(\d{3})/)?.[1] || '';
+
+  const filteredUsers = users.filter(u => {
+    if (!`${u.firstName} ${u.lastName} ${u.email} ${u.role} ${u.rollNumber || ''}`.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (filters.degreeType && u.degreeType !== filters.degreeType) return false;
+    if (filters.departmentId && u.departmentId !== parseInt(filters.departmentId)) return false;
+    if (filters.programId && u.programId !== parseInt(filters.programId)) return false;
+    if (filters.year && extractYear(u.rollNumber) !== filters.year) return false;
+    return true;
+  });
+
+  const uniqueYears = [...new Set(users.map(u => extractYear(u.rollNumber)).filter(Boolean))].sort();
 
   const getBadge = (role) => {
     switch (role) {
@@ -83,17 +106,73 @@ function UserManagement() {
     </button>
   );
 
+  const showField = (field) => {
+    if (!editUser) return true;
+    if (field === 'degreeType') return editUser.role === 'STUDENT';
+    if (field === 'programId') return editUser.role === 'STUDENT';
+    if (field === 'rollNumber') return editUser.role === 'STUDENT';
+    return true;
+  };
+
   return (
-    <PageLayout title="Users" user={user} actions={actions}>
+    <PageLayout title={isCoordinator ? 'Manage Users' : 'Users'} user={user} actions={actions}>
       <div className="page-header">
         <h1>
           <span className="material-symbols-outlined">groups</span>
-          System Users
+          {isCoordinator ? 'Department Users' : 'System Users'}
         </h1>
-        <p>Create, edit, and manage system users</p>
+        <p>Create, edit, and manage {isCoordinator ? 'department ' : ''}users</p>
       </div>
 
       <div className="table-container">
+        <div className="filter-bar">
+          <div className="filter-item">
+            <label>Degree</label>
+            <select value={filters.degreeType} onChange={e => setFilters({...filters, degreeType: e.target.value})}>
+              <option value="">All</option>
+              <option value="BACHELOR">Bachelor</option>
+              <option value="MASTER">Master</option>
+            </select>
+          </div>
+          {!isCoordinator && (
+            <div className="filter-item">
+              <label>Department</label>
+              <select value={filters.departmentId} onChange={e => setFilters({...filters, departmentId: e.target.value, programId: ''})}>
+                <option value="">All</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="filter-item">
+            <label>Program</label>
+            <select value={filters.programId} onChange={e => setFilters({...filters, programId: e.target.value})}>
+              <option value="">All</option>
+              {programs
+                .filter(p => !filters.departmentId || p.departmentId === parseInt(filters.departmentId))
+                .map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+            </select>
+          </div>
+          <div className="filter-item">
+            <label>Year</label>
+            <select value={filters.year} onChange={e => setFilters({...filters, year: e.target.value})}>
+              <option value="">All</option>
+              {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          {(filters.degreeType || filters.departmentId || filters.programId || filters.year) && (
+            <div className="filter-item">
+              <label>&nbsp;</label>
+              <button className="btn btn-outline btn-sm" onClick={() => setFilters({ degreeType: '', departmentId: '', programId: '', year: '' })}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                Clear
+              </button>
+            </div>
+          )}
+          <div className="filter-item" style={{ marginLeft: 'auto' }}>
+            <label>&nbsp;</label>
+            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredUsers.length} users</span>
+          </div>
+        </div>
         <div className="table-toolbar">
           <div className="table-toolbar-left">
             <div className="search-input-wrapper">
@@ -107,7 +186,6 @@ function UserManagement() {
             </div>
           </div>
           <div className="table-toolbar-right">
-            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredUsers.length} users</span>
           </div>
         </div>
 
@@ -128,8 +206,10 @@ function UserManagement() {
               <thead>
                 <tr>
                   <th>User</th>
-                  <th>Email</th>
+                  <th>Email / Roll</th>
                   <th>Role</th>
+                  <th>Degree / Program</th>
+                  <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -145,12 +225,24 @@ function UserManagement() {
                       </div>
                     </td>
                     <td>
-                      <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{u.email}</span>
+                      <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{u.rollNumber || u.email}</span>
                     </td>
                     <td>
                       <span className={`badge badge-${getBadge(u.role)}`}>
                         <span className="dot" />
                         {u.role.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 13 }}>
+                      {u.role === 'STUDENT' ? (
+                        <>                        {u.degreeType} · {u.program?.code}</>
+                      ) : (
+                        <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge ${u.active ? 'badge-active' : 'badge-pending'}`}>
+                        <span className="dot" />{u.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
@@ -187,17 +279,19 @@ function UserManagement() {
               </div>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>First Name</label>
-                <input value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} required placeholder="Enter first name" />
-              </div>
-              <div className="form-group">
-                <label>Last Name</label>
-                <input value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} required placeholder="Enter last name" />
+              <div className="form-row" style={{ display: 'flex', gap: 12 }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>First Name</label>
+                  <input value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} required placeholder="First name" />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Last Name</label>
+                  <input value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} required placeholder="Last name" />
+                </div>
               </div>
               <div className="form-group">
                 <label>Email</label>
-                <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required placeholder="Enter email address" />
+                <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required placeholder="email@example.com" />
               </div>
               <div className="form-group">
                 <label>Password {editUser && '(leave blank to keep)'}</label>
@@ -206,12 +300,37 @@ function UserManagement() {
               <div className="form-group">
                 <label>Role</label>
                 <select value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
-                  <option value="MAINTAINER">Maintainer</option>
-                  <option value="COORDINATOR">Coordinator</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="STUDENT">Student</option>
+                  {allowedRoles.map(r => (
+                    <option key={r} value={r}>{r.replace('_', ' ')}</option>
+                  ))}
                 </select>
               </div>
+              {form.role === 'STUDENT' && (
+                <>
+                  <div className="form-group">
+                    <label>Degree Type</label>
+                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})}>
+                      <option value="BACHELOR">Bachelor</option>
+                      <option value="MASTER">Master</option>
+                    </select>
+                  </div>
+                  <div className="form-row" style={{ display: 'flex', gap: 12 }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Program</label>
+                      <select value={form.programId} onChange={e => setForm({...form, programId: e.target.value})}>
+                        <option value="">Select program...</option>
+                        {programs.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Roll Number</label>
+                      <input value={form.rollNumber} onChange={e => setForm({...form, rollNumber: e.target.value})} placeholder="e.g. 080BCT001" />
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>
                   <span className="material-symbols-outlined">close</span>

@@ -17,11 +17,39 @@ function numberToWords(n) {
   return 'Out of range';
 }
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const os = require('os');
+const fsSync = require('fs');
+
+const CHROME_CANDIDATES = [
+  process.env.PUPPETEER_EXECUTABLE_PATH,
+  process.env.CHROME_PATH,
+  os.platform() === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : null,
+  os.platform() === 'win32' ? 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' : null,
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/chromium',
+  '/usr/local/bin/chromium',
+  '/snap/bin/chromium',
+].filter(Boolean);
+
+function findChrome() {
+  for (const candidate of CHROME_CANDIDATES) {
+    try {
+      if (candidate && fsSync.existsSync(candidate)) return candidate;
+    } catch (_) { /* ignore */ }
+  }
+  return null;
+}
 
 async function generatePdf(html) {
+  const executablePath = findChrome();
+  if (!executablePath) {
+    throw new Error(
+      'Chrome/Chromium executable not found. Set PUPPETEER_EXECUTABLE_PATH or CHROME_PATH environment variable.'
+    );
+  }
   const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
+    executablePath,
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });

@@ -45,10 +45,26 @@ exports.uploadDocument = async (req, res) => {
     const proposal = await prisma.proposal.create({
       data: {
         stage,
+        documentType: 'PROPOSAL',
         documentUrl,
         submittedById: req.user.id,
         ...(type === 'group' ? { groupId: whereClause.groupId } : { thesisId: whereClause.thesisId }),
       },
+    });
+
+    // Fire-and-forget embedding generation so the user doesn't wait.
+    setImmediate(async () => {
+      try {
+        const aiController = require('./aiController');
+        const aiReq = { params: { id: proposal.id }, headers: req.headers };
+        const aiRes = {
+          json: () => {},
+          status: () => aiRes,
+        };
+        await aiController.embed(aiReq, aiRes);
+      } catch (e) {
+        console.error('background embed error:', e.message);
+      }
     });
 
     // Notify supervisor + coordinators (not the student)
@@ -179,6 +195,56 @@ exports.getThesisById = async (req, res) => {
   }
 };
 
+exports.removeMember = async (req, res) => {
+  try {
+    const groupId = parseInt(req.params.groupId, 10);
+    const studentId = parseInt(req.params.studentId, 10);
+    if (!groupId || !studentId) {
+      return res.status(400).json({ error: 'groupId and studentId are required' });
+    }
+
+    const group = await prisma.projectGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        members: true,
+        announcement: { select: { groupSizeMin: true, groupSizeMax: true } },
+      },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const isSelf = req.user.id === studentId;
+    const isCreator = group.members[0]?.studentId === req.user.id;
+    const canRemove = isSelf || isCreator || req.user.role === 'COORDINATOR' || req.user.role === 'MAINTAINER';
+    if (!canRemove) return res.status(403).json({ error: 'Not allowed to remove this member' });
+
+    const member = group.members.find((m) => m.studentId === studentId);
+    if (!member) return res.status(404).json({ error: 'Member not in this group' });
+
+    // Announcement-driven minimum size guard (defaults to 1 if no announcement)
+    const minSize = group.announcement?.groupSizeMin ?? 1;
+    if (group.members.length - 1 < minSize) {
+      return res.status(400).json({
+        error: `Cannot remove: this group requires a minimum of ${minSize} members.`,
+      });
+    }
+
+    await prisma.groupMember.delete({ where: { id: member.id } });
+
+    const remaining = await prisma.groupMember.count({ where: { groupId } });
+    if (remaining === 0 && group.status === 'PENDING') {
+      // No members left and group is still forming — clean it up.
+      await prisma.projectGroup.delete({ where: { id: groupId } });
+      return res.json({ message: 'Member removed and empty group deleted' });
+    }
+
+    audit.log({ action: 'REMOVE', entity: 'GroupMember', entityId: member.id, details: `Removed student ${studentId} from group ${groupId}`, performedById: req.user.id });
+    res.json({ message: 'Member removed' });
+  } catch (e) {
+    console.error('removeMember error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.getMyNotifications = async (req, res) => {
   try {
     const notifications = await prisma.notification.findMany({
@@ -199,6 +265,31 @@ exports.markNotificationRead = async (req, res) => {
     });
     res.json({ message: 'Marked as read' });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.deleteThesis = async (req, res) => {
+  try {
+    const thesisId = Number(req.params.id);
+    const thesis = await prisma.thesis.findUnique({
+      where: { id: thesisId },
+      include: { evaluationComponents: true, proposals: true },
+    });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (thesis.studentId !== req.user.id) return res.status(403).json({ error: 'This thesis does not belong to you' });
+    if (thesis.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Only pending theses can be deleted' });
+    }
+
+    await prisma.proposal.deleteMany({ where: { thesisId } });
+    await prisma.evaluationComponent.deleteMany({ where: { thesisId } });
+    await prisma.thesis.delete({ where: { id: thesisId } });
+
+    audit.log({ action: 'DELETE', entity: 'Thesis', entityId: thesisId, details: `Student deleted thesis "${thesis.title}"`, performedById: req.user.id });
+    res.json({ message: 'Thesis deleted' });
+  } catch (e) {
+    console.error('deleteThesis error:', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

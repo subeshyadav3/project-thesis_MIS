@@ -16,7 +16,7 @@ function CoordinatorAnnouncements() {
   const [academicYears, setAcademicYears] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [form, setForm] = useState({
-    title: '', message: '', type: 'GENERAL', audience: 'ALL',
+    title: '', message: '', type: 'GENERAL',
     degreeType: '', programIds: [], studentIds: [],
     academicYearId: '', allowGroupFormation: false,
     expiresAt: '',
@@ -25,6 +25,9 @@ function CoordinatorAnnouncements() {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentOpen, setStudentOpen] = useState(false);
+  const [viewAnnouncement, setViewAnnouncement] = useState(null);
+  const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
+  const [subLoading, setSubLoading] = useState(false);
   const studentRef = useRef(null);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -56,15 +59,19 @@ function CoordinatorAnnouncements() {
       toast.warning('Title, message, and academic year are required');
       return;
     }
+    if (!form.degreeType) {
+      toast.warning('Degree type is required');
+      return;
+    }
     try {
       await api.post('/announcements', {
         ...form,
-        programIds: form.audience === 'PROGRAMS' ? selectedPrograms : [],
-        studentIds: form.audience === 'STUDENTS' ? selectedStudents : [],
+        programIds: selectedPrograms,
+        studentIds: selectedStudents,
       });
       toast.success('Announcement created');
       setShowCreate(false);
-      setForm({ title: '', message: '', type: 'GENERAL', audience: 'ALL', degreeType: '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, expiresAt: '' });
+      setForm({ title: '', message: '', type: 'GENERAL', degreeType: '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, expiresAt: '' });
       setSelectedPrograms([]);
       setSelectedStudents([]);
       loadData();
@@ -77,6 +84,35 @@ function CoordinatorAnnouncements() {
       toast.success('Announcement deactivated');
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+  };
+
+  const loadSubmissions = async (ann) => {
+    setSubLoading(true);
+    try {
+      if (ann.type === 'THESIS') {
+        const { data } = await api.get(`/theses?announcementId=${ann.id}&status=PENDING`);
+        setSubmissions({ groups: [], theses: data });
+      } else {
+        const { data } = await api.get(`/groups?announcementId=${ann.id}&status=PENDING`);
+        setSubmissions({ groups: data, theses: [] });
+      }
+    } catch (err) {
+      toast.error('Failed to load submissions');
+      setSubmissions({ groups: [], theses: [] });
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  const handleApprove = async (item, type) => {
+    try {
+      const endpoint = type === 'thesis' ? `/theses/${item.id}/status` : `/groups/${item.id}/status`;
+      await api.put(endpoint, { status: 'ACTIVE' });
+      toast.success('Submission approved');
+      loadSubmissions(viewAnnouncement);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to approve');
+    }
   };
 
   const actions = (
@@ -147,6 +183,11 @@ function CoordinatorAnnouncements() {
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>
+                          {hasGF && (
+                            <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
+                              <span className="material-symbols-outlined">visibility</span> View Submissions
+                            </button>
+                          )}
                           {active && (
                             <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)}>
                               <span className="material-symbols-outlined">cancel</span> Deactivate
@@ -175,7 +216,7 @@ function CoordinatorAnnouncements() {
                 <div className="form-row" style={{ display: 'flex', gap: 12 }}>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label>Type</label>
-                    <select value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                    <select value={form.type} onChange={e => { const t = e.target.value; setForm({...form, type: t, allowGroupFormation: ['MINOR', 'MAJOR', 'THESIS'].includes(t) ? true : form.allowGroupFormation, degreeType: ['MINOR', 'MAJOR'].includes(t) ? 'BACHELOR' : t === 'THESIS' ? 'MASTER' : '' }); }}>
                       <option value="GENERAL">General</option>
                       <option value="MINOR">Minor Project</option>
                       <option value="MAJOR">Major Project</option>
@@ -183,12 +224,11 @@ function CoordinatorAnnouncements() {
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
-                    <label>Audience</label>
-                    <select value={form.audience} onChange={e => setForm({...form, audience: e.target.value})}>
-                      <option value="ALL">All Students (Dept)</option>
-                      <option value="DEGREE">By Degree</option>
-                      <option value="PROGRAMS">By Program</option>
-                      <option value="STUDENTS">Specific Students</option>
+                    <label>Degree Type *</label>
+                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})} required>
+                      <option value="">Select...</option>
+                      <option value="BACHELOR">Bachelor</option>
+                      <option value="MASTER">Master</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
@@ -200,85 +240,114 @@ function CoordinatorAnnouncements() {
                   </div>
                 </div>
 
-                {form.audience === 'DEGREE' && (
-                  <div className="form-group">
-                    <label>Degree Type</label>
-                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})}>
-                      <option value="">Select...</option>
-                      <option value="BACHELOR">Bachelor</option>
-                      <option value="MASTER">Master</option>
-                    </select>
-                  </div>
-                )}
-
-                {form.audience === 'PROGRAMS' && (
-                  <div className="form-group">
-                    <label>Programs</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {programs.map(p => (
-                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                          <input type="checkbox" checked={selectedPrograms.includes(p.id)} onChange={() => {
-                            setSelectedPrograms(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id]);
-                          }} />
-                          {p.name} ({p.code})
+                <div className="form-group">
+                  <label>Programs {form.degreeType ? `(showing ${form.degreeType === 'BACHELOR' ? 'Bachelor' : 'Master'} programs)` : ''}</label>
+                  <div className="filter-bar" style={{ border: 'none', padding: '8px 0', gap: 6 }}>
+                    {(() => {
+                      const hasDegreeData = programs.some(p => p.degreeType);
+                      return programs.filter(p => !form.degreeType || (hasDegreeData ? p.degreeType === form.degreeType : true)).map(p => (
+                        <label key={p.id} className="badge" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: selectedPrograms.includes(p.id) ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)' }}>
+                          <input type="checkbox" checked={selectedPrograms.includes(p.id)} onChange={() => setSelectedPrograms(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} style={{ margin: 0, accentColor: 'var(--color-primary)' }} />
+                          <span style={{ fontWeight: selectedPrograms.includes(p.id) ? 600 : 400 }}>{p.code}</span>
                         </label>
-                      ))}
-                    </div>
+                      ));
+                    })()}
                   </div>
-                )}
+                </div>
 
-                {form.audience === 'STUDENTS' && (
-                  <div className="form-group" ref={studentRef}>
-                    <label>Students</label>
-                    <div className="sup-dropdown-trigger">
-                      <div className="sup-search-wrapper" onClick={() => setStudentOpen(true)}>
-                        <span className="material-symbols-outlined">search</span>
-                        <input type="text" placeholder="Search students..." value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentOpen(true); }} onFocus={() => setStudentOpen(true)} />
-                      </div>
-                      {studentOpen && (
-                        <div className="sup-dropdown" style={{ maxHeight: 200, overflowY: 'auto' }}>
-                          {allStudents.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(studentSearch.toLowerCase())).map(s => {
+                <div className="form-group" ref={studentRef}>
+                  <label>Specific Students (optional)</label>
+                  <div className="sup-dropdown-trigger">
+                    <div className="sup-search-wrapper" onClick={() => setStudentOpen(true)}>
+                      <span className="material-symbols-outlined">search</span>
+                      <input type="text" placeholder="Search students..." value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentOpen(true); }} onFocus={() => setStudentOpen(true)} />
+                    </div>
+                    {studentOpen && (
+                      <div className="sup-dropdown" style={{ maxHeight: 200, overflowY: 'auto' }}>
+                      {allStudents.filter(s => `${s.firstName} ${s.lastName} ${s.rollNumber || ''} ${s.email}`.toLowerCase().includes(studentSearch.toLowerCase())).map(s => {
                             const sel = selectedStudents.includes(s.id);
                             return (
                               <div key={s.id} className={`sup-dropdown-item ${sel ? 'sup-dropdown-item-selected' : ''}`} onClick={() => setSelectedStudents(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}>
                                 <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
-                                <div className="sup-dropdown-item-info"><div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div><div className="sup-dropdown-item-email">{s.email}</div></div>
+                                <div className="sup-dropdown-item-info">
+                                  <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                  <div className="sup-dropdown-item-email">{s.rollNumber || s.email} · {s.program?.code || '—'}</div>
+                                </div>
                                 {sel && <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>}
                               </div>
                             );
                           })}
-                        </div>
-                      )}
-                      {selectedStudents.length > 0 && (
-                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {selectedStudents.map(id => {
-                            const s = allStudents.find(x => x.id === id);
-                            return s ? <span key={id} className="badge badge-active" style={{ gap: 4 }}>{s.firstName} {s.lastName} <span style={{ cursor: 'pointer' }} onClick={() => setSelectedStudents(prev => prev.filter(x => x !== id))}>×</span></span> : null;
-                          })}
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                    {selectedStudents.length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {selectedStudents.map(id => {
+                          const s = allStudents.find(x => x.id === id);
+                          return s ? <span key={id} className="badge badge-active" style={{ gap: 4 }}>{s.firstName} {s.lastName} <span style={{ cursor: 'pointer' }} onClick={() => setSelectedStudents(prev => prev.filter(x => x !== id))}>×</span></span> : null;
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input type="checkbox" id="gf" checked={form.allowGroupFormation} onChange={e => setForm({...form, allowGroupFormation: e.target.checked})} />
-                  <label htmlFor="gf" style={{ margin: 0 }}>Allow Group Formation</label>
                 </div>
 
-                {form.allowGroupFormation && (
-                  <div className="form-row" style={{ display: 'flex', gap: 12 }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label>Max Members</label>
-                      <input type="number" value={form.type === 'THESIS' ? 1 : 4} disabled style={{ opacity: 0.6 }} />
-                      <small style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Thesis=1, Bachelor=4</small>
+                <div className="form-group" style={{
+                  background: 'var(--color-surface-container-low)',
+                  borderRadius: 'var(--border-radius-md)',
+                  padding: '16px',
+                  border: form.allowGroupFormation ? '2px solid var(--color-primary)' : '2px solid var(--color-outline-variant)',
+                  transition: 'all 0.2s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: form.allowGroupFormation ? 16 : 0 }}>
+                    <div
+                      onClick={() => setForm({...form, allowGroupFormation: !form.allowGroupFormation})}
+                      style={{
+                        width: 44, height: 24, borderRadius: 12,
+                        background: form.allowGroupFormation ? 'var(--color-primary)' : 'var(--color-outline)',
+                        position: 'relative', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                      }}
+                    >
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: 2,
+                        left: form.allowGroupFormation ? 22 : 2,
+                        transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
                     </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label>Expires At (optional)</label>
-                      <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
+                    <div>
+                      <label style={{ margin: 0, fontWeight: 600, cursor: 'pointer' }} onClick={() => setForm({...form, allowGroupFormation: !form.allowGroupFormation})}>
+                        Allow Group Formation
+                      </label>
+                      <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                        Students can form groups under this announcement
+                      </p>
                     </div>
                   </div>
-                )}
+                  {form.allowGroupFormation && (
+                    <div className="form-row" style={{ display: 'flex', gap: 12 }}>
+                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                        <label style={{ fontSize: 12 }}>Max Members</label>
+                        <div style={{
+                          padding: '10px 14px',
+                          borderRadius: 'var(--border-radius-md)',
+                          background: 'var(--color-surface-container-lowest)',
+                          border: '1px solid var(--color-outline)',
+                          fontSize: 14,
+                          color: 'var(--color-on-surface)',
+                          opacity: 0.7,
+                        }}>
+                          {form.type === 'THESIS' ? 1 : 4}
+                          <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginLeft: 8 }}>
+                            (Thesis=1, Bachelor=4)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                        <label style={{ fontSize: 12 }}>Expires At (optional)</label>
+                        <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="modal-actions">
                   <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}><span className="material-symbols-outlined">close</span> Cancel</button>
@@ -288,6 +357,71 @@ function CoordinatorAnnouncements() {
             </div>
           </div>
         )}
+
+        {viewAnnouncement && (
+          <div className="modal-overlay" onClick={() => setViewAnnouncement(null)}>
+            <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-header-icon info"><span className="material-symbols-outlined">groups</span></div>
+                <div className="modal-header-text"><h2>Submissions: {viewAnnouncement.title}</h2><p>{TYPE_LABELS[viewAnnouncement.type] || viewAnnouncement.type}</p></div>
+              </div>
+              <div className="modal-body">
+                {subLoading ? (
+                  <div className="loading-state"><span className="material-symbols-outlined spin">progress_activity</span><p>Loading submissions...</p></div>
+                ) : (
+                  <div className="table-container">
+                    <table className="table">
+                      <thead>
+                        <tr><th>Title</th><th>Student(s)</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
+                      </thead>
+                      <tbody>
+                        {viewAnnouncement.type === 'THESIS' ? (
+                          submissions.theses.length === 0 ? (
+                            <tr><td colSpan={4} className="empty-cell">No pending thesis submissions</td></tr>
+                          ) : (
+                            submissions.theses.map(t => (
+                              <tr key={t.id}>
+                                <td>{t.title}</td>
+                                <td>{t.student ? `${t.student.firstName} ${t.student.lastName}` : '—'}</td>
+                                <td><span className="badge badge-pending">{t.status}</span></td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button className="btn btn-sm btn-primary" onClick={() => handleApprove(t, 'thesis')}>
+                                    <span className="material-symbols-outlined">check_circle</span> Approve
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )
+                        ) : (
+                          submissions.groups.length === 0 ? (
+                            <tr><td colSpan={4} className="empty-cell">No pending group submissions</td></tr>
+                          ) : (
+                            submissions.groups.map(g => (
+                              <tr key={g.id}>
+                                <td>{g.projectTitle || g.name}</td>
+                                <td>{g.members?.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}</td>
+                                <td><span className="badge badge-pending">{g.status}</span></td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button className="btn btn-sm btn-primary" onClick={() => handleApprove(g, 'group')}>
+                                    <span className="material-symbols-outlined">check_circle</span> Approve
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setViewAnnouncement(null)}><span className="material-symbols-outlined">close</span> Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </PageLayout>
     </ErrorBoundary>
   );

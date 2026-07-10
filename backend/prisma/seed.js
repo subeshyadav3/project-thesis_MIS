@@ -11,7 +11,11 @@ const hash = bcrypt.hashSync('subesh', 10);
 
 function getProgramFromRoll(roll) {
   const match = roll.match(/^\d{3}([A-Za-z.]+)\d{3}$/);
-  return match ? match[1].toUpperCase() : null;
+  if (!match) return null;
+  const code = match[1].toUpperCase();
+  // master program codes
+  const masterMap = { MSCS: 'MSCS', MECE: 'MECE', MPED: 'MPED' };
+  return masterMap[code] || code;
 }
 
 async function main() {
@@ -24,9 +28,11 @@ async function main() {
   await prisma.evaluation.deleteMany();
   await prisma.evaluationComponent.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.groupInvitation.deleteMany();
   await prisma.groupMember.deleteMany();
   await prisma.projectGroup.deleteMany();
   await prisma.thesis.deleteMany();
+  await prisma.announcement.deleteMany();
   await prisma.academicYear.deleteMany();
   await prisma.program.deleteMany();
   await prisma.department.deleteMany();
@@ -37,22 +43,27 @@ async function main() {
   // DEPARTMENTS & PROGRAMS
   // ============================================================
   const ceeDept = await prisma.department.create({
-    data: { name: 'Bachelor in Computer & Electronics Engineering', code: 'CEE' },
+    data: { name: 'Computer & Electronics Engineering', code: 'CEE' },
   });
   const belDept = await prisma.department.create({
-    data: { name: 'Bachelor in Electrical Engineering', code: 'BEL' },
+    data: { name: 'Electrical Engineering', code: 'BEL' },
   });
 
   const programs = {};
   const progDefs = [
-    { code: 'BCT', name: 'Computer Engineering', departmentId: ceeDept.id },
-    { code: 'BEI', name: 'Electronics & Information Engineering', departmentId: ceeDept.id },
-    { code: 'BEL', name: 'Electrical Engineering', departmentId: belDept.id },
+    // Bachelor programs
+    { code: 'BCT', name: 'Computer Engineering', degreeType: 'BACHELOR', departmentId: ceeDept.id },
+    { code: 'BEI', name: 'Electronics & Information Engineering', degreeType: 'BACHELOR', departmentId: ceeDept.id },
+    { code: 'BEL', name: 'Electrical Engineering', degreeType: 'BACHELOR', departmentId: belDept.id },
+    // Master programs
+    { code: 'MSCS', name: 'MSc in Computer Systems', degreeType: 'MASTER', departmentId: ceeDept.id },
+    { code: 'MECE', name: 'ME in Computer Engineering', degreeType: 'MASTER', departmentId: ceeDept.id },
+    { code: 'MPED', name: 'ME in Power & Energy Development', degreeType: 'MASTER', departmentId: belDept.id },
   ];
   for (const p of progDefs) {
     programs[p.code] = await prisma.program.create({ data: p });
   }
-  console.log(`Created ${progDefs.length} programs under 2 departments`);
+  console.log(`Created ${progDefs.length} programs (${progDefs.filter(p => p.degreeType === 'BACHELOR').length} bachelor, ${progDefs.filter(p => p.degreeType === 'MASTER').length} master) under 2 departments`);
 
   // ============================================================
   // ACADEMIC YEARS (for CEE department)
@@ -155,12 +166,15 @@ async function main() {
     { fn: 'Nabin', ln: 'Chalise', roll: '080BEI004', degreeType: 'BACHELOR' },
     { fn: 'Reema', ln: 'Pathak', roll: '080BEI005', degreeType: 'BACHELOR' },
     // ── MASTER STUDENTS (indices 30-35) ──
-    { fn: 'Anup', ln: 'Baral', roll: '081BCT001', degreeType: 'MASTER' },
-    { fn: 'Bhawana', ln: 'Sapkota', roll: '081BCT002', degreeType: 'MASTER' },
-    { fn: 'Dinesh', ln: 'Parajuli', roll: '081BCT003', degreeType: 'MASTER' },
-    { fn: 'Elina', ln: 'Maskey', roll: '081BCT004', degreeType: 'MASTER' },
-    { fn: 'Firoj', ln: 'Ansari', roll: '081BCT005', degreeType: 'MASTER' },
-    { fn: 'Gita', ln: 'Neupane', roll: '081BCT006', degreeType: 'MASTER' },
+    // MSCS program (CEE dept)
+    { fn: 'Anup', ln: 'Baral', roll: '080MSCS001', degreeType: 'MASTER' },
+    { fn: 'Bhawana', ln: 'Sapkota', roll: '080MSCS002', degreeType: 'MASTER' },
+    { fn: 'Dinesh', ln: 'Parajuli', roll: '080MSCS003', degreeType: 'MASTER' },
+    // MECE program (CEE dept)
+    { fn: 'Elina', ln: 'Maskey', roll: '080MECE001', degreeType: 'MASTER' },
+    { fn: 'Firoj', ln: 'Ansari', roll: '080MECE002', degreeType: 'MASTER' },
+    // MPED program (BEL dept)
+    { fn: 'Gita', ln: 'Neupane', roll: '080MPED001', degreeType: 'MASTER' },
     // ── UNASSIGNED (indices 36-39) ──
     { fn: 'Hari', ln: 'Bohora', roll: '081BCT007', degreeType: 'BACHELOR' },
     { fn: 'Isha', ln: 'Adhikari', roll: '081BCT008', degreeType: 'BACHELOR' },
@@ -367,7 +381,7 @@ async function main() {
   const testExaminer1 = await prisma.user.create({ data: { email: 'examiner@test.com', password: hash, firstName: 'Test', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER', departmentId: ceeDept.id } });
   const testExaminer2 = await prisma.user.create({ data: { email: 'examiner2@test.com', password: hash, firstName: 'Second', lastName: 'Examiner', role: 'EXTERNAL_EXAMINER', departmentId: ceeDept.id } });
   const testBachelorStu = await prisma.user.create({ data: { email: 'bachelor@test.com', password: hash, firstName: 'Bach', lastName: 'Student', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: ceeDept.id, programId: programs.BCT.id, rollNumber: 'TEST001' } });
-  const testMasterStu = await prisma.user.create({ data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER', departmentId: ceeDept.id, programId: programs.BCT.id, rollNumber: '080MSNCS001' } });
+  const testMasterStu = await prisma.user.create({ data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER', departmentId: ceeDept.id, programId: programs.MSCS.id, rollNumber: '080MSCS099' } });
 
   // ---- SUPERVISOR 1 ────────────────────────────────────
   // Bachelor group (MAJOR) — sup1 + bachelorStu → examiner1
@@ -482,8 +496,8 @@ async function main() {
   console.log('  EXAMINER 2:          examiner2@test.com');
   console.log('  BACHELOR STUDENT:    bachelor@test.com');
   console.log('  MASTER STUDENT:      master@test.com');
-  console.log(`\nDepartments: CEE (BCT, BEI), BEL (BEL)`);
-  console.log(`${students.length} students, ${createdGroups.length} groups, ${createdTheses.length} theses`);
+  console.log(`\nDepartments: CEE [BCT, BEI (Bachelor) | MSCS, MECE (Master)], BEL [BEL (Bachelor) | MPED (Master)]`);
+  console.log(`${students.length} students (${studentDefs.filter(s => s.degreeType === 'BACHELOR').length} bachelor, ${studentDefs.filter(s => s.degreeType === 'MASTER').length} master), ${createdGroups.length} groups, ${createdTheses.length} theses`);
 }
 
 main()

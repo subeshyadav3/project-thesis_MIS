@@ -25,6 +25,8 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
   const toast = useToast();
 
   const canComment = user && ['SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'].includes(user.role);
+  const openAI = canComment;
+  const userRole = user?.role;
 
   const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const byStage = stages.reduce((acc, stage) => {
@@ -160,7 +162,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                             title="Open in new tab">
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
                           </a>
-                          {canComment && (
+                          {openAI && (
                             <button
                               className="btn btn-sm"
                               style={{

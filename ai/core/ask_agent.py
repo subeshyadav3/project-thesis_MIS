@@ -21,19 +21,27 @@ def build_ask_agent() -> StateGraph:
 
     chain = prompt | llm
 
-    def ask_node(state: AskState) -> dict:
+    async def ask_node(state: AskState) -> dict:
         raw = state.get("document_text", "")
         question = state.get("question", "")
         if not raw:
             return {"answer": "No document text available.", "error": None}
         if not question:
             return {"answer": "No question asked.", "error": None}
-        try:
-            result = chain.invoke({"document_text": raw[:30000], "question": question})
-            answer = result.content if hasattr(result, "content") else str(result)
-            return {"answer": answer.strip(), "error": None}
-        except Exception as e:
-            return {"answer": "", "error": str(e)}
+        last_err = None
+        for attempt in range(3):
+            try:
+                result = await chain.ainvoke({"document_text": raw[:30000], "question": question})
+                answer = (result.content if hasattr(result, "content") else str(result)) or ""
+                answer = answer.strip()
+                if not answer:
+                    last_err = "Empty LLM response"
+                    continue
+                return {"answer": answer, "error": None}
+            except Exception as e:
+                last_err = str(e)
+                continue
+        return {"answer": "", "error": last_err or "Ask failed"}
 
     builder = StateGraph(AskState)
     builder.add_node("ask", ask_node)

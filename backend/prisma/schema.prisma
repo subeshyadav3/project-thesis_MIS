@@ -93,6 +93,7 @@ model Announcement {
   updatedAt       DateTime            @updatedAt
 
   groups          ProjectGroup[]
+  theses          Thesis[]
   invitations     GroupInvitation[]
 
   @@index([type])
@@ -190,6 +191,7 @@ model Program {
   name         String
   code         String   @unique
   departmentId Int
+  degreeType   DegreeType?
   department   Department  @relation(fields: [departmentId], references: [id])
   createdAt    DateTime    @default(now())
 
@@ -271,6 +273,8 @@ model Thesis {
   supervisor     User?        @relation("SupervisedTheses", fields: [supervisorId], references: [id])
   academicYearId Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  announcementId Int?
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -283,6 +287,7 @@ model Thesis {
   @@index([status])
   @@index([studentId])
   @@index([academicYearId])
+  @@index([announcementId])
 }
 
 model EvaluationComponent {
@@ -349,6 +354,7 @@ model Proposal {
   id                Int           @id @default(autoincrement())
   stage             EvaluationStage
   documentUrl       String?
+  documentType      String        @default("PROPOSAL")
   supervisorComment String?
   studentFeedback   String?
   groupId           Int?
@@ -359,6 +365,36 @@ model Proposal {
   submittedBy       User          @relation(fields: [submittedById], references: [id])
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
+  embedding         DocumentEmbedding?
+}
+
+enum DocumentType {
+  PROPOSAL
+  PROGRESS_REPORT
+  MID_TERM_REPORT
+  FINAL_REPORT
+  THESIS_DRAFT
+  THESIS_FINAL
+  OTHER
+}
+
+model DocumentEmbedding {
+  id              Int          @id @default(autoincrement())
+  proposalId      Int          @unique
+  proposal        Proposal     @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  documentType    DocumentType @default(PROPOSAL)
+  status          String       @default("PENDING")
+  vector          Float[]      @default([])
+  model           String
+  chunkCount      Int          @default(0)
+  charCount       Int          @default(0)
+  error           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([documentType])
+  @@index([status])
 }
 
 model Notification {
