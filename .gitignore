@@ -46,3 +46,6 @@ PLAN.md
 
 # MiMoCode internal
 .mimocode/
+
+# Kimchi internal
+.kimchi/
