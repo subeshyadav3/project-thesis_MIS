@@ -278,3 +278,30 @@ def get_llm_factory() -> LLMFactory:
     if _default_factory is None:
         _default_factory = LLMFactory()
     return _default_factory
+
+
+def get_llm():
+    """Return a LangChain-compatible LLM backed by the NVIDIA API.
+
+    Used by the legacy LangGraph agents (ask_agent, marker, summarizer).
+    Falls back gracefully if langchain-nvidia-ai-endpoints is not installed.
+    """
+    try:
+        from langchain_nvidia_ai_endpoints import ChatNVIDIA
+    except ImportError:
+        raise RuntimeError(
+            "langchain-nvidia-ai-endpoints is required for LangGraph agents. "
+            "Run: pip install -r ai_chatbot/requirements.txt"
+        )
+
+    key = settings.nvidia_api_key
+    if not key:
+        raise LLMAuthError("NVIDIA_API_KEY is not configured.")
+
+    return ChatNVIDIA(
+        model=settings.nvidia_model,
+        api_key=key,
+        base_url=settings.nvidia_base_url,
+        temperature=settings.nvidia_temperature,
+        max_tokens=settings.nvidia_max_tokens,
+    )

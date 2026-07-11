@@ -24,3 +24,16 @@ psycopg2-binary==2.9.10
 
 # Async helpers
 tenacity==9.0.0
+
+# OpenAI SDK (used by NVIDIA build API)
+openai>=1.0.0
+
+# LangChain / LangGraph (alternative AI agents)
+langchain==0.3.17
+langgraph==0.2.66
+langchain-community==0.3.16
+langchain-nvidia-ai-endpoints==0.3.5
+
+# Fallback PDF parser
+pypdf2==3.0.1
+pypdf==5.1.0

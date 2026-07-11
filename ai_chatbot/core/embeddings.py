@@ -125,3 +125,15 @@ def force_hash_only() -> None:
     global _model
     _model = None
     os.environ.setdefault("TPMS_EMBED_HACKS", "1")
+
+
+def cosine_similarity(a: List[float], b: List[float]) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    import math
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(x * x for x in b))
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)
