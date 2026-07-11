@@ -389,6 +389,8 @@ model DocumentEmbedding {
   model           String
   chunkCount      Int          @default(0)
   charCount       Int          @default(0)
+  summaryText     String?
+  evaluation      Json?
   error           String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

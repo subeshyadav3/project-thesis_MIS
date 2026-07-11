@@ -4,6 +4,36 @@ const fs = require('fs');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 
+/**
+ * Trigger the new ai_chatbot pipeline in the background. Best-effort —
+ * synchronously returns the response while the AI runs async, with errors
+ * only logged, never rethrown to the caller.
+ */
+function triggerAIChatbot({ proposalId, documentUrl, documentType, authToken }) {
+  const base = (process.env.AI_CHATBOT_URL || 'http://localhost:8001').replace(/\/$/, '');
+  const url = `${base}/api/ai/analyze`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = authToken;
+  const fetchAndLog = async () => {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ proposal_id: proposalId, document_url: documentUrl, document_type: documentType }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!resp.ok) {
+        console.warn(`[ai_chatbot] analyze returned ${resp.status} for proposal ${proposalId}`);
+      } else {
+        console.log(`[ai_chatbot] analyze queued for proposal ${proposalId}`);
+      }
+    } catch (e) {
+      console.warn(`[ai_chatbot] unreachable for proposal ${proposalId}:`, e.message);
+    }
+  };
+  setImmediate(fetchAndLog);
+}
+
 exports.uploadProposal = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -41,15 +71,11 @@ exports.uploadProposal = async (req, res) => {
     });
 
     // Background embedding generation so the user doesn't wait.
-    setImmediate(async () => {
-      try {
-        const aiController = require('./aiController');
-        const aiReq = { params: { id: proposal.id }, headers: req.headers };
-        const aiRes = { json: () => {}, status: () => aiRes };
-        await aiController.embed(aiReq, aiRes);
-      } catch (e) {
-        console.error('background embed error:', e.message);
-      }
+    triggerAIChatbot({
+      proposalId: proposal.id,
+      documentUrl: proposal.documentUrl,
+      documentType: stage,
+      authToken: req.headers.authorization,
     });
 
     audit.log({ action: 'UPLOAD', entity: 'Proposal', entityId: proposal.id, details: `Proposal uploaded for ${entityType}/${entityId}`, performedById: req.user.id });
