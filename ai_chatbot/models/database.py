@@ -37,7 +37,7 @@ class AIDocumentAnalysis(_Base):
     evaluation = Column(JSONB, nullable=False)  # full EvaluationReport as JSON
     char_count = Column(Integer, nullable=False, default=0)
     chunk_count = Column(Integer, nullable=False, default=0)
-    model = Column(String(128), nullable=False, default="groq-llama3")
+    model = Column(String(128), nullable=False, default="meta/llama-3.1-70b-instruct")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -154,7 +154,7 @@ class SummarizeRequest(BaseModel):
 class SummarizeResponse(BaseModel):
     summary: str
     text: Optional[str] = None
-    model: str = "groq-llama3"
+    model: str = "meta/llama-3.1-70b-instruct"
 
 
 # ──/evaluate ────────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ class EvaluateResponse(BaseModel):
     overall_score: float
     summary: str
     criteria: List[EvaluateCriterionScore]
-    model: str = "groq-llama3"
+    model: str = "meta/llama-3.1-70b-instruct"
 
 
 # ──/ask ─────────────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     question: str
-    model: str = "groq-llama3"
+    model: str = "meta/llama-3.1-70b-instruct"
 
 
 # ──/embed ───────────────────────────────────────────────────────────────────

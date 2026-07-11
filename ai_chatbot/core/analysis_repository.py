@@ -35,7 +35,7 @@ async def upsert_analysis(
     evaluation: Dict[str, Any],
     char_count: int,
     chunk_count: int,
-    model: str = "groq-llama3",
+    model: str = "meta/llama-3.1-70b-instruct",
 ) -> int:
     """Create-or-update the analysis row. Returns the row id."""
     async with session_scope() as session:

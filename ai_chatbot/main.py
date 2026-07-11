@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Backend URL: %s", settings.backend_base_url)
     logger.info("Vector store: %s", settings.chroma_persist_dir)
-    logger.info("LLM model: %s", settings.groq_model)
+    logger.info("LLM provider: %s (model=%s)", settings.nvidia_base_url, settings.nvidia_model)
     yield
     logger.info("Shutting down %s", settings.service_title)
 

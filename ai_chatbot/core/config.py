@@ -59,8 +59,6 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 10
 
-    # ──LLM (Groq - Llama 3) ──────────────────────────────────────────────
-    # -----------------------------------------------------------------
     # LLM (NVIDIA build API -- OpenAI-compatible)
     # The Express bridge sends ``nvidia_api_key`` per-request; the service
     # itself prefers NVIDIA_API_KEY (or OPENAI_API_KEY) from the environment.
