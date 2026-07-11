@@ -40,6 +40,7 @@ const SUGGESTED_QUESTIONS = [
 export default function AiAssistantModal({ proposal, onClose }) {
   const [tab, setTab] = useState('summarize');
   const [loading, setLoading] = useState(false);
+  const [streamingTabs, setStreamingTabs] = useState({});
   const [result, setResult] = useState(null);
   const [question, setQuestion] = useState('');
   const [criteriaList, setCriteriaList] = useState([]);
@@ -52,6 +53,9 @@ export default function AiAssistantModal({ proposal, onClose }) {
   const [similarityScope, setSimilarityScope] = useState('all');
   const [similarityTopK, setSimilarityTopK] = useState(5);
   const [similarityThreshold, setSimilarityThreshold] = useState(0);
+  const [streamingText, setStreamingText] = useState('');
+  const [cachedResults, setCachedResults] = useState({});
+  const abortRef = useRef(null);
   const resultRef = useRef(null);
   const toast = useToast();
 
@@ -60,48 +64,327 @@ export default function AiAssistantModal({ proposal, onClose }) {
   const canUseSimilarity = ['COORDINATOR', 'SUPERVISOR'].includes(user.role);
   if (!isNonStudent) return null;
 
-  const callAI = async (endpoint, payload) => {
-    setLoading(true);
-    setResult(null);
+  const parseJSONFromText = (text) => {
+    if (!text) return null;
+    let cleaned = text.replace(/^```json\s*/i, '').replace(/```/gi, '').trim();
+    const tryParse = (s) => { try { return JSON.parse(s); } catch (_) { return null; } };
+    let r = tryParse(cleaned);
+    if (r && typeof r === 'object') return r;
+    // Strip trailing incomplete values: ": "..." → ': ""'
+    cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*$/, '').replace(/:\s*"[^"]*$/, ': ""');
+    r = tryParse(cleaned);
+    if (r && typeof r === 'object') return r;
+    // Track open braces/brackets and close them
+    const stack = [];
+    let inStr = false, esc = false;
+    for (const ch of cleaned) {
+      if (esc) { esc = false; continue; }
+      if (ch === '\\') { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{' || ch === '[') stack.push(ch === '{' ? '}' : ']');
+      else if (ch === '}' || ch === ']') stack.pop();
+    }
+    let fixed = cleaned.replace(/,\s*$/, '');
+    while (stack.length) fixed += stack.pop();
+    r = tryParse(fixed);
+    if (r && typeof r === 'object') return r;
+    return null;
+  };
+
+  // Extract readable plain-text from a value that might be raw JSON string
+  const extractStringValue = (val) => {
+    if (val == null) return '';
+    if (typeof val !== 'string') return val;
+    const trimmed = val.trim();
+    // If it's JSON-like, try to extract content
+    if (trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```')) {
+      const parsed = parseJSONFromText(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        // Extract executive_summary or first string field
+        if (parsed.executive_summary) return parsed.executive_summary;
+        if (parsed.summary) return parsed.summary;
+        return Object.values(parsed).find(v => typeof v === 'string') || val;
+      }
+      // Couldn't parse — strip JSON syntax as best-effort
+      return trimmed.replace(/[{}":,\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return val;
+  };
+
+  // Sanitize summary by ensuring each field is a clean string (not raw JSON)
+  const sanitizeSummary = (summary) => {
+    if (!summary || typeof summary !== 'object') return summary;
+    const out = {};
+    for (const [k, v] of Object.entries(summary)) {
+      if (Array.isArray(v)) {
+        // arrays stay as arrays, but each item is sanitized
+        out[k] = v.map(item => {
+          if (typeof item === 'string') {
+            const trimmed = item.trim();
+            // If a string item looks like JSON object syntax, extract plain text
+            if (trimmed.startsWith('{') || trimmed.startsWith('```')) {
+              return extractStringValue(trimmed);
+            }
+            return item;
+          }
+          return item;
+        });
+      } else if (typeof v === 'string') {
+        out[k] = extractStringValue(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  };
+
+  const abortStream = () => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+  };
+
+  const callAIStream = async (endpoint, payload, { onDelta, streamKey } = {}) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    if (streamKey) {
+      setStreamingTabs(prev => ({ ...prev, [streamKey]: controller }));
+      setLoading(true);
+    }
+    setStreamingText('');
+    const token = localStorage.getItem('token');
+    const API_URL = import.meta.env.VITE_API_URL || '/api';
     try {
-      const { data } = await api.post(endpoint, payload);
-      return data;
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        let errMsg = `AI service error ${response.status}`;
+        try { errMsg = JSON.parse(errText).error || errMsg; } catch (_) {}
+        throw new Error(errMsg);
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalResult = null;
+      let accumulatedText = '';
+
+      const processLine = (line) => {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) return;
+        const jsonStr = trimmed.slice(6);
+        try {
+          const data = JSON.parse(jsonStr);
+          if (data.error) throw new Error(data.error);
+          if (data.delta) {
+            accumulatedText += data.delta;
+            if (onDelta) onDelta(accumulatedText);
+          }
+          if (data.done) finalResult = data.result || data;
+        } catch (e) {
+          if (e instanceof SyntaxError) return;
+          throw e;
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (buffer.trim()) processLine(buffer);
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n');
+        buffer = parts.pop();
+        for (const part of parts) processLine(part);
+      }
+
+      return { finalResult, accumulatedText };
     } catch (err) {
-      toast.error(err.response?.data?.error || 'AI service unavailable. Is the AI server running?');
+      if (err.name === 'AbortError') return null;
+      toast.error(err.message || 'AI service unavailable. Is the AI server running?');
       return null;
     } finally {
-      setLoading(false);
+      if (streamKey) {
+        setStreamingTabs(prev => {
+          const n = { ...prev };
+          delete n[streamKey];
+          // Mark loading = any active streams remain
+          setLoading(Object.keys(n).length > 0);
+          return n;
+        });
+      }
+      abortRef.current = null;
+      setStreamingText('');
     }
   };
 
   const handleSummarize = async () => {
     const payload = {};
     if (useCustomPrompt && customPrompt.trim()) payload.custom_prompt = customPrompt.trim();
-    const data = await callAI(`/ai/summarize/${proposal.id}`, payload);
-    if (data) setResult({ type: 'summary', data: data.summary, custom: data.custom });
+    const placeholder = { type: 'summary', data: {}, custom: false, _streaming: true };
+    setResult(placeholder);
+    setCachedResults(prev => ({ ...prev, summarize: placeholder }));
+    const res = await callAIStream(`/ai/summarize/${proposal.id}`, payload, {
+      streamKey: 'summarize',
+      onDelta: (text) => {
+        // Try to incrementally parse the partial JSON and show readable fields
+        const partial = parseJSONFromText(text);
+        if (partial && typeof partial === 'object') {
+          const sanitized = sanitizeSummary(partial);
+          const partialEntry = { type: 'summary', data: sanitized, custom: false, _streaming: true };
+          // Only update active tab's result if user is still on summarize tab
+          if (tab === 'summarize') setResult(partialEntry);
+          setCachedResults(prev => ({ ...prev, summarize: partialEntry }));
+        } else {
+          setStreamingText('Generating summary...');
+        }
+      },
+    });
+    if (!res) return;
+    const { finalResult, accumulatedText } = res;
+
+    let summary = parseJSONFromText(accumulatedText);
+    if (!summary || typeof summary !== 'object') {
+      let fromDone = finalResult?.summary;
+      if (typeof fromDone === 'string') {
+        try { fromDone = JSON.parse(fromDone); } catch (_) {}
+      }
+      if (fromDone && typeof fromDone === 'object') summary = fromDone;
+    }
+    if (summary?.executive_summary && summary.executive_summary.includes('"executive_summary"')) {
+      const reparsed = parseJSONFromText(summary.executive_summary);
+      if (reparsed && typeof reparsed === 'object') summary = { ...summary, ...reparsed };
+    }
+    if (summary && typeof summary === 'object') {
+      summary = sanitizeSummary(summary);
+    }
+
+    if (summary && typeof summary === 'object' && (summary.executive_summary || summary.objectives || summary.methodology)) {
+      const entry = { type: 'summary', data: summary, custom: finalResult?.custom, _streaming: false };
+      // Only push to result if user is currently viewing this tab
+      if (tab === 'summarize') setResult(entry);
+      setCachedResults(prev => ({ ...prev, summarize: entry }));
+    } else {
+      toast.error('Failed to parse AI summary. Please try again.');
+    }
   };
 
   const handleAsk = async () => {
     if (!question.trim()) { toast.warning('Enter a question first'); return; }
-    const data = await callAI(`/ai/ask/${proposal.id}`, { question });
-    if (data) setResult({ type: 'answer', data: data.answer, question });
+    const qQuestion = question;
+    const placeholder = { type: 'answer', data: '', question: qQuestion, _streaming: true };
+    setResult(placeholder);
+    setCachedResults(prev => ({ ...prev, ask: placeholder }));
+    const res = await callAIStream(`/ai/ask/${proposal.id}`, { question: qQuestion }, {
+      streamKey: 'ask',
+      onDelta: (text) => {
+        const partialEntry = { type: 'answer', data: text, question: qQuestion, _streaming: true };
+        if (tab === 'ask') setResult(partialEntry);
+        setCachedResults(prev => ({ ...prev, ask: partialEntry }));
+      },
+    });
+    if (!res) return;
+    const { finalResult, accumulatedText } = res;
+    const answer = finalResult?.answer || accumulatedText || '';
+    if (answer) {
+      const entry = { type: 'answer', data: answer, question: qQuestion, _streaming: false };
+      if (tab === 'ask') setResult(entry);
+      setCachedResults(prev => ({ ...prev, ask: entry }));
+    }
   };
 
   const handleEvaluate = async () => {
     if (criteriaList.length === 0) { toast.warning('Add at least one criterion'); return; }
     const payload = { criteria: criteriaList };
     if (useCustomInstructions && customInstructions.trim()) payload.custom_instructions = customInstructions.trim();
-    const data = await callAI(`/ai/evaluate/${proposal.id}`, payload);
-    if (data) setResult({ type: 'evaluation', data });
+    const placeholder = { type: 'evaluation', data: { scores: [], total_marks: 0, max_marks: 0 }, _streaming: true };
+    setResult(placeholder);
+    setCachedResults(prev => ({ ...prev, evaluate: placeholder }));
+    const res = await callAIStream(`/ai/evaluate/${proposal.id}`, payload, {
+      streamKey: 'evaluate',
+      onDelta: (text) => {
+        const partial = parseJSONFromText(text);
+        if (partial && (partial.criteria?.length || partial.summary || partial.overall_score !== undefined)) {
+          if (partial.criteria?.length) {
+            const scores = partial.criteria.map((c) => ({
+              criterion_name: c.label || c.key,
+              marks: c.score || 0,
+              max_marks: criteriaList.find((rc) => (rc.name || rc.key) === (c.label || c.key))?.maxMarks || 10,
+              reasoning: c.reason || '',
+            }));
+            const total_marks = scores.reduce((sum, s) => sum + s.marks, 0);
+            const max_marks = scores.reduce((sum, s) => sum + s.max_marks, 0);
+            const partialEntry = { type: 'evaluation', data: { scores, total_marks, max_marks }, _streaming: true };
+            if (tab === 'evaluate') setResult(partialEntry);
+            setCachedResults(prev => ({ ...prev, evaluate: partialEntry }));
+          } else if (partial.summary) {
+            const partialEntry = { type: 'evaluation', data: { scores: [], total_marks: 0, max_marks: 0, summary_text: extractStringValue(partial.summary) || partial.summary }, _streaming: true };
+            if (tab === 'evaluate') setResult(partialEntry);
+            setCachedResults(prev => ({ ...prev, evaluate: partialEntry }));
+          }
+        } else {
+          setStreamingText('Evaluating...');
+        }
+      },
+    });
+    if (!res) return;
+    const { finalResult, accumulatedText } = res;
+
+    let evalData = parseJSONFromText(accumulatedText);
+    if (!evalData?.criteria?.length) evalData = finalResult;
+    if (!evalData?.criteria?.length && accumulatedText) evalData = parseJSONFromText(accumulatedText);
+
+    if (evalData?.criteria?.length) {
+      const scores = evalData.criteria.map((c) => ({
+        criterion_name: c.label || c.key,
+        marks: c.score || 0,
+        max_marks: criteriaList.find((rc) => (rc.name || rc.key) === (c.label || c.key))?.maxMarks || 10,
+        reasoning: c.reason || '',
+      }));
+      const total_marks = scores.reduce((sum, s) => sum + s.marks, 0);
+      const max_marks = scores.reduce((sum, s) => sum + s.max_marks, 0);
+      const entry = { type: 'evaluation', data: { scores, total_marks, max_marks }, _streaming: false };
+      if (tab === 'evaluate') setResult(entry);
+      setCachedResults(prev => ({ ...prev, evaluate: entry }));
+    } else if (evalData?.summary) {
+      const entry = { type: 'evaluation', data: { scores: [], summary_text: evalData.summary, total_marks: 0, max_marks: 0 }, _streaming: false };
+      if (tab === 'evaluate') setResult(entry);
+      setCachedResults(prev => ({ ...prev, evaluate: entry }));
+    } else {
+      toast.error('Failed to parse evaluation. Please try again.');
+    }
   };
 
   const handleSimilarity = async () => {
-    const data = await callAI(`/ai/similarity/${proposal.id}`, {
-      scope: similarityScope,
-      top_k: Number(similarityTopK) || 5,
-      threshold: Number(similarityThreshold) || 0,
-    });
-    if (data) setResult({ type: 'similarity', data });
+    setLoading(true);
+    setResult(null);
+    try {
+      const { data } = await api.post(`/ai/similarity/${proposal.id}`, {
+        scope: similarityScope,
+        top_k: Number(similarityTopK) || 5,
+        threshold: Number(similarityThreshold) || 0,
+      });
+      if (data) {
+        const entry = { type: 'similarity', data };
+        setResult(entry);
+        setCachedResults(prev => ({ ...prev, similarity: entry }));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'AI service unavailable. Is the AI server running?');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addCriterion = (name = '', maxMarks = 10) => {
@@ -165,7 +448,13 @@ export default function AiAssistantModal({ proposal, onClose }) {
                 <button
                   key={key}
                   className={`ai-tab ${tab === key ? 'active' : ''}`}
-                  onClick={() => { setTab(key); setResult(null); setQuestion(''); }}
+                  onClick={() => {
+                    // Tab switch should NOT cancel in-flight streams — every tab can stream in parallel.
+                    setTab(key);
+                    setQuestion('');
+                    const cached = cachedResults[key];
+                    setResult(cached || null);
+                  }}
                 >
                   <span className="material-symbols-outlined">{meta.icon}</span>
                   <span>{meta.label}</span>
@@ -377,25 +666,38 @@ export default function AiAssistantModal({ proposal, onClose }) {
               </div>
             )}
 
-            {/* ─── LOADING ─── */}
-            {loading && (
+            {/* ─── LOADING / STREAMING ─── */}
+            {loading && !(result && (result._streaming || result.type === 'ask' || result.type === 'summary' || result.type === 'evaluation')) && (
               <div className="ai-loading">
-                <div className="ai-loading-spinner">
-                  <div className="ai-spinner-ring" />
-                  <span className="material-symbols-outlined">psychology</span>
-                </div>
-                <div className="ai-loading-text">
-                  <p className="ai-loading-title">AI is analyzing the document...</p>
-                  <p className="ai-loading-sub">Reading content and generating insights</p>
-                </div>
-                <div className="ai-loading-dots">
-                  <span className="ai-dot" /><span className="ai-dot" /><span className="ai-dot" />
-                </div>
+                {streamingText ? (
+                  <div className="ai-streaming">
+                    <span className="material-symbols-outlined">psychology</span>
+                    <span>{streamingText}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="ai-loading-spinner">
+                      <div className="ai-spinner-ring" />
+                      <span className="material-symbols-outlined">psychology</span>
+                    </div>
+                    <div className="ai-loading-text">
+                      <p className="ai-loading-title">AI is analyzing the document...</p>
+                      <p className="ai-loading-sub">Reading content and generating insights</p>
+                    </div>
+                    <div className="ai-loading-dots">
+                      <span className="ai-dot" /><span className="ai-dot" /><span className="ai-dot" />
+                    </div>
+                  </>
+                )}
+                <button className="btn btn-outline btn-sm ai-abort-btn" onClick={abortStream}>
+                  <span className="material-symbols-outlined">stop</span>
+                  Cancel
+                </button>
               </div>
             )}
 
             {/* ─── RESULTS ─── */}
-            {result && !loading && (
+            {result && (
               <div className="ai-result" ref={resultRef}>
                 <div className="ai-result-header">
                   <div className="ai-result-title">
@@ -405,6 +707,12 @@ export default function AiAssistantModal({ proposal, onClose }) {
                     <span>
                       {result.type === 'summary' ? 'Summary' : result.type === 'answer' ? 'Answer' : result.type === 'similarity' ? 'Similar Documents' : 'Evaluation Results'}
                     </span>
+                    {result._streaming && (
+                      <span className="ai-streaming-pill">
+                        <span className="ai-streaming-dot" />
+                        Generating…
+                      </span>
+                    )}
                   </div>
                   <button className="ai-copy-btn" onClick={copyResult} title="Copy to clipboard">
                     <span className="material-symbols-outlined">{showCopied ? 'check' : 'content_copy'}</span>
@@ -412,13 +720,20 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   </button>
                 </div>
                 <div className="ai-result-body">
-                  {result.type === 'summary' && <SummaryView data={result.data} custom={result.custom} />}
-                  {result.type === 'answer' && <AnswerView data={result.data} question={result.question} />}
-                  {result.type === 'evaluation' && <EvaluationView data={result.data} />}
+                  {result.type === 'summary' && <SummaryView data={result.data} custom={result.custom} streaming={result._streaming} />}
+                  {result.type === 'answer' && <AnswerView data={result.data} question={result.question} streaming={result._streaming} />}
+                  {result.type === 'evaluation' && <EvaluationView data={result.data} streaming={result._streaming} />}
                   {result.type === 'similarity' && <SimilarityView data={result.data} />}
+                  {result._streaming && <span className="ai-streaming-tail"><span className="ai-streaming-dot" /> streaming…</span>}
                 </div>
                 <div className="ai-result-actions">
-                  <button className="btn btn-outline btn-sm" onClick={() => setResult(null)}>
+                  {result._streaming && streamingTabs[result.type === 'similarity' ? 'similarity' : result.type === 'answer' ? 'ask' : result.type === 'evaluation' ? 'evaluate' : 'summarize'] && (
+                    <button className="btn btn-outline btn-sm" onClick={abortStream}>
+                      <span className="material-symbols-outlined">stop_circle</span>
+                      Cancel
+                    </button>
+                  )}
+                  <button className="btn btn-outline btn-sm" onClick={() => { abortStream(); setResult(null); setCachedResults(prev => { const n = { ...prev }; delete n[tab]; return n; }); }}>
                     <span className="material-symbols-outlined">refresh</span>
                     {tab === 'ask' ? 'Ask Another' : tab === 'similarity' ? 'Re-scan' : 'Re-run'}
                   </button>
@@ -439,9 +754,8 @@ export default function AiAssistantModal({ proposal, onClose }) {
 
 /* ─── SUB-COMPONENTS ─── */
 
-function SummaryView({ data, custom }) {
+function SummaryView({ data, custom, streaming }) {
   if (!data || data.error) return <p className="ai-error">Failed to generate summary.</p>;
-
   const sections = [
     { key: 'executive_summary', label: 'Executive Summary', icon: 'article', color: 'var(--color-primary)' },
     { key: 'objectives', label: 'Objectives', icon: 'track_changes', color: 'var(--color-success)', list: true },
@@ -450,6 +764,22 @@ function SummaryView({ data, custom }) {
     { key: 'strengths', label: 'Strengths', icon: 'check_circle', color: 'var(--color-success)', list: true },
     { key: 'weaknesses_or_risks', label: 'Weaknesses / Risks', icon: 'warning', color: 'var(--color-warning)', list: true },
   ];
+
+  const hasContent = sections.some(s => {
+    const v = data?.[s.key];
+    return v && !(Array.isArray(v) && v.length === 0);
+  });
+
+  if (streaming && !hasContent) {
+    return (
+      <div className="ai-summary">
+        <div className="ai-pill">
+          <span className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }}>psychology</span>
+          Generating summary...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ai-summary">
@@ -481,7 +811,7 @@ function SummaryView({ data, custom }) {
   );
 }
 
-function AnswerView({ data, question }) {
+function AnswerView({ data, question, streaming }) {
   return (
     <div className="ai-answer">
       {question && (
@@ -492,13 +822,41 @@ function AnswerView({ data, question }) {
       )}
       <div className="ai-answer-response">
         <span className="material-symbols-outlined">smart_toy</span>
-        <p>{data}</p>
+        <p>{data}{streaming && data && <span className="ai-cursor">▍</span>}</p>
       </div>
     </div>
   );
 }
 
-function EvaluationView({ data }) {
+function EvaluationView({ data, streaming }) {
+  if (!data) return null;
+  // While streaming with no usable content yet, show a loading-style indicator
+  if (streaming && !data.scores?.length) {
+    return (
+      <div className="ai-evaluation">
+        <div className="ai-pill">
+          <span className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }}>psychology</span>
+          Evaluating...
+        </div>
+        {data.summary_text && (
+          <p style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{data.summary_text}</p>
+        )}
+      </div>
+    );
+  }
+  // If we don't have criteria rows yet but we have a streaming summary text, show that
+  if (data?.summary_text) {
+    if (!data?.scores?.length) {
+      return (
+        <div className="ai-evaluation">
+          <div className="ai-pill">
+            <span className="material-symbols-outlined">hourglass_top</span> Evaluation pending…
+          </div>
+          <p style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{data.summary_text}</p>
+        </div>
+      );
+    }
+  }
   if (!data?.scores || data.error) return <p className="ai-error">Evaluation failed.</p>;
   const pct = data.max_marks ? Math.round((data.total_marks / data.max_marks) * 100) : 0;
   const grade = pct >= 80 ? 'A' : pct >= 65 ? 'B' : pct >= 50 ? 'C' : pct >= 35 ? 'D' : 'F';
@@ -813,6 +1171,44 @@ const aiStyles = `
 .ai-loading-title { font-weight: 600; font-size: 14px; margin: 0; }
 .ai-loading-sub { font-size: 12px; color: var(--color-on-surface-variant); margin: 4px 0 0; }
 .ai-loading-dots { display: flex; gap: 6px; }
+.ai-streaming-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  font-size: 11px;
+  font-weight: 600;
+}
+.ai-streaming-pill .ai-streaming-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: inline-block;
+  animation: aiPulse 1s ease-in-out infinite;
+}
+.ai-streaming-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface-variant);
+  font-size: 11px;
+  font-weight: 500;
+}
+.ai-streaming-tail .ai-streaming-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: aiPulse 1s ease-in-out infinite;
+}
+.ai-abort-btn { align-self: center; margin-top: 8px; display: flex; align-items: center; gap: 4px; font-size: 12px; }
 .ai-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -981,6 +1377,15 @@ const aiStyles = `
 }
 
 .ai-error { color: var(--color-error); font-size: 13px; }
+.ai-streaming {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 12px 14px; background: var(--color-surface-container-low);
+  border-radius: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+  animation: aiFadeIn 0.2s;
+}
+.ai-streaming .material-symbols-outlined { font-size: 18px; color: var(--color-primary); animation: aiPulse 1s ease-in-out infinite; }
+@keyframes aiPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes aiFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* Custom prompt */
 .ai-custom-prompt {

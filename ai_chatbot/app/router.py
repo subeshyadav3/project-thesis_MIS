@@ -188,39 +188,94 @@ def _build_synthetic_doc(text: str) -> ProcessedDocument:
     )
 
 
-@router.post("/summarize", tags=["legacy"], response_model=SummarizeResponse)
-async def summarize_endpoint(payload: SummarizeRequest) -> SummarizeResponse:
-    """Generate an executive summary for ``document_text`` in one LLM call."""
+@router.post("/summarize", tags=["legacy"])
+async def summarize_endpoint(payload: SummarizeRequest):
+    """Generate a structured summary for ``document_text`` in one LLM call."""
     try:
         factory = _resolve_llm_factory(payload.nvidia_api_key)
     except LLMAuthError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
     system = (
-        "You are a senior academic reviewer. Produce a long EXECUTIVE SUMMARY "
-        "(4-6 short paragraphs) capturing the problem statement, proposed "
-        "solution, methodology, expected outcomes, scope, and risks. "
-        "Write in clear English."
+        "You are a senior academic reviewer. Analyze the following project/thesis "
+        "document and produce a structured summary in JSON format with these keys:\n"
+        "- executive_summary (2-3 sentences)\n"
+        "- objectives (bullet list)\n"
+        "- methodology (brief description)\n"
+        "- expected_outcomes (bullet list)\n"
+        "- strengths (2-3 points)\n"
+        "- weaknesses_or_risks (2-3 points)\n\n"
+        "Respond ONLY with valid JSON."
     )
     user_prefix = (payload.custom_prompt + "\n\n") if payload.custom_prompt else ""
     user = (
         f"{user_prefix}DOCUMENT TYPE: {payload.document_type or 'PROPOSAL'}\n\n"
-        f"DOCUMENT TEXT:\n{payload.document_text}"
+        f"DOCUMENT TEXT:\n{payload.document_text[:30000]}"
     )
 
     try:
-        text = await factory.acomplete(
+        raw = await factory.acomplete_json(
             system=system,
             user=user,
             temperature=0.2,
-            max_tokens=900,
+            max_tokens=4096,
+            retry_on_fail=2,
         )
     except LLMUnavailableError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     except LLMOutputError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
-    return SummarizeResponse(summary=text, text=text, model=factory.model)
+    return {
+        "summary": raw,
+        "document_type": payload.document_type or "PROPOSAL",
+        "custom": bool(payload.custom_prompt and payload.custom_prompt.strip()),
+        "model": factory.model,
+    }
+
+
+@router.post("/summarize/stream", tags=["legacy"])
+async def summarize_stream_endpoint(payload: SummarizeRequest):
+    """Stream the summary text, then send the parsed JSON result."""
+    try:
+        factory = _resolve_llm_factory(payload.nvidia_api_key)
+    except LLMAuthError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    system = (
+        "You are a senior academic reviewer. Analyze the following project/thesis "
+        "document and produce a structured summary in JSON format with these keys:\n"
+        "- executive_summary (2-3 sentences)\n"
+        "- objectives (bullet list)\n"
+        "- methodology (brief description)\n"
+        "- expected_outcomes (bullet list)\n"
+        "- strengths (2-3 points)\n"
+        "- weaknesses_or_risks (2-3 points)\n\n"
+        "Respond ONLY with valid JSON."
+    )
+    user_prefix = (payload.custom_prompt + "\n\n") if payload.custom_prompt else ""
+    user = (
+        f"{user_prefix}DOCUMENT TYPE: {payload.document_type or 'PROPOSAL'}\n\n"
+        f"DOCUMENT TEXT:\n{payload.document_text[:30000]}"
+    )
+
+    async def _stream():
+        buf = ""
+        try:
+            async for chunk in factory.astream(system=system, user=user, temperature=0.2, max_tokens=4096):
+                buf += chunk
+                yield f"data: {json.dumps({'delta': chunk})}\n\n"
+            import json as _json
+            try:
+                parsed = _json.loads(buf.strip().removeprefix("```json").removesuffix("```").strip())
+            except _json.JSONDecodeError:
+                parsed = {"executive_summary": buf.strip()[:500], "objectives": [], "methodology": "", "expected_outcomes": [], "strengths": [], "weaknesses_or_risks": []}
+            yield f"data: {json.dumps({'done': True, 'result': {'summary': parsed, 'document_type': payload.document_type or 'PROPOSAL', 'custom': bool(payload.custom_prompt and payload.custom_prompt.strip()), 'model': factory.model}})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(_stream(), media_type="text/event-stream")
 
 
 @router.post("/evaluate", tags=["legacy"], response_model=EvaluateResponse)
@@ -266,7 +321,7 @@ async def evaluate_endpoint(payload: EvaluateRequest) -> EvaluateResponse:
             system=system,
             user=user,
             temperature=0.1,
-            max_tokens=1400,
+            max_tokens=4096,
             retry_on_fail=2,
         )
     except LLMUnavailableError as exc:
@@ -309,6 +364,80 @@ async def evaluate_endpoint(payload: EvaluateRequest) -> EvaluateResponse:
         criteria=result_scores,
         model=factory.model,
     )
+
+
+@router.post("/evaluate/stream", tags=["legacy"])
+async def evaluate_stream_endpoint(payload: EvaluateRequest):
+    """Stream evaluation text, then send parsed result."""
+    try:
+        factory = _resolve_llm_factory(payload.nvidia_api_key)
+    except LLMAuthError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    criteria_list = payload.criteria or []
+    if not criteria_list:
+        raise HTTPException(status_code=400, detail="criteria array is required")
+
+    crit_lines = []
+    for c in criteria_list:
+        weight = c.weight if c.weight is not None else 1.0
+        desc = c.description or c.label or c.key
+        crit_lines.append(f"- {c.key} ({c.label or c.key}, weight {weight}): {desc}")
+
+    system = (
+        "You are a senior academic reviewer scoring a student proposal. "
+        "Return STRICT JSON: each criterion row has score (0-10), reason "
+        "(2-3 sentences), and an optional evidence snippet. Be honest and concise."
+    )
+    user = (
+        "Score the document TEXT below against each criterion.\n\n"
+        f"CRITERIA:\n" + "\n".join(crit_lines) + "\n\n"
+        f"TYPE: {payload.document_type or 'PROPOSAL'}\n"
+        + (f"EXTRA INSTRUCTIONS: {payload.custom_instructions}\n" if payload.custom_instructions else "")
+        + "\nDOCUMENT TEXT:\n"
+        + payload.document_text
+        + "\n\nReturn JSON in this exact shape:\n"
+        + '{"overall_score": <number>, '
+        + '"summary": "<2-3 sentence verdict>", '
+        + '"criteria": ['
+        + '{...one entry per criterion key, fields: key, score, reason, evidence"}, '
+        + '...]}'
+    )
+
+    async def _stream():
+        buf = ""
+        try:
+            async for chunk in factory.astream(system=system, user=user, temperature=0.1, max_tokens=4096):
+                buf += chunk
+                yield f"data: {json.dumps({'delta': chunk})}\n\n"
+            import json as _json
+            try:
+                raw = _json.loads(buf.strip().removeprefix("```json").removesuffix("```").strip())
+            except _json.JSONDecodeError:
+                raw = {"overall_score": 0, "summary": "Parse failed", "criteria": []}
+            result_scores = []
+            by_key = {str(r.get("key") or "").strip().lower(): r for r in (raw.get("criteria") or [])}
+            for c in criteria_list:
+                row = by_key.get(c.key.strip().lower()) or {}
+                result_scores.append({
+                    "key": c.key, "label": c.label or c.key,
+                    "score": _clamp_score(float(row.get("score", 0))),
+                    "reason": str(row.get("reason") or "No reason provided.").strip(),
+                    "evidence": str(row.get("evidence")).strip() if row.get("evidence") else None,
+                })
+            overall = float(raw.get("overall_score") or 0)
+            if not overall and result_scores:
+                overall = sum(s["score"] for s in result_scores) / len(result_scores)
+            overall = _clamp_score(overall)
+            summary_text = str(raw.get("summary") or raw.get("summary_overall") or "").strip()
+            if not summary_text:
+                summary_text = "Evaluation complete. See per-criterion reasons."
+            yield f"data: {json.dumps({'done': True, 'result': {'overall_score': overall, 'summary': summary_text, 'criteria': result_scores, 'model': factory.model}})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(_stream(), media_type="text/event-stream")
 
 
 def _clamp_score(value: float) -> float:
@@ -357,6 +486,32 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         raise HTTPException(status_code=502, detail=str(exc))
 
     return AskResponse(answer=answer, question=payload.question, model=factory.model)
+
+
+@router.post("/ask/stream", tags=["legacy"])
+async def ask_stream_endpoint(payload: AskRequest):
+    """Stream the answer token-by-token using SSE."""
+    try:
+        factory = _resolve_llm_factory(payload.nvidia_api_key)
+    except LLMAuthError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    system = ANSWER_SYSTEM
+    user = (
+        "DOCUMENT TYPE: " + (payload.document_type or "PROPOSAL") + "\n\n"
+        "DOCUMENT TEXT:\n" + payload.document_text + "\n\nQUESTION: " + payload.question
+    )
+
+    async def _stream():
+        try:
+            async for chunk in factory.astream(system=system, user=user, temperature=0.2, max_tokens=900):
+                yield f"data: {json.dumps({'delta': chunk})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'question': payload.question})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(_stream(), media_type="text/event-stream")
 
 
 @router.post("/embed", tags=["legacy"], response_model=EmbedResponse)
