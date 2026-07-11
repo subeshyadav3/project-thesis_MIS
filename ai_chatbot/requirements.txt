@@ -1,0 +1,26 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+python-multipart==0.0.20
+
+# HTTP client
+httpx==0.28.1
+
+# PDF
+PyMuPDF==1.25.3
+
+# Embeddings + vector store
+sentence-transformers==3.3.1
+chromadb==0.5.23
+
+# Groq LLM SDK (uses the OpenAI SDK client under the hood)
+groq==0.13.0
+
+# PostgreSQL access for storing AI analysis results
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.10
+
+# Async helpers
+tenacity==9.0.0
