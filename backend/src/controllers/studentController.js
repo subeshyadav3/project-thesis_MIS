@@ -4,6 +4,37 @@ const path = require('path');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 
+/**
+ * Fire the unified ai_chatbot pipeline in the background.
+ * Reuses the same endpoint the legacy embed routine did, but the new service
+ * performs extract -> chunk -> embed -> store -> analyze -> persist + summary
+ * + evaluation automatically. Failures are non-blocking.
+ */
+function triggerAIPipeline({ proposalId, documentUrl, documentType, authToken }) {
+  const base = (process.env.AI_CHATBOT_URL || 'http://localhost:8001').replace(/\/$/, '');
+  const url = `${base}/api/ai/analyze`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = authToken;
+  const fire = async () => {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ proposal_id: proposalId, document_url: documentUrl, document_type: documentType }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!resp.ok) {
+        console.warn(`[ai_chatbot] analyze returned ${resp.status} for proposal ${proposalId}`);
+      } else {
+        console.log(`[ai_chatbot] analyze queued for proposal ${proposalId}`);
+      }
+    } catch (e) {
+      console.warn(`[ai_chatbot] unreachable for proposal ${proposalId}:`, e.message);
+    }
+  };
+  setImmediate(fire);
+}
+
 exports.uploadDocument = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -53,18 +84,11 @@ exports.uploadDocument = async (req, res) => {
     });
 
     // Fire-and-forget embedding generation so the user doesn't wait.
-    setImmediate(async () => {
-      try {
-        const aiController = require('./aiController');
-        const aiReq = { params: { id: proposal.id }, headers: req.headers };
-        const aiRes = {
-          json: () => {},
-          status: () => aiRes,
-        };
-        await aiController.embed(aiReq, aiRes);
-      } catch (e) {
-        console.error('background embed error:', e.message);
-      }
+    triggerAIPipeline({
+      proposalId: proposal.id,
+      documentUrl: proposal.documentUrl,
+      documentType: stage,
+      authToken: req.headers.authorization,
     });
 
     // Notify supervisor + coordinators (not the student)
