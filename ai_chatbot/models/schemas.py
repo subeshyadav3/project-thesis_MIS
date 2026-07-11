@@ -138,3 +138,118 @@ class HealthResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: Optional[Any] = None
+
+
+# ──/summarize (legacy AiAssistantModal) ─────────────────────────────────────
+
+
+class SummarizeRequest(BaseModel):
+    proposal_id: Optional[int] = None
+    document_text: str = Field(..., min_length=1, max_length=200_000)
+    document_type: Optional[str] = "PROPOSAL"
+    custom_prompt: Optional[str] = None
+    nvidia_api_key: Optional[str] = None
+
+
+class SummarizeResponse(BaseModel):
+    summary: str
+    text: Optional[str] = None
+    model: str = "groq-llama3"
+
+
+# ──/evaluate ────────────────────────────────────────────────────────────────
+
+
+class EvaluateCriterionInput(BaseModel):
+    key: str
+    label: Optional[str] = None
+    weight: Optional[float] = 1.0
+    description: Optional[str] = None
+
+
+class EvaluateRequest(BaseModel):
+    proposal_id: Optional[int] = None
+    document_text: str = Field(..., min_length=1, max_length=200_000)
+    criteria: List[EvaluateCriterionInput]
+    document_type: Optional[str] = "PROPOSAL"
+    custom_instructions: Optional[str] = None
+    nvidia_api_key: Optional[str] = None
+
+
+class EvaluateCriterionScore(BaseModel):
+    key: str
+    label: str
+    score: float
+    reason: str
+    evidence: Optional[str] = None
+
+
+class EvaluateResponse(BaseModel):
+    overall_score: float
+    summary: str
+    criteria: List[EvaluateCriterionScore]
+    model: str = "groq-llama3"
+
+
+# ──/ask ─────────────────────────────────────────────────────────────────────
+
+
+class AskRequest(BaseModel):
+    proposal_id: Optional[int] = None
+    document_text: str = Field(..., min_length=1, max_length=200_000)
+    question: str = Field(..., min_length=3, max_length=2000)
+    document_type: Optional[str] = "PROPOSAL"
+    nvidia_api_key: Optional[str] = None
+
+
+class AskResponse(BaseModel):
+    answer: str
+    question: str
+    model: str = "groq-llama3"
+
+
+# ──/embed ───────────────────────────────────────────────────────────────────
+
+
+class EmbedRequest(BaseModel):
+    proposal_id: Optional[int] = None
+    document_text: str = Field(..., min_length=1, max_length=200_000)
+    document_type: Optional[str] = "PROPOSAL"
+    nvidia_api_key: Optional[str] = None
+
+
+class EmbedResponse(BaseModel):
+    vector: List[float]
+    vector_dim: int
+    char_count: int
+    model: str = "sentence-transformers"
+
+
+class CandidateVector(BaseModel):
+    id: int
+    vector: List[float]
+
+
+class CandidatesResponse(BaseModel):
+    scope: str = "all"
+    candidates: List[CandidateVector] = Field(default_factory=list)
+
+
+class SimilarityRequest(BaseModel):
+    proposal_id: Optional[int] = None
+    document_text: Optional[str] = None
+    candidates: List[CandidateVector] = Field(default_factory=list)
+    top_k: int = 5
+    threshold: float = 0.0
+    document_type: Optional[str] = "PROPOSAL"
+    nvidia_api_key: Optional[str] = None
+
+
+class SimilarityMatch(BaseModel):
+    id: int
+    score: float
+
+
+class SimilarityResponse(BaseModel):
+    compared: int = 0
+    matches: List[SimilarityMatch] = Field(default_factory=list)

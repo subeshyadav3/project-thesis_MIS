@@ -1,4 +1,13 @@
-"""LLM factory — Groq Llama 3 client with structured error handling."""
+"""LLM factory — NVIDIA build API (OpenAI-compatible) client.
+
+Uses ``integrate.api.nvidia.com/v1`` as the upstream, with ``openai``'s
+AsyncOpenAI as the transport. All models in the NVIDIA catalog are listed at
+https://build.nvidia.com/explore/discover (and ``GET https://integrate.api.nvidia.com/v1/models``).
+
+Set ``NVIDIA_API_KEY`` (preferred) or ``OPENAI_API_KEY`` as the key. ``model``
+defaults to ``meta/llama-3.1-70b-instruct``, which is OpenAI-compatible and
+currently supported — override via ``NVIDIA_MODEL``.
+"""
 
 from __future__ import annotations
 
@@ -6,13 +15,23 @@ import asyncio
 import json
 from typing import Any, Dict, List, Mapping, Optional
 
-from groq import AsyncGroq, APIError, APIConnectionError, RateLimitError
+from openai import (
+    APIConnectionError,
+    APIError,
+    AsyncOpenAI,
+    AuthenticationError,
+    NotFoundError,
+    RateLimitError,
+)
 
 from .config import settings
 from .logger import get_logger
 
 
 logger = get_logger(__name__)
+
+
+# ──Exception surface (kept Groq-compatible so existing callers keep working) ──
 
 
 class LLMAuthError(RuntimeError):
@@ -27,24 +46,38 @@ class LLMOutputError(RuntimeError):
     """Raised when the model returns malformed output that we cannot parse."""
 
 
-class LLMFactory:
-    """Thin wrapper that:
+# ──Factory ──────────────────────────────────────────────────────────────────
 
-    • enforces presence of the API key,
-    • centralizes the default model + temperature,
-    • provides structured JSON helpers,
-    • handles retries / connection-failure mapping consistently.
+
+class LLMFactory:
+    """Thin async wrapper around the NVIDIA build API.
+
+    • Enforces presence of an API key (env: ``NVIDIA_API_KEY``).
+    • Centralizes the default model + temperature.
+    • Provides structured JSON helpers.
+    • Handles retries / connection-failure mapping consistently.
     """
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or settings.groq_api_key
-        self.model = model or settings.groq_model
+        self.api_key = api_key or settings.nvidia_api_key
+        self.model = model or settings.nvidia_model
         if not self.api_key:
-            raise LLMAuthError("GROQ_API_KEY is not configured. Set it in ai_chatbot/.env.")
+            raise LLMAuthError(
+                "NVIDIA_API_KEY is not configured. Set it in ai_chatbot/.env."
+            )
+
+    @property
+    def provider(self) -> str:
+        return "nvidia-build"
 
     # ──Client construction ────────────────────────────────────────────────
-    def _client(self) -> AsyncGroq:
-        return AsyncGroq(api_key=self.api_key, timeout=settings.llm_request_timeout)
+    def _client(self) -> AsyncOpenAI:
+        return AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=settings.nvidia_base_url,
+            timeout=settings.llm_request_timeout,
+            max_retries=0,
+        )
 
     # ──Plain completion ───────────────────────────────────────────────────
     async def acomplete(
@@ -58,27 +91,48 @@ class LLMFactory:
     ) -> str:
         """Return raw text content. Strips trailing whitespace."""
         client = self._client()
-        try:
-            resp = await client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                temperature=temperature if temperature is not None else settings.groq_temperature,
-                max_tokens=max_tokens if max_tokens is not None else settings.groq_max_tokens,
-                stop=stop,
-            )
-        except APIConnectionError as exc:
-            raise LLMUnavailableError(f"LLM connection failed: {exc}") from exc
-        except RateLimitError as exc:
-            raise LLMUnavailableError(f"LLM rate-limited: {exc}") from exc
-        except APIError as exc:
-            raise LLMUnavailableError(f"LLM API error: {exc}") from exc
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": (
+                temperature if temperature is not None else settings.nvidia_temperature
+            ),
+            "max_tokens": (
+                max_tokens if max_tokens is not None else settings.nvidia_max_tokens
+            ),
+            "stream": False,
+        }
+        if stop:
+            kwargs["stop"] = stop
 
-        content: Optional[str] = resp.choices[0].message.content if resp.choices else None
+        try:
+            resp = await client.chat.completions.create(**kwargs)
+        except AuthenticationError as exc:
+            raise LLMAuthError(f"NVIDIA API key rejected: {exc}") from exc
+        except NotFoundError as exc:
+            # Most common cause: decommissioned/typo'd model name.
+            raise LLMAuthError(
+                f"NVIDIA model '{self.model}' not found. Set NVIDIA_MODEL to a currently "
+                f"supported one (see https://build.nvidia.com/explore/discover). Detail: {exc}"
+            ) from exc
+        except APIConnectionError as exc:
+            raise LLMUnavailableError(f"NVIDIA connection failed: {exc}") from exc
+        except RateLimitError as exc:
+            raise LLMUnavailableError(f"NVIDIA rate-limited: {exc}") from exc
+        except APIError as exc:
+            raise LLMUnavailableError(f"NVIDIA API error: {exc}") from exc
+
+        try:
+            message = resp.choices[0].message
+            content = getattr(message, "content", None) if message else None
+        except (IndexError, AttributeError) as exc:
+            raise LLMOutputError(f"Unexpected NVIDIA response shape: {exc}") from exc
+
         if not content or not content.strip():
-            raise LLMOutputError("LLM returned empty content.")
+            raise LLMOutputError("NVIDIA returned empty content.")
         return content.strip()
 
     # ──Structured JSON ────────────────────────────────────────────────────
@@ -91,11 +145,7 @@ class LLMFactory:
         max_tokens: Optional[int] = None,
         retry_on_fail: int = 2,
     ) -> Dict[str, Any]:
-        """Like ``acomplete`` but forces a JSON object and parses it.
-
-        Asks the model to wrap output in fenced ```json codeblocks and tolerates
-        minor preamble. Falls back to coerce raw arrays or trimmed txt.
-        """
+        """Like ``acomplete`` but forces a JSON object and parses it."""
         json_hint = (
             "\n\nReturn ONLY a JSON object. No prose, no markdown. "
             "Keys must exactly match what the schema asks for."
@@ -112,7 +162,12 @@ class LLMFactory:
                 return _coerce_json(raw)
             except LLMOutputError as exc:
                 last_err = exc
-                logger.warning("JSON parse failed (attempt %d/%d): %s", attempt + 1, retry_on_fail + 1, exc)
+                logger.warning(
+                    "JSON parse failed (attempt %d/%d): %s",
+                    attempt + 1,
+                    retry_on_fail + 1,
+                    exc,
+                )
                 await asyncio.sleep(0.5 * (attempt + 1))
         raise LLMOutputError(f"Could not parse LLM output as JSON: {last_err}")
 
@@ -127,21 +182,33 @@ class LLMFactory:
     ):
         """Yield content chunks as they arrive. Used by /chat streaming."""
         client = self._client()
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": (
+                temperature if temperature is not None else settings.nvidia_temperature
+            ),
+            "max_tokens": (
+                max_tokens if max_tokens is not None else settings.nvidia_max_tokens
+            ),
+            "stream": True,
+        }
+
         try:
-            stream = await client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                temperature=temperature if temperature is not None else settings.groq_temperature,
-                max_tokens=max_tokens if max_tokens is not None else settings.groq_max_tokens,
-                stream=True,
-            )
+            stream = await client.chat.completions.create(**kwargs)
+        except AuthenticationError as exc:
+            raise LLMAuthError(f"NVIDIA API key rejected: {exc}") from exc
+        except NotFoundError as exc:
+            raise LLMAuthError(
+                f"NVIDIA model '{self.model}' not found: {exc}"
+            ) from exc
         except APIConnectionError as exc:
-            raise LLMUnavailableError(f"LLM connection failed: {exc}") from exc
+            raise LLMUnavailableError(f"NVIDIA connection failed: {exc}") from exc
         except APIError as exc:
-            raise LLMUnavailableError(f"LLM API error: {exc}") from exc
+            raise LLMUnavailableError(f"NVIDIA API error: {exc}") from exc
 
         async for chunk in stream:
             try:
@@ -164,7 +231,6 @@ def _coerce_json(raw: str) -> Mapping[str, Any]:
         text = text.strip("`")
         if text.lower().startswith("json"):
             text = text[4:]
-        # Drop language tags and trailing fence.
         if "```" in text:
             text = text.split("```", 1)[0]
 
@@ -193,10 +259,13 @@ def _coerce_json(raw: str) -> Mapping[str, Any]:
                         break
         start = text.find("{", start + 1)
 
-    raise LLMOutputError(f"No parseable JSON object found in LLM output of length {len(raw)}")
+    raise LLMOutputError(
+        f"No parseable JSON object found in LLM output of length {len(raw)}"
+    )
 
 
 # ──Default singleton ────────────────────────────────────────────────────────
+
 
 _default_factory: Optional[LLMFactory] = None
 

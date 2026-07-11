@@ -1,4 +1,4 @@
-"""Configuration module for the AI chatbot service.
+﻿"""Configuration module for the AI chatbot service.
 
 Loads environment variables from the parent .env file (or a local one)
 and exposes a typed Settings object.
@@ -60,11 +60,21 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
 
     # ──LLM (Groq - Llama 3) ──────────────────────────────────────────────
+    # -----------------------------------------------------------------
+    # LLM (NVIDIA build API -- OpenAI-compatible)
+    # The Express bridge sends ``nvidia_api_key`` per-request; the service
+    # itself prefers NVIDIA_API_KEY (or OPENAI_API_KEY) from the environment.
+    nvidia_api_key: str = Field(default="")
+    nvidia_base_url: str = Field(default="https://integrate.api.nvidia.com/v1")
+    nvidia_model: str = Field(default="meta/llama-3.1-70b-instruct")
+    nvidia_temperature: float = 0.2
+    nvidia_max_tokens: int = 2048
+    llm_request_timeout: int = 120
+
+    # Legacy Groq keys kept so older .env files do not crash startup.
+    # They are no longer used at runtime.
     groq_api_key: str = Field(default="")
     groq_model: str = Field(default="llama-3.1-70b-versatile")
-    groq_temperature: float = 0.2
-    groq_max_tokens: int = 2048
-    llm_request_timeout: int = 120
 
     # ──Embedding model (local sentence-transformers) ─────────────────────
     embedding_model_name: str = Field(default="BAAI/bge-small-en-v1.5")
