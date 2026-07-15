@@ -97,10 +97,9 @@ function BachelorProjects() {
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
-    if (!selectedFile || !selectedYear) { toast.warning('Select file and academic year'); return; }
+    if (!selectedFile) { toast.warning('Select a file'); return; }
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('academicYearId', selectedYear);
     formData.append('projectType', uploadProjectType);
     try {
       await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -517,24 +516,12 @@ function BachelorProjects() {
                 </select>
               </div>
               <div className="form-group">
-                <label>Academic Year</label>
-                <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} required>
-                  <option value="">Select academic year...</option>
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
                 <label>Excel File (.xlsx)</label>
                 <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
+                <a href="/bachelor_upload_template.xlsx" download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span> Download blank template
+                </a>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginBottom: 8 }}>
-                Required columns: Group Name, Project Title, Member Names, Roll Numbers
-              </p>
-              {selectedYear && (
-                <p style={{ fontSize: 12, color: 'var(--color-primary)', marginBottom: 8 }}>
-                  If a student's roll number already exists, the system will auto-match with existing student data.
-                </p>
-              )}
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
                   <span className="material-symbols-outlined">close</span>
