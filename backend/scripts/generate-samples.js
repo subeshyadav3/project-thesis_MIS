@@ -1,61 +1,61 @@
 const XLSX = require('xlsx');
-const path = require('path');
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
 
-const outDir = path.join(__dirname, '..');
+async function main() {
+  const year = await p.academicYear.findFirst({
+    where: { department: { code: 'CEE' } },
+    orderBy: { year: 'desc' },
+  });
+  const progBCT = await p.program.findFirst({ where: { code: 'BCT' } });
+  const progMSCS = await p.program.findFirst({ where: { code: 'MSCS' } });
+  const progMECE = await p.program.findFirst({ where: { code: 'MECE' } });
 
-// ============================================================
-// Bachelor Projects Sample
-// ============================================================
-const bachelorData = [
-  {
-    'Group Name': 'Team Alpha',
-    'Project Title': 'AI-Powered Smart Farming Assistant for Nepali Agriculture',
-    'Member Names': 'Ram Khadka,Sita Poudel,Gopal Thapa',
-    'Roll Numbers': '078BCT021,078BCT022,078BCT023',
-  },
-  {
-    'Group Name': 'CodeCraft',
-    'Project Title': 'E-Hospital: Blockchain-based Medical Record System',
-    'Member Names': 'Anita Shrestha,Bibek Sharma,Radha Neupane',
-    'Roll Numbers': '078BCT031,078BCT032,078BCT033',
-  },
-  {
-    'Group Name': 'CyberNepal',
-    'Project Title': 'Network Intrusion Detection for Government Infrastructure',
-    'Member Names': 'Dipendra Karki,Muna Acharya,Rajan Puri',
-    'Roll Numbers': '080BCT011,080BCT012,080BCT013',
-  },
-];
+  const assigned = new Set();
+  (await p.groupMember.findMany({ select: { studentId: true } })).forEach(x => assigned.add(x.studentId));
+  (await p.thesis.findMany({ select: { studentId: true } })).forEach(x => assigned.add(x.studentId));
 
-const bachelorWS = XLSX.utils.json_to_sheet(bachelorData);
-const bachelorWB = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(bachelorWB, bachelorWS, 'Bachelor Projects');
-XLSX.writeFile(bachelorWB, path.join(outDir, 'sample_bachelor_projects.xlsx'));
-console.log('Created sample_bachelor_projects.xlsx');
+  // ── BACHELOR GROUPS ──
+  const bctStudents = await p.user.findMany({
+    where: { role: 'STUDENT', degreeType: 'BACHELOR', programId: progBCT.id },
+    orderBy: { rollNumber: 'asc' },
+  });
 
-// ============================================================
-// Master Theses Sample
-// ============================================================
-const thesisData = [
-  {
-    'Project Title': 'Deep Learning for Nepali Sign Language Recognition',
-    'Member Names': 'Pooja Magar',
-    'Roll Numbers': '080BCT001',
-  },
-  {
-    'Project Title': 'Federated Learning for Privacy-Preserving Medical Diagnosis',
-    'Member Names': 'Rajan Puri',
-    'Roll Numbers': '080BCT008',
-  },
-  {
-    'Project Title': 'NLP-based Automatic Question Paper Generator in Nepali',
-    'Member Names': 'Sushma Karki',
-    'Roll Numbers': '080BCT009',
-  },
-];
+  // Use all BCT students (some assigned, some not) — existing ones will be skipped
+  const bachelorData = bctStudents.slice(0, 9).map((s, i) => ({
+    'Group Name': `SampleGroup${Math.floor(i / 3) + 1}`,
+    'Project Title': `Sample Bachelor Project ${Math.floor(i / 3) + 1}`,
+    'Member Names': s.firstName + ' ' + s.lastName,
+    'Roll Numbers': s.rollNumber,
+    'Academic Year': year.year,
+  }));
 
-const thesisWS = XLSX.utils.json_to_sheet(thesisData);
-const thesisWB = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(thesisWB, thesisWS, 'Master Theses');
-XLSX.writeFile(thesisWB, path.join(outDir, 'sample_master_theses.xlsx'));
-console.log('Created sample_master_theses.xlsx');
+  const wb1 = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet(bachelorData);
+  XLSX.utils.book_append_sheet(wb1, ws1, 'Groups');
+  XLSX.writeFile(wb1, 'excel-templates/bachelor_upload_template.xlsx');
+  console.log('Created excel-templates/bachelor_upload_template.xlsx');
+
+  // ── MASTER THESES ──
+  const masterStudents = await p.user.findMany({
+    where: { role: 'STUDENT', degreeType: 'MASTER' },
+    orderBy: { rollNumber: 'asc' },
+  });
+
+  const thesisData = masterStudents.map((s, i) => ({
+    'Student Name': s.firstName + ' ' + s.lastName,
+    'Roll Number': s.rollNumber,
+    'Thesis Title': `Sample Master Thesis ${i + 1}`,
+    'Academic Year': year.year,
+  }));
+
+  const wb2 = XLSX.utils.book_new();
+  const ws2 = XLSX.utils.json_to_sheet(thesisData);
+  XLSX.utils.book_append_sheet(wb2, ws2, 'Theses');
+  XLSX.writeFile(wb2, 'excel-templates/master_upload_template.xlsx');
+  console.log('Created excel-templates/master_upload_template.xlsx');
+
+  await p.$disconnect();
+}
+
+main().catch(e => { console.error(e); p.$disconnect(); });

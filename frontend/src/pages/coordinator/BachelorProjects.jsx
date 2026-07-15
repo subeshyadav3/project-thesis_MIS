@@ -47,6 +47,9 @@ function BachelorProjects() {
   const [editExamSearch, setEditExamSearch] = useState('');
   const [editSupOpen, setEditSupOpen] = useState(false);
   const [editExamOpen, setEditExamOpen] = useState(false);
+  const [editStatus, setEditStatus] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const editSupRef = useRef(null);
   const editExamRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -131,10 +134,9 @@ useEffect(() => {
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
-    if (!selectedFile || !selectedYear) { toast.warning('Select file and academic year'); return; }
+    if (!selectedFile) { toast.warning('Select a file'); return; }
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('academicYearId', selectedYear);
     formData.append('projectType', uploadProjectType);
     try {
       await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -167,9 +169,37 @@ useEffect(() => {
     } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
   };
 
+  const confirmDeleteGroup = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Group',
+      message: 'Are you sure you want to delete this pending group? This cannot be undone.',
+      onConfirm: () => {
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        handleDeleteGroup(id);
+      },
+      danger: true,
+    });
+  };
+
+  const handleDeleteGroup = async (id) => {
+    try {
+      await api.delete(`/groups/${id}`);
+      toast.success('Group deleted');
+      setShowDetail(null);
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+  };
+
   const handleEditSave = async (groupId) => {
     try {
       const promises = [];
+      if (editTitle !== undefined && editTitle !== showDetail.projectTitle) {
+        promises.push(api.put(`/groups/${groupId}`, { projectTitle: editTitle }));
+      }
+      if (editDescription !== undefined && editDescription !== (showDetail.description || '')) {
+        promises.push(api.put(`/groups/${groupId}`, { description: editDescription }));
+      }
       if (editSupId !== undefined) {
         const currentSup = showDetail?.supervisorId?.toString();
         if (editSupId !== currentSup) {
@@ -194,6 +224,9 @@ useEffect(() => {
             }
           }
         }
+      }
+      if (editStatus && editStatus !== showDetail.status) {
+        promises.push(api.put(`/groups/${groupId}/status`, { status: editStatus }));
       }
       await Promise.all(promises);
       toast.success('Changes saved successfully');
@@ -302,10 +335,10 @@ const filteredGroups = useMemo(() => {
 
   const sortedGroups = useMemo(() => {
     return [...filteredByAdvanced].sort((a, b) => {
-      const statusOrder = { ACTIVE: 0, COMPLETED: 1 };
-      return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+      const statusOrder = { PENDING: 0, ACTIVE: 1, COMPLETED: 2 };
+      return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
     });
-  }, [filteredGroups]);
+  }, [filteredByAdvanced]);
 
   const totalPages = Math.ceil(sortedGroups.length / PAGE_SIZE);
   const paginatedGroups = sortedGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -322,6 +355,11 @@ const filteredGroups = useMemo(() => {
   const openDetail = (g, mode) => {
     setShowDetail(g);
     setDetailMode(mode || 'view');
+    if (mode === 'edit') {
+      setEditTitle(g.projectTitle || '');
+      setEditDescription(g.description || '');
+      setEditStatus(g.status || '');
+    }
   };
 
   const safeMembers = (g) => (g.members || []).filter(m => m.student);
@@ -376,6 +414,7 @@ const filteredGroups = useMemo(() => {
   ];
 
   const statusOptions = [
+    { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
@@ -407,6 +446,14 @@ const filteredGroups = useMemo(() => {
                 <h2>{showDetail.name}</h2>
                 <p>{showDetail.projectTitle}</p>
               </div>
+              <div className="modal-header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {showDetail.status === 'PENDING' && detailMode === 'view' && (
+                  <button className="btn btn-sm btn-primary" onClick={() => { setDetailMode('edit'); setEditTitle(showDetail.projectTitle || ''); setEditDescription(showDetail.description || ''); setEditStatus('ACTIVE'); }}>
+                    <span className="material-symbols-outlined">play_arrow</span>
+                    Make Active
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="detail-section">
@@ -425,6 +472,10 @@ const filteredGroups = useMemo(() => {
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
                   <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
+                </div>
+                <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
+                  <span className="detail-label">Description</span>
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{showDetail.description || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Supervisor</span>
@@ -482,6 +533,23 @@ const filteredGroups = useMemo(() => {
               <div className="detail-section">
                 <h4 className="detail-section-title">Edit Assignments</h4>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: 300 }}>
+                    <label>Project Title</label>
+                    <input className="form-input" type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 300 }}>
+                    <label>Description</label>
+                    <textarea className="form-input" rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Project description..." />
+                  </div>
+                  {showDetail.status === 'PENDING' && (
+                    <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                      <label>Status</label>
+                      <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                        <option value="PENDING">Pending</option>
+                        <option value="ACTIVE">Active</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
                     <div className="sup-dropdown-trigger">
@@ -591,10 +659,16 @@ const filteredGroups = useMemo(() => {
                   Save Changes
                 </button>
               )}
-              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+              {showDetail.status === 'ACTIVE' && detailMode !== 'edit' && (
                 <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
                   <span className="material-symbols-outlined">check_circle</span>
                   Mark Complete
+                </button>
+              )}
+              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+                <button className="btn btn-danger" onClick={() => confirmDeleteGroup(showDetail.id)}>
+                  <span className="material-symbols-outlined">delete</span>
+                  Delete
                 </button>
               )}
 
@@ -633,8 +707,8 @@ const filteredGroups = useMemo(() => {
 
       {selectedGroups.length > 1 && (
         <div className="card" style={{ padding: 12, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Assign Supervisor ({selectedGroups.length} groups)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Actions ({selectedGroups.length} groups)</span>
             <select className="form-input" style={{ width: 200 }} value={bulkSupervisorId} onChange={e => setBulkSupervisorId(e.target.value)}>
               <option value="">Select supervisor...</option>
               {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
@@ -651,6 +725,45 @@ const filteredGroups = useMemo(() => {
                 toast.error(err.response?.data?.error || 'Bulk assign failed');
               }
             }}>Assign</button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const pending = selectedGroups.filter(g => g.status === 'PENDING');
+              if (pending.length === 0) return toast.warning('No pending groups selected');
+              try {
+                await Promise.all(pending.map(g => api.put(`/groups/${g.id}/status`, { status: 'ACTIVE' })));
+                toast.success(`Activated ${pending.length} groups`);
+                setSelectedGroups([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk activate failed');
+              }
+            }}>
+              <span className="material-symbols-outlined">play_arrow</span>
+              Make Active
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={() => {
+              const pending = selectedGroups.filter(g => g.status === 'PENDING');
+              if (pending.length === 0) return toast.warning('No pending groups selected');
+              setConfirmDialog({
+                open: true,
+                title: 'Delete Groups',
+                message: `Are you sure you want to delete ${pending.length} pending groups? This cannot be undone.`,
+                onConfirm: async () => {
+                  try {
+                    await Promise.all(pending.map(g => api.delete(`/groups/${g.id}`)));
+                    toast.success(`Deleted ${pending.length} groups`);
+                    setSelectedGroups([]);
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                    loadData();
+                  } catch (err) {
+                    toast.error(err.response?.data?.error || 'Bulk delete failed');
+                  }
+                },
+                danger: true,
+              });
+            }}>
+              <span className="material-symbols-outlined">delete</span>
+              Delete
+            </button>
           </div>
         </div>
       )}
@@ -681,15 +794,24 @@ const filteredGroups = useMemo(() => {
           </div>
         ) : (
           <>
-            <table>
+            <table style={{ tableLayout: 'fixed', minWidth: 0 }}>
+              <colgroup>
+                <col style={{ width: 32 }} />
+                <col />
+                <col />
+                <col style={{ width: 65 }} />
+                <col />
+                <col style={{ width: 95 }} />
+                <col style={{ width: 60 }} />
+                <col style={{ width: 155 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}></th>
+                  <th></th>
                   <th>Group</th>
                   <th>Project Title</th>
                   <th>Type</th>
                   <th>Members</th>
-                  <th>Supervisor</th>
                   <th>Status</th>
                   <th>Year</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -698,79 +820,68 @@ const filteredGroups = useMemo(() => {
               <tbody>
                   {paginatedGroups.map(g => (
                   <tr key={g.id} onClick={() => navigate(`/coordinator/project/group/${g.id}`)} style={{ cursor: 'pointer' }}>
-                    <td onClick={e => e.stopPropagation()}>
+                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '8px 12px' }}>
                       <input type="checkbox" checked={selectedGroups.includes(g)} onChange={() => {
                         setSelectedGroups(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
                       }} />
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div className="default-badge">{g.name?.slice(0, 2).toUpperCase()}</div>
-                        <span style={{ fontWeight: 500 }}>{g.name}</span>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="default-badge" style={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{g.name?.slice(0, 2).toUpperCase()}</div>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>{g.name}</span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                    <td>
-                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 11 }}>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 10 }}>
                         <span className="dot" />
                         {g.projectType === 'MAJOR' ? 'Major' : 'Minor'}
                       </span>
                     </td>
-                    <td>
-                      <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                      <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>
                         {safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(', ') || '—'}
                       </span>
                     </td>
-                    <td>
-                      {g.supervisor ? (
-                        <span style={{ fontWeight: 500, color: 'var(--color-primary)' }}>
-                          {g.supervisor.firstName} {g.supervisor.lastName}
-                        </span>
-                      ) : (
-                        <span className="badge badge-pending">
-                          <span className="dot" />
-                          Unassigned
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10 }}>
                         <span className="dot" />
                         {g.status || 'PENDING'}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(g.academicYear) || '—'}
                     </td>
-                    <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-sm btn-outline" onClick={() => openDetail(g, 'view')}>
-                          <span className="material-symbols-outlined">visibility</span>
-                          View
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-sm btn-outline" title="View" onClick={() => openDetail(g, 'view')} style={{ padding: '3px 5px', minWidth: 0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
                         </button>
                         {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
-                            <span className="material-symbols-outlined">edit</span>
-                            Edit
+                          <button className="btn btn-sm btn-outline-primary" title="Edit" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                          </button>
+                        )}
+                        {g.status === 'ACTIVE' && (
+                          <button className="btn btn-sm btn-success" title="Complete" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
                           </button>
                         )}
                         {g.status === 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline" onClick={() => {
+                          <button className="btn btn-sm btn-outline" title="Download PDF" onClick={() => {
                             const a = document.createElement('a');
                             a.href = `/api/print/group/${g.id}`;
                             a.download = `evaluation_${g.id}.pdf`;
                             document.body.appendChild(a);
                             a.click();
                             document.body.removeChild(a);
-                          }}>
-                            <span className="material-symbols-outlined">download</span>
-                            PDF
+                          }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
                           </button>
                         )}
                         {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }}>
-                            <span className="material-symbols-outlined">check_circle</span>
-                            Complete
+                          <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteGroup(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
                           </button>
                         )}
                       </div>
@@ -805,13 +916,6 @@ const filteredGroups = useMemo(() => {
             </div>
             <form onSubmit={handleFileUpload}>
               <div className="form-group">
-                <label>Academic Year</label>
-                <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} required>
-                  <option value="">Select academic year...</option>
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
                 <label>Project Type</label>
                 <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
                   <option value="MINOR">Minor Project</option>
@@ -821,10 +925,10 @@ const filteredGroups = useMemo(() => {
               <div className="form-group">
                 <label>Excel File (.xlsx)</label>
                 <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
+                <a href="/bachelor_upload_template.xlsx" download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span> Download blank template
+                </a>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginBottom: 8 }}>
-                Required columns: Group Name, Project Title, Member Names, Roll Numbers
-              </p>
             <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
                   <span className="material-symbols-outlined">close</span>

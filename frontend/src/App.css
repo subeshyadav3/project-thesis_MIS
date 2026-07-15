@@ -101,6 +101,19 @@
 
   /* ─── Material Symbols config ──────────────── */
   .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined Variable';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
     user-select: none;
   }
@@ -1191,10 +1204,10 @@
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
+    gap: 4px;
+    padding: 2px 8px;
     border-radius: 50px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     font-family: var(--font-label);
     border: 1px solid transparent;
@@ -1202,8 +1215,8 @@
   }
 
   .badge .dot {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
   }
 
