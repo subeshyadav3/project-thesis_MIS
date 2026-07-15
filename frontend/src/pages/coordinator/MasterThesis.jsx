@@ -42,6 +42,8 @@ function MasterThesis() {
   const [editExamSearch, setEditExamSearch] = useState('');
   const [editSupOpen, setEditSupOpen] = useState(false);
   const [editExamOpen, setEditExamOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const editSupRef = useRef(null);
   const editExamRef = useRef(null);
   const [examSearch, setExamSearch] = useState('');
@@ -122,10 +124,9 @@ useEffect(() => {
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
-    if (!selectedFile || !selectedYear) { toast.warning('Select file and academic year'); return; }
+    if (!selectedFile) { toast.warning('Select a file'); return; }
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('academicYearId', selectedYear);
     try {
       await api.post('/theses/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Theses imported successfully');
@@ -142,6 +143,28 @@ const handleComplete = async (id) => {
       setShowDetail(null);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+  };
+
+  const confirmDeleteThesis = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Thesis',
+      message: 'Are you sure you want to delete this pending thesis? This cannot be undone.',
+      onConfirm: () => {
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        handleDeleteThesis(id);
+      },
+      danger: true,
+    });
+  };
+
+  const handleDeleteThesis = async (id) => {
+    try {
+      await api.delete(`/theses/${id}`);
+      toast.success('Thesis deleted');
+      setShowDetail(null);
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
   };
 
   const confirmComplete = (id) => {
@@ -168,6 +191,12 @@ const handleComplete = async (id) => {
   const handleEditSave = async (thesisId) => {
     try {
       const promises = [];
+      if (editTitle !== undefined && editTitle !== showDetail.title) {
+        promises.push(api.put(`/theses/${thesisId}`, { title: editTitle }));
+      }
+      if (editDescription !== undefined && editDescription !== (showDetail.description || '')) {
+        promises.push(api.put(`/theses/${thesisId}`, { description: editDescription }));
+      }
       if (editSupId !== undefined) {
         const currentSup = showDetail?.supervisorId?.toString();
         if (editSupId !== currentSup) {
@@ -218,8 +247,8 @@ const handleComplete = async (id) => {
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
-      const statusOrder = { ACTIVE: 0, COMPLETED: 1 };
-      return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+      const statusOrder = { PENDING: 0, ACTIVE: 1, COMPLETED: 2 };
+      return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
     });
   }, [filteredTheses]);
 
@@ -236,6 +265,10 @@ const handleComplete = async (id) => {
   const openDetail = (t, mode) => {
     setShowDetail(t);
     setDetailMode(mode || 'view');
+    if (mode === 'edit') {
+      setEditTitle(t.title || '');
+      setEditDescription(t.description || '');
+    }
   };
 
   const formatAcademicYear = (ay) => {
@@ -282,6 +315,7 @@ const handleComplete = async (id) => {
   );
 
   const statusOptions = [
+    { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
@@ -332,6 +366,10 @@ return (
                   <span className="detail-label">Created</span>
                   <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
                 </div>
+                <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
+                  <span className="detail-label">Description</span>
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{showDetail.description || '—'}</span>
+                </div>
                 <div className="detail-item">
                   <span className="detail-label">Supervisor</span>
                   <span>{showDetail.supervisor
@@ -378,6 +416,14 @@ return (
               <div className="detail-section">
                 <h4 className="detail-section-title">Edit Assignments</h4>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: 300 }}>
+                    <label>Thesis Title</label>
+                    <input className="form-input" type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 300 }}>
+                    <label>Description</label>
+                    <textarea className="form-input" rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Thesis description..." />
+                  </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
                     <div className="sup-dropdown-trigger">
@@ -489,10 +535,16 @@ return (
                   Save Changes
                 </button>
               )}
-              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+              {showDetail.status === 'ACTIVE' && detailMode !== 'edit' && (
                 <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
                   <span className="material-symbols-outlined">check_circle</span>
                   Mark Complete
+                </button>
+              )}
+              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+                <button className="btn btn-danger" onClick={() => confirmDeleteThesis(showDetail.id)}>
+                  <span className="material-symbols-outlined">delete</span>
+                  Delete
                 </button>
               )}
             </div>
@@ -544,7 +596,7 @@ return (
           </div>
         ) : (
           <>
-            <table>
+            <table style={{ minWidth: 0 }}>
               <thead>
                 <tr>
                   <th>Student</th>
@@ -552,15 +604,15 @@ return (
                   <th>Supervisor</th>
                   <th>Status</th>
                   <th>Year</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th style={{ textAlign: 'right', width: '1%', whiteSpace: 'nowrap' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedTheses.map(t => (
                   <tr key={t.id} onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)} style={{ cursor: 'pointer' }}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div className="default-badge">
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="default-badge" style={{ width: 28, height: 28, fontSize: 10 }}>
                           {t.student?.firstName?.charAt(0)}{t.student?.lastName?.charAt(0)}
                         </div>
                         <span style={{ fontWeight: 500 }}>
@@ -568,57 +620,58 @@ return (
                         </span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
-                    <td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
                       {t.supervisor ? (
-                        <span style={{ fontWeight: 500, color: 'var(--color-primary)' }}>
+                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 13 }}>
                           {t.supervisor.firstName} {t.supervisor.lastName}
                         </span>
                       ) : (
-                        <span className="badge badge-pending">
+                        <span className="badge badge-pending" style={{ fontSize: 10 }}>
                           <span className="dot" />
                           Unassigned
                         </span>
                       )}
                     </td>
-                    <td>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10 }}>
                         <span className="dot" />
                         {t.status || 'PENDING'}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(t.academicYear) || '—'}
                     </td>
-                    <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-sm btn-outline" onClick={() => openDetail(t, 'view')}>
-                          <span className="material-symbols-outlined">visibility</span>
-                          View
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-sm btn-outline" title="View" onClick={() => openDetail(t, 'view')} style={{ padding: '3px 5px', minWidth: 0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
                         </button>
                         {t.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline-primary" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
-                            <span className="material-symbols-outlined">edit</span>
-                            Edit
+                          <button className="btn btn-sm btn-outline-primary" title="Edit" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                          </button>
+                        )}
+                        {t.status === 'ACTIVE' && (
+                          <button className="btn btn-sm btn-success" title="Complete" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
                           </button>
                         )}
                         {t.status === 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline" onClick={() => {
+                          <button className="btn btn-sm btn-outline" title="Download PDF" onClick={() => {
                             const a = document.createElement('a');
                             a.href = `/api/print/thesis/${t.id}`;
                             a.download = `evaluation_${t.id}.pdf`;
                             document.body.appendChild(a);
                             a.click();
                             document.body.removeChild(a);
-                          }}>
-                            <span className="material-symbols-outlined">download</span>
-                            PDF
+                          }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
                           </button>
                         )}
                         {t.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }}>
-                            <span className="material-symbols-outlined">check_circle</span>
-                            Complete
+                          <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteThesis(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
                           </button>
                         )}
                       </div>
@@ -653,19 +706,12 @@ return (
             </div>
             <form onSubmit={handleFileUpload}>
               <div className="form-group">
-                <label>Academic Year</label>
-                <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} required>
-                  <option value="">Select academic year...</option>
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
                 <label>Excel File (.xlsx)</label>
                 <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
+                <a href="/master_upload_template.xlsx" download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span> Download blank template
+                </a>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginBottom: 8 }}>
-                Required columns: Project Title, Student Name, Roll Number
-              </p>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
                   <span className="material-symbols-outlined">close</span>

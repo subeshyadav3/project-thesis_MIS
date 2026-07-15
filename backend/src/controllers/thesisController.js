@@ -96,31 +96,64 @@ exports.uploadExcel = async (req, res) => {
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(sheet);
-    const { academicYearId } = req.body;
     const created = [];
+    const skipped = [];
     for (const row of data) {
       const title = row['Project Title'] || row['title'] || row['projectTitle'];
       const studentName = (row['Member Names'] || row['studentName'] || '').toString();
       const rollNumber = (row['Roll Numbers'] || row['rollNumbers'] || '').toString();
+      const yearValue = (row['Academic Year'] || row['academicYear'] || row['year'] || '').toString().trim();
+      // Skip blank rows
+      if (!title || !rollNumber) {
+        skipped.push({ title: title || '(blank)', reason: 'Empty project title or roll number' });
+        continue;
+      }
+      // Resolve academic year
+      const academicYear = await prisma.academicYear.findFirst({
+        where: { year: yearValue, departmentId: req.user.departmentId },
+      });
+      if (!academicYear) {
+        return res.status(400).json({ error: `Academic year "${yearValue}" not found for your department` });
+      }
       const nameParts = studentName.split(' ');
       const firstName = nameParts[0] || studentName;
       const lastName = nameParts.slice(1).join(' ') || '';
-      let student = await prisma.user.findFirst({
-        where: { lastName, firstName, role: 'STUDENT' },
-      });
+      const email = `${rollNumber.toLowerCase()}@pcampus.edu.np`;
+      let student = await prisma.user.findFirst({ where: { email } });
       if (!student) {
-        student = await prisma.user.create({
-          data: {
-            email: `${rollNumber.toLowerCase()}@pcampus.edu.np`,
-            password: await bcrypt.hash('student123', 10),
-            firstName,
-            lastName,
-            role: 'STUDENT',
-          },
+        student = await prisma.user.findFirst({
+          where: { lastName, firstName, role: 'STUDENT' },
         });
+        if (!student) {
+          student = await prisma.user.create({
+            data: {
+              email,
+              password: await bcrypt.hash('subesh', 10),
+              firstName,
+              lastName,
+              role: 'STUDENT',
+            },
+          });
+        }
+      }
+      // Skip if student already has an active thesis
+      const activeThesis = await prisma.thesis.findFirst({
+        where: { studentId: student.id, status: { in: ['PENDING', 'ACTIVE'] } },
+      });
+      if (activeThesis) {
+        skipped.push({ student: `${student.firstName} ${student.lastName}`, roll: rollNumber, reason: `Already has an active thesis: "${activeThesis.title}" (status: ${activeThesis.status})` });
+        continue;
+      }
+      // Skip if same thesis title already exists for this student and academic year
+      const duplicateThesis = await prisma.thesis.findFirst({
+        where: { title, studentId: student.id, academicYearId: academicYear.id },
+      });
+      if (duplicateThesis) {
+        skipped.push({ student: `${student.firstName} ${student.lastName}`, roll: rollNumber, reason: `Duplicate thesis: "${title}" already exists for this student and year` });
+        continue;
       }
       const thesis = await prisma.thesis.create({
-        data: { title, projectType: 'MASTER', studentId: student.id, academicYearId: parseInt(academicYearId) },
+        data: { title, projectType: 'MASTER', studentId: student.id, status: 'ACTIVE', academicYearId: academicYear.id },
       });
       const defaults = getDefaultComponents('MASTER');
       for (const comp of defaults) {
@@ -130,8 +163,12 @@ exports.uploadExcel = async (req, res) => {
       }
       created.push(thesis);
     }
-    audit.log({ action: 'CREATE', entity: 'Thesis', details: `Imported ${created.length} theses via Excel`, performedById: req.user.id });
-    res.status(201).json({ message: `${created.length} theses created`, theses: created });
+    audit.log({ action: 'CREATE', entity: 'Thesis', details: `Imported ${created.length} theses via Excel${skipped.length ? `, ${skipped.length} students skipped` : ''}`, performedById: req.user.id });
+    res.status(201).json({
+      message: `${created.length} theses created${skipped.length ? `, ${skipped.length} students skipped` : ''}`,
+      theses: created,
+      skipped: skipped.length ? skipped : undefined,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -224,5 +261,49 @@ exports.exportTheses = async (req, res) => {
     res.send(buf);
   } catch (error) {
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+exports.deleteThesis = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const thesis = await prisma.thesis.findUnique({
+      where: { id },
+      include: { proposals: true, evaluations: true },
+    });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    // Allow delete if PENDING, or if no files uploaded AND no evaluations done
+    if (thesis.status !== 'PENDING' && (thesis.proposals.length > 0 || thesis.evaluations.length > 0)) {
+      return res.status(400).json({ error: 'Cannot delete: thesis has files uploaded or evaluations completed' });
+    }
+    await prisma.$transaction([
+      prisma.evaluation.deleteMany({ where: { thesisId: id } }),
+      prisma.evaluationComponent.deleteMany({ where: { thesisId: id } }),
+      prisma.proposal.deleteMany({ where: { thesisId: id } }),
+      prisma.examinerAssignment.deleteMany({ where: { thesisId: id } }),
+      prisma.thesis.delete({ where: { id } }),
+    ]);
+    audit.log({ action: 'DELETE', entity: 'Thesis', entityId: id, details: `Deleted thesis "${thesis.title}"`, performedById: req.user.id });
+    res.json({ message: 'Thesis deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.updateThesis = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { title, description } = req.body;
+    const data = {};
+    if (title !== undefined) data.title = title;
+    if (description !== undefined) data.description = description;
+    const thesis = await prisma.thesis.update({
+      where: { id },
+      data,
+    });
+    audit.log({ action: 'UPDATE', entity: 'Thesis', entityId: id, details: `Updated thesis "${thesis.title}"`, performedById: req.user.id });
+    res.json({ message: 'Thesis updated', thesis });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

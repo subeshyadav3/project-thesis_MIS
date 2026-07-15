@@ -54,6 +54,11 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
         <input className="form-input" value={createForm.projectTitle} onChange={e => setCreateForm({...createForm, projectTitle: e.target.value})} placeholder="Enter project title" />
       </div>
 
+      <div className="form-group" style={{ margin: 0 }}>
+        <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+        <textarea className="form-input" rows={3} value={createForm.description || ''} onChange={e => setCreateForm({...createForm, description: e.target.value})} placeholder="Brief description of your project..." />
+      </div>
+
       <div style={{ borderTop: '1px solid var(--color-outline-variant)', paddingTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
@@ -139,7 +144,7 @@ function StudentGroups() {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAnn, setSelectedAnn] = useState(null);
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '' });
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', description: '' });
   const [inviteSearch, setInviteSearch] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -177,12 +182,13 @@ function StudentGroups() {
         announcementId: selectedAnn.id,
         name: createForm.name.trim() || undefined,
         projectTitle: createForm.projectTitle.trim() || undefined,
+        description: createForm.description?.trim() || undefined,
         programId: user.programId,
         memberIds: selectedMembers,
       });
       toast.success('Group created!');
       setSelectedAnn(null);
-      setCreateForm({ name: '', projectTitle: '' });
+      setCreateForm({ name: '', projectTitle: '', description: '' });
       setSelectedMembers([]);
       loadAll();
     } catch (err) {
