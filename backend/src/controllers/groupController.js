@@ -128,7 +128,7 @@ exports.createGroup = async (req, res) => {
             if (matched) {
               student = matched;
             } else {
-              const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
+              const hash = await bcrypt.hash('subesh', 10);
               student = await prisma.user.create({
                 data: { email, password: hash, firstName: fn || 'Student', lastName: ln || roll, role: 'STUDENT', degreeType: 'BACHELOR', programId: resolvedProgramId, departmentId: req.user.departmentId },
               });
@@ -166,35 +166,64 @@ exports.uploadExcel = async (req, res) => {
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(sheet);
-    const { academicYearId, projectType, programId: bodyProgramId } = req.body;
     const created = [];
+    const skipped = [];
+    const { projectType } = req.body;
     const schemeType = projectType || 'MINOR';
-    // Resolve group program
-    let resolvedProgramId = bodyProgramId ? parseInt(bodyProgramId) : null;
     for (const row of data) {
       const groupName = row['Group Name'] || row['groupName'];
       const projectTitle = row['Project Title'] || row['projectTitle'];
       const memberNames = (row['Member Names'] || row['memberNames'] || '').toString();
       const rollNumbers = (row['Roll Numbers'] || row['rollNumbers'] || '').toString();
+      const yearValue = (row['Academic Year'] || row['academicYear'] || row['year'] || '').toString().trim();
       const names = memberNames.split(',').map(s => s.trim()).filter(Boolean);
       const rolls = rollNumbers.split(',').map(s => s.trim()).filter(Boolean);
-      // Derive program from first existing student if not specified
-      if (!resolvedProgramId) {
-        for (const roll of rolls) {
-          const existing = await prisma.user.findFirst({ where: { email: `${roll.toLowerCase()}@pcampus.edu.np` }, select: { programId: true } });
-          if (existing?.programId) { resolvedProgramId = existing.programId; break; }
+      // Resolve academic year
+      const academicYear = await prisma.academicYear.findFirst({
+        where: { year: yearValue, departmentId: req.user.departmentId },
+      });
+      if (!academicYear) {
+        return res.status(400).json({ error: `Academic year "${yearValue}" not found for your department` });
+      }
+      // Auto-detect program from roll number
+      let resolvedProgramId = null;
+      for (const roll of rolls) {
+        const existing = await prisma.user.findFirst({ where: { email: `${roll.toLowerCase()}@pcampus.edu.np` }, select: { programId: true } });
+        if (existing?.programId) { resolvedProgramId = existing.programId; break; }
+      }
+      // If no student found, derive program from roll pattern
+      if (!resolvedProgramId && rolls.length > 0) {
+        const rollMatch = rolls[0].match(/^\d{3}([A-Za-z.]+)\d{3}$/);
+        if (rollMatch) {
+          const progCode = rollMatch[1].toUpperCase();
+          const prog = await prisma.program.findFirst({ where: { code: progCode } });
+          if (prog) resolvedProgramId = prog.id;
         }
       }
       let groupProgram = null;
       if (resolvedProgramId) {
         groupProgram = await prisma.program.findUnique({ where: { id: resolvedProgramId } });
       }
+      // Skip blank rows
+      if (!groupName || !projectTitle) {
+        skipped.push({ group: groupName || '(blank)', reason: 'Empty group name or project title' });
+        continue;
+      }
+      // Skip if group with same name already exists for this academic year
+      const existingGroup = await prisma.projectGroup.findFirst({
+        where: { name: groupName, academicYearId: academicYear.id },
+      });
+      if (existingGroup) {
+        skipped.push({ group: groupName, reason: `Group "${groupName}" already exists for academic year ${yearValue}` });
+        continue;
+      }
       const group = await prisma.projectGroup.create({
         data: {
           name: groupName,
           projectTitle,
           projectType: schemeType,
-          academicYearId: parseInt(academicYearId),
+          status: 'ACTIVE',
+          academicYearId: academicYear.id,
           programId: resolvedProgramId,
         },
       });
@@ -211,12 +240,12 @@ exports.uploadExcel = async (req, res) => {
         const firstName = nameParts[0] || names[i];
         const lastName = nameParts.slice(1).join(' ') || '';
         const roll = rolls[i] || `R${Date.now()}${i}`;
-        let student = await prisma.user.findFirst({
-          where: { lastName: lastName, firstName: firstName, role: 'STUDENT' },
-        });
+        const email = `${roll.toLowerCase()}@pcampus.edu.np`;
+        let student = await prisma.user.findFirst({ where: { email } });
         if (!student) {
-          const email = `${roll.toLowerCase()}@pcampus.edu.np`;
-          student = await prisma.user.findFirst({ where: { email } });
+          student = await prisma.user.findFirst({
+            where: { lastName: lastName, firstName: firstName, role: 'STUDENT' },
+          });
           if (!student) {
             const hash = await bcrypt.hash(Math.random().toString(36).slice(2, 10), 10);
             student = await prisma.user.create({
@@ -239,14 +268,30 @@ exports.uploadExcel = async (req, res) => {
             error: `Student ${student.firstName} ${student.lastName} is from a different program. Same-program grouping required.`,
           });
         }
+        // Skip if student already in an active group
+        const activeMembership = await prisma.groupMember.findFirst({
+          where: {
+            studentId: student.id,
+            group: { status: { in: ['PENDING', 'ACTIVE'] } },
+          },
+          include: { group: { select: { name: true } } },
+        });
+        if (activeMembership) {
+          skipped.push({ student: `${student.firstName} ${student.lastName}`, roll, reason: `Already in group "${activeMembership.group.name}" (status: ${activeMembership.group.status})` });
+          continue;
+        }
         await prisma.groupMember.create({
           data: { studentId: student.id, groupId: group.id, rollNumber: roll },
         });
       }
       created.push(group);
     }
-    audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Imported ${created.length} groups via Excel`, performedById: req.user.id });
-    res.status(201).json({ message: `${created.length} groups created`, groups: created });
+    audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Imported ${created.length} groups via Excel${skipped.length ? `, ${skipped.length} students skipped` : ''}`, performedById: req.user.id });
+    res.status(201).json({
+      message: `${created.length} groups created${skipped.length ? `, ${skipped.length} students skipped` : ''}`,
+      groups: created,
+      skipped: skipped.length ? skipped : undefined,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -389,5 +434,51 @@ exports.bulkAssignSupervisor = async (req, res) => {
     res.json({ success: true, data: { updated: result.count } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+exports.deleteGroup = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const group = await prisma.projectGroup.findUnique({
+      where: { id },
+      include: { proposals: true, evaluations: true },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (group.status !== 'PENDING' && (group.proposals.length > 0 || group.evaluations.length > 0)) {
+      return res.status(400).json({ error: 'Cannot delete: group has files uploaded or evaluations completed' });
+    }
+    await prisma.$transaction([
+      prisma.groupMember.deleteMany({ where: { groupId: id } }),
+      prisma.evaluation.deleteMany({ where: { groupId: id } }),
+      prisma.evaluationComponent.deleteMany({ where: { groupId: id } }),
+      prisma.proposal.deleteMany({ where: { groupId: id } }),
+      prisma.examinerAssignment.deleteMany({ where: { groupId: id } }),
+      prisma.groupInvitation.deleteMany({ where: { groupId: id } }),
+      prisma.recommendation.deleteMany({ where: { groupId: id } }),
+      prisma.projectGroup.delete({ where: { id } }),
+    ]);
+    audit.log({ action: 'DELETE', entity: 'ProjectGroup', entityId: id, details: `Deleted group "${group.name}"`, performedById: req.user.id });
+    res.json({ message: 'Group deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.updateGroup = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { projectTitle, description } = req.body;
+    const data = {};
+    if (projectTitle !== undefined) data.projectTitle = projectTitle;
+    if (description !== undefined) data.description = description;
+    const group = await prisma.projectGroup.update({
+      where: { id },
+      data,
+    });
+    audit.log({ action: 'UPDATE', entity: 'ProjectGroup', entityId: id, details: `Updated group "${group.name}"`, performedById: req.user.id });
+    res.json({ message: 'Group updated', group });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

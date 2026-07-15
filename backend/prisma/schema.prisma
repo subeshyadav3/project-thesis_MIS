@@ -220,6 +220,7 @@ model ProjectGroup {
   id             Int                 @id @default(autoincrement())
   name           String
   projectTitle   String
+  description    String             @default("")
   projectType    BachelorProjectType @default(MINOR)
   status         GroupStatus         @default(PENDING)
   supervisorId   Int?
@@ -265,6 +266,7 @@ model GroupMember {
 model Thesis {
   id             Int          @id @default(autoincrement())
   title          String
+  description    String       @default("")
   projectType    String       @default("MASTER")
   studentId      Int
   student        User         @relation("StudentTheses", fields: [studentId], references: [id])
