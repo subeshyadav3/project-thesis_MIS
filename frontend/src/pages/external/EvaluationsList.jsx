@@ -4,7 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import ConfirmDialog from '../../components/ConfirmDialog';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -13,9 +13,8 @@ function ExternalEvaluationsList() {
   const [theses, setTheses] = useState([]);
   const [activeTab, setActiveTab] = useState('groups');
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState(null);
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: null });
   const toast = useToast();
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -31,68 +30,6 @@ function ExternalEvaluationsList() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
-
-  const finalizeEvaluation = async (componentId, payload) => {
-    try {
-      await api.put(`/evaluations/${componentId}/complete`, payload);
-      toast.success('Evaluation finalized');
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); }
-    finally { setCompleting(null); }
-  };
-
-  const handleCompleteGroup = async (id) => {
-    setCompleting(id);
-    try {
-      const { data } = await api.get(`/evaluations/group/${id}`);
-      const extComp = (data.components || []).find(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-      if (!extComp) { toast.error('No examiner component found'); setCompleting(null); return; }
-      const evaluation = (data.evaluations || []).find(e => e.componentId === extComp.id);
-      if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
-        setCompleting(null);
-        setConfirmDialog({
-          open: true,
-          message: 'No marks submitted yet. Complete without marks?',
-          onConfirm: () => {
-            setConfirmDialog({ open: false, message: '', onConfirm: null });
-            setCompleting(extComp.id);
-            finalizeEvaluation(extComp.id, { groupId: id });
-          }
-        });
-        return;
-      }
-      await finalizeEvaluation(extComp.id, { groupId: id });
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); setCompleting(null); }
-  };
-
-  const handleCompleteThesis = async (id) => {
-    setCompleting(id);
-    try {
-      const { data } = await api.get(`/evaluations/thesis/${id}`);
-      const extComps = (data.components || []).filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-      if (!extComps.length) { toast.error('No examiner component found'); setCompleting(null); return; }
-      const allHaveMarks = extComps.every(comp => {
-        const e = (data.evaluations || []).find(ev => ev.componentId === comp.id);
-        return e && e.marks !== null && e.marks !== undefined;
-      });
-      if (!allHaveMarks) {
-        setCompleting(null);
-        setConfirmDialog({
-          open: true,
-          message: 'Some criteria have no marks. Complete without marks?',
-          onConfirm: () => {
-            setConfirmDialog({ open: false, message: '', onConfirm: null });
-            extComps.forEach(comp => {
-              finalizeEvaluation(comp.id, { thesisId: id });
-            });
-          }
-        });
-        return;
-      }
-      for (const comp of extComps) {
-        await finalizeEvaluation(comp.id, { thesisId: id });
-      }
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete'); setCompleting(null); }
-  };
 
   const groupsWithStatus = useMemo(() => {
     return groups.map(g => {
@@ -190,8 +127,11 @@ function ExternalEvaluationsList() {
                         </td>
                         <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                            <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/external/evaluate/group/${g.id}`)}>
-                              <span className="material-symbols-outlined">grading</span> Evaluate
+                            <button className="btn btn-sm btn-outline" onClick={() => navigate(`/external/evaluate/group/${g.id}`)}>
+                              <span className="material-symbols-outlined">visibility</span> View
+                            </button>
+                            <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(g); }}>
+                              <span className="material-symbols-outlined">picture_as_pdf</span> PDF
                             </button>
                           </div>
                         </td>
@@ -234,8 +174,11 @@ function ExternalEvaluationsList() {
                         <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.supervisor ? `${t.supervisor.designation ? t.supervisor.designation + ' ' : ''}${t.supervisor.firstName} ${t.supervisor.lastName}` : '—'}</td>
                         <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                            <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)}>
-                              <span className="material-symbols-outlined">grading</span> Evaluate
+                            <button className="btn btn-sm btn-outline" onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)}>
+                              <span className="material-symbols-outlined">visibility</span> View
+                            </button>
+                            <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(t); }}>
+                              <span className="material-symbols-outlined">picture_as_pdf</span> PDF
                             </button>
                           </div>
                         </td>
@@ -248,17 +191,15 @@ function ExternalEvaluationsList() {
           )}
         </>
       )}
-      <ConfirmDialog
-        open={confirmDialog.open}
-        title="Confirm"
-        message={confirmDialog.message}
-        onConfirm={() => {
-          const fn = confirmDialog.onConfirm;
-          setConfirmDialog({ open: false, message: '', onConfirm: null });
-          fn?.();
-        }}
-        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: null })}
-      />
+      {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type={pdfPreviewItem.title ? 'thesis' : 'group'}
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+          onSave={() => { setPdfPreviewItem(null); window.location.reload(); }}
+          {...(pdfPreviewItem.title ? { initialScope: 'external' } : {})}
+        />
+      )}
     </PageLayout>
     </ErrorBoundary>
   );

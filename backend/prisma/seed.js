@@ -223,6 +223,9 @@ async function main() {
   for (const s of studentDefs) {
     const progCode = getProgramFromRoll(s.roll);
     const program = programs[progCode];
+    // Derive batch from roll number prefix (e.g., "080BCT001" → "2080")
+    const rollMatch = s.roll.match(/^(\d{3})/);
+    const batch = rollMatch ? `20${rollMatch[1]}` : null;
     students.push(await prisma.user.create({
       data: {
         email: `${s.roll.toLowerCase()}@pcampus.edu.np`,
@@ -232,6 +235,7 @@ async function main() {
         role: 'STUDENT',
         degreeType: s.degreeType,
         rollNumber: s.roll,
+        batch,
         departmentId: program.departmentId,
         programId: program.id,
       },
@@ -357,6 +361,10 @@ async function main() {
   for (let i = 0; i < thesisDefs.length; i++) {
     const t = thesisDefs[i];
     const student = students[t.studentOffset];
+    // Derive program cluster from student's roll number (Prisma create doesn't return relations)
+    const studentDef = studentDefs[t.studentOffset];
+    const progCode = getProgramFromRoll(studentDef?.roll || '');
+    const cluster = (progCode && programs[progCode]?.cluster) || null;
     const thesis = await prisma.thesis.create({
       data: {
         title: t.title,
@@ -365,6 +373,8 @@ async function main() {
         status: 'ACTIVE',
         supervisorId: supervisors[t.supIdx % supervisors.length].id,
         academicYearId: ay['2080'].id,
+        batch: student.batch || null,
+        cluster,
       },
     });
     await attachComponents({ thesisId: thesis.id, projectType: 'MASTER' });
@@ -387,24 +397,30 @@ async function main() {
       data: { stage: 'PROPOSAL', documentUrl: '/api/files/groups/sample_proposal.pdf', submittedById: leadStudent.id, groupId: g.id },
     });
     await prisma.evaluation.create({
-      data: { componentId: compByType.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 4.0, comment: 'Strong defense presentation.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: g.id },
+      data: { componentId: compByType.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 4.0, comment: 'Strong defense presentation.', comments: 'Proposal was well prepared and clearly presented.', suggestions: 'Consider adding more technical depth to the methodology section.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: g.id },
     });
     await prisma.evaluation.create({
-      data: { componentId: compByType.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 3.5, comment: 'Progress is on track.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: g.id },
+      data: { componentId: compByType.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 3.5, comment: 'Progress is on track.', comments: 'Good progress shown during midterm review.', suggestions: 'Focus on completing the implementation phase before the final defense.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: g.id },
     });
     await prisma.evaluation.create({
-      data: { componentId: compByType.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 21.5, comment: 'Well-structured proposal.', status: 'COMPLETED', submittedById: g.supervisorId, groupId: g.id },
+      data: { componentId: compByType.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 21.5, comment: 'Well-structured proposal.', comments: 'The student showed consistent effort throughout the project.', suggestions: 'Document the code more thoroughly for future reference.', status: 'COMPLETED', submittedById: g.supervisorId, groupId: g.id },
     });
     const examiner = externalExaminers[i % externalExaminers.length];
     await prisma.evaluation.create({
-      data: { componentId: compByType.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 8.0, comment: 'Solid technical implementation.', status: 'COMPLETED', submittedById: examiner.id, groupId: g.id },
+      data: { componentId: compByType.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 8.0, comment: 'Solid technical implementation.', comments: 'Technical implementation was solid and well-tested.', suggestions: 'Improve the user interface for better usability.', status: 'COMPLETED', submittedById: examiner.id, groupId: g.id },
     });
     await prisma.evaluation.create({
-      data: { componentId: compByType.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 4.5, comment: 'Confident final defense.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: g.id },
+      data: { componentId: compByType.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 4.5, comment: 'Confident final defense.', comments: 'Confident and well-articulated final defense presentation.', suggestions: 'Prepare more detailed slides for complex topics.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: g.id },
     });
   }
   for (let i = 0; i < 5 && i < createdGroups.length; i++) {
     await prisma.projectGroup.update({ where: { id: createdGroups[i].id }, data: { status: 'COMPLETED' } });
+  }
+  // Set batch on groups from first member's roll number
+  for (const g of createdGroups) {
+    const members = await prisma.groupMember.findMany({ where: { groupId: g.id }, include: { student: true } });
+    const batch = members.map(m => m.student.batch).find(Boolean);
+    if (batch) await prisma.projectGroup.update({ where: { id: g.id }, data: { batch } });
   }
   console.log('Created sample evaluations for first 5 groups');
 
@@ -452,7 +468,7 @@ async function main() {
 
   // Master thesis — sup1 + masterStu → examiner1
   const testThesis = await prisma.thesis.create({
-    data: { title: 'Test Master Thesis — AI in Healthcare', projectType: 'MASTER', studentId: testMasterStu.id, status: 'ACTIVE', supervisorId: testSup1.id, academicYearId: ay['2080'].id },
+    data: { title: 'Test Master Thesis — AI in Healthcare', projectType: 'MASTER', studentId: testMasterStu.id, status: 'ACTIVE', supervisorId: testSup1.id, academicYearId: ay['2080'].id, batch: testMasterStu.batch || '2080', cluster: programs.MSNCS.cluster },
   });
   await attachComponents({ thesisId: testThesis.id, projectType: 'MASTER' });
   await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer1.id, thesisId: testThesis.id, assignedById: coordinators.MSNCS.id } });
@@ -461,22 +477,20 @@ async function main() {
     orderBy: { id: 'asc' },
   });
   const supCritMarks = [18, 17, 18, 16, 16];
-  for (let i = 0; i < 5 && i < masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR').length; i++) {
-    const comp = masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR')[i];
-    if (comp) {
-      await prisma.evaluation.create({
-        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: supCritMarks[i], comment: i === 1 ? 'All chapters completed well.' : '', status: 'COMPLETED', submittedById: testSup1.id, thesisId: testThesis.id },
-      });
-    }
+  const supComps = masterComps.filter(c => c.evaluatorRole === 'SUPERVISOR');
+  for (let i = 0; i < supComps.length; i++) {
+    const comp = supComps[i];
+    await prisma.evaluation.create({
+      data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: supCritMarks[i], comment: i === 1 ? 'All chapters completed well.' : '', comments: 'The student worked diligently on the thesis. All chapters are well structured.', suggestions: 'Consider publishing the findings in a conference paper.', status: 'COMPLETED', submittedById: testSup1.id, thesisId: testThesis.id },
+    });
   }
   const extCritMarks = [16, 15, 16, 16, 15];
-  for (let i = 0; i < 5 && i < masterComps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER').length; i++) {
-    const comp = masterComps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER')[i];
-    if (comp) {
-      await prisma.evaluation.create({
-        data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: extCritMarks[i], comment: i === 0 ? 'Good presentation.' : '', status: 'COMPLETED', submittedById: testExaminer1.id, thesisId: testThesis.id },
-      });
-    }
+  const extComps = masterComps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  for (let i = 0; i < extComps.length; i++) {
+    const comp = extComps[i];
+    await prisma.evaluation.create({
+      data: { componentId: comp.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: extCritMarks[i], comment: i === 0 ? 'Good presentation.' : '', comments: 'The research methodology was sound and results are reproducible.', suggestions: 'Expand the literature review to include more recent publications.', status: 'COMPLETED', submittedById: testExaminer1.id, thesisId: testThesis.id },
+    });
   }
 
   // ── SUPERVISOR 2 ────────────────────────────────────
@@ -489,11 +503,27 @@ async function main() {
   await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer2.id, groupId: sup2Group.id, assignedById: coordinators.BCT.id } });
 
   const sup2masterStu = students[32];
+  const sup2ProgCode = getProgramFromRoll(studentDefs[32]?.roll || '');
+  const sup2Cluster = sup2ProgCode ? programs[sup2ProgCode]?.cluster : null;
   const sup2Thesis = await prisma.thesis.create({
-    data: { title: 'Blockchain-based Academic Credential Verification', projectType: 'MASTER', studentId: sup2masterStu.id, status: 'ACTIVE', supervisorId: testSup2.id, academicYearId: ay['2080'].id },
+    data: { title: 'Blockchain-based Academic Credential Verification', projectType: 'MASTER', studentId: sup2masterStu.id, status: 'ACTIVE', supervisorId: testSup2.id, academicYearId: ay['2080'].id, batch: sup2masterStu.batch || '2080', cluster: sup2Cluster || programs.MSNCS.cluster },
   });
   await attachComponents({ thesisId: sup2Thesis.id, projectType: 'MASTER' });
   await prisma.examinerAssignment.create({ data: { externalExaminerId: testExaminer2.id, thesisId: sup2Thesis.id, assignedById: coordinators.MSNCS.id } });
+  // Create sample evaluations with per-role comments/suggestions for sup2Thesis
+  const sup2Comps = await prisma.evaluationComponent.findMany({ where: { thesisId: sup2Thesis.id }, orderBy: { id: 'asc' } });
+  const sup2SupComps = sup2Comps.filter(c => c.evaluatorRole === 'SUPERVISOR');
+  const sup2ExtComps = sup2Comps.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  for (let i = 0; i < sup2SupComps.length; i++) {
+    await prisma.evaluation.create({
+      data: { componentId: sup2SupComps[i].id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 16 + i, comment: 'Good progress.', comments: 'The student showed consistent dedication.', suggestions: 'Improve the evaluation section.', status: 'COMPLETED', submittedById: testSup2.id, thesisId: sup2Thesis.id },
+    });
+  }
+  for (let i = 0; i < sup2ExtComps.length; i++) {
+    await prisma.evaluation.create({
+      data: { componentId: sup2ExtComps[i].id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 14 + i, comment: 'Adequate.', comments: 'The thesis meets the required standards.', suggestions: 'Add more comparative analysis.', status: 'COMPLETED', submittedById: testExaminer2.id, thesisId: sup2Thesis.id },
+    });
+  }
 
   // Per-criteria sample evaluations for other master theses
   const thesisEvalPatterns = [];
@@ -522,7 +552,7 @@ async function main() {
         const marks = pattern.sup[j];
         if (marks !== null) {
           await prisma.evaluation.create({
-            data: { componentId: supComps[j].id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks, comment: '', status: 'COMPLETED', submittedById: supervisors[i % supervisors.length].id, thesisId: thesis.id },
+            data: { componentId: supComps[j].id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks, comment: '', comments: 'Submitted marks per criteria.', suggestions: '', status: 'COMPLETED', submittedById: supervisors[i % supervisors.length].id, thesisId: thesis.id },
           });
         }
       }
@@ -531,7 +561,7 @@ async function main() {
       const examiner = externalExaminers[i % externalExaminers.length];
       for (let j = 0; j < extComps.length; j++) {
         await prisma.evaluation.create({
-          data: { componentId: extComps[j].id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: pattern.ext[j], comment: '', status: 'COMPLETED', submittedById: examiner.id, thesisId: thesis.id },
+          data: { componentId: extComps[j].id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: pattern.ext[j], comment: '', comments: 'External evaluation completed.', suggestions: 'Further improvements recommended.', status: 'COMPLETED', submittedById: examiner.id, thesisId: thesis.id },
         });
       }
     }
