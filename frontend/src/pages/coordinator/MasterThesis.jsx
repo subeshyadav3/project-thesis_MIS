@@ -60,6 +60,9 @@ function MasterThesis() {
   const [bulkPreview, setBulkPreview] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkYearId, setBulkYearId] = useState('');
+  const [selectedTheses, setSelectedTheses] = useState([]);
+  const [bulkSupervisorId, setBulkSupervisorId] = useState('');
+  const selectAllRef = useRef(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = useCallback(() => {
@@ -207,6 +210,29 @@ const handleComplete = async (id) => {
       setShowDetail(null);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+  };
+
+  // Select all on current page
+  useEffect(() => {
+    if (selectAllRef.current) {
+      const allIds = paginatedTheses.map(t => t.id);
+      const selectedOnPage = selectedTheses.filter(id => allIds.includes(id)).length;
+      selectAllRef.current.indeterminate = selectedOnPage > 0 && selectedOnPage < allIds.length;
+    }
+  }, [selectedTheses, paginatedTheses]);
+
+  const toggleSelectAll = () => {
+    const allIds = paginatedTheses.map(t => t.id);
+    const allSelected = allIds.every(id => selectedTheses.includes(id));
+    if (allSelected) {
+      setSelectedTheses(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedTheses(prev => [...new Set([...prev, ...allIds])]);
+    }
+  };
+
+  const toggleSelectThesis = (id) => {
+    setSelectedTheses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const confirmComplete = (id) => {
@@ -645,6 +671,70 @@ return (
         </div>
       </div>
 
+      {selectedTheses.length > 1 && (
+        <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Actions ({selectedTheses.length} theses)</span>
+            <select className="form-input" style={{ width: 200 }} value={bulkSupervisorId} onChange={e => setBulkSupervisorId(e.target.value)}>
+              <option value="">Select supervisor...</option>
+              {supervisors.map(s => <option key={s.id} value={s.id}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</option>)}
+            </select>
+            <button className="btn btn-primary btn-sm" onClick={async () => {
+              if (!bulkSupervisorId) return toast.warning('Select a supervisor');
+              try {
+                for (const id of selectedTheses) {
+                  await api.post('/assignment-requests', { thesisId: id, supervisorId: parseInt(bulkSupervisorId) });
+                }
+                toast.success(`Assigned supervisor to ${selectedTheses.length} theses`);
+                setSelectedTheses([]);
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Bulk assign failed'); }
+            }}>Assign Supervisor</button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const pending = selectedTheses.filter(id => {
+                const t = theses.find(th => th.id === id);
+                return t && (t.status === 'PENDING' || t.status === 'ACTIVE');
+              });
+              if (pending.length === 0) return toast.warning('No pending/active theses selected');
+              try {
+                await Promise.all(pending.map(id => api.put(`/theses/${id}/status`, { status: 'ACTIVE' })));
+                toast.success(`Activated ${pending.length} theses`);
+                setSelectedTheses([]);
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Bulk activate failed'); }
+            }}>
+              <span className="material-symbols-outlined">play_arrow</span>
+              Make Active
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={() => {
+              const pending = selectedTheses.filter(id => {
+                const t = theses.find(th => th.id === id);
+                return t && t.status === 'PENDING';
+              });
+              if (pending.length === 0) return toast.warning('No pending theses selected');
+              setConfirmDialog({
+                open: true,
+                title: 'Delete Theses',
+                message: `Are you sure you want to delete ${pending.length} pending theses? This cannot be undone.`,
+                onConfirm: async () => {
+                  try {
+                    await Promise.all(pending.map(id => api.delete(`/theses/${id}`)));
+                    toast.success(`Deleted ${pending.length} theses`);
+                    setSelectedTheses([]);
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                    loadData();
+                  } catch (err) { toast.error(err.response?.data?.error || 'Bulk delete failed'); }
+                },
+                danger: true,
+              });
+            }}>
+              <span className="material-symbols-outlined">delete</span>
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
@@ -671,9 +761,21 @@ return (
           </div>
         ) : (
           <>
-            <table style={{ minWidth: 0 }}>
+            <table style={{ tableLayout: 'fixed', minWidth: 0 }}>
+              <colgroup>
+                <col style={{ width: 32 }} />
+                <col />
+                <col />
+                <col />
+                <col style={{ width: 95 }} />
+                <col style={{ width: 60 }} />
+                <col style={{ width: 155 }} />
+              </colgroup>
               <thead>
                 <tr>
+                  <th>
+                    <input type="checkbox" ref={selectAllRef} onChange={toggleSelectAll} />
+                  </th>
                   <th>Student</th>
                   <th>Thesis Title</th>
                   <th>Supervisor</th>
@@ -685,6 +787,9 @@ return (
               <tbody>
                 {paginatedTheses.map(t => (
                   <tr key={t.id} onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)} style={{ cursor: 'pointer' }}>
+                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '8px 12px' }}>
+                      <input type="checkbox" checked={selectedTheses.includes(t.id)} onChange={() => toggleSelectThesis(t.id)} />
+                    </td>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div className="default-badge" style={{ width: 28, height: 28, fontSize: 10 }}>

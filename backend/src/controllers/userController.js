@@ -377,7 +377,37 @@ exports.getAuditLogs = async (req, res) => {
     if (req.query.entity) where.entity = req.query.entity;
     if (req.query.entityId) where.entityId = parseInt(req.query.entityId);
     if (req.query.action) where.action = req.query.action;
-    // Coordinator sees all audit logs for full oversight
+
+    // Scope audit logs to the coordinator's own program/department
+    if (req.user.role === 'COORDINATOR') {
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        // Program coordinator: only see logs performed by users in their program/department
+        const programUserIds = await prisma.user.findMany({
+          where: {
+            OR: [
+              { programId: program.id },
+              { role: { in: ['SUPERVISOR', 'EXTERNAL_EXAMINER'] }, departmentId: program.departmentId },
+            ],
+          },
+          select: { id: true },
+        });
+        const ids = programUserIds.map(u => u.id);
+        // Also include the coordinator themselves
+        ids.push(req.user.id);
+        where.performedById = { in: ids };
+      } else {
+        // Department-level coordinator: only see logs from their department
+        const deptUserIds = await prisma.user.findMany({
+          where: { departmentId: req.user.departmentId },
+          select: { id: true },
+        });
+        const ids = deptUserIds.map(u => u.id);
+        ids.push(req.user.id);
+        where.performedById = { in: ids };
+      }
+    }
+
     const logs = await prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },

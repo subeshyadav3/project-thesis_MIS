@@ -123,11 +123,13 @@ app.get('/api/stats', authenticate, async (req, res) => {
     const activeGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'ACTIVE' } });
     const completedGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'COMPLETED' } });
     const pendingTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'PENDING' } });
+    const activeTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'ACTIVE' } });
+    const completedTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'COMPLETED' } });
     const minorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MINOR' } });
     const majorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MAJOR' } });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
-      pendingGroups, activeGroups, completedGroups, pendingTheses,
+      pendingGroups, activeGroups, completedGroups, pendingTheses, activeTheses, completedTheses,
       minorGroups, majorGroups,
     });
   } catch (error) {
