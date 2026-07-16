@@ -17,7 +17,10 @@ exports.login = async (req, res) => {
   try {
     const email = req.body.email?.toLowerCase();
     const { password } = req.body;
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({
+      where: { email },
+      include: { department: true },
+    });
     if (!user) {
       audit.log({ action: 'LOGIN_FAILED', entity: 'User', details: `Failed login attempt for ${email}`, performedById: null });
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -30,6 +33,11 @@ exports.login = async (req, res) => {
     if (!user.active) {
       audit.log({ action: 'LOGIN_FAILED', entity: 'User', details: `Disabled account login attempt for ${email}`, performedById: null });
       return res.status(401).json({ error: 'Account is disabled' });
+    }
+    // For coordinators, find their program via Program.coordinatorId
+    if (user.role === 'COORDINATOR') {
+      const prog = await prisma.program.findUnique({ where: { coordinatorId: user.id } });
+      user.program = prog || null;
     }
     const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -52,7 +60,15 @@ exports.logout = async (req, res) => {
 };
 
 exports.getMe = async (req, res) => {
-  const { password: _, ...userData } = req.user;
+  let user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    include: { department: true },
+  });
+  if (user.role === 'COORDINATOR') {
+    const prog = await prisma.program.findUnique({ where: { coordinatorId: user.id } });
+    user.program = prog || null;
+  }
+  const { password: _, ...userData } = user;
   res.json(userData);
 };
 

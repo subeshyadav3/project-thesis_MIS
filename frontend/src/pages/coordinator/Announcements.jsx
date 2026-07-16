@@ -12,16 +12,16 @@ function CoordinatorAnnouncements() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [programs, setPrograms] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [form, setForm] = useState({
     title: '', message: '', type: 'GENERAL',
-    degreeType: '', programIds: [], studentIds: [],
+    degreeType: user.program?.degreeType || '',
+    programIds: user.program?.id ? [user.program.id] : [],
+    studentIds: [],
     academicYearId: '', allowGroupFormation: false,
     expiresAt: '',
   });
-  const [selectedPrograms, setSelectedPrograms] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentOpen, setStudentOpen] = useState(false);
@@ -36,7 +36,6 @@ function CoordinatorAnnouncements() {
     setLoading(true);
     Promise.all([
       api.get('/announcements').then(({ data }) => setAnnouncements(data)),
-      api.get('/departments/programs').then(({ data }) => setPrograms(data)),
       api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data)),
     ]).catch(e => toast.error('Failed to load data')).finally(() => setLoading(false));
@@ -59,20 +58,17 @@ function CoordinatorAnnouncements() {
       toast.warning('Title, message, and academic year are required');
       return;
     }
-    if (!form.degreeType) {
-      toast.warning('Degree type is required');
-      return;
-    }
+    // degreeType and programIds are auto-set from user.program
     try {
       await api.post('/announcements', {
         ...form,
-        programIds: selectedPrograms,
+        degreeType: user.program?.degreeType || '',
+        programIds: user.program?.id ? [user.program.id] : [],
         studentIds: selectedStudents,
       });
       toast.success('Announcement created');
       setShowCreate(false);
-      setForm({ title: '', message: '', type: 'GENERAL', degreeType: '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, expiresAt: '' });
-      setSelectedPrograms([]);
+      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, expiresAt: '' });
       setSelectedStudents([]);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to create'); }
@@ -224,34 +220,11 @@ function CoordinatorAnnouncements() {
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
-                    <label>Degree Type *</label>
-                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})} required>
-                      <option value="">Select...</option>
-                      <option value="BACHELOR">Bachelor</option>
-                      <option value="MASTER">Master</option>
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
                     <label>Academic Year *</label>
                     <select value={form.academicYearId} onChange={e => setForm({...form, academicYearId: e.target.value})} required>
                       <option value="">Select year...</option>
                       {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
                     </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Programs {form.degreeType ? `(showing ${form.degreeType === 'BACHELOR' ? 'Bachelor' : 'Master'} programs)` : ''}</label>
-                  <div className="filter-bar" style={{ border: 'none', padding: '8px 0', gap: 6 }}>
-                    {(() => {
-                      const hasDegreeData = programs.some(p => p.degreeType);
-                      return programs.filter(p => !form.degreeType || (hasDegreeData ? p.degreeType === form.degreeType : true)).map(p => (
-                        <label key={p.id} className="badge" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: selectedPrograms.includes(p.id) ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)' }}>
-                          <input type="checkbox" checked={selectedPrograms.includes(p.id)} onChange={() => setSelectedPrograms(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} style={{ margin: 0, accentColor: 'var(--color-primary)' }} />
-                          <span style={{ fontWeight: selectedPrograms.includes(p.id) ? 600 : 400 }}>{p.code}</span>
-                        </label>
-                      ));
-                    })()}
                   </div>
                 </div>
 

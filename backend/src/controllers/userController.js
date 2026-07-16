@@ -8,7 +8,7 @@ const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
   role: true, degreeType: true, active: true,
   departmentId: true, programId: true,
-  rollNumber: true,
+  rollNumber: true, designation: true,
   createdAt: true, updatedAt: true,
 };
 
@@ -18,9 +18,17 @@ const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
 exports.getUsers = async (req, res) => {
   try {
     const where = {};
-    // Coordinator can only see users in their department
     if (req.user.role === 'COORDINATOR') {
-      where.departmentId = req.user.departmentId;
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        where.OR = [
+          { role: 'STUDENT', programId: program.id },
+          { role: { in: ['SUPERVISOR', 'EXTERNAL_EXAMINER'] }, departmentId: req.user.departmentId },
+        ];
+      } else {
+        where.role = { in: ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'] };
+        where.departmentId = req.user.departmentId;
+      }
     }
     const users = await prisma.user.findMany({
       where,
@@ -37,7 +45,7 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, degreeType, departmentId, programId } = req.body;
+    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber } = req.body;
     if (!email || !password || !firstName || !lastName || !role) {
       return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
     }
@@ -48,18 +56,22 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
     }
     // Coordinator can only create users in their own department
-    const targetDeptId = departmentId || req.user.departmentId;
+    const targetDeptId = departmentId ? parseInt(departmentId) : req.user.departmentId;
     if (req.user.role === 'COORDINATOR' && targetDeptId !== req.user.departmentId) {
       return res.status(403).json({ error: 'Cannot create users outside your department' });
     }
-    // Coordinator cannot create MAINTAINER or COORDINATOR roles
+    // Coordinator cannot create MAINTAINER or COORDINATOR roles (MAINTAINER can create any role)
     if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role)) {
       return res.status(403).json({ error: 'Coordinator can only create supervisors, examiners, and students' });
     }
 
     const hash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { email, password: hash, firstName, lastName, role, degreeType, departmentId: targetDeptId, programId },
+      data: {
+        email, password: hash, firstName, lastName, role, degreeType,
+        departmentId: targetDeptId, programId: programId ? parseInt(programId) : undefined,
+        designation, rollNumber,
+      },
       select: USER_SELECT,
     });
   audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Created ${role} ${email}`, performedById: req.user.id });
@@ -101,9 +113,9 @@ exports.updateUser = async (req, res) => {
     if (req.body.email !== undefined) data.email = req.body.email;
     if (req.body.role) data.role = req.body.role;
     if (req.body.degreeType) data.degreeType = req.body.degreeType;
-    if (req.body.programId) data.programId = req.body.programId;
+    if (req.body.programId) data.programId = parseInt(req.body.programId);
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
-
+    if (req.body.designation !== undefined) data.designation = req.body.designation;
     const user = await prisma.user.update({
       where: { id: userId },
       data,
@@ -150,9 +162,12 @@ exports.getUsersByRole = async (req, res) => {
     if (req.query.programId) {
       where.programId = parseInt(req.query.programId);
     }
-    // Coordinator can only see users in their department
     if (req.user.role === 'COORDINATOR') {
       where.departmentId = req.user.departmentId;
+      // Coordinators can only fetch SUPERVISOR, EXTERNAL_EXAMINER, STUDENT roles
+      if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(req.params.role.toUpperCase())) {
+        return res.json([]);
+      }
     }
     const users = await prisma.user.findMany({
       where,
@@ -224,6 +239,69 @@ exports.toggleActive = async (req, res) => {
   audit.log({ action: 'DEACTIVATE', entity: 'User', entityId: user.id, details: `${action}d user ${user.email}`, performedById: req.user.id });
   try { notifSvc.notify(user.id, 'USER_STATUS_CHANGED', `Your account has been ${action.toLowerCase()}d`); } catch (e) { console.error(e.message); }
   res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.bulkCreateUsers = async (req, res) => {
+  try {
+    const { users } = req.body;
+    if (!users || !Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ error: 'users array is required and must not be empty' });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (const u of users) {
+      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
+      if (!email || !password || !firstName || !lastName || !role) {
+        errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
+        continue;
+      }
+      if (!VALID_ROLES.includes(role)) {
+        errors.push({ email, error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+        continue;
+      }
+      if (degreeType && !VALID_DEGREE_TYPES.includes(degreeType)) {
+        errors.push({ email, error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
+        continue;
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        errors.push({ email, error: 'Duplicate email' });
+        continue;
+      }
+
+      try {
+        const hash = await bcrypt.hash(password, 10);
+        const user = await prisma.user.create({
+          data: {
+            email, password: hash, firstName, lastName, role,
+            degreeType: degreeType || null,
+            departmentId: departmentId ? parseInt(departmentId) : null,
+            programId: programId ? parseInt(programId) : null,
+            designation: designation || null,
+            rollNumber: rollNumber || null,
+          },
+          select: USER_SELECT,
+        });
+        created.push(user);
+        audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Bulk created ${role} ${email}`, performedById: req.user.id });
+        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+      } catch (err) {
+        errors.push({ email, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      message: `Successfully created ${created.length} user(s)`,
+      created: created.length,
+      failed: errors.length,
+      errors,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

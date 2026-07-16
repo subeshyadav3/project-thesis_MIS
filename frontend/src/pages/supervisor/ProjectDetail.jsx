@@ -269,13 +269,13 @@ function ProjectDetail() {
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
               <span>{title}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Supervisor:</span>
-              <span>{item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
+              <span>{item?.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Internal Examiner:</span>
               <span>
                 {item?.examinerAssignments?.length > 0
                   ? item.examinerAssignments.map(a => (
                     <span key={a.id} className="badge badge-info" style={{ fontSize: 12 }}>
-                      {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                      {a.externalExaminer?.designation ? a.externalExaminer.designation + ' ' : ''}{a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
                     </span>
                   ))
                   : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>

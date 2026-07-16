@@ -65,7 +65,7 @@ function BachelorProjects() {
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
-      api.get('/users', { signal }).then(({ data }) => setAllStudents(data.filter(u => u.role === 'STUDENT'))),
+      api.get(`/users/role/STUDENT?all=true&degreeType=BACHELOR${user.program?.id ? '&programId=' + user.program.id : ''}`, { signal }).then(({ data }) => setAllStudents(data)),
     ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -186,7 +186,7 @@ function BachelorProjects() {
     return groups.filter(g => {
       const searchStr = (
         g.name + ' ' + g.projectTitle + ' ' +
-        (g.supervisor ? `${g.supervisor.firstName} ${g.supervisor.lastName}` : '') + ' ' +
+        (g.supervisor ? `${g.supervisor.designation ? g.supervisor.designation + ' ' : ''}${g.supervisor.firstName} ${g.supervisor.lastName}` : '') + ' ' +
         (g.members || []).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''} ${m.rollNumber || ''}`).join(' ')
       ).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
@@ -264,7 +264,7 @@ function BachelorProjects() {
     { value: 'NONE', label: 'Unassigned' },
     ...supervisors.map(s => ({
       value: s.id.toString(),
-      label: `${s.firstName} ${s.lastName}`,
+      label: `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName}`,
     })),
   ];
 
@@ -380,7 +380,7 @@ function BachelorProjects() {
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editSupId ? allSupervisors.find(s => s.id.toString() === editSupId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === editSupId)?.lastName || 'Search supervisor...' : 'No supervisor'}
+                          placeholder={editSupId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === editSupId)) : 'No supervisor'}
                           value={editSupSearch}
                           onChange={e => { setEditSupSearch(e.target.value); setEditSupOpen(true); }}
                           onFocus={() => setEditSupOpen(true)}
@@ -394,10 +394,10 @@ function BachelorProjects() {
                       </div>
                       {editSupOpen && (
                         <div className="sup-dropdown">
-                          {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
+                          {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No supervisors found</div>
                           ) : (
-                            allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
+                            allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
                               const selected = editSupId === s.id.toString();
                               return (
                                 <div
@@ -407,7 +407,7 @@ function BachelorProjects() {
                                 >
                                   <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                     <div className="sup-dropdown-item-email">{s.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: s.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: s.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -428,7 +428,7 @@ function BachelorProjects() {
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editExamId ? examiners.find(e => e.id.toString() === editExamId)?.firstName + ' ' + examiners.find(e => e.id.toString() === editExamId)?.lastName || 'Search examiner...' : 'No examiner'}
+                          placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
                           value={editExamSearch}
                           onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
                           onFocus={() => setEditExamOpen(true)}
@@ -442,10 +442,10 @@ function BachelorProjects() {
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
                               const selected = editExamId === e.id.toString();
                               return (
                                 <div
@@ -455,7 +455,7 @@ function BachelorProjects() {
                                 >
                                   <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                     <div className="sup-dropdown-item-email">{e.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -579,7 +579,7 @@ function BachelorProjects() {
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.supervisorId ? allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.lastName || 'Search supervisor...' : 'Search supervisor...'}
+                      placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
                       value={createSupSearch}
                       onChange={e => { setCreateSupSearch(e.target.value); setCreateSupOpen(true); }}
                       onFocus={() => setCreateSupOpen(true)}
@@ -593,10 +593,10 @@ function BachelorProjects() {
                   </div>
                   {createSupOpen && (
                     <div className="sup-dropdown">
-                      {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
+                      {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No supervisors found</div>
                       ) : (
-                        allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
+                        allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
                           const selected = createForm.supervisorId === s.id.toString();
                           return (
                             <div
@@ -606,7 +606,7 @@ function BachelorProjects() {
                             >
                               <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                 <div className="sup-dropdown-item-email">{s.email}</div>
                               </div>
                               {selected && (
@@ -692,7 +692,7 @@ function BachelorProjects() {
                                       >
                                         <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                                         <div className="sup-dropdown-item-info">
-                                          <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                          <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                           <div className="sup-dropdown-item-email">{s.rollNumber || ''}</div>
                                         </div>
                                         {isMatchByRoll && (
@@ -824,7 +824,7 @@ function BachelorProjects() {
                       <td>
                         {g.supervisor ? (
                           <span style={{ fontWeight: 500, color: 'var(--color-primary)' }}>
-                            {g.supervisor.firstName} {g.supervisor.lastName}
+                            {g.supervisor.designation ? g.supervisor.designation + ' ' : ''}{g.supervisor.firstName} {g.supervisor.lastName}
                           </span>
                         ) : (
                           <span className="badge badge-pending">

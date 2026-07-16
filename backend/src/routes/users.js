@@ -10,5 +10,6 @@ router.delete('/:id', authenticate, authorize('MAINTAINER', 'COORDINATOR'), user
 router.get('/role/:role', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getUsersByRole);
 router.put('/:id/toggle-active', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.toggleActive);
 router.get('/audit-logs', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getAuditLogs);
+router.post('/bulk', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.bulkCreateUsers);
 
 module.exports = router;

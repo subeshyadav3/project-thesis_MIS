@@ -13,6 +13,9 @@ const TYPE_ICON = {
   GROUP_INVITATION: 'person_add',
   GROUP_INVITATION_ACCEPTED: 'check',
   GROUP_MEMBER_JOINED: 'group_add',
+  CROSS_PROGRAM_REQUEST: 'contact_support',
+  CROSS_PROGRAM_APPROVED: 'check_circle',
+  CROSS_PROGRAM_REJECTED: 'cancel',
 };
 
 function NotificationBell() {

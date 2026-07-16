@@ -10,8 +10,13 @@ exports.getTheses = async (req, res) => {
   try {
     const where = {};
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept) where.academicYear = { departmentId: dept.id };
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        where.student = { programId: program.id };
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept) where.academicYear = { departmentId: dept.id };
+      }
     }
     if (req.query.announcementId) where.announcementId = Number(req.query.announcementId);
     if (req.query.status) where.status = req.query.status;
@@ -38,7 +43,7 @@ exports.getThesis = async (req, res) => {
     const thesis = await prisma.thesis.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, programId: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
@@ -50,9 +55,16 @@ exports.getThesis = async (req, res) => {
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept && thesis.academicYear?.departmentId !== dept.id) {
-        return res.status(403).json({ error: 'Access denied. Thesis belongs to another department.' });
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        if (thesis.student?.programId !== program.id) {
+          return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+        }
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept && thesis.academicYear?.departmentId !== dept.id) {
+          return res.status(403).json({ error: 'Access denied. Thesis belongs to another department.' });
+        }
       }
     }
     res.json(thesis);
@@ -233,8 +245,13 @@ exports.exportTheses = async (req, res) => {
     const XLSX = require('xlsx');
     const where = {};
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept) where.academicYear = { departmentId: dept.id };
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        where.student = { programId: program.id };
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept) where.academicYear = { departmentId: dept.id };
+      }
     }
     const theses = await prisma.thesis.findMany({
       where,

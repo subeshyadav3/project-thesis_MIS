@@ -39,7 +39,6 @@ function Evaluations() {
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('bachelor');
   const [showForward, setShowForward] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -47,18 +46,25 @@ function Evaluations() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isBachelorCoordinator = user.program?.degreeType === 'BACHELOR';
+  const isMasterCoordinator = user.program?.degreeType === 'MASTER';
+  const [viewMode, setViewMode] = useState(isMasterCoordinator ? 'master' : 'bachelor');
   const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
-      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.message || 'Failed to load data'); }).finally(() => setLoading(false));
+    const promises = [];
+    if (isBachelorCoordinator || viewMode === 'bachelor') {
+      promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
+    }
+    if (isMasterCoordinator || viewMode === 'master') {
+      promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+    }
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.message || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [isBachelorCoordinator, isMasterCoordinator, viewMode, toast]);
 
 
   const handleForward = async () => {
@@ -232,12 +238,16 @@ function Evaluations() {
       <div className="card">
         <div className="card-header">
           <div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
-            <div className={`tab ${viewMode === 'bachelor' ? 'active' : ''}`} onClick={() => setViewMode('bachelor')}>
-              <span className="material-symbols-outlined">school</span>Bachelor Projects
-            </div>
-            <div className={`tab ${viewMode === 'master' ? 'active' : ''}`} onClick={() => setViewMode('master')}>
-              <span className="material-symbols-outlined">library_books</span>Master's Thesis
-            </div>
+            {isBachelorCoordinator && (
+              <div className={`tab ${viewMode === 'bachelor' ? 'active' : ''}`} onClick={() => setViewMode('bachelor')}>
+                <span className="material-symbols-outlined">school</span>Bachelor Projects
+              </div>
+            )}
+            {isMasterCoordinator && (
+              <div className={`tab ${viewMode === 'master' ? 'active' : ''}`} onClick={() => setViewMode('master')}>
+                <span className="material-symbols-outlined">library_books</span>Master's Thesis
+              </div>
+            )}
           </div>
         </div>
 

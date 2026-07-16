@@ -23,32 +23,41 @@ function ExaminerList() {
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
-  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isBachelorCoordinator = user.program?.degreeType === 'BACHELOR';
+  const isMasterCoordinator = user.program?.degreeType === 'MASTER';
 
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
+    const promises = [
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
+    ];
+    // Only fetch theses for Master coordinators
+    if (isMasterCoordinator) {
+      promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+    }
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [isMasterCoordinator]);
 
   const loadData = () => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
+    const promises = [
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
+    ];
+    if (isMasterCoordinator) {
+      promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+    }
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
 
   const handleCreate = async (e) => {
@@ -61,7 +70,7 @@ function ExaminerList() {
       await api.post('/users', { ...createForm, role: 'EXTERNAL_EXAMINER' });
       toast.success('Internal Examiner created successfully');
       setShowCreate(false);
-      setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
+      setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -95,7 +104,7 @@ function ExaminerList() {
       }
     }
     try {
-      const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email };
+      const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, designation: editForm.designation };
       if (editForm.password) payload.password = editForm.password;
       await api.put(`/users/${showEdit.id}`, payload);
       if (editForm.active !== showEdit.active) {
@@ -108,14 +117,14 @@ function ExaminerList() {
   };
 
   const openEdit = (ex) => {
-    setEditForm({ firstName: ex.firstName, lastName: ex.lastName, email: ex.email, password: '', active: ex.active });
+    setEditForm({ firstName: ex.firstName, lastName: ex.lastName, email: ex.email, password: '', active: ex.active, designation: ex.designation || '' });
     setShowEdit(ex);
   };
 
   const enriched = useMemo(() => {
     return examiners.map(e => {
       const assignedGroups = groups.filter(g => (g.examinerAssignments || []).some(a => a.externalExaminerId === e.id));
-      const assignedTheses = theses.filter(t => (t.examinerAssignments || []).some(a => a.externalExaminerId === e.id));
+      const assignedTheses = isMasterCoordinator ? theses.filter(t => (t.examinerAssignments || []).some(a => a.externalExaminerId === e.id)) : [];
       return {
         ...e,
         assignedGroups,
@@ -125,7 +134,7 @@ function ExaminerList() {
         totalCount: assignedGroups.length + assignedTheses.length,
       };
     });
-  }, [examiners, groups, theses]);
+  }, [examiners, groups, theses, isMasterCoordinator]);
 
   const filteredExaminers = useMemo(() => {
     if (!searchQuery) return enriched;
@@ -140,9 +149,9 @@ function ExaminerList() {
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(1); }, [totalPages, currentPage]);
 
   const totalAssigned = groups.reduce((s, g) => s + (g.examinerAssignments?.length || 0), 0)
-    + theses.reduce((s, t) => s + (t.examinerAssignments?.length || 0), 0);
+    + (isMasterCoordinator ? theses.reduce((s, t) => s + (t.examinerAssignments?.length || 0), 0) : 0);
   const unassignedGroups = groups.filter(g => !g.examinerAssignments?.length).length;
-  const unassignedTheses = theses.filter(t => !t.examinerAssignments?.length).length;
+  const unassignedTheses = isMasterCoordinator ? theses.filter(t => !t.examinerAssignments?.length).length : 0;
 
   const actions = (
     <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
@@ -182,6 +191,18 @@ function ExaminerList() {
               <div className="form-group">
                 <label>Password</label>
                 <input value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} required placeholder="Default: subesh" />
+              </div>
+              <div className="form-group">
+                <label>Designation</label>
+                <select value={createForm.designation} onChange={e => setCreateForm({...createForm, designation: e.target.value})}>
+                  <option value="">Select designation...</option>
+                  <option value="Asst. Prof.">Asst. Prof.</option>
+                  <option value="Asst. Prof. Dr.">Asst. Prof. Dr.</option>
+                  <option value="Assoc. Prof.">Assoc. Prof.</option>
+                  <option value="Assoc. Prof. Dr.">Assoc. Prof. Dr.</option>
+                  <option value="Prof.">Prof.</option>
+                  <option value="Prof. Dr.">Prof. Dr.</option>
+                </select>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
@@ -237,29 +258,31 @@ function ExaminerList() {
                 </table>
               )}
             </div>
-            <div className="detail-section">
-              <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
-              {showDetail.assignedTheses.length === 0 ? (
-                <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses assigned.</p>
-              ) : (
-                <table className="detail-table">
-                  <thead>
-                    <tr><th>Student</th><th>Thesis Title</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {showDetail.assignedTheses.map(t => (
-                      <tr key={t.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
-                        <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
-                        <td>
-                          <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}><span className="dot" />{t.status || 'PENDING'}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {isMasterCoordinator && (
+              <div className="detail-section">
+                <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
+                {showDetail.assignedTheses.length === 0 ? (
+                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses assigned.</p>
+                ) : (
+                  <table className="detail-table">
+                    <thead>
+                      <tr><th>Student</th><th>Thesis Title</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {showDetail.assignedTheses.map(t => (
+                        <tr key={t.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)}>
+                          <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
+                          <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
+                          <td>
+                            <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}><span className="dot" />{t.status || 'PENDING'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
             <div className="modal-actions">
               <button className="btn btn-danger" onClick={() => { handleDelete(showDetail.id); setShowDetail(null); }}>
                 <span className="material-symbols-outlined">delete</span>
@@ -305,6 +328,18 @@ function ExaminerList() {
                 <input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="New password" />
               </div>
               <div className="form-group">
+                <label>Designation</label>
+                <select value={editForm.designation} onChange={e => setEditForm({...editForm, designation: e.target.value})}>
+                  <option value="">Select designation...</option>
+                  <option value="Asst. Prof.">Asst. Prof.</option>
+                  <option value="Asst. Prof. Dr.">Asst. Prof. Dr.</option>
+                  <option value="Assoc. Prof.">Assoc. Prof.</option>
+                  <option value="Assoc. Prof. Dr.">Assoc. Prof. Dr.</option>
+                  <option value="Prof.">Prof.</option>
+                  <option value="Prof. Dr.">Prof. Dr.</option>
+                </select>
+              </div>
+              <div className="form-group">
                 <label>Status</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: editForm.active ? 'var(--color-success)' : 'var(--color-error)' }}>
@@ -347,11 +382,13 @@ function ExaminerList() {
           <div className="stat-number">{unassignedGroups}</div>
           <div className="stat-label">Projects Unassigned</div>
         </div>
-        <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
-          <div className="stat-number">{unassignedTheses}</div>
-          <div className="stat-label">Theses Unassigned</div>
-        </div>
+        {isMasterCoordinator && (
+          <div className="stat-card bento-card">
+            <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
+            <div className="stat-number">{unassignedTheses}</div>
+            <div className="stat-label">Theses Unassigned</div>
+          </div>
+        )}
       </div>
 
       <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search examiners..." style={{ maxWidth: 320, marginBottom: 12 }} />
@@ -375,15 +412,16 @@ function ExaminerList() {
           <>
             <table>
               <thead>
-                <tr>
-                  <th>Examiner</th>
-                  <th>Email</th>
-                  <th>Status</th>
-                  <th>Bachelor Projects</th>
-                  <th>Master Theses</th>
-                  <th>Total</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
+                  <tr>
+                    <th>Examiner</th>
+                    <th>Designation</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Bachelor Projects</th>
+                    {isMasterCoordinator && <th>Master Theses</th>}
+                    <th>Total</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
               </thead>
               <tbody>
                 {paginated.map(s => (
@@ -394,6 +432,7 @@ function ExaminerList() {
                         <span style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</span>
                       </div>
                     </td>
+                    <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.designation || '—'}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
                     <td>
                       <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
@@ -401,7 +440,7 @@ function ExaminerList() {
                       </span>
                     </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
-                    <td><span className="stat-chip">{s.thesisCount}</span></td>
+                    {isMasterCoordinator && <td><span className="stat-chip">{s.thesisCount}</span></td>}
                     <td><span className="stat-chip stat-chip-primary">{s.totalCount}</span></td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>

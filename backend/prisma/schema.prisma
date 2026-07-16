@@ -137,10 +137,13 @@ model User {
   lastName    String
   role        Role
   degreeType  DegreeType?
+  designation String?
+  canSupervise Boolean  @default(false)
   departmentId Int?
   department  Department? @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
   programId   Int?
   program     Program?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: SetNull)
+  coordinatorProgram Program? @relation("CoordinatorProgram")
   rollNumber       String?
   resetToken       String?   @unique
   resetTokenExpires DateTime?
@@ -162,6 +165,9 @@ model User {
   examinerAssignmentsAssigned ExaminerAssignment[] @relation("AssignedBy")
   auditLogs                   AuditLog[]
   announcementsCreated        Announcement[]           @relation("AnnouncementCreator")
+  assignmentRequestsSent      AssignmentRequest[]      @relation("AssignmentRequestFrom")
+  assignmentRequestsReceived  AssignmentRequest[]      @relation("AssignmentRequestTo")
+  assignmentRequestSupervisor AssignmentRequest[]      @relation("AssignmentRequestSupervisor")
   invitationsSent             GroupInvitation[]        @relation("GroupInviter")
   invitationsReceived         GroupInvitation[]        @relation("GroupInvitee")
   groupsFormed                ProjectGroup[]           @relation("GroupFormer")
@@ -192,6 +198,8 @@ model Program {
   code         String   @unique
   departmentId Int
   degreeType   DegreeType?
+  coordinatorId Int?    @unique
+  coordinator   User?    @relation("CoordinatorProgram", fields: [coordinatorId], references: [id])
   department   Department  @relation(fields: [departmentId], references: [id])
   createdAt    DateTime    @default(now())
 
@@ -285,6 +293,7 @@ model Thesis {
   proposals            Proposal[]
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
+  assignmentRequests   AssignmentRequest[]
 
   @@index([status])
   @@index([studentId])
@@ -418,6 +427,26 @@ model ExternalExaminer {
   phone      String?
   department String?
   createdAt  DateTime @default(now())
+}
+
+model AssignmentRequest {
+  id                Int           @id @default(autoincrement())
+  thesisId          Int
+  thesis            Thesis        @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  supervisorId      Int
+  supervisor        User          @relation("AssignmentRequestSupervisor", fields: [supervisorId], references: [id])
+  fromCoordinatorId Int
+  fromCoordinator   User          @relation("AssignmentRequestFrom", fields: [fromCoordinatorId], references: [id])
+  toCoordinatorId   Int
+  toCoordinator     User          @relation("AssignmentRequestTo", fields: [toCoordinatorId], references: [id])
+  status            String        @default("PENDING")
+  rejectReason      String?
+  notificationId    Int?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([toCoordinatorId])
+  @@index([status])
 }
 
 model Recommendation {

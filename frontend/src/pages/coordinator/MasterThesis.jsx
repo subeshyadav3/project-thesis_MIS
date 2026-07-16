@@ -54,6 +54,7 @@ function MasterThesis() {
   const [createStudentOpen, setCreateStudentOpen] = useState(false);
   const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = useCallback(() => {
@@ -66,6 +67,7 @@ function MasterThesis() {
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
+      api.get('/assignment-requests', { signal }).then(({ data }) => setPendingRequests(data.filter(r => r.status === 'PENDING'))).catch(() => setPendingRequests([])),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -200,7 +202,19 @@ const handleComplete = async (id) => {
       if (editSupId !== undefined) {
         const currentSup = showDetail?.supervisorId?.toString();
         if (editSupId !== currentSup) {
-          promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: parseInt(editSupId) || null }));
+          if (!editSupId) {
+            promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: null }));
+          } else {
+            promises.push(
+              api.post('/assignment-requests', { thesisId, supervisorId: parseInt(editSupId) })
+                .then(res => {
+                  if (res.data?.crossProgram) {
+                    setPendingRequests(prev => [...prev, res.data.request]);
+                  }
+                  return res;
+                })
+            );
+          }
         }
       }
       if (editExamId !== undefined) {
@@ -222,8 +236,13 @@ const handleComplete = async (id) => {
           }
         }
       }
-      await Promise.all(promises);
-      toast.success('Changes saved successfully');
+      const results = await Promise.all(promises);
+      const hasCrossProgram = results.some(r => r?.data?.crossProgram);
+      if (hasCrossProgram) {
+        toast.info('Cross-program supervisor request sent for approval.');
+      } else {
+        toast.success('Changes saved successfully');
+      }
       setShowDetail(null);
       loadData();
     } catch (err) {
@@ -329,7 +348,7 @@ const handleComplete = async (id) => {
     { value: 'NONE', label: 'Unassigned' },
     ...supervisors.map(s => ({
       value: s.id.toString(),
-      label: `${s.firstName} ${s.lastName}`,
+      label: `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName}`,
     })),
   ];
 
@@ -372,10 +391,26 @@ return (
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Supervisor</span>
-                  <span>{showDetail.supervisor
-                    ? `${showDetail.supervisor.firstName} ${showDetail.supervisor.lastName}`
-                    : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
-                  }</span>
+                  <span>
+                    {showDetail.supervisor ? (
+                      <>
+                        {showDetail.supervisor.firstName} {showDetail.supervisor.lastName}
+                        {pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') && (
+                          <span className="badge badge-warning" style={{ marginLeft: 8, fontSize: 10 }}>
+                            <span className="dot" />Pending Approval
+                          </span>
+                        )}
+                      </>
+                    ) : pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') ? (
+                      <span className="badge badge-warning" style={{ fontSize: 10 }}>
+                        <span className="dot" />Pending Approval
+                      </span>
+                    ) : (
+                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="dot" />Unassigned
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
@@ -431,7 +466,7 @@ return (
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editSupId ? allSupervisors.find(s => s.id.toString() === editSupId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === editSupId)?.lastName || 'Search supervisor...' : 'No supervisor'}
+                          placeholder={editSupId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === editSupId)) : 'No supervisor'}
                           value={editSupSearch}
                           onChange={e => { setEditSupSearch(e.target.value); setEditSupOpen(true); }}
                           onFocus={() => setEditSupOpen(true)}
@@ -445,10 +480,10 @@ return (
                       </div>
                       {editSupOpen && (
                         <div className="sup-dropdown">
-                          {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
+                          {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No supervisors found</div>
                           ) : (
-                            allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
+                            allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
                               const selected = editSupId === s.id.toString();
                               return (
                                 <div
@@ -458,7 +493,7 @@ return (
                                 >
                                   <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                     <div className="sup-dropdown-item-email">{s.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: s.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: s.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -479,7 +514,7 @@ return (
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editExamId ? examiners.find(e => e.id.toString() === editExamId)?.firstName + ' ' + examiners.find(e => e.id.toString() === editExamId)?.lastName || 'Search examiner...' : 'No examiner'}
+                          placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
                           value={editExamSearch}
                           onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
                           onFocus={() => setEditExamOpen(true)}
@@ -493,10 +528,10 @@ return (
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
                               const selected = editExamId === e.id.toString();
                               return (
                                 <div
@@ -506,7 +541,7 @@ return (
                                 >
                                   <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                     <div className="sup-dropdown-item-email">{e.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -625,6 +660,11 @@ return (
                       {t.supervisor ? (
                         <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 13 }}>
                           {t.supervisor.firstName} {t.supervisor.lastName}
+                        </span>
+                      ) : pendingRequests.some(r => r.thesisId === t.id && r.status === 'PENDING') ? (
+                        <span className="badge badge-warning" style={{ fontSize: 10 }}>
+                          <span className="dot" />
+                          Pending Approval
                         </span>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
@@ -791,7 +831,7 @@ return (
                             >
                               <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                 <div className="sup-dropdown-item-email">{s.email || ''}</div>
                               </div>
                               {isSelected && (
@@ -819,7 +859,7 @@ return (
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.supervisorId ? allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.lastName || 'Search supervisor...' : 'Search supervisor...'}
+                      placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
                       value={createSupSearch}
                       onChange={e => { setCreateSupSearch(e.target.value); setCreateSupOpen(true); }}
                       onFocus={() => setCreateSupOpen(true)}
@@ -833,10 +873,10 @@ return (
                   </div>
                   {createSupOpen && (
                     <div className="sup-dropdown">
-                      {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
+                      {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No supervisors found</div>
                       ) : (
-                        allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
+                        allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
                           const selected = createForm.supervisorId === s.id.toString();
                           return (
                             <div
@@ -848,7 +888,7 @@ return (
                                 {s.firstName?.[0]}{s.lastName?.[0]}
                               </div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                 <div className="sup-dropdown-item-email">{s.email}</div>
                               </div>
                               {selected && (
@@ -869,7 +909,7 @@ return (
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.examinerId ? examiners.find(e => e.id.toString() === createForm.examinerId)?.firstName + ' ' + examiners.find(e => e.id.toString() === createForm.examinerId)?.lastName || 'Search examiner...' : 'Search examiner...'}
+                      placeholder={createForm.examinerId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createForm.examinerId)) : 'Search examiner...'}
                       value={examSearch}
                       onChange={e => { setExamSearch(e.target.value); setExamOpen(true); }}
                       onFocus={() => setExamOpen(true)}
@@ -883,10 +923,10 @@ return (
                   </div>
                   {examOpen && (
                     <div className="sup-dropdown">
-                      {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
+                      {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No examiners found</div>
                       ) : (
-                        examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
+                        examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
                           const selected = createForm.examinerId === e.id.toString();
                           return (
                             <div
@@ -898,7 +938,7 @@ return (
                                 {e.firstName?.[0]}{e.lastName?.[0]}
                               </div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                 <div className="sup-dropdown-item-email">{e.email}</div>
                               </div>
                               {selected && (

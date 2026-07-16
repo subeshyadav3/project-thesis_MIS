@@ -10,11 +10,13 @@ function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '' });
+  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({ degreeType: '', departmentId: '', programId: '', year: '' });
   const [programs, setPrograms] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkJson, setBulkJson] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isCoordinator = user.role === 'COORDINATOR';
   const toast = useToast();
@@ -47,7 +49,7 @@ function UserManagement() {
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '' });
+      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.error || 'An error occurred');
@@ -67,13 +69,13 @@ function UserManagement() {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '' });
+    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '', designation: u.designation || '' });
     setShowModal(true);
   };
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
     setShowModal(true);
   };
 
@@ -100,10 +102,18 @@ function UserManagement() {
   };
 
   const actions = (
-    <button className="btn btn-primary btn-sm" onClick={openCreate}>
-      <span className="material-symbols-outlined">add</span>
-      Add User
-    </button>
+    <>
+      {!isCoordinator && (
+        <button className="btn btn-outline btn-sm" onClick={() => setShowBulk(true)}>
+          <span className="material-symbols-outlined">upload_file</span>
+          Bulk Import
+        </button>
+      )}
+      <button className="btn btn-primary btn-sm" onClick={openCreate}>
+        <span className="material-symbols-outlined">add</span>
+        Add User
+      </button>
+    </>
   );
 
   const showField = (field) => {
@@ -119,60 +129,12 @@ function UserManagement() {
       <div className="page-header">
         <h1>
           <span className="material-symbols-outlined">groups</span>
-          {isCoordinator ? 'Department Users' : 'System Users'}
+          {isCoordinator ? 'Manage Users' : 'System Users'}
         </h1>
-        <p>Create, edit, and manage {isCoordinator ? 'department ' : ''}users</p>
+        <p>Create, edit, and manage {isCoordinator ? 'program ' : ''}users</p>
       </div>
 
       <div className="table-container">
-        <div className="filter-bar">
-          <div className="filter-item">
-            <label>Degree</label>
-            <select value={filters.degreeType} onChange={e => setFilters({...filters, degreeType: e.target.value})}>
-              <option value="">All</option>
-              <option value="BACHELOR">Bachelor</option>
-              <option value="MASTER">Master</option>
-            </select>
-          </div>
-          {!isCoordinator && (
-            <div className="filter-item">
-              <label>Department</label>
-              <select value={filters.departmentId} onChange={e => setFilters({...filters, departmentId: e.target.value, programId: ''})}>
-                <option value="">All</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-          )}
-          <div className="filter-item">
-            <label>Program</label>
-            <select value={filters.programId} onChange={e => setFilters({...filters, programId: e.target.value})}>
-              <option value="">All</option>
-              {programs
-                .filter(p => !filters.departmentId || p.departmentId === parseInt(filters.departmentId))
-                .map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
-            </select>
-          </div>
-          <div className="filter-item">
-            <label>Year</label>
-            <select value={filters.year} onChange={e => setFilters({...filters, year: e.target.value})}>
-              <option value="">All</option>
-              {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          {(filters.degreeType || filters.departmentId || filters.programId || filters.year) && (
-            <div className="filter-item">
-              <label>&nbsp;</label>
-              <button className="btn btn-outline btn-sm" onClick={() => setFilters({ degreeType: '', departmentId: '', programId: '', year: '' })}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                Clear
-              </button>
-            </div>
-          )}
-          <div className="filter-item" style={{ marginLeft: 'auto' }}>
-            <label>&nbsp;</label>
-            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredUsers.length} users</span>
-          </div>
-        </div>
         <div className="table-toolbar">
           <div className="table-toolbar-left">
             <div className="search-input-wrapper">
@@ -186,6 +148,7 @@ function UserManagement() {
             </div>
           </div>
           <div className="table-toolbar-right">
+            <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredUsers.length} users</span>
           </div>
         </div>
 
@@ -237,7 +200,19 @@ function UserManagement() {
                       {u.role === 'STUDENT' ? (
                         <>                        {u.degreeType} · {u.program?.code}</>
                       ) : (
-                        <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
+                        <>
+                          <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
+                          {['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'].includes(u.role) && u.designation && (
+                            <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', display: 'block' }}>
+                              {u.designation}
+                            </span>
+                          )}
+                          {u.role === 'COORDINATOR' && u.program && (
+                            <span style={{ fontSize: 11, color: 'var(--color-primary)', display: 'block' }}>
+                              {u.program.name} ({u.program.code})
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                     <td>
@@ -266,6 +241,58 @@ function UserManagement() {
         )}
       </div>
 
+      {showBulk && (
+        <div className="modal-overlay" onClick={() => setShowBulk(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+            <div className="modal-header">
+              <div className="modal-header-icon info">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Bulk Import Users</h2>
+                <p>Paste a JSON array of users to create them in bulk</p>
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', margin: 0 }}>
+                Expected format: [{"{"}"email": "...", "password": "...", "firstName": "...", "lastName": "...", "role": "...", "designation": "...", "programId": ..., "canSupervise": true/false{"}"}]
+              </p>
+            </div>
+            <div className="form-group">
+              <textarea
+                className="form-input"
+                rows={10}
+                value={bulkJson}
+                onChange={e => setBulkJson(e.target.value)}
+                placeholder='[&#10;  {"email": "coord.bct@example.com", "password": "pass123", "firstName": "Ram", "lastName": "Prasad", "role": "COORDINATOR", "designation": "Asst. Prof.", "programId": 1, "canSupervise": false}&#10;]'
+                style={{ fontFamily: 'monospace', fontSize: 12 }}
+              />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => setShowBulk(false)}>
+                <span className="material-symbols-outlined">close</span>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={async () => {
+                try {
+                  const users = JSON.parse(bulkJson);
+                  if (!Array.isArray(users)) throw new Error('Must be an array');
+                  const { data } = await api.post('/users/bulk', { users });
+                  toast.success(data.message);
+                  setShowBulk(false);
+                  setBulkJson('');
+                  loadUsers();
+                } catch (err) {
+                  toast.error(err.response?.data?.error || err.message || 'Invalid JSON');
+                }
+              }}>
+                <span className="material-symbols-outlined">upload</span>
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -305,6 +332,34 @@ function UserManagement() {
                   ))}
                 </select>
               </div>
+              {['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'].includes(form.role) && (
+                <>
+                  <div className="form-group">
+                    <label>Designation</label>
+                    <select value={form.designation} onChange={e => setForm({...form, designation: e.target.value})}>
+                      <option value="">Select designation...</option>
+                      <option value="Asst. Prof.">Asst. Prof.</option>
+                      <option value="Asst. Prof. Dr.">Asst. Prof. Dr.</option>
+                      <option value="Assoc. Prof.">Assoc. Prof.</option>
+                      <option value="Assoc. Prof. Dr.">Assoc. Prof. Dr.</option>
+                      <option value="Prof.">Prof.</option>
+                      <option value="Prof. Dr.">Prof. Dr.</option>
+                    </select>
+                  </div>
+                  {form.role === 'COORDINATOR' && (
+                    <div className="form-group">
+                      <label>Program (Coordinator for)</label>
+                      <select value={form.programId} onChange={e => setForm({...form, programId: e.target.value})}>
+                        <option value="">Select program...</option>
+                        {programs.filter(p => editUser ? true : true).map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.code}) — {p.degreeType}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                </>
+              )}
               {form.role === 'STUDENT' && (
                 <>
                   <div className="form-group">

@@ -23,6 +23,7 @@ const examinerAssignmentRoutes = require('./routes/examinerAssignments');
 const printRoutes = require('./routes/print');
 const proposalRoutes = require('./routes/proposals');
 const announcementRoutes = require('./routes/announcements');
+const assignmentRequestRoutes = require('./routes/assignmentRequests');
 const studentGroupRoutes = require('./routes/studentGroups');
 const aiRoutes = require('./routes/ai');
 const chatbotRoutes = require('./routes/chatbot');
@@ -64,6 +65,7 @@ app.use('/api/examiner-assignments', examinerAssignmentRoutes);
 app.use('/api/print', printRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/assignment-requests', assignmentRequestRoutes);
 app.use('/api/student-groups', studentGroupRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/chatbot', chatbotRoutes);
@@ -93,26 +95,36 @@ app.get('/api/stats', authenticate, async (req, res) => {
   try {
     let departmentId = null;
     let academicYearIds = null;
+    let programId = null;
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept) {
-        departmentId = dept.id;
-        academicYearIds = (await prisma.academicYear.findMany({ where: { departmentId: dept.id }, select: { id: true } })).map(a => a.id);
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        programId = program.id;
+        departmentId = program.departmentId;
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept) {
+          departmentId = dept.id;
+          academicYearIds = (await prisma.academicYear.findMany({ where: { departmentId: dept.id }, select: { id: true } })).map(a => a.id);
+        }
       }
     }
     const yearFilter = academicYearIds ? { academicYearId: { in: academicYearIds } } : {};
+    const programFilter = programId ? { programId } : {};
     const deptUserFilter = departmentId ? { departmentId } : {};
-    const totalGroups = await prisma.projectGroup.count({ where: yearFilter });
-    const totalTheses = await prisma.thesis.count({ where: yearFilter });
+    const studentProgramFilter = programId ? { programId } : {};
+    const thesisFilter = programId ? { student: { programId } } : yearFilter;
+    const totalGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter } });
+    const totalTheses = await prisma.thesis.count({ where: thesisFilter });
     const totalSupervisors = await prisma.user.count({ where: { role: 'SUPERVISOR', ...deptUserFilter } });
     const totalCoordinators = await prisma.user.count({ where: { role: 'COORDINATOR' } });
-    const totalStudents = await prisma.user.count({ where: { role: 'STUDENT', ...deptUserFilter } });
-    const pendingGroups = await prisma.projectGroup.count({ where: { ...yearFilter, status: 'PENDING' } });
-    const activeGroups = await prisma.projectGroup.count({ where: { ...yearFilter, status: 'ACTIVE' } });
-    const completedGroups = await prisma.projectGroup.count({ where: { ...yearFilter, status: 'COMPLETED' } });
-    const pendingTheses = await prisma.thesis.count({ where: { ...yearFilter, status: 'PENDING' } });
-    const minorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, projectType: 'MINOR' } });
-    const majorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, projectType: 'MAJOR' } });
+    const totalStudents = await prisma.user.count({ where: { role: 'STUDENT', ...deptUserFilter, ...studentProgramFilter } });
+    const pendingGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'PENDING' } });
+    const activeGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'ACTIVE' } });
+    const completedGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'COMPLETED' } });
+    const pendingTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'PENDING' } });
+    const minorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MINOR' } });
+    const majorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MAJOR' } });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
       pendingGroups, activeGroups, completedGroups, pendingTheses,

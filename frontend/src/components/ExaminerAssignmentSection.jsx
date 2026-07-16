@@ -91,7 +91,7 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
               <select value={selectedExaminerId} onChange={e => setSelectedExaminerId(e.target.value)}>
                 <option value="">— Choose an examiner —</option>
                 {examiners.filter(e => !firstAssignment || e.id !== firstAssignment.externalExaminerId).map(e => (
-                  <option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.email})</option>
+                  <option key={e.id} value={e.id}>{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName} ({e.email})</option>
                 ))}
               </select>
             </div>
@@ -124,7 +124,7 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>
-                {examinerUser?.firstName} {examinerUser?.lastName}
+                {examinerUser?.designation ? examinerUser.designation + ' ' : ''}{examinerUser?.firstName} {examinerUser?.lastName}
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
                 {examinerUser?.email}

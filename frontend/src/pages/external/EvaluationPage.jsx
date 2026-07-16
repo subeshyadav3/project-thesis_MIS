@@ -188,7 +188,7 @@ function ExternalExaminerEvaluationPage() {
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
               <span>{title}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Supervisor:</span>
-              <span>{item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
+              <span>{item?.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Status:</span>
               <span><span className={`badge badge-${item?.status?.toLowerCase() || 'pending'}`}>{item?.status || 'PENDING'}</span></span>
               {item?.examinerAssignments?.length > 0 && (

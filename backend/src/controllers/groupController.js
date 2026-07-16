@@ -11,8 +11,13 @@ exports.getGroups = async (req, res) => {
   try {
     const where = {};
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept) where.academicYear = { departmentId: dept.id };
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        where.programId = program.id;
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept) where.academicYear = { departmentId: dept.id };
+      }
     }
     if (req.query.announcementId) where.announcementId = Number(req.query.announcementId);
     if (req.query.status) where.status = req.query.status;
@@ -53,9 +58,16 @@ exports.getGroup = async (req, res) => {
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept && group.academicYear?.departmentId !== dept.id) {
-        return res.status(403).json({ error: 'Access denied. Group belongs to another department.' });
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        if (group.programId !== program.id) {
+          return res.status(403).json({ error: 'Access denied. Group belongs to another program.' });
+        }
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept && group.academicYear?.departmentId !== dept.id) {
+          return res.status(403).json({ error: 'Access denied. Group belongs to another department.' });
+        }
       }
     }
     res.json(group);
@@ -380,8 +392,13 @@ exports.exportGroups = async (req, res) => {
     const XLSX = require('xlsx');
     const where = {};
     if (req.user.role === 'COORDINATOR') {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept) where.academicYear = { departmentId: dept.id };
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        where.programId = program.id;
+      } else {
+        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+        if (dept) where.academicYear = { departmentId: dept.id };
+      }
     }
     const groups = await prisma.projectGroup.findMany({
       where,

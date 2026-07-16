@@ -237,7 +237,7 @@ function ExternalEvaluationsList() {
                             {t.evalStatus === 'COMPLETED' ? 'Completed' : t.hasMarks ? 'Draft' : 'Pending'}
                           </span>
                         </td>
-                        <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : '—'}</td>
+                        <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.supervisor ? `${t.supervisor.designation ? t.supervisor.designation + ' ' : ''}${t.supervisor.firstName} ${t.supervisor.lastName}` : '—'}</td>
                         <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                             <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)}>

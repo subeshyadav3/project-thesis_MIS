@@ -30,6 +30,8 @@ import ExternalDashboard from './pages/external/Dashboard';
 import ExternalEvaluationsList from './pages/external/EvaluationsList';
 import ExternalEvaluationPage from './pages/external/EvaluationPage';
 import PrivateRoute from './components/PrivateRoute';
+import DegreeGuard from './components/DegreeGuard';
+import NotFound from './pages/NotFound';
 import './App.css';
 
 function App() {
@@ -42,8 +44,8 @@ function App() {
           <Route path="/maintainer/users" element={<PrivateRoute role="MAINTAINER"><UserManagement /></PrivateRoute>} />
           <Route path="/maintainer/departments" element={<PrivateRoute role="MAINTAINER"><DepartmentManagement /></PrivateRoute>} />
           <Route path="/maintainer/*" element={<PrivateRoute role="MAINTAINER"><MaintainerDashboard /></PrivateRoute>} />
-          <Route path="/coordinator/bachelor" element={<PrivateRoute role="COORDINATOR"><BachelorProjects /></PrivateRoute>} />
-          <Route path="/coordinator/master" element={<PrivateRoute role="COORDINATOR"><MasterThesis /></PrivateRoute>} />
+          <Route path="/coordinator/bachelor" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="BACHELOR"><BachelorProjects /></DegreeGuard></PrivateRoute>} />
+          <Route path="/coordinator/master" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="MASTER"><MasterThesis /></DegreeGuard></PrivateRoute>} />
           <Route path="/coordinator/evaluations" element={<PrivateRoute role="COORDINATOR"><Evaluations /></PrivateRoute>} />
           <Route path="/coordinator/supervisors" element={<PrivateRoute role="COORDINATOR"><SupervisorList /></PrivateRoute>} />
           <Route path="/coordinator/examiners" element={<PrivateRoute role="COORDINATOR"><ExaminerList /></PrivateRoute>} />

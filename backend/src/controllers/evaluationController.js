@@ -154,28 +154,6 @@ exports.submitComponentMarks = async (req, res) => {
         itemTitle: itemTitle || 'project',
         submitterId: req.user.id,
       });
-      // Email notification to students
-      try {
-        const emailService = require('../services/emailService');
-        if (groupId) {
-          const grp = await prisma.projectGroup.findUnique({
-            where: { id: parseInt(groupId) },
-            include: { members: { include: { student: { select: { email: true } } } } },
-          });
-          const studentEmails = grp?.members?.map(m => m.student.email).filter(Boolean) || [];
-          if (studentEmails.length) {
-            emailService.notifyEvaluationSubmitted(studentEmails, grp.name, itemTitle, `${submitter.firstName} ${submitter.lastName}`, component.evaluationType, `${data.marks ?? '-'}/${component.maxMarks}`);
-          }
-        } else if (thesisId) {
-          const th = await prisma.thesis.findUnique({
-            where: { id: parseInt(thesisId) },
-            include: { student: { select: { email: true } } },
-          });
-          if (th?.student?.email) {
-            emailService.notifyEvaluationSubmitted([th.student.email], `${th.student.firstName} ${th.student.lastName} (Thesis)`, itemTitle, `${submitter.firstName} ${submitter.lastName}`, component.evaluationType, `${data.marks ?? '-'}/${component.maxMarks}`);
-          }
-        }
-      } catch (e) { console.error('email notification error:', e.message); }
     } catch (e) { console.error('notifyMarksSubmitted:', e.message); }
 
     res.status(existing ? 200 : 201).json({ evaluation, summary });
