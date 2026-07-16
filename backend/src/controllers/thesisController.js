@@ -260,6 +260,9 @@ exports.bulkImportConfirm = async (req, res) => {
 
     const created = [];
     const skipped = [];
+    const coordinatorProgram = req.user.role === 'COORDINATOR'
+      ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
+      : null;
 
     for (const row of rows) {
       const { studentMatch, supervisorMatch, externalMidTermMatch, externalFinalMatch, title, batch, cluster } = row;
@@ -272,95 +275,97 @@ exports.bulkImportConfirm = async (req, res) => {
         skipped.push({ row: row.row, reason: 'No thesis title' });
         continue;
       }
-      const student = await prisma.user.findUnique({ where: { id: studentMatch.id }, include: { program: true } });
-      if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
-        skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
-        continue;
-      }
-      const coordinatorProgram = req.user.role === 'COORDINATOR'
-        ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
-        : null;
-      if (coordinatorProgram && student.programId !== coordinatorProgram.id) {
-        skipped.push({ row: row.row, reason: 'Student belongs to another program' });
-        continue;
-      }
 
-      // Check for active thesis
-      const activeThesis = await prisma.thesis.findFirst({
-        where: { studentId: studentMatch.id, status: { in: ['PENDING', 'ACTIVE'] } },
-      });
-      if (activeThesis) {
-        skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Already has active thesis: "${activeThesis.title}"` });
-        continue;
-      }
+      // Wrap the race-condition-prone check+create in a transaction
+      const thesis = await prisma.$transaction(async (tx) => {
+        const student = await tx.user.findUnique({ where: { id: studentMatch.id }, include: { program: true } });
+        if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
+          skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
+          return null;
+        }
+        if (coordinatorProgram && student.programId !== coordinatorProgram.id) {
+          skipped.push({ row: row.row, reason: 'Student belongs to another program' });
+          return null;
+        }
 
-      // Check for duplicate
-      const duplicate = await prisma.thesis.findFirst({
-        where: { title, studentId: studentMatch.id, academicYearId: parseInt(academicYearId) },
-      });
-      if (duplicate) {
-        skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Duplicate thesis: "${title}"` });
-        continue;
-      }
-
-      // Create thesis
-      const thesis = await prisma.thesis.create({
-        data: {
-          title,
-          projectType: 'MASTER',
-          studentId: studentMatch.id,
-          status: supervisorMatch?.id ? 'ACTIVE' : 'PENDING',
-          academicYearId: parseInt(academicYearId),
-          supervisorId: supervisorMatch?.id || null,
-          externalMidTermId: externalMidTermMatch?.id || null,
-          externalFinalId: externalFinalMatch?.id || null,
-          cluster: cluster || student.program?.cluster || null,
-          batch: batch || student.batch || null,
-        },
-      });
-
-      // Create default evaluation components
-      const defaults = getDefaultComponents('MASTER');
-      for (const comp of defaults) {
-        await prisma.evaluationComponent.create({
-          data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
+        // Check for active thesis within the transaction
+        const activeThesis = await tx.thesis.findFirst({
+          where: { studentId: studentMatch.id, status: { in: ['PENDING', 'ACTIVE'] } },
         });
-      }
+        if (activeThesis) {
+          skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Already has active thesis: "${activeThesis.title}"` });
+          return null;
+        }
 
-      // Create ExaminerAssignment records for externals
-      if (externalMidTermMatch?.id) {
-        await prisma.examinerAssignment.upsert({
-          where: { externalExaminerId_thesisId: { externalExaminerId: externalMidTermMatch.id, thesisId: thesis.id } },
-          update: {},
-          create: { externalExaminerId: externalMidTermMatch.id, thesisId: thesis.id, assignedById: req.user.id },
-        }).catch(() => {}); // ignore if already assigned
-      }
-      if (externalFinalMatch?.id) {
-        await prisma.examinerAssignment.upsert({
-          where: { externalExaminerId_thesisId: { externalExaminerId: externalFinalMatch.id, thesisId: thesis.id } },
-          update: {},
-          create: { externalExaminerId: externalFinalMatch.id, thesisId: thesis.id, assignedById: req.user.id },
-        }).catch(() => {}); // ignore if already assigned
-      }
+        // Check for duplicate within the transaction
+        const duplicate = await tx.thesis.findFirst({
+          where: { title, studentId: studentMatch.id, academicYearId: parseInt(academicYearId) },
+        });
+        if (duplicate) {
+          skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Duplicate thesis: "${title}"` });
+          return null;
+        }
 
-      // Auto-link to active THESIS announcement
-      try {
-        const activeAnnouncements = await prisma.announcement.findMany({
-          where: {
-            type: 'THESIS',
-            degreeType: 'MASTER',
+        // All checks passed — create thesis
+        const newThesis = await tx.thesis.create({
+          data: {
+            title,
+            projectType: 'MASTER',
+            studentId: studentMatch.id,
+            status: supervisorMatch?.id ? 'ACTIVE' : 'PENDING',
             academicYearId: parseInt(academicYearId),
+            supervisorId: supervisorMatch?.id || null,
+            externalMidTermId: externalMidTermMatch?.id || null,
+            externalFinalId: externalFinalMatch?.id || null,
+            cluster: cluster || student.program?.cluster || null,
+            batch: batch || student.batch || null,
           },
         });
-        if (activeAnnouncements.length > 0) {
-          await prisma.thesis.update({
-            where: { id: thesis.id },
-            data: { announcementId: activeAnnouncements[0].id },
+
+        // Create default evaluation components
+        const defaults = getDefaultComponents('MASTER');
+        for (const comp of defaults) {
+          await tx.evaluationComponent.create({
+            data: { ...comp, thesisId: newThesis.id, createdById: req.user.id },
           });
         }
-      } catch (e) { /* ignore announcement linking errors */ }
 
-      created.push(thesis);
+        // Create ExaminerAssignment records for externals
+        if (externalMidTermMatch?.id) {
+          await tx.examinerAssignment.upsert({
+            where: { externalExaminerId_thesisId: { externalExaminerId: externalMidTermMatch.id, thesisId: newThesis.id } },
+            update: {},
+            create: { externalExaminerId: externalMidTermMatch.id, thesisId: newThesis.id, assignedById: req.user.id },
+          }).catch(() => {});
+        }
+        if (externalFinalMatch?.id) {
+          await tx.examinerAssignment.upsert({
+            where: { externalExaminerId_thesisId: { externalExaminerId: externalFinalMatch.id, thesisId: newThesis.id } },
+            update: {},
+            create: { externalExaminerId: externalFinalMatch.id, thesisId: newThesis.id, assignedById: req.user.id },
+          }).catch(() => {});
+        }
+
+        // Auto-link to active THESIS announcement
+        try {
+          const activeAnnouncements = await tx.announcement.findMany({
+            where: {
+              type: 'THESIS',
+              degreeType: 'MASTER',
+              academicYearId: parseInt(academicYearId),
+            },
+          });
+          if (activeAnnouncements.length > 0) {
+            await tx.thesis.update({
+              where: { id: newThesis.id },
+              data: { announcementId: activeAnnouncements[0].id },
+            });
+          }
+        } catch (e) { /* ignore announcement linking errors */ }
+
+        created.push(newThesis);
+        return newThesis;
+      });
     }
 
     audit.log({ action: 'CREATE', entity: 'Thesis', details: `Bulk imported ${created.length} theses${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });

@@ -397,6 +397,7 @@ function ExternalExaminerEvaluationPage() {
         type={type}
         id={id}
         onClose={() => setShowPdfPreview(false)}
+        onSave={() => { setShowPdfPreview(false); loadData(); }}
       />
     )}
     </ErrorBoundary>

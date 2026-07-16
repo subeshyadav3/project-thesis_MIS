@@ -338,9 +338,47 @@ function sendPdf(res, pdf, filename) {
   res.send(pdf);
 }
 
+/** Verify the requesting user has access to the given group/thesis.
+ *  Sends a 403 response directly if access is denied.
+ *  Returns true if access is granted. */
+async function checkPrintAccess(req, res, type, id) {
+  if (req.user.role === 'MAINTAINER') return true;
+  if (req.user.role === 'COORDINATOR') {
+    const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+    if (program) {
+      let itemProgramId = null;
+      if (type === 'group') {
+        const g = await prisma.projectGroup.findUnique({ where: { id }, select: { programId: true } });
+        itemProgramId = g?.programId;
+      } else {
+        const t = await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { programId: true } } } });
+        itemProgramId = t?.student?.programId;
+      }
+      if (itemProgramId && itemProgramId !== program.id) {
+        res.status(403).json({ error: 'Access denied. Item belongs to another program.' });
+        return false;
+      }
+    } else {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) {
+        const ay = type === 'group'
+          ? await prisma.academicYear.findFirst({ where: { projectGroups: { some: { id } } }, select: { departmentId: true } })
+          : await prisma.academicYear.findFirst({ where: { theses: { some: { id } } }, select: { departmentId: true } });
+        if (ay && ay.departmentId !== dept.id) {
+          res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 exports.printGroupEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'group', id);
+    if (!granted) return;
     const group = await prisma.projectGroup.findUnique({
       where: { id },
       include: {
@@ -401,6 +439,8 @@ exports.printGroupEvaluation = async (req, res) => {
 exports.printThesisEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'thesis', id);
+    if (!granted) return;
     const thesis = await prisma.thesis.findUnique({
       where: { id },
       include: {
@@ -451,6 +491,8 @@ exports.printThesisEvaluation = async (req, res) => {
 exports.previewGroupEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'group', id);
+    if (!granted) return;
     const group = await prisma.projectGroup.findUnique({
       where: { id },
       include: {
@@ -511,6 +553,8 @@ exports.previewGroupEvaluation = async (req, res) => {
 exports.previewThesisEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'thesis', id);
+    if (!granted) return;
     const thesis = await prisma.thesis.findUnique({
       where: { id },
       include: {

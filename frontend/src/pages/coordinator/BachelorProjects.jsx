@@ -1183,6 +1183,7 @@ const filteredGroups = useMemo(() => {
           type="group"
           id={pdfPreviewItem.id}
           onClose={() => setPdfPreviewItem(null)}
+          onSave={loadData}
         />
       )}
       <ConfirmDialog

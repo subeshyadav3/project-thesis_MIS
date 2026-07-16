@@ -3,7 +3,7 @@ import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
 /** Editable review surface shared by coordinators, supervisors and externals. */
-export default function EvaluationPdfPreview({ type, id, onClose }) {
+export default function EvaluationPdfPreview({ type, id, onClose, onSave }) {
   const [item, setItem] = useState(null);
   const [previewHtml, setPreviewHtml] = useState('');
   const [loading, setLoading] = useState(true);
@@ -69,6 +69,7 @@ export default function EvaluationPdfPreview({ type, id, onClose }) {
         });
       }
       await load();
+      if (onSave) onSave();
     } catch (e) { setError(e.response?.data?.error || e.message || 'Could not save changes.'); }
     finally { setSaving(false); }
   };

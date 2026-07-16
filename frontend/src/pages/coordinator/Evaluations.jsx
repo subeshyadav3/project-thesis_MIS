@@ -173,19 +173,6 @@ function Evaluations() {
     </>
   );
 
-  // Download single evaluation as PDF
-  const handlePrintSingle = (item) => {
-    const endpoint = viewMode === 'bachelor'
-      ? `/api/print/group/${item.id}`
-      : `/api/print/thesis/${item.id}`;
-    const a = document.createElement('a');
-    a.href = endpoint;
-    a.download = `evaluation_${item.id}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
   // Download all evaluated results (one by one)
   const handlePrintAll = () => {
     const evaluated = filteredItems.filter(i => computeStatus(i) === 'COMPLETE' || computeStatus(i) === 'PARTIAL');
@@ -440,6 +427,7 @@ function Evaluations() {
           type={viewMode === 'bachelor' ? 'group' : 'thesis'}
           id={pdfPreviewItem.id}
           onClose={() => setPdfPreviewItem(null)}
+          onSave={() => { setPdfPreviewItem(null); setSelectedItem(null); setShowSummaryModal(false); }}
         />
       )}
 

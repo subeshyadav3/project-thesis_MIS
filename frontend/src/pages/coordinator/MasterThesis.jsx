@@ -1053,6 +1053,7 @@ return (
           type="thesis"
           id={pdfPreviewItem.id}
           onClose={() => setPdfPreviewItem(null)}
+          onSave={loadData}
         />
       )}
       <ConfirmDialog

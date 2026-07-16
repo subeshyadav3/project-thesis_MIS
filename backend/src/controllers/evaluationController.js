@@ -294,12 +294,24 @@ exports.completeEvaluation = async (req, res) => {
     const componentId = parseInt(req.params.id);
     const { groupId, thesisId } = req.body;
 
-    const evaluation = await prisma.evaluation.findUnique({
-      where: { componentId },
+    if (!groupId && !thesisId) {
+      return res.status(400).json({ error: 'groupId or thesisId is required' });
+    }
+
+    // Scope the query to the specific group or thesis
+    const scopeWhere = groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) };
+
+    const evaluation = await prisma.evaluation.findFirst({
+      where: { componentId, ...scopeWhere },
       include: { component: true },
     });
     if (!evaluation) {
       return res.status(404).json({ error: 'Evaluation not found. Submit marks first.' });
+    }
+
+    // Prevent re-completing an already completed evaluation
+    if (evaluation.status === 'COMPLETED' && !['COORDINATOR', 'MAINTAINER'].includes(req.user.role)) {
+      return res.status(400).json({ error: 'Evaluation already completed.' });
     }
     if (!['COORDINATOR', 'MAINTAINER'].includes(req.user.role) && req.user.role !== evaluation.component.evaluatorRole) {
       return res.status(403).json({ error: 'You cannot complete this evaluation.' });
