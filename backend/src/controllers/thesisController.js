@@ -1,6 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
 const XLSX = require('xlsx');
-const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
@@ -79,6 +78,10 @@ exports.createThesis = async (req, res) => {
     if (!title || !studentId || !academicYearId) {
       return res.status(400).json({ error: 'title, studentId, and academicYearId are required' });
     }
+    const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) }, include: { program: true } });
+    if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
+      return res.status(400).json({ error: 'studentId must belong to a master student' });
+    }
     const thesis = await prisma.thesis.create({
       data: {
         title,
@@ -86,6 +89,8 @@ exports.createThesis = async (req, res) => {
         studentId: parseInt(studentId),
         academicYearId: parseInt(academicYearId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
+        batch: student.batch || null,
+        cluster: student.program?.cluster || null,
         status: supervisorId ? 'ACTIVE' : 'PENDING',
       },
     });
@@ -97,90 +102,6 @@ exports.createThesis = async (req, res) => {
     }
     audit.log({ action: 'CREATE', entity: 'Thesis', entityId: thesis.id, details: `Created thesis "${thesis.title}"`, performedById: req.user.id });
     res.status(201).json(thesis);
-  } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-exports.uploadExcel = async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(sheet);
-    const created = [];
-    const skipped = [];
-    for (const row of data) {
-      const title = row['Project Title'] || row['title'] || row['projectTitle'];
-      const studentName = (row['Member Names'] || row['studentName'] || '').toString();
-      const rollNumber = (row['Roll Numbers'] || row['rollNumbers'] || '').toString();
-      const yearValue = (row['Academic Year'] || row['academicYear'] || row['year'] || '').toString().trim();
-      // Skip blank rows
-      if (!title || !rollNumber) {
-        skipped.push({ title: title || '(blank)', reason: 'Empty project title or roll number' });
-        continue;
-      }
-      // Resolve academic year
-      const academicYear = await prisma.academicYear.findFirst({
-        where: { year: yearValue, departmentId: req.user.departmentId },
-      });
-      if (!academicYear) {
-        return res.status(400).json({ error: `Academic year "${yearValue}" not found for your department` });
-      }
-      const nameParts = studentName.split(' ');
-      const firstName = nameParts[0] || studentName;
-      const lastName = nameParts.slice(1).join(' ') || '';
-      const email = `${rollNumber.toLowerCase()}@pcampus.edu.np`;
-      let student = await prisma.user.findFirst({ where: { email } });
-      if (!student) {
-        student = await prisma.user.findFirst({
-          where: { lastName, firstName, role: 'STUDENT' },
-        });
-        if (!student) {
-          student = await prisma.user.create({
-            data: {
-              email,
-              password: await bcrypt.hash('subesh', 10),
-              firstName,
-              lastName,
-              role: 'STUDENT',
-            },
-          });
-        }
-      }
-      // Skip if student already has an active thesis
-      const activeThesis = await prisma.thesis.findFirst({
-        where: { studentId: student.id, status: { in: ['PENDING', 'ACTIVE'] } },
-      });
-      if (activeThesis) {
-        skipped.push({ student: `${student.firstName} ${student.lastName}`, roll: rollNumber, reason: `Already has an active thesis: "${activeThesis.title}" (status: ${activeThesis.status})` });
-        continue;
-      }
-      // Skip if same thesis title already exists for this student and academic year
-      const duplicateThesis = await prisma.thesis.findFirst({
-        where: { title, studentId: student.id, academicYearId: academicYear.id },
-      });
-      if (duplicateThesis) {
-        skipped.push({ student: `${student.firstName} ${student.lastName}`, roll: rollNumber, reason: `Duplicate thesis: "${title}" already exists for this student and year` });
-        continue;
-      }
-      const thesis = await prisma.thesis.create({
-        data: { title, projectType: 'MASTER', studentId: student.id, status: 'ACTIVE', academicYearId: academicYear.id },
-      });
-      const defaults = getDefaultComponents('MASTER');
-      for (const comp of defaults) {
-        await prisma.evaluationComponent.create({
-          data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
-        });
-      }
-      created.push(thesis);
-    }
-    audit.log({ action: 'CREATE', entity: 'Thesis', details: `Imported ${created.length} theses via Excel${skipped.length ? `, ${skipped.length} students skipped` : ''}`, performedById: req.user.id });
-    res.status(201).json({
-      message: `${created.length} theses created${skipped.length ? `, ${skipped.length} students skipped` : ''}`,
-      theses: created,
-      skipped: skipped.length ? skipped : undefined,
-    });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -227,10 +148,14 @@ exports.bulkImportPreview = async (req, res) => {
 
     // Load all candidates in the coordinator's department
     const deptId = req.user.departmentId;
-    const [allStudents, allSupervisors, allExternals] = await Promise.all([
+    const coordinatorProgram = req.user.role === 'COORDINATOR'
+      ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
+      : null;
+    const [allStudents, allSupervisors, allExternals, programs] = await Promise.all([
       prisma.user.findMany({ where: { role: 'STUDENT', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } }),
       prisma.user.findMany({ where: { role: 'SUPERVISOR', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.user.findMany({ where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
+      prisma.program.findMany({ where: { departmentId: deptId }, select: { id: true, name: true, code: true, degreeType: true, cluster: true } }),
     ]);
 
     const preview = [];
@@ -244,6 +169,7 @@ exports.bulkImportPreview = async (req, res) => {
       const title = (row['Title'] || row['title'] || row['Project Title'] || '').toString().trim();
       const batch = (row['Batch'] || row['batch'] || '').toString().trim();
       const cluster = (row['Cluster'] || row['cluster'] || '').toString().trim();
+      const programValue = (row['Program'] || row['program'] || '').toString().trim();
       const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
       const externalMidTermName = (row['External_mid_term'] || row['externalMidTerm'] || '').toString().trim();
       const externalFinalName = (row['External_final'] || row['externalFinal'] || '').toString().trim();
@@ -251,6 +177,10 @@ exports.bulkImportPreview = async (req, res) => {
       if (!name && !roll && !title) continue; // skip blank rows
 
       const warnings = [];
+      const importedProgram = programValue
+        ? programs.find(p => p.code.toLowerCase() === programValue.toLowerCase() || p.name.toLowerCase() === programValue.toLowerCase())
+        : null;
+      if (programValue && !importedProgram) warnings.push(`Program not found for "${programValue}"`);
 
       // Match student
       let studentMatch = null;
@@ -266,6 +196,12 @@ exports.bulkImportPreview = async (req, res) => {
         unmatchCount++;
       } else {
         matchCount++;
+        if (coordinatorProgram && studentMatch.user.programId !== coordinatorProgram.id) {
+          warnings.push('Student belongs to another program and cannot be imported by this coordinator');
+        }
+        if (importedProgram && studentMatch.user.programId !== importedProgram.id) {
+          warnings.push('Program does not match the matched student');
+        }
       }
 
       // Match supervisor
@@ -293,6 +229,7 @@ exports.bulkImportPreview = async (req, res) => {
         title,
         batch,
         cluster,
+        program: importedProgram ? { id: importedProgram.id, code: importedProgram.code, name: importedProgram.name, cluster: importedProgram.cluster } : null,
         programId: studentMatch?.user?.programId || null,
         studentMatch: studentMatch ? { id: studentMatch.user.id, name: `${studentMatch.user.firstName} ${studentMatch.user.lastName}`, score: studentMatch.score, status: 'matched' } : null,
         supervisorMatch: supervisorMatch ? { id: supervisorMatch.user.id, name: `${supervisorMatch.user.firstName} ${supervisorMatch.user.lastName}`, score: supervisorMatch.score, status: 'matched' } : null,
@@ -335,6 +272,18 @@ exports.bulkImportConfirm = async (req, res) => {
         skipped.push({ row: row.row, reason: 'No thesis title' });
         continue;
       }
+      const student = await prisma.user.findUnique({ where: { id: studentMatch.id }, include: { program: true } });
+      if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
+        skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
+        continue;
+      }
+      const coordinatorProgram = req.user.role === 'COORDINATOR'
+        ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
+        : null;
+      if (coordinatorProgram && student.programId !== coordinatorProgram.id) {
+        skipped.push({ row: row.row, reason: 'Student belongs to another program' });
+        continue;
+      }
 
       // Check for active thesis
       const activeThesis = await prisma.thesis.findFirst({
@@ -365,8 +314,8 @@ exports.bulkImportConfirm = async (req, res) => {
           supervisorId: supervisorMatch?.id || null,
           externalMidTermId: externalMidTermMatch?.id || null,
           externalFinalId: externalFinalMatch?.id || null,
-          cluster: cluster || null,
-          batch: batch || null,
+          cluster: cluster || student.program?.cluster || null,
+          batch: batch || student.batch || null,
         },
       });
 

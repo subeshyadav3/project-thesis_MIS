@@ -6,6 +6,7 @@ import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -54,6 +55,7 @@ function MasterThesis() {
   const [createStudentOpen, setCreateStudentOpen] = useState(false);
   const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [bulkPreview, setBulkPreview] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -735,18 +737,9 @@ return (
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
                           </button>
                         )}
-                        {t.status === 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline" title="Download PDF" onClick={() => {
-                            const a = document.createElement('a');
-                            a.href = `/api/print/thesis/${t.id}`;
-                            a.download = `evaluation_${t.id}.pdf`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                          </button>
-                        )}
+                        <button className="btn btn-sm btn-outline" title="PDF Preview" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(t); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
+                        </button>
                         {t.status !== 'COMPLETED' && (
                           <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteThesis(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
@@ -1054,6 +1047,13 @@ return (
             </form>
           </div>
         </div>
+      )}
+            {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type="thesis"
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+        />
       )}
       <ConfirmDialog
         open={confirmDialog.open}

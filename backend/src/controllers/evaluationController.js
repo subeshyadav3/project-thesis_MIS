@@ -26,8 +26,9 @@ exports.submitComponentMarks = async (req, res) => {
     });
     if (!component) return res.status(404).json({ error: 'Evaluation component not found' });
 
-    // The user role must match the component's evaluatorRole
-    if (req.user.role !== component.evaluatorRole) {
+    // Coordinators can correct any mark; evaluators remain limited to their own role.
+    const canManageAll = ['COORDINATOR', 'MAINTAINER'].includes(req.user.role);
+    if (!canManageAll && req.user.role !== component.evaluatorRole) {
       return res.status(403).json({
         error: `${req.user.role} cannot evaluate the "${component.name}" component (evaluator: ${component.evaluatorRole}).`,
       });
@@ -71,6 +72,11 @@ exports.submitComponentMarks = async (req, res) => {
     const marksValidation = validateMarks(marks, component.maxMarks);
     if (!marksValidation.valid) return res.status(400).json({ error: marksValidation.error });
 
+    const scopeWhere = groupId ? { groupId: parseInt(groupId, 10) } : { thesisId: parseInt(thesisId, 10) };
+    const existing = await prisma.evaluation.findFirst({
+      where: { componentId: component.id, ...scopeWhere },
+    });
+
     const data = {
       componentId: component.id,
       stage: component.evaluationType === 'MIDTERM_DEFENSE' ? 'MID_TERM'
@@ -80,15 +86,11 @@ exports.submitComponentMarks = async (req, res) => {
       comment: comment || null,
       comments: comments || null,
       suggestions: suggestions || null,
-      submittedById: req.user.id,
+      // Preserve the original evaluator when a coordinator corrects a saved mark.
+      submittedById: existing?.submittedById || req.user.id,
       ...(groupId ? { groupId: parseInt(groupId) } : {}),
       ...(thesisId ? { thesisId: parseInt(thesisId) } : {}),
     };
-
-    const scopeWhere = groupId ? { groupId: parseInt(groupId, 10) } : { thesisId: parseInt(thesisId, 10) };
-    const existing = await prisma.evaluation.findFirst({
-      where: { componentId: component.id, ...scopeWhere },
-    });
 
     const isUpdate = !!existing;
     const evaluation = await (isUpdate
@@ -299,10 +301,7 @@ exports.completeEvaluation = async (req, res) => {
     if (!evaluation) {
       return res.status(404).json({ error: 'Evaluation not found. Submit marks first.' });
     }
-    if (evaluation.status === 'COMPLETED') {
-      return res.status(400).json({ error: 'Evaluation already completed.' });
-    }
-    if (req.user.role !== evaluation.component.evaluatorRole) {
+    if (!['COORDINATOR', 'MAINTAINER'].includes(req.user.role) && req.user.role !== evaluation.component.evaluatorRole) {
       return res.status(403).json({ error: 'You cannot complete this evaluation.' });
     }
 

@@ -24,7 +24,6 @@ function ProjectDetail() {
   const [components, setComponents] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState(null);
   const [finalizing, setFinalizing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
@@ -125,37 +124,6 @@ function ProjectDetail() {
     } finally {
       setSavingFeedback(false);
     }
-  };
-
-  const doComplete = async (componentId) => {
-    setCompleting(componentId);
-    try {
-      const payload = {};
-      if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
-      await api.put(`/evaluations/${componentId}/complete`, payload);
-      toast.success('Evaluation marked as complete');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to complete evaluation');
-    } finally {
-      setCompleting(null);
-    }
-  };
-
-  const handleComplete = (componentId) => {
-    const e = evaluationForComponent(componentId);
-    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
-      setConfirmDialog({
-        open: true,
-        title: 'Complete Evaluation',
-        message: 'The marks for this component are zero or not set. Do you still want to mark it as complete?',
-        danger: true,
-        confirmLabel: 'Complete Anyway',
-        onConfirm: () => doComplete(componentId),
-      });
-      return;
-    }
-    doComplete(componentId);
   };
 
   const doFinalize = async () => {
@@ -421,7 +389,7 @@ function ProjectDetail() {
                 id={parseInt(id)}
                 currentSupervisor={item?.supervisor}
                 onRefresh={loadData}
-                disabled={item?.status === 'COMPLETED'}
+                disabled={false}
               />
             </div>
           )}
@@ -434,7 +402,7 @@ function ProjectDetail() {
                 id={parseInt(id)}
                 currentAssignments={item?.examinerAssignments || []}
                 onRefresh={loadData}
-                disabled={item?.status === 'COMPLETED'}
+                disabled={false}
               />
             </div>
           )}
@@ -479,7 +447,6 @@ function ProjectDetail() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
                 {currentUserComponents.map(comp => {
                   const e = evaluationForComponent(comp.id);
-                  const isCompleted = e?.status === 'COMPLETED';
                   return (
                     <div key={comp.id} className="card">
                       <div className="card-header">
@@ -489,7 +456,6 @@ function ProjectDetail() {
                             {ROLE_LABEL[comp.evaluatorRole]} evaluation · Max {comp.maxMarks} marks
                           </span>
                         </div>
-                        {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                       </div>
                       <div style={{ padding: '0 16px 16px' }}>
                         <DefenseCard
@@ -619,12 +585,10 @@ function ProjectDetail() {
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
                 {defenseComps.map(c => {
                   const e = evaluationForComponent(c.id);
-                  const isCompleted = e?.status === 'COMPLETED';
                   return (
                     <div key={c.id} className="card" style={{ flex: 1, minWidth: 240 }}>
                       <div className="card-header">
                         <h3>{c.name}</h3>
-                        {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                       </div>
                       <div style={{ padding: '0 12px 12px' }}>
                         <DefenseCard
@@ -640,23 +604,6 @@ function ProjectDetail() {
             );
           })()}
 
-          {/* Coordinator: Finalize project */}
-          {isCoordinator && item?.status !== 'COMPLETED' && (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <div className="card-header">
-                <h3>Finalize Project</h3>
-              </div>
-              <div style={{ padding: 16 }}>
-                <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', marginBottom: 12 }}>
-                  Mark this project as completed. This will lock all assignments and prevent further edits.
-                </p>
-                <button className="btn btn-primary" onClick={handleFinalize} disabled={finalizing}>
-                  <span className="material-symbols-outlined">{finalizing ? 'progress_activity' : 'check_circle'}</span>
-                  {finalizing ? 'Finalizing...' : 'Finalize Project'}
-                </button>
-              </div>
-            </div>
-          )}
           {/* Print Evaluation Form */}
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header"><h3>Download Evaluation</h3></div>

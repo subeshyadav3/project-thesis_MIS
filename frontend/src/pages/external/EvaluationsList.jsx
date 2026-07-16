@@ -193,12 +193,6 @@ function ExternalEvaluationsList() {
                             <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/external/evaluate/group/${g.id}`)}>
                               <span className="material-symbols-outlined">grading</span> Evaluate
                             </button>
-                            {g.evalStatus !== 'COMPLETED' && (
-                              <button className="btn btn-sm btn-success" onClick={() => handleCompleteGroup(g.id)} disabled={completing === g.id}>
-                                <span className="material-symbols-outlined">{completing === g.id ? 'progress_activity' : 'check_circle'}</span>
-                                {completing === g.id ? '...' : 'Complete'}
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -243,12 +237,6 @@ function ExternalEvaluationsList() {
                             <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)}>
                               <span className="material-symbols-outlined">grading</span> Evaluate
                             </button>
-                            {t.evalStatus !== 'COMPLETED' && (
-                              <button className="btn btn-sm btn-success" onClick={() => handleCompleteThesis(t.id)} disabled={completing === t.id}>
-                                <span className="material-symbols-outlined">{completing === t.id ? 'progress_activity' : 'check_circle'}</span>
-                                {completing === t.id ? '...' : 'Complete'}
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>

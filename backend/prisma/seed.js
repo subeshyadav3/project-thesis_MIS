@@ -49,10 +49,10 @@ async function main() {
   const progDefs = [
     { code: 'BCT', name: 'Bachelor of Computer Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
     { code: 'BEI', name: 'Bachelor of Electronics and Information Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
-    { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', departmentId: eceDept.id },
-    { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', departmentId: eceDept.id },
-    { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', departmentId: eceDept.id },
-    { code: 'MSCSKE', name: 'MSc in Computer Science and Knowledge Engineering', degreeType: 'MASTER', departmentId: eceDept.id },
+    { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', cluster: 'Cluster 1', departmentId: eceDept.id },
+    { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', cluster: 'Cluster 2', departmentId: eceDept.id },
+    { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', cluster: 'Cluster 3', departmentId: eceDept.id },
+    { code: 'MSCSKE', name: 'MSc in Computer Science and Knowledge Engineering', degreeType: 'MASTER', cluster: 'Cluster 4', departmentId: eceDept.id },
   ];
   for (const p of progDefs) {
     programs[p.code] = await prisma.program.create({ data: p });

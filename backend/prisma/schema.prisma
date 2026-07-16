@@ -201,6 +201,7 @@ model Program {
   code         String   @unique
   departmentId Int
   degreeType   DegreeType?
+  cluster      String?
   coordinatorId Int?    @unique
   coordinator   User?    @relation("CoordinatorProgram", fields: [coordinatorId], references: [id])
   department   Department  @relation(fields: [departmentId], references: [id])

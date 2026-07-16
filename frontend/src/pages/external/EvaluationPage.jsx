@@ -6,7 +6,6 @@ import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -22,9 +21,7 @@ function ExternalExaminerEvaluationPage() {
   const [components, setComponents] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: null });
   const [feedbackComments, setFeedbackComments] = useState('');
   const [feedbackSuggestions, setFeedbackSuggestions] = useState('');
   const [savingFeedback, setSavingFeedback] = useState(false);
@@ -113,37 +110,6 @@ function ExternalExaminerEvaluationPage() {
     } finally {
       setSavingFeedback(false);
     }
-  };
-
-  const doComplete = async (componentId) => {
-    setCompleting(componentId);
-    try {
-      const payload = {};
-      if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
-      await api.put(`/evaluations/${componentId}/complete`, payload);
-      toast.success('Evaluation marked as complete');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to complete evaluation');
-    } finally {
-      setCompleting(null);
-    }
-  };
-
-  const handleComplete = async (componentId) => {
-    const e = evaluationForComponent(componentId);
-    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
-      setConfirmDialog({
-        open: true,
-        message: 'Warning: The marks for this component are zero or not set. Do you still want to mark it as complete?',
-        onConfirm: () => {
-          setConfirmDialog({ open: false, message: '', onConfirm: null });
-          doComplete(componentId);
-        }
-      });
-      return;
-    }
-    await doComplete(componentId);
   };
 
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
@@ -346,7 +312,6 @@ function ExternalExaminerEvaluationPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
               {currentUserComponents.map(comp => {
                 const e = evaluationForComponent(comp.id);
-                const isCompleted = e?.status === 'COMPLETED';
                 return (
                   <div key={comp.id} className="card">
                     <div className="card-header">
@@ -356,7 +321,6 @@ function ExternalExaminerEvaluationPage() {
                           {ROLE_LABEL[comp.evaluatorRole]} evaluation · Max {comp.maxMarks} marks
                         </span>
                       </div>
-                      {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                     </div>
                     <div style={{ padding: '0 16px 16px' }}>
                       <ExaminerEvaluationForm
@@ -427,17 +391,6 @@ function ExternalExaminerEvaluationPage() {
           )}
         </>
       )}
-      <ConfirmDialog
-        open={confirmDialog.open}
-        title="Confirm"
-        message={confirmDialog.message}
-        onConfirm={() => {
-          const fn = confirmDialog.onConfirm;
-          setConfirmDialog({ open: false, message: '', onConfirm: null });
-          fn?.();
-        }}
-        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: null })}
-      />
     </PageLayout>
     {showPdfPreview && (
       <EvaluationPdfPreview
@@ -450,7 +403,7 @@ function ExternalExaminerEvaluationPage() {
   );
 }
 
-function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, completing }) {
+function ExaminerEvaluationForm({ component, evaluation, onSave }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const toast = useToast();

@@ -6,6 +6,7 @@ import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -62,6 +63,7 @@ function BachelorProjects() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
   const loadData = useCallback(() => {
@@ -864,18 +866,9 @@ const filteredGroups = useMemo(() => {
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
                           </button>
                         )}
-                        {g.status === 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline" title="Download PDF" onClick={() => {
-                            const a = document.createElement('a');
-                            a.href = `/api/print/group/${g.id}`;
-                            a.download = `evaluation_${g.id}.pdf`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                          </button>
-                        )}
+                        <button className="btn btn-sm btn-outline" title="PDF Preview" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(g); }} style={{ padding: '3px 5px', minWidth: 0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
+                        </button>
                         {g.status !== 'COMPLETED' && (
                           <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteGroup(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
@@ -1185,6 +1178,13 @@ const filteredGroups = useMemo(() => {
         </div>
       )}
     </PageLayout>
+      {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type="group"
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+        />
+      )}
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}

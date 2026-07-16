@@ -9,7 +9,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.get('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.getTheses);
 router.get('/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'MAINTAINER'), thesisController.getThesis);
 router.post('/', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.createThesis);
-router.post('/upload', authenticate, authorize('COORDINATOR'), upload.single('file'), thesisController.uploadExcel);
 router.post('/bulk-import', authenticate, authorize('COORDINATOR'), upload.single('file'), thesisController.bulkImportPreview);
 router.post('/bulk-import/confirm', authenticate, authorize('COORDINATOR'), thesisController.bulkImportConfirm);
 router.put('/:id', authenticate, authorize('COORDINATOR'), thesisController.updateThesis);

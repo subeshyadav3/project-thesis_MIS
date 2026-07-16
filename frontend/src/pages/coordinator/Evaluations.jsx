@@ -342,7 +342,7 @@ function Evaluations() {
                           <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all components" style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
                           </button>
-                          <button className="btn btn-outline btn-sm" onClick={() => setPdfPreviewItem(item)} title="Open PDF Preview" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
+                          <button className="btn btn-outline btn-sm" onClick={() => setPdfPreviewItem(item)} title="Open PDF Preview" style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>picture_as_pdf</span>
                           </button>
                         </div>
