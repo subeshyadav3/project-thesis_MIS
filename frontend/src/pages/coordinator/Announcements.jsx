@@ -9,6 +9,7 @@ const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major 
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
 
 function CoordinatorAnnouncements() {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -30,7 +31,6 @@ function CoordinatorAnnouncements() {
   const [subLoading, setSubLoading] = useState(false);
   const studentRef = useRef(null);
   const toast = useToast();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = useCallback(() => {
     setLoading(true);

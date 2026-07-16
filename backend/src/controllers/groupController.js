@@ -78,7 +78,7 @@ exports.getGroup = async (req, res) => {
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, projectTitle, academicYearId, supervisorId, students, projectType, programId } = req.body;
+    const { name, projectTitle, academicYearId, supervisorId, students, projectType, programId, batch } = req.body;
     if (!name || !projectTitle || !academicYearId) {
       return res.status(400).json({ error: 'name, projectTitle, and academicYearId are required' });
     }
@@ -101,6 +101,7 @@ exports.createGroup = async (req, res) => {
         name,
         projectTitle,
         projectType: projectType || 'MINOR',
+        batch: batch || null,
         academicYearId: parseInt(academicYearId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         programId: resolvedProgramId,

@@ -145,8 +145,8 @@ model User {
   program     Program?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: SetNull)
   coordinatorProgram Program? @relation("CoordinatorProgram")
   rollNumber       String?
-  currentYear      Int?
-  currentSemester  Int?
+  enrollmentYear      Int?
+  enrollmentSemester  Int?
   resetToken       String?   @unique
   resetTokenExpires DateTime?
   active           Boolean   @default(true)
@@ -234,6 +234,7 @@ model ProjectGroup {
   projectTitle   String
   description    String             @default("")
   projectType    BachelorProjectType @default(MINOR)
+  batch          String?
   status         GroupStatus         @default(PENDING)
   supervisorId   Int?
   supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])

@@ -3,18 +3,30 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
+const { computeCurrentYearSemester } = require('../utils/computeYearSemester');
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
   role: true, degreeType: true, active: true,
   departmentId: true, programId: true,
   rollNumber: true, designation: true,
-  currentYear: true, currentSemester: true,
+  enrollmentYear: true, enrollmentSemester: true,
   createdAt: true, updatedAt: true,
 };
 
 const VALID_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'STUDENT', 'EXTERNAL_EXAMINER'];
 const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
+
+function enrichWithComputedYearSemester(user) {
+  if (user.role !== 'STUDENT' || !user.enrollmentYear || !user.enrollmentSemester) return user;
+  const maxYear = user.degreeType === 'MASTER' ? 2 : 4;
+  const computed = computeCurrentYearSemester(user.enrollmentYear, user.enrollmentSemester, 9, maxYear);
+  if (computed) {
+    user.currentYear = computed.year;
+    user.currentSemester = computed.semester;
+  }
+  return user;
+}
 
 exports.getUsers = async (req, res) => {
   try {
@@ -38,7 +50,7 @@ exports.getUsers = async (req, res) => {
         program: { select: { id: true, name: true, code: true } },
       },
     });
-    res.json(users);
+    res.json(users.map(enrichWithComputedYearSemester));
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -46,7 +58,7 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber, currentYear, currentSemester } = req.body;
+    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber, enrollmentYear, enrollmentSemester } = req.body;
     if (!email || !password || !firstName || !lastName || !role) {
       return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
     }
@@ -72,8 +84,8 @@ exports.createUser = async (req, res) => {
         email, password: hash, firstName, lastName, role, degreeType,
         departmentId: targetDeptId, programId: programId ? parseInt(programId) : undefined,
         designation, rollNumber,
-        currentYear: currentYear ? parseInt(currentYear) : null,
-        currentSemester: currentSemester ? parseInt(currentSemester) : null,
+        enrollmentYear: enrollmentYear ? parseInt(enrollmentYear) : null,
+        enrollmentSemester: enrollmentSemester ? parseInt(enrollmentSemester) : null,
       },
       select: USER_SELECT,
     });
@@ -119,8 +131,8 @@ exports.updateUser = async (req, res) => {
     if (req.body.programId) data.programId = parseInt(req.body.programId);
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
-    if (req.body.currentYear !== undefined) data.currentYear = req.body.currentYear ? parseInt(req.body.currentYear) : null;
-    if (req.body.currentSemester !== undefined) data.currentSemester = req.body.currentSemester ? parseInt(req.body.currentSemester) : null;
+    if (req.body.currentYear !== undefined) data.enrollmentYear = req.body.enrollmentYear ? parseInt(req.body.enrollmentYear) : null;
+    if (req.body.currentSemester !== undefined) data.enrollmentSemester = req.body.enrollmentSemester ? parseInt(req.body.enrollmentSemester) : null;
     const user = await prisma.user.update({
       where: { id: userId },
       data,
@@ -181,7 +193,7 @@ exports.getUsersByRole = async (req, res) => {
         program: { select: { id: true, name: true, code: true } },
       },
     });
-    res.json(users);
+    res.json(users.map(enrichWithComputedYearSemester));
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -260,7 +272,7 @@ exports.bulkCreateUsers = async (req, res) => {
     const errors = [];
 
     for (const u of users) {
-      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber, currentYear, currentSemester } = u;
+      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber, enrollmentYear, enrollmentSemester } = u;
       if (!email || !password || !firstName || !lastName || !role) {
         errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
         continue;
@@ -290,8 +302,8 @@ exports.bulkCreateUsers = async (req, res) => {
             programId: programId ? parseInt(programId) : null,
             designation: designation || null,
             rollNumber: rollNumber || null,
-            currentYear: currentYear ? parseInt(currentYear) : null,
-            currentSemester: currentSemester ? parseInt(currentSemester) : null,
+            enrollmentYear: enrollmentYear ? parseInt(enrollmentYear) : null,
+            enrollmentSemester: enrollmentSemester ? parseInt(enrollmentSemester) : null,
           },
           select: USER_SELECT,
         });

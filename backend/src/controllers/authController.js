@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
+const { computeCurrentYearSemester } = require('../utils/computeYearSemester');
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -43,6 +44,15 @@ exports.login = async (req, res) => {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     });
     const { password: _, ...userData } = user;
+    // Enrich students with computed year/semester
+    if (userData.role === 'STUDENT' && userData.enrollmentYear && userData.enrollmentSemester) {
+      const maxYear = userData.degreeType === 'MASTER' ? 2 : 4;
+      const computed = computeCurrentYearSemester(userData.enrollmentYear, userData.enrollmentSemester, 9, maxYear);
+      if (computed) {
+        userData.currentYear = computed.year;
+        userData.currentSemester = computed.semester;
+      }
+    }
     res.cookie('token', token, COOKIE_OPTS);
     audit.log({ action: 'LOGIN', entity: 'User', entityId: user.id, details: `${user.role} ${user.email} logged in`, performedById: user.id });
     res.json({ token, user: userData });
@@ -69,6 +79,15 @@ exports.getMe = async (req, res) => {
     user.program = prog || null;
   }
   const { password: _, ...userData } = user;
+  // Enrich students with computed year/semester
+  if (userData.role === 'STUDENT' && userData.enrollmentYear && userData.enrollmentSemester) {
+    const maxYear = userData.degreeType === 'MASTER' ? 2 : 4;
+    const computed = computeCurrentYearSemester(userData.enrollmentYear, userData.enrollmentSemester, 9, maxYear);
+    if (computed) {
+      userData.currentYear = computed.year;
+      userData.currentSemester = computed.semester;
+    }
+  }
   res.json(userData);
 };
 
