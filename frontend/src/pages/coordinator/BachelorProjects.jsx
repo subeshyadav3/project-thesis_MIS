@@ -27,7 +27,7 @@ function BachelorProjects() {
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedProjectType, setSelectedProjectType] = useState('MINOR');
   const [uploadProjectType, setUploadProjectType] = useState('MINOR');
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -975,6 +975,11 @@ const filteredGroups = useMemo(() => {
                   <option value="MINOR">Minor Project</option>
                   <option value="MAJOR">Major Project</option>
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Batch</label>
+                <input value={createForm.batch} onChange={e => setCreateForm({...createForm, batch: e.target.value})} placeholder="e.g. 080" />
+                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Auto-derived from student roll numbers</span>
               </div>
 
               <div className="form-group" ref={createSupRef}>

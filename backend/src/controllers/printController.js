@@ -82,7 +82,7 @@ function buildBlankLines(count) {
   return out;
 }
 
-function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments) {
+function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions) {
   const totalMarks = supCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -95,7 +95,8 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       <td style="text-align:center;padding:4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
     </tr>`).join('');
 
-  const commentText = comments.join('; ');
+  const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
+  const suggestionText = feedbackSuggestions || '';
 
   return `
     ${buildPageHeader()}
@@ -140,7 +141,8 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
     </div>
     <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>${buildBlankLines(8)}
+      <strong>Suggestions &amp; recommendations:</strong>
+      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
     </div>
 
     <div style="font-size:12px;margin-top:16px;">
@@ -153,7 +155,7 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -165,7 +167,8 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
       <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
     </tr>`).join('');
 
-  const commentText = comments.join('; ');
+  const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
+  const suggestionText = feedbackSuggestions || '';
 
   return `
     ${buildPageHeader()}
@@ -205,7 +208,8 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
       ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
     </div>
     <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>${buildBlankLines(8)}
+      <strong>Suggestions &amp; recommendations:</strong>
+      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
     </div>
 
     <div style="font-size:12px;margin-top:16px;">
@@ -239,16 +243,20 @@ function buildMasterFormat(data) {
   const supComments = supEvals.filter(e => e.comment).map(e => e.comment);
   const extComments = extEvals.filter(e => e.comment).map(e => e.comment);
 
+  // Extract feedback comments and suggestions from evaluations
+  const feedbackComments = evaluations.map(e => e.comments).filter(Boolean).join('\n');
+  const feedbackSuggestions = evaluations.map(e => e.suggestions).filter(Boolean).join('\n');
+
   const studentName = name;
   const rollNo = student?.rollNumber || '—';
 
   const page1 = `
     <div style="page-break-after:always;">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments)}
+      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, feedbackComments, feedbackSuggestions)}
     </div>`;
   const page2 = `
     <div>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments)}
+      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, feedbackComments, feedbackSuggestions)}
     </div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Thesis Evaluation - ${esc(title)}</title>
@@ -364,6 +372,8 @@ exports.printGroupEvaluation = async (req, res) => {
         maxMarks: c.maxMarks,
         marks: e?.marks ?? null,
         comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
         submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
       };
     });
@@ -415,6 +425,8 @@ exports.printThesisEvaluation = async (req, res) => {
         maxMarks: c.maxMarks,
         marks: e?.marks ?? null,
         comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
         submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
       };
     });
@@ -470,6 +482,8 @@ exports.previewGroupEvaluation = async (req, res) => {
         maxMarks: c.maxMarks,
         marks: e?.marks ?? null,
         comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
         submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
       };
     });
@@ -521,6 +535,8 @@ exports.previewThesisEvaluation = async (req, res) => {
         maxMarks: c.maxMarks,
         marks: e?.marks ?? null,
         comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
         submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
       };
     });

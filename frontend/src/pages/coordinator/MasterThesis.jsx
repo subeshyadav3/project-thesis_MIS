@@ -55,6 +55,9 @@ function MasterThesis() {
   const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [bulkPreview, setBulkPreview] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkYearId, setBulkYearId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = useCallback(() => {
@@ -127,15 +130,50 @@ useEffect(() => {
   const handleFileUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile) { toast.warning('Select a file'); return; }
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+    if (!bulkYearId) { toast.warning('Select an academic year'); return; }
+    setBulkLoading(true);
     try {
-      await api.post('/theses/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Theses imported successfully');
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('academicYearId', bulkYearId);
+      const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBulkPreview(data);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkPreview?.preview) return;
+    setBulkLoading(true);
+    try {
+      const rows = bulkPreview.preview.map(p => ({
+        row: p.row,
+        name: p.name,
+        roll: p.roll,
+        title: p.title,
+        batch: p.batch,
+        cluster: p.cluster,
+        programId: p.programId,
+        studentMatch: p.studentMatch,
+        supervisorMatch: p.supervisorMatch,
+        externalMidTermMatch: p.externalMidTermMatch,
+        externalFinalMatch: p.externalFinalMatch,
+      }));
+      await api.post('/theses/bulk-import/confirm', { rows, academicYearId: parseInt(bulkYearId) });
+      toast.success(`${bulkPreview.stats.matched} theses imported`);
       setShowUpload(false);
+      setBulkPreview(null);
       setSelectedFile(null);
+      setBulkYearId('');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Import failed');
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
 const handleComplete = async (id) => {
@@ -733,36 +771,87 @@ return (
       </div>
 
       {showUpload && (
-        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => { setShowUpload(false); setBulkPreview(null); }}>
+          <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
                 <span className="material-symbols-outlined">upload_file</span>
               </div>
               <div className="modal-header-text">
-                <h2>Upload Excel</h2>
-                <p>Import theses from an Excel spreadsheet</p>
+                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Import Theses'}</h2>
+                <p>{bulkPreview ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched` : 'Upload Excel with Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch'}</p>
               </div>
             </div>
-            <form onSubmit={handleFileUpload}>
-              <div className="form-group">
-                <label>Excel File (.xlsx)</label>
-                <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
-                <a href="/master_upload_template.xlsx" download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span> Download blank template
-                </a>
+
+            {!bulkPreview ? (
+              <form onSubmit={handleFileUpload}>
+                <div className="form-group">
+                  <label>Academic Year</label>
+                  <select value={bulkYearId} onChange={e => setBulkYearId(e.target.value)} required>
+                    <option value="">Select year...</option>
+                    {academicYears.map(y => <option key={y.id} value={y.id}>{y.year} {y.semester}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Excel File (.xlsx)</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
+                  <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Columns: Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch</span>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
+                    <span className="material-symbols-outlined">close</span>Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                    {bulkLoading ? 'Analyzing...' : 'Preview'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
+                  <table style={{ width: '100%', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Roll</th>
+                        <th>Title</th>
+                        <th>Student</th>
+                        <th>Supervisor</th>
+                        <th>Ext (Mid)</th>
+                        <th>Ext (Final)</th>
+                        <th>Cluster</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPreview.preview.map(p => (
+                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
+                          <td>{p.row}</td>
+                          <td>{p.name}</td>
+                          <td style={{ fontSize: 11 }}>{p.roll}</td>
+                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</td>
+                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.cluster || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
+                    <span className="material-symbols-outlined">arrow_back</span>Back
+                  </button>
+                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} theses`}
+                  </button>
+                </div>
               </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
-                  <span className="material-symbols-outlined">close</span>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">upload</span>
-                  Upload
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}

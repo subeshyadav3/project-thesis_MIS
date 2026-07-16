@@ -4,6 +4,7 @@ import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
 import ExaminerAssignmentSection from '../../components/ExaminerAssignmentSection';
 import SupervisorAssignmentSection from '../../components/SupervisorAssignmentSection';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -37,6 +38,10 @@ function ProjectDetail() {
   const [uploading, setUploading] = useState(false);
   const [recommendationContent, setRecommendationContent] = useState('');
   const [issuingRecommendation, setIssuingRecommendation] = useState(false);
+  const [feedbackComments, setFeedbackComments] = useState('');
+  const [feedbackSuggestions, setFeedbackSuggestions] = useState('');
+  const [savingFeedback, setSavingFeedback] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   const loadData = useCallback((signal) => {
     setLoading(true);
@@ -50,6 +55,12 @@ function ProjectDetail() {
         setSummary(data.summary || null);
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
+        // Load existing comments/suggestions from evaluations
+        const evals = data.evaluations || [];
+        const existingComments = evals.map(e => e.comments).filter(Boolean).join('\n');
+        const existingSuggestions = evals.map(e => e.suggestions).filter(Boolean).join('\n');
+        if (existingComments) setFeedbackComments(existingComments);
+        if (existingSuggestions) setFeedbackSuggestions(existingSuggestions);
       })
       .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load evaluations'); })
       .finally(() => setLoading(false));
@@ -86,6 +97,33 @@ function ProjectDetail() {
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || `Failed to save ${component.name}`);
+    }
+  };
+
+  const handleSaveFeedback = async () => {
+    if (!feedbackComments.trim() && !feedbackSuggestions.trim()) {
+      toast.warning('Please enter comments or suggestions');
+      return;
+    }
+    setSavingFeedback(true);
+    try {
+      // Save feedback to all user's evaluation components
+      for (const comp of currentUserComponents) {
+        const payload = {
+          componentId: comp.id,
+          marks: evaluationForComponent(comp.id)?.marks ?? null,
+          comments: feedbackComments || null,
+          suggestions: feedbackSuggestions || null,
+        };
+        if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
+        await api.post('/evaluations/marks', payload);
+      }
+      toast.success('Feedback saved');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save feedback');
+    } finally {
+      setSavingFeedback(false);
     }
   };
 
@@ -438,28 +476,78 @@ function ProjectDetail() {
           {/* Supervisor / External Examiner: evaluation form(s) */}
           {!isCoordinator && currentUserComponents.length > 0 && (() => {
             return (
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
                 {currentUserComponents.map(comp => {
                   const e = evaluationForComponent(comp.id);
                   const isCompleted = e?.status === 'COMPLETED';
                   return (
-                    <div key={comp.id} className="card" style={{ flex: '1 1 300px' }}>
+                    <div key={comp.id} className="card">
                       <div className="card-header">
-                        <h3>{comp.name}</h3>
+                        <div>
+                          <h3 style={{ margin: 0 }}>{comp.name}</h3>
+                          <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                            {ROLE_LABEL[comp.evaluatorRole]} evaluation · Max {comp.maxMarks} marks
+                          </span>
+                        </div>
                         {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                       </div>
-                      <div style={{ padding: '0 12px 12px' }}>
+                      <div style={{ padding: '0 16px 16px' }}>
                         <DefenseCard
                           component={comp}
                           evaluation={e}
                           onSave={(marks) => handleSaveComponent(comp, marks)}
-                          onComplete={() => handleComplete(comp.id)}
-                          completing={completing === comp.id}
                         />
                       </div>
                     </div>
                   );
                 })}
+
+                {/* Comments + Suggestions feedback section */}
+                <div className="card">
+                  <div className="card-header">
+                    <div>
+                      <h3 style={{ margin: 0 }}>Feedback</h3>
+                      <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                        Overall comments and suggestions for this evaluation
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600 }}>Comments</label>
+                      <textarea
+                        rows={3}
+                        value={feedbackComments}
+                        onChange={e => setFeedbackComments(e.target.value)}
+                        placeholder="Enter your overall comments about this evaluation..."
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600 }}>Suggestions & Recommendations</label>
+                      <textarea
+                        rows={3}
+                        value={feedbackSuggestions}
+                        onChange={e => setFeedbackSuggestions(e.target.value)}
+                        placeholder="Enter suggestions and recommendations..."
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleSaveFeedback}
+                        disabled={savingFeedback}
+                        style={{ padding: '6px 16px', fontSize: 13 }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+                          {savingFeedback ? 'progress_activity' : 'save'}
+                        </span>
+                        {savingFeedback ? 'Saving...' : 'Save Feedback'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })()}
@@ -543,8 +631,6 @@ function ProjectDetail() {
                           component={c}
                           evaluation={e}
                           onSave={(marks) => handleSaveComponent(c, marks)}
-                          onComplete={() => handleComplete(c.id)}
-                          completing={completing === c.id}
                         />
                       </div>
                     </div>
@@ -572,27 +658,15 @@ function ProjectDetail() {
             </div>
           )}
           {/* Print Evaluation Form */}
-          {isCoordinator && (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <div className="card-header"><h3>Download Evaluation</h3></div>
-              <div style={{ padding: 16 }}>
-                <button className="btn btn-outline" onClick={() => {
-                  const endpoint = type === 'group'
-                    ? `/api/print/group/${id}`
-                    : `/api/print/thesis/${id}`;
-                  const a = document.createElement('a');
-                  a.href = endpoint;
-                  a.download = `evaluation_${id}.pdf`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                }}>
-                  <span className="material-symbols-outlined">download</span>
-                  Download PDF
-                </button>
-              </div>
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header"><h3>Download Evaluation</h3></div>
+            <div style={{ padding: 16 }}>
+              <button className="btn btn-outline" onClick={() => setShowPdfPreview(true)}>
+                <span className="material-symbols-outlined">picture_as_pdf</span>
+                Open PDF Preview
+              </button>
             </div>
-          )}
+          </div>
 
           {/* If no user component found */}
           {currentUserComponents.length === 0 && !isCoordinator && (
@@ -617,6 +691,13 @@ function ProjectDetail() {
         />
       )}
     </PageLayout>
+      {showPdfPreview && (
+        <EvaluationPdfPreview
+          type={type}
+          id={id}
+          onClose={() => setShowPdfPreview(false)}
+        />
+      )}
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}
@@ -630,7 +711,7 @@ function ProjectDetail() {
   );
 }
 
-function DefenseCard({ component, evaluation, onSave, onComplete, completing }) {
+function DefenseCard({ component, evaluation, onSave }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
   const [saving, setSaving] = useState(false);
 
@@ -639,48 +720,57 @@ function DefenseCard({ component, evaluation, onSave, onComplete, completing }) 
   }, [evaluation?.id, evaluation?.marks]);
 
   const submit = async () => {
+    if (marks === '' || marks === null || marks === undefined) return;
     setSaving(true);
     try { await onSave(marks); }
     finally { setSaving(false); }
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
-      <input
-        type="number"
-        value={marks}
-        onChange={e => setMarks(e.target.value)}
-        max={component.maxMarks}
-        min="0"
-        step="0.5"
-        placeholder="0"
-        style={{ width: 80, padding: '6px 8px', fontSize: 14, textAlign: 'center' }}
-      />
-      <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
-      <button
-        className="btn btn-primary btn-sm"
-        onClick={submit}
-        disabled={saving}
-        style={{ minWidth: 32, padding: '6px 8px' }}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-          {saving ? 'progress_activity' : 'save'}
-        </span>
-      </button>
-      <button
-        className="btn btn-sm"
-        style={{
-          background: 'var(--color-success-container)',
-          color: 'var(--color-on-success-container)',
-          minWidth: 32, padding: '6px 8px',
-        }}
-        onClick={onComplete}
-        disabled={completing}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-          {completing ? 'progress_activity' : 'check_circle'}
-        </span>
-      </button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 10,
+          background: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-primary-container)' : 'var(--color-surface-container)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
+          flexShrink: 0,
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+            {(marks !== '' && marks !== null && marks !== undefined) ? 'check_circle' : 'edit'}
+          </span>
+        </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{component.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+            Max {component.maxMarks} marks
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input
+          type="number"
+          value={marks}
+          onChange={e => setMarks(e.target.value)}
+          max={component.maxMarks}
+          min="0"
+          step="0.5"
+          placeholder="0"
+          style={{ width: 70, padding: '8px 10px', fontSize: 14, textAlign: 'center', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}
+        />
+        <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', fontWeight: 500 }}>/ {component.maxMarks}</span>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={submit}
+          disabled={saving || marks === '' || marks === null || marks === undefined}
+          style={{ padding: '6px 14px', fontSize: 13 }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+            {saving ? 'progress_activity' : 'save'}
+          </span>
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 }

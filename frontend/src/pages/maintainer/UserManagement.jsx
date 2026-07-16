@@ -11,7 +11,7 @@ function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '', enrollmentYear: '', enrollmentSemester: '' });
+  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({ degreeType: '', departmentId: '', programId: '', year: '' });
   const [programs, setPrograms] = useState([]);
@@ -41,8 +41,6 @@ function UserManagement() {
       if (!payload.password) delete payload.password;
       if (!payload.programId) delete payload.programId;
       if (!payload.rollNumber) delete payload.rollNumber;
-      if (!payload.enrollmentYear) delete payload.enrollmentYear;
-      if (!payload.enrollmentSemester) delete payload.enrollmentSemester;
       if (editUser) {
         await api.put(`/users/${editUser.id}`, payload);
         toast.success('User updated successfully');
@@ -52,7 +50,7 @@ function UserManagement() {
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '', enrollmentYear: '', enrollmentSemester: '' });
+      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.error || 'An error occurred');
@@ -72,13 +70,13 @@ function UserManagement() {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '', designation: u.designation || '', enrollmentYear: u.enrollmentYear || '', enrollmentSemester: u.enrollmentSemester || '' });
+    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '', designation: u.designation || '' });
     setShowModal(true);
   };
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '', enrollmentYear: '', enrollmentSemester: '' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
     setShowModal(true);
   };
 
@@ -384,38 +382,11 @@ function UserManagement() {
                   </div>
                   <div className="form-row" style={{ display: 'flex', gap: 12 }}>
                     <div className="form-group" style={{ flex: 1 }}>
-                      <label>Program</label>
-                      <select value={form.programId} onChange={e => setForm({...form, programId: e.target.value})}>
-                        <option value="">Select program...</option>
-                        {programs.map(p => (
-                          <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
                       <label>Roll Number</label>
                       <input value={form.rollNumber} onChange={e => setForm({...form, rollNumber: e.target.value})} placeholder="e.g. 080BCT001" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label>Enrollment Year</label>
-                      <select value={form.enrollmentYear} onChange={e => setForm({...form, enrollmentYear: e.target.value})}>
-                        <option value="">—</option>
-                        <option value="2024">2024</option>
-                        <option value="2023">2023</option>
-                        <option value="2022">2022</option>
-                        <option value="2021">2021</option>
-                        <option value="2020">2020</option>
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label>Enrollment Semester</label>
-                      <select value={form.enrollmentSemester} onChange={e => setForm({...form, enrollmentSemester: e.target.value})}>
-                        <option value="">—</option>
-                        <option value="1">I (Sem 1)</option>
-                        <option value="2">II (Sem 2)</option>
-                      </select>
+                      <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                        Batch & year/semester auto-assigned from roll number
+                      </span>
                     </div>
                   </div>
                 </>

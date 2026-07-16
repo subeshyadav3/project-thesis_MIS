@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -50,6 +51,7 @@ function Evaluations() {
   const isMasterCoordinator = user.program?.degreeType === 'MASTER';
   const [viewMode, setViewMode] = useState(isMasterCoordinator ? 'master' : 'bachelor');
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -340,8 +342,8 @@ function Evaluations() {
                           <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all components" style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
                           </button>
-                          <button className="btn btn-outline btn-sm" onClick={() => handlePrintSingle(item)} title="Print / Save PDF" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>print</span>
+                          <button className="btn btn-outline btn-sm" onClick={() => setPdfPreviewItem(item)} title="Open PDF Preview" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>picture_as_pdf</span>
                           </button>
                         </div>
                       </td>
@@ -409,7 +411,7 @@ function Evaluations() {
             </div>
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowSummaryModal(false)}><span className="material-symbols-outlined">close</span>Close</button>
-              <button className="btn btn-primary" onClick={() => handlePrintSingle(selectedItem)}><span className="material-symbols-outlined">download</span>Download PDF</button>
+              <button className="btn btn-primary" onClick={() => { setShowSummaryModal(false); setPdfPreviewItem(selectedItem); }}><span className="material-symbols-outlined">picture_as_pdf</span>Open PDF Preview</button>
             </div>
           </div>
         </div>
@@ -431,6 +433,14 @@ function Evaluations() {
             </div>
           </div>
         </div>
+      )}
+
+      {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type={viewMode === 'bachelor' ? 'group' : 'thesis'}
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+        />
       )}
 
       <ConfirmDialog

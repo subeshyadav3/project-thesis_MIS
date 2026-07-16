@@ -9,21 +9,67 @@ const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
   role: true, degreeType: true, active: true,
   departmentId: true, programId: true,
-  rollNumber: true, designation: true,
-  enrollmentYear: true, enrollmentSemester: true,
+  rollNumber: true, designation: true, batch: true,
   createdAt: true, updatedAt: true,
 };
 
 const VALID_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'STUDENT', 'EXTERNAL_EXAMINER'];
 const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
 
+/**
+ * Extract batch from roll number. Roll "080BCT001" → "080".
+ */
+function extractBatchFromRoll(rollNumber) {
+  if (!rollNumber) return null;
+  const match = rollNumber.match(/^(\d{2,3})/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Compute current year and semester from batch.
+ * batch "080" → year 2080, then compute year/semester based on current date.
+ * Academic year starts in Mangshir (≈ November, month 11).
+ */
+function computeCurrentYearSemesterFromBatch(batch, degreeType) {
+  if (!batch) return { currentYear: null, currentSemester: null };
+
+  const offset = parseInt(batch);
+  const batchYear = offset < 100 ? 2000 + offset : offset;
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  // Academic year starts Nov (month 11)
+  let academicYearStart;
+  if (currentMonth >= 11) {
+    academicYearStart = currentYear;
+  } else {
+    academicYearStart = currentYear - 1;
+  }
+
+  const monthsSinceStart = currentMonth >= 11
+    ? currentMonth - 11
+    : (12 - 11) + currentMonth;
+
+  const semInYear = monthsSinceStart < 6 ? 1 : 2;
+  const yearsSinceBatch = academicYearStart - batchYear;
+  const totalSemesters = yearsSinceBatch * 2 + (semInYear - 1);
+
+  const maxYear = degreeType === 'MASTER' ? 2 : 4;
+  const year = Math.min(Math.max(1, Math.ceil((totalSemesters + 1) / 2)), maxYear);
+  const semester = Math.min(Math.max(1, totalSemesters - (year - 1) * 2 + 1), 2);
+
+  return { currentYear: year, currentSemester: semester };
+}
+
 function enrichWithComputedYearSemester(user) {
-  if (user.role !== 'STUDENT' || !user.enrollmentYear || !user.enrollmentSemester) return user;
+  if (user.role !== 'STUDENT' || !user.batch) return user;
   const maxYear = user.degreeType === 'MASTER' ? 2 : 4;
-  const computed = computeCurrentYearSemester(user.enrollmentYear, user.enrollmentSemester, 9, maxYear);
-  if (computed) {
-    user.currentYear = computed.year;
-    user.currentSemester = computed.semester;
+  const computed = computeCurrentYearSemesterFromBatch(user.batch, user.degreeType);
+  if (computed.currentYear) {
+    user.currentYear = computed.currentYear;
+    user.currentSemester = computed.currentSemester;
   }
   return user;
 }
@@ -58,7 +104,7 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber, enrollmentYear, enrollmentSemester } = req.body;
+    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber } = req.body;
     if (!email || !password || !firstName || !lastName || !role) {
       return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
     }
@@ -79,13 +125,12 @@ exports.createUser = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
+    const batch = extractBatchFromRoll(rollNumber);
     const user = await prisma.user.create({
       data: {
         email, password: hash, firstName, lastName, role, degreeType,
         departmentId: targetDeptId, programId: programId ? parseInt(programId) : undefined,
-        designation, rollNumber,
-        enrollmentYear: enrollmentYear ? parseInt(enrollmentYear) : null,
-        enrollmentSemester: enrollmentSemester ? parseInt(enrollmentSemester) : null,
+        designation, rollNumber, batch,
       },
       select: USER_SELECT,
     });
@@ -272,7 +317,7 @@ exports.bulkCreateUsers = async (req, res) => {
     const errors = [];
 
     for (const u of users) {
-      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber, enrollmentYear, enrollmentSemester } = u;
+      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
       if (!email || !password || !firstName || !lastName || !role) {
         errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
         continue;
@@ -294,6 +339,7 @@ exports.bulkCreateUsers = async (req, res) => {
 
       try {
         const hash = await bcrypt.hash(password, 10);
+        const batch = extractBatchFromRoll(rollNumber);
         const user = await prisma.user.create({
           data: {
             email, password: hash, firstName, lastName, role,
@@ -302,8 +348,7 @@ exports.bulkCreateUsers = async (req, res) => {
             programId: programId ? parseInt(programId) : null,
             designation: designation || null,
             rollNumber: rollNumber || null,
-            enrollmentYear: enrollmentYear ? parseInt(enrollmentYear) : null,
-            enrollmentSemester: enrollmentSemester ? parseInt(enrollmentSemester) : null,
+            batch,
           },
           select: USER_SELECT,
         });
