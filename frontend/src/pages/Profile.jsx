@@ -4,6 +4,7 @@ import PageLayout from '../components/PageLayout';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
+import { formatYearSemester } from '../utils/romanNumerals';
 
 function Profile() {
   const navigate = useNavigate();
@@ -109,6 +110,14 @@ function Profile() {
                 <span className="detail-label">Department</span>
                 <span>{user.department?.name || '—'}</span>
               </div>
+              {user.role === 'STUDENT' && user.currentYear && (
+                <div className="detail-item">
+                  <span className="detail-label">Year / Semester</span>
+                  <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-primary)' }}>
+                    {formatYearSemester(user.currentYear, user.currentSemester)}
+                  </span>
+                </div>
+              )}
 
             </div>
           </div>

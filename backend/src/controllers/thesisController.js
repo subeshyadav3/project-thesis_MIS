@@ -186,6 +186,247 @@ exports.uploadExcel = async (req, res) => {
   }
 };
 
+// --- Fuzzy matching helper ---
+function fuzzyMatch(inputName, candidates) {
+  if (!inputName || !inputName.trim()) return null;
+  const normalized = name => name.toLowerCase().trim().replace(/\s+/g, ' ');
+  const input = normalized(inputName);
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const c of candidates) {
+    const fullName = normalized(`${c.firstName} ${c.lastName}`);
+    // Exact substring match = 1.0
+    if (fullName.includes(input) || input.includes(fullName)) {
+      return { user: c, score: 1.0, method: 'exact' };
+    }
+    // Word-level matching
+    const inputWords = input.split(' ');
+    const nameWords = fullName.split(' ');
+    const matched = inputWords.filter(w => nameWords.some(nw => nw.includes(w) || w.includes(nw)));
+    const score = matched.length / Math.max(inputWords.length, nameWords.length);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = c;
+    }
+  }
+
+  return bestScore >= 0.5 ? { user: bestMatch, score: bestScore, method: 'fuzzy' } : null;
+}
+
+// Step 1: Parse Excel + fuzzy match → return preview
+exports.bulkImportPreview = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const academicYearId = req.body.academicYearId ? parseInt(req.body.academicYearId) : null;
+    if (!academicYearId) return res.status(400).json({ error: 'academicYearId is required' });
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+
+    // Load all candidates in the coordinator's department
+    const deptId = req.user.departmentId;
+    const [allStudents, allSupervisors, allExternals] = await Promise.all([
+      prisma.user.findMany({ where: { role: 'STUDENT', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } }),
+      prisma.user.findMany({ where: { role: 'SUPERVISOR', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
+      prisma.user.findMany({ where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
+    ]);
+
+    const preview = [];
+    let matchCount = 0;
+    let unmatchCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const name = (row['Name'] || row['name'] || '').toString().trim();
+      const roll = (row['Roll'] || row['roll'] || row['Roll Numbers'] || '').toString().trim();
+      const title = (row['Title'] || row['title'] || row['Project Title'] || '').toString().trim();
+      const batch = (row['Batch'] || row['batch'] || '').toString().trim();
+      const cluster = (row['Cluster'] || row['cluster'] || '').toString().trim();
+      const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
+      const externalMidTermName = (row['External_mid_term'] || row['externalMidTerm'] || '').toString().trim();
+      const externalFinalName = (row['External_final'] || row['externalFinal'] || '').toString().trim();
+
+      if (!name && !roll && !title) continue; // skip blank rows
+
+      const warnings = [];
+
+      // Match student
+      let studentMatch = null;
+      if (roll) {
+        const byRoll = allStudents.find(s => s.rollNumber && s.rollNumber.toLowerCase() === roll.toLowerCase());
+        if (byRoll) studentMatch = { user: byRoll, score: 1.0, method: 'roll' };
+      }
+      if (!studentMatch && name) {
+        studentMatch = fuzzyMatch(name, allStudents);
+      }
+      if (!studentMatch) {
+        warnings.push(`Student not found for "${name}" (roll: ${roll})`);
+        unmatchCount++;
+      } else {
+        matchCount++;
+      }
+
+      // Match supervisor
+      const supervisorMatch = supervisorName ? fuzzyMatch(supervisorName, allSupervisors) : null;
+      if (supervisorName && !supervisorMatch) {
+        warnings.push(`Supervisor not found for "${supervisorName}"`);
+      }
+
+      // Match external mid-term
+      const externalMidTermMatch = externalMidTermName ? fuzzyMatch(externalMidTermName, allExternals) : null;
+      if (externalMidTermName && !externalMidTermMatch) {
+        warnings.push(`External Mid-Term not found for "${externalMidTermName}"`);
+      }
+
+      // Match external final
+      const externalFinalMatch = externalFinalName ? fuzzyMatch(externalFinalName, allExternals) : null;
+      if (externalFinalName && !externalFinalMatch) {
+        warnings.push(`External Final not found for "${externalFinalName}"`);
+      }
+
+      preview.push({
+        row: i + 1,
+        name,
+        roll,
+        title,
+        batch,
+        cluster,
+        programId: studentMatch?.user?.programId || null,
+        studentMatch: studentMatch ? { id: studentMatch.user.id, name: `${studentMatch.user.firstName} ${studentMatch.user.lastName}`, score: studentMatch.score, status: 'matched' } : null,
+        supervisorMatch: supervisorMatch ? { id: supervisorMatch.user.id, name: `${supervisorMatch.user.firstName} ${supervisorMatch.user.lastName}`, score: supervisorMatch.score, status: 'matched' } : null,
+        externalMidTermMatch: externalMidTermMatch ? { id: externalMidTermMatch.user.id, name: `${externalMidTermMatch.user.firstName} ${externalMidTermMatch.user.lastName}`, score: externalMidTermMatch.score, status: 'matched' } : null,
+        externalFinalMatch: externalFinalMatch ? { id: externalFinalMatch.user.id, name: `${externalFinalMatch.user.firstName} ${externalFinalMatch.user.lastName}`, score: externalFinalMatch.score, status: 'matched' } : null,
+        warnings,
+      });
+    }
+
+    res.json({
+      preview,
+      stats: { total: preview.length, matched: matchCount, unmatched: unmatchCount },
+    });
+  } catch (error) {
+    console.error('bulkImportPreview error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Step 2: Confirm import → create theses + assignments
+exports.bulkImportConfirm = async (req, res) => {
+  try {
+    const { rows, academicYearId } = req.body;
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'rows array is required' });
+    }
+    if (!academicYearId) return res.status(400).json({ error: 'academicYearId is required' });
+
+    const created = [];
+    const skipped = [];
+
+    for (const row of rows) {
+      const { studentMatch, supervisorMatch, externalMidTermMatch, externalFinalMatch, title, batch, cluster } = row;
+
+      if (!studentMatch?.id) {
+        skipped.push({ row: row.row, reason: 'No student matched' });
+        continue;
+      }
+      if (!title) {
+        skipped.push({ row: row.row, reason: 'No thesis title' });
+        continue;
+      }
+
+      // Check for active thesis
+      const activeThesis = await prisma.thesis.findFirst({
+        where: { studentId: studentMatch.id, status: { in: ['PENDING', 'ACTIVE'] } },
+      });
+      if (activeThesis) {
+        skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Already has active thesis: "${activeThesis.title}"` });
+        continue;
+      }
+
+      // Check for duplicate
+      const duplicate = await prisma.thesis.findFirst({
+        where: { title, studentId: studentMatch.id, academicYearId: parseInt(academicYearId) },
+      });
+      if (duplicate) {
+        skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Duplicate thesis: "${title}"` });
+        continue;
+      }
+
+      // Create thesis
+      const thesis = await prisma.thesis.create({
+        data: {
+          title,
+          projectType: 'MASTER',
+          studentId: studentMatch.id,
+          status: supervisorMatch?.id ? 'ACTIVE' : 'PENDING',
+          academicYearId: parseInt(academicYearId),
+          supervisorId: supervisorMatch?.id || null,
+          externalMidTermId: externalMidTermMatch?.id || null,
+          externalFinalId: externalFinalMatch?.id || null,
+          cluster: cluster || null,
+          batch: batch || null,
+        },
+      });
+
+      // Create default evaluation components
+      const defaults = getDefaultComponents('MASTER');
+      for (const comp of defaults) {
+        await prisma.evaluationComponent.create({
+          data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
+        });
+      }
+
+      // Create ExaminerAssignment records for externals
+      if (externalMidTermMatch?.id) {
+        await prisma.examinerAssignment.upsert({
+          where: { externalExaminerId_thesisId: { externalExaminerId: externalMidTermMatch.id, thesisId: thesis.id } },
+          update: {},
+          create: { externalExaminerId: externalMidTermMatch.id, thesisId: thesis.id, assignedById: req.user.id },
+        }).catch(() => {}); // ignore if already assigned
+      }
+      if (externalFinalMatch?.id) {
+        await prisma.examinerAssignment.upsert({
+          where: { externalExaminerId_thesisId: { externalExaminerId: externalFinalMatch.id, thesisId: thesis.id } },
+          update: {},
+          create: { externalExaminerId: externalFinalMatch.id, thesisId: thesis.id, assignedById: req.user.id },
+        }).catch(() => {}); // ignore if already assigned
+      }
+
+      // Auto-link to active THESIS announcement
+      try {
+        const activeAnnouncements = await prisma.announcement.findMany({
+          where: {
+            type: 'THESIS',
+            degreeType: 'MASTER',
+            academicYearId: parseInt(academicYearId),
+          },
+        });
+        if (activeAnnouncements.length > 0) {
+          await prisma.thesis.update({
+            where: { id: thesis.id },
+            data: { announcementId: activeAnnouncements[0].id },
+          });
+        }
+      } catch (e) { /* ignore announcement linking errors */ }
+
+      created.push(thesis);
+    }
+
+    audit.log({ action: 'CREATE', entity: 'Thesis', details: `Bulk imported ${created.length} theses${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });
+
+    res.status(201).json({
+      message: `${created.length} theses imported${skipped.length ? `, ${skipped.length} skipped` : ''}`,
+      created: created.length,
+      skipped: skipped.length ? skipped : undefined,
+    });
+  } catch (error) {
+    console.error('bulkImportConfirm error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.updateThesisStatus = async (req, res) => {
   try {
     const oldThesis = await prisma.thesis.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, title: true } });

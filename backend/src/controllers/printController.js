@@ -434,3 +434,109 @@ exports.printThesisEvaluation = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Preview endpoint - returns HTML instead of PDF
+exports.previewGroupEvaluation = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const group = await prisma.projectGroup.findUnique({
+      where: { id },
+      include: {
+        supervisor: { select: { firstName: true, lastName: true } },
+        academicYear: true,
+        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
+        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+        evaluationComponents: true,
+      },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const evaluations = group.evaluations;
+    const projectType = group.projectType;
+    const maxTotal = projectType === 'MAJOR' ? 100 : 50;
+    const total = evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+
+    const memberList = group.members.map(m =>
+      `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
+    ).join(', ');
+
+    const evalData = group.evaluationComponents.map(c => {
+      const e = evaluations.find(ev => ev.componentId === c.id);
+      return {
+        name: c.name,
+        evaluatorRole: c.evaluatorRole === 'COORDINATOR' ? 'Coordinator'
+          : c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner' : c.evaluatorRole,
+        maxMarks: c.maxMarks,
+        marks: e?.marks ?? null,
+        comment: e?.comment || null,
+        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+      };
+    });
+
+    const html = buildBachelorFormat({
+      title: group.projectTitle,
+      name: group.name,
+      supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
+      academicYear: group.academicYear?.year || 'N/A',
+      members: memberList,
+      evaluations: evalData,
+      projectType,
+      total: total.toFixed(1),
+      maxTotal,
+    });
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('previewGroupEvaluation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.previewThesisEvaluation = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const thesis = await prisma.thesis.findUnique({
+      where: { id },
+      include: {
+        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
+        supervisor: { select: { firstName: true, lastName: true } },
+        academicYear: true,
+        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+        evaluationComponents: true,
+      },
+    });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    const evaluations = thesis.evaluations;
+
+    const evalData = thesis.evaluationComponents.map(c => {
+      const e = evaluations.find(ev => ev.componentId === c.id);
+      return {
+        name: c.name,
+        evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
+          : 'Coordinator',
+        maxMarks: c.maxMarks,
+        marks: e?.marks ?? null,
+        comment: e?.comment || null,
+        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+      };
+    });
+
+    const html = buildMasterFormat({
+      title: thesis.title,
+      name: `${thesis.student.firstName} ${thesis.student.lastName}`,
+      supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+      evaluations: evalData,
+      student: thesis.student || null,
+    });
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('previewThesisEvaluation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

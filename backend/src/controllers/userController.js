@@ -9,6 +9,7 @@ const USER_SELECT = {
   role: true, degreeType: true, active: true,
   departmentId: true, programId: true,
   rollNumber: true, designation: true,
+  currentYear: true, currentSemester: true,
   createdAt: true, updatedAt: true,
 };
 
@@ -45,7 +46,7 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber } = req.body;
+    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber, currentYear, currentSemester } = req.body;
     if (!email || !password || !firstName || !lastName || !role) {
       return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
     }
@@ -71,6 +72,8 @@ exports.createUser = async (req, res) => {
         email, password: hash, firstName, lastName, role, degreeType,
         departmentId: targetDeptId, programId: programId ? parseInt(programId) : undefined,
         designation, rollNumber,
+        currentYear: currentYear ? parseInt(currentYear) : null,
+        currentSemester: currentSemester ? parseInt(currentSemester) : null,
       },
       select: USER_SELECT,
     });
@@ -116,6 +119,8 @@ exports.updateUser = async (req, res) => {
     if (req.body.programId) data.programId = parseInt(req.body.programId);
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
+    if (req.body.currentYear !== undefined) data.currentYear = req.body.currentYear ? parseInt(req.body.currentYear) : null;
+    if (req.body.currentSemester !== undefined) data.currentSemester = req.body.currentSemester ? parseInt(req.body.currentSemester) : null;
     const user = await prisma.user.update({
       where: { id: userId },
       data,
@@ -255,7 +260,7 @@ exports.bulkCreateUsers = async (req, res) => {
     const errors = [];
 
     for (const u of users) {
-      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
+      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber, currentYear, currentSemester } = u;
       if (!email || !password || !firstName || !lastName || !role) {
         errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
         continue;
@@ -285,6 +290,8 @@ exports.bulkCreateUsers = async (req, res) => {
             programId: programId ? parseInt(programId) : null,
             designation: designation || null,
             rollNumber: rollNumber || null,
+            currentYear: currentYear ? parseInt(currentYear) : null,
+            currentSemester: currentSemester ? parseInt(currentSemester) : null,
           },
           select: USER_SELECT,
         });

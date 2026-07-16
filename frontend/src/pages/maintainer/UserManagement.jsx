@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { formatYearSemester } from '../../utils/romanNumerals';
 
 const COORDINATOR_ALLOWED_ROLES = ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
 
@@ -10,7 +11,7 @@ function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '', currentYear: '', currentSemester: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({ degreeType: '', departmentId: '', programId: '', year: '' });
   const [programs, setPrograms] = useState([]);
@@ -40,6 +41,8 @@ function UserManagement() {
       if (!payload.password) delete payload.password;
       if (!payload.programId) delete payload.programId;
       if (!payload.rollNumber) delete payload.rollNumber;
+      if (!payload.currentYear) delete payload.currentYear;
+      if (!payload.currentSemester) delete payload.currentSemester;
       if (editUser) {
         await api.put(`/users/${editUser.id}`, payload);
         toast.success('User updated successfully');
@@ -49,7 +52,7 @@ function UserManagement() {
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '', currentYear: '', currentSemester: '' });
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.error || 'An error occurred');
@@ -69,13 +72,13 @@ function UserManagement() {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '', designation: u.designation || '' });
+    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '', designation: u.designation || '', currentYear: u.currentYear || '', currentSemester: u.currentSemester || '' });
     setShowModal(true);
   };
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '', currentYear: '', currentSemester: '' });
     setShowModal(true);
   };
 
@@ -172,6 +175,7 @@ function UserManagement() {
                   <th>Email / Roll</th>
                   <th>Role</th>
                   <th>Degree / Program</th>
+                  <th>Year/Sem</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -213,6 +217,15 @@ function UserManagement() {
                             </span>
                           )}
                         </>
+                      )}
+                    </td>
+                    <td style={{ fontSize: 13 }}>
+                      {u.role === 'STUDENT' && u.currentYear ? (
+                        <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                          {formatYearSemester(u.currentYear, u.currentSemester)}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
                       )}
                     </td>
                     <td>
@@ -382,6 +395,52 @@ function UserManagement() {
                     <div className="form-group" style={{ flex: 1 }}>
                       <label>Roll Number</label>
                       <input value={form.rollNumber} onChange={e => setForm({...form, rollNumber: e.target.value})} placeholder="e.g. 080BCT001" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Current Year</label>
+                      <select value={form.currentYear} onChange={e => setForm({...form, currentYear: e.target.value})}>
+                        <option value="">—</option>
+                        {form.degreeType === 'BACHELOR' ? (
+                          <>
+                            <option value="1">I (Year 1)</option>
+                            <option value="2">II (Year 2)</option>
+                            <option value="3">III (Year 3)</option>
+                            <option value="4">IV (Year 4)</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="1">I (Year 1)</option>
+                            <option value="2">II (Year 2)</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Current Semester</label>
+                      <select value={form.currentSemester} onChange={e => setForm({...form, currentSemester: e.target.value})}>
+                        <option value="">—</option>
+                        {form.degreeType === 'BACHELOR' ? (
+                          <>
+                            <option value="1">I (Sem 1)</option>
+                            <option value="2">II (Sem 2)</option>
+                            <option value="3">III (Sem 3)</option>
+                            <option value="4">IV (Sem 4)</option>
+                            <option value="5">V (Sem 5)</option>
+                            <option value="6">VI (Sem 6)</option>
+                            <option value="7">VII (Sem 7)</option>
+                            <option value="8">VIII (Sem 8)</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="1">I (Sem 1)</option>
+                            <option value="2">II (Sem 2)</option>
+                            <option value="3">III (Sem 3)</option>
+                            <option value="4">IV (Sem 4)</option>
+                          </>
+                        )}
+                      </select>
                     </div>
                   </div>
                 </>

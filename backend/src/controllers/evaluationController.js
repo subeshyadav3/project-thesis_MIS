@@ -9,7 +9,7 @@ const audit = require('../services/auditService');
 // One Evaluation per component (upsert by componentId).
 exports.submitComponentMarks = async (req, res) => {
   try {
-    const { componentId, marks, comment, groupId, thesisId } = req.body;
+    const { componentId, marks, comment, comments, suggestions, groupId, thesisId } = req.body;
 
     if (!componentId || (groupId == null && thesisId == null)) {
       return res.status(400).json({ error: 'componentId and groupId/thesisId are required' });
@@ -67,18 +67,6 @@ exports.submitComponentMarks = async (req, res) => {
       }
     }
 
-    // Prevent editing if parent project/thesis is COMPLETED
-    const groupIdNum = groupId ? parseInt(groupId) : null;
-    const thesisIdNum = thesisId ? parseInt(thesisId) : null;
-    if (groupIdNum) {
-      const grp = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { status: true } });
-      if (grp?.status === 'COMPLETED') return res.status(400).json({ error: 'Cannot edit marks: project is already completed.' });
-    }
-    if (thesisIdNum) {
-      const th = await prisma.thesis.findUnique({ where: { id: thesisIdNum }, select: { status: true } });
-      if (th?.status === 'COMPLETED') return res.status(400).json({ error: 'Cannot edit marks: thesis is already completed.' });
-    }
-
     // Validate marks (allow null to clear)
     const marksValidation = validateMarks(marks, component.maxMarks);
     if (!marksValidation.valid) return res.status(400).json({ error: marksValidation.error });
@@ -90,6 +78,8 @@ exports.submitComponentMarks = async (req, res) => {
       evaluationType: component.evaluationType,
       marks: marks !== null && marks !== undefined && marks !== '' ? parseFloat(marks) : null,
       comment: comment || null,
+      comments: comments || null,
+      suggestions: suggestions || null,
       submittedById: req.user.id,
       ...(groupId ? { groupId: parseInt(groupId) } : {}),
       ...(thesisId ? { thesisId: parseInt(thesisId) } : {}),
@@ -99,11 +89,6 @@ exports.submitComponentMarks = async (req, res) => {
     const existing = await prisma.evaluation.findFirst({
       where: { componentId: component.id, ...scopeWhere },
     });
-
-    // Prevent editing if already completed
-    if (existing && existing.status === 'COMPLETED') {
-      return res.status(400).json({ error: 'Evaluation is already completed and cannot be edited.' });
-    }
 
     const isUpdate = !!existing;
     const evaluation = await (isUpdate

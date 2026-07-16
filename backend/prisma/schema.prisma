@@ -145,6 +145,8 @@ model User {
   program     Program?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: SetNull)
   coordinatorProgram Program? @relation("CoordinatorProgram")
   rollNumber       String?
+  currentYear      Int?
+  currentSemester  Int?
   resetToken       String?   @unique
   resetTokenExpires DateTime?
   active           Boolean   @default(true)
@@ -154,6 +156,8 @@ model User {
   coordinatorFor           Department?          @relation("CoordinatorDepartment")
   supervisedGroups         ProjectGroup[]        @relation("SupervisedGroups")
   supervisedTheses         Thesis[]              @relation("SupervisedTheses")
+  externalMidTermTheses    Thesis[]              @relation("ExternalMidTerm")
+  externalFinalTheses      Thesis[]              @relation("ExternalFinal")
   thesis                   Thesis[]              @relation("StudentTheses")
   groupMembers             GroupMember[]
   evaluationsSubmitted     Evaluation[]          @relation("EvaluationSubmitter")
@@ -281,6 +285,12 @@ model Thesis {
   status         ThesisStatus @default(PENDING)
   supervisorId   Int?
   supervisor     User?        @relation("SupervisedTheses", fields: [supervisorId], references: [id])
+  externalMidTermId Int?
+  externalMidTerm   User?    @relation("ExternalMidTerm", fields: [externalMidTermId], references: [id], onDelete: SetNull)
+  externalFinalId   Int?
+  externalFinal     User?    @relation("ExternalFinal", fields: [externalFinalId], references: [id], onDelete: SetNull)
+  cluster        String?
+  batch          String?
   academicYearId Int
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   announcementId Int?
@@ -330,6 +340,8 @@ model Evaluation {
   evaluationType EvaluationType
   marks          Float?
   comment        String?
+  comments       String?
+  suggestions    String?
   status         EvaluationStatus   @default(DRAFT)
   submittedById  Int
   submittedBy    User               @relation("EvaluationSubmitter", fields: [submittedById], references: [id])

@@ -324,7 +324,6 @@ function ProjectDetail() {
                       borderRadius: 8,
                       background: isCompleted ? 'var(--color-surface-container-low)' : 'transparent',
                       border: `1px solid ${isCompleted ? 'var(--color-success)' : 'var(--color-outline-variant)'}`,
-                      opacity: isCompleted ? 0.85 : 1,
                     }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: 10,
@@ -334,7 +333,7 @@ function ProjectDetail() {
                         flexShrink: 0,
                       }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {isCompleted ? 'lock' : hasMarks ? 'check_circle' : 'pending'}
+                          {isCompleted ? 'check_circle' : hasMarks ? 'check_circle' : 'pending'}
                         </span>
                       </div>
                       <div style={{ flex: 1 }}>
@@ -444,29 +443,20 @@ function ProjectDetail() {
                   const e = evaluationForComponent(comp.id);
                   const isCompleted = e?.status === 'COMPLETED';
                   return (
-                    <div key={comp.id} className="card" style={{ flex: '1 1 300px', opacity: isCompleted ? 0.85 : 1 }}>
+                    <div key={comp.id} className="card" style={{ flex: '1 1 300px' }}>
                       <div className="card-header">
                         <h3>{comp.name}</h3>
                         {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                       </div>
-                      {isCompleted || item?.status === 'COMPLETED' ? (
-                        <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
-                          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
-                            Marks: {e?.marks ?? '—'} / {comp.maxMarks}
-                          </div>
-                          {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4 }}>"{e.comment}"</p>}
-                        </div>
-                      ) : (
+                      <div style={{ padding: '0 12px 12px' }}>
                         <DefenseCard
                           component={comp}
                           evaluation={e}
-                          onSave={(marks, comment) => handleSaveComponent(comp, marks, comment)}
+                          onSave={(marks) => handleSaveComponent(comp, marks)}
                           onComplete={() => handleComplete(comp.id)}
                           completing={completing === comp.id}
-                          disabled={item?.status === 'COMPLETED'}
                         />
-                      )}
+                      </div>
                     </div>
                   );
                 })}
@@ -543,29 +533,20 @@ function ProjectDetail() {
                   const e = evaluationForComponent(c.id);
                   const isCompleted = e?.status === 'COMPLETED';
                   return (
-                    <div key={c.id} className="card" style={{ flex: 1, minWidth: 240, opacity: isCompleted ? 0.85 : 1 }}>
+                    <div key={c.id} className="card" style={{ flex: 1, minWidth: 240 }}>
                       <div className="card-header">
                         <h3>{c.name}</h3>
                         {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                       </div>
-                      {isCompleted ? (
-                        <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
-                          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
-                            Marks: {e?.marks ?? '—'} / {c.maxMarks}
-                          </div>
-                          {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4 }}>"{e.comment}"</p>}
-                        </div>
-                      ) : (
+                      <div style={{ padding: '0 12px 12px' }}>
                         <DefenseCard
                           component={c}
                           evaluation={e}
-                          onSave={(marks, comment) => handleSaveComponent(c, marks, comment)}
+                          onSave={(marks) => handleSaveComponent(c, marks)}
                           onComplete={() => handleComplete(c.id)}
                           completing={completing === c.id}
-                          disabled={item?.status === 'COMPLETED'}
                         />
-                      )}
+                      </div>
                     </div>
                   );
                 })}
@@ -649,86 +630,58 @@ function ProjectDetail() {
   );
 }
 
-function DefenseCard({ component, evaluation, onSave, onComplete, completing, disabled }) {
+function DefenseCard({ component, evaluation, onSave, onComplete, completing }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
-  const [comment, setComment] = useState(evaluation?.comment ?? '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setMarks(evaluation?.marks?.toString() ?? '');
-    setComment(evaluation?.comment ?? '');
-  }, [evaluation?.id, evaluation?.marks, evaluation?.comment]);
+  }, [evaluation?.id, evaluation?.marks]);
 
   const submit = async () => {
     setSaving(true);
-    try { await onSave(marks, comment); }
+    try { await onSave(marks); }
     finally { setSaving(false); }
   };
 
-  if (disabled) {
-    return (
-      <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
-        <p style={{ marginTop: 8 }}>Project has been finalized. Marks cannot be edited.</p>
-        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
-          {evaluation?.marks ?? '—'} / {component.maxMarks}
-        </div>
-        {evaluation?.comment && <p style={{ fontStyle: 'italic', marginTop: 4 }}>"{evaluation.comment}"</p>}
-      </div>
-    );
-  }
-
   return (
-    <>
-      <div className="form-group">
-        <label style={{ fontSize: 12 }}>Marks (out of {component.maxMarks})</label>
-        <input
-          type="number"
-          value={marks}
-          onChange={e => setMarks(e.target.value)}
-          max={component.maxMarks}
-          min="0"
-          step="0.5"
-          placeholder="0"
-        />
-      </div>
-      <div className="form-group">
-        <label style={{ fontSize: 12 }}>Comment</label>
-        <input
-          type="text"
-          value={comment}
-          onChange={e => setComment(e.target.value)}
-          placeholder={`${component.name} comments...`}
-        />
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          className="btn btn-primary"
-          onClick={submit}
-          disabled={saving}
-          style={{ flex: 1 }}
-        >
-          <span className="material-symbols-outlined">
-            {saving ? 'progress_activity' : 'save'}
-          </span>
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-
-        <button
-          className="btn"
-          style={{
-            background: 'var(--color-success-container)',
-            color: 'var(--color-on-success-container)',
-          }}
-          onClick={onComplete}
-          disabled={completing}
-        >
-          <span className="material-symbols-outlined">
-            {completing ? 'progress_activity' : 'lock'}
-          </span>
-        </button>
-      </div>
-    </>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+      <input
+        type="number"
+        value={marks}
+        onChange={e => setMarks(e.target.value)}
+        max={component.maxMarks}
+        min="0"
+        step="0.5"
+        placeholder="0"
+        style={{ width: 80, padding: '6px 8px', fontSize: 14, textAlign: 'center' }}
+      />
+      <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={submit}
+        disabled={saving}
+        style={{ minWidth: 32, padding: '6px 8px' }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+          {saving ? 'progress_activity' : 'save'}
+        </span>
+      </button>
+      <button
+        className="btn btn-sm"
+        style={{
+          background: 'var(--color-success-container)',
+          color: 'var(--color-on-success-container)',
+          minWidth: 32, padding: '6px 8px',
+        }}
+        onClick={onComplete}
+        disabled={completing}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+          {completing ? 'progress_activity' : 'check_circle'}
+        </span>
+      </button>
+    </div>
   );
 }
 

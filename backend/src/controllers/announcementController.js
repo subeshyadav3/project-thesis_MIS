@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
 const { resolveAudience, listEligibleAnnouncementsForStudent, isStudentAlreadyInAGroupAnnouncement } = require('../services/announcementService');
+const { RULES } = require('../config/yearSemesterRules');
 
 function asCleanAudience(body) {
   const out = { ...body };

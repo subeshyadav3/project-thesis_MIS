@@ -248,7 +248,7 @@ function ExternalExaminerEvaluationPage() {
                         flexShrink: 0,
                       }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {isCompleted ? 'lock' : hasMarks ? 'check_circle' : 'pending'}
+                          {isCompleted ? 'check_circle' : hasMarks ? 'check_circle' : 'pending'}
                         </span>
                       </div>
                       <div style={{ flex: 1 }}>
@@ -306,28 +306,20 @@ function ExternalExaminerEvaluationPage() {
                 const e = evaluationForComponent(comp.id);
                 const isCompleted = e?.status === 'COMPLETED';
                 return (
-                  <div key={comp.id} className="card" style={{ flex: '1 1 300px', opacity: isCompleted ? 0.85 : 1 }}>
+                  <div key={comp.id} className="card" style={{ flex: '1 1 300px' }}>
                     <div className="card-header">
                       <h3>{comp.name}</h3>
                       {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
                     </div>
-                    {isCompleted || item?.status === 'COMPLETED' ? (
-                      <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
-                        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
-                          Marks: {e?.marks ?? '—'} / {comp.maxMarks}
-                        </div>
-                        {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4 }}>"{e.comment}"</p>}
-                      </div>
-                    ) : (
+                    <div style={{ padding: '0 12px 12px' }}>
                       <ExaminerEvaluationForm
                         component={comp}
                         evaluation={e}
-                        onSave={(marks, comment) => handleSaveComponent(comp, marks, comment)}
+                        onSave={(marks) => handleSaveComponent(comp, marks)}
                         onComplete={() => handleComplete(comp.id)}
                         completing={completing === comp.id}
                       />
-                    )}
+                    </div>
                   </div>
                 );
               })}
@@ -361,14 +353,12 @@ function ExternalExaminerEvaluationPage() {
 
 function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, completing }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
-  const [comment, setComment] = useState(evaluation?.comment ?? '');
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     setMarks(evaluation?.marks?.toString() ?? '');
-    setComment(evaluation?.comment ?? '');
-  }, [evaluation?.id, evaluation?.marks, evaluation?.comment]);
+  }, [evaluation?.id, evaluation?.marks]);
 
   const submit = async () => {
     if (marks === '' || marks === null || marks === undefined) {
@@ -381,52 +371,35 @@ function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, com
       return;
     }
     setSaving(true);
-    try { await onSave(marks, comment); }
+    try { await onSave(marks); }
     finally { setSaving(false); }
   };
 
   return (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16, alignItems: 'start', padding: '0 16px 12px' }}>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label style={{ fontSize: 12 }}>Marks (out of {component.maxMarks})</label>
-          <input
-            type="number"
-            value={marks}
-            onChange={e => setMarks(e.target.value)}
-            max={component.maxMarks}
-            min="0"
-            step="0.5"
-            placeholder="0"
-            style={{ fontSize: 20, fontWeight: 700, textAlign: 'center' }}
-          />
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label style={{ fontSize: 12 }}>Comment (optional)</label>
-          <textarea
-            value={comment}
-            onChange={e => setComment(e.target.value)}
-            placeholder="Enter your evaluation comment..."
-            style={{ minHeight: 80, width: '100%' }}
-          />
-        </div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '0 16px 16px' }}>
-        <button className="btn btn-primary" onClick={submit} disabled={saving}>
-          <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'save'}</span>
-          {saving ? 'Saving...' : 'Save Marks'}
-        </button>
-        <button
-          className="btn"
-          style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}
-          onClick={onComplete}
-          disabled={completing}
-        >
-          <span className="material-symbols-outlined">{completing ? 'progress_activity' : 'lock'}</span>
-          {completing ? 'Completing...' : 'Complete'}
-        </button>
-      </div>
-    </>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+      <input
+        type="number"
+        value={marks}
+        onChange={e => setMarks(e.target.value)}
+        max={component.maxMarks}
+        min="0"
+        step="0.5"
+        placeholder="0"
+        style={{ width: 80, padding: '6px 8px', fontSize: 14, textAlign: 'center' }}
+      />
+      <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
+      <button className="btn btn-primary btn-sm" onClick={submit} disabled={saving} style={{ minWidth: 32, padding: '6px 8px' }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{saving ? 'progress_activity' : 'save'}</span>
+      </button>
+      <button
+        className="btn btn-sm"
+        style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)', minWidth: 32, padding: '6px 8px' }}
+        onClick={onComplete}
+        disabled={completing}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{completing ? 'progress_activity' : 'check_circle'}</span>
+      </button>
+    </div>
   );
 }
 
