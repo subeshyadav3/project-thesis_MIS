@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
+const fuzzyMatch = require('../utils/fuzzyMatch');
 
 exports.getTheses = async (req, res) => {
   try {
@@ -107,34 +108,6 @@ exports.createThesis = async (req, res) => {
   }
 };
 
-// --- Fuzzy matching helper ---
-function fuzzyMatch(inputName, candidates) {
-  if (!inputName || !inputName.trim()) return null;
-  const normalized = name => name.toLowerCase().trim().replace(/\s+/g, ' ');
-  const input = normalized(inputName);
-  let bestMatch = null;
-  let bestScore = 0;
-
-  for (const c of candidates) {
-    const fullName = normalized(`${c.firstName} ${c.lastName}`);
-    // Exact substring match = 1.0
-    if (fullName.includes(input) || input.includes(fullName)) {
-      return { user: c, score: 1.0, method: 'exact' };
-    }
-    // Word-level matching
-    const inputWords = input.split(' ');
-    const nameWords = fullName.split(' ');
-    const matched = inputWords.filter(w => nameWords.some(nw => nw.includes(w) || w.includes(nw)));
-    const score = matched.length / Math.max(inputWords.length, nameWords.length);
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = c;
-    }
-  }
-
-  return bestScore >= 0.5 ? { user: bestMatch, score: bestScore, method: 'fuzzy' } : null;
-}
-
 // Step 1: Parse Excel + fuzzy match → return preview
 exports.bulkImportPreview = async (req, res) => {
   try {
@@ -189,7 +162,7 @@ exports.bulkImportPreview = async (req, res) => {
         if (byRoll) studentMatch = { user: byRoll, score: 1.0, method: 'roll' };
       }
       if (!studentMatch && name) {
-        studentMatch = fuzzyMatch(name, allStudents);
+        studentMatch = fuzzyMatch(name, allStudents, 0.5);
       }
       if (!studentMatch) {
         warnings.push(`Student not found for "${name}" (roll: ${roll})`);
@@ -205,19 +178,19 @@ exports.bulkImportPreview = async (req, res) => {
       }
 
       // Match supervisor
-      const supervisorMatch = supervisorName ? fuzzyMatch(supervisorName, allSupervisors) : null;
+      const supervisorMatch = supervisorName ? fuzzyMatch(supervisorName, allSupervisors, 0.5) : null;
       if (supervisorName && !supervisorMatch) {
         warnings.push(`Supervisor not found for "${supervisorName}"`);
       }
 
       // Match external mid-term
-      const externalMidTermMatch = externalMidTermName ? fuzzyMatch(externalMidTermName, allExternals) : null;
+      const externalMidTermMatch = externalMidTermName ? fuzzyMatch(externalMidTermName, allExternals, 0.5) : null;
       if (externalMidTermName && !externalMidTermMatch) {
         warnings.push(`External Mid-Term not found for "${externalMidTermName}"`);
       }
 
       // Match external final
-      const externalFinalMatch = externalFinalName ? fuzzyMatch(externalFinalName, allExternals) : null;
+      const externalFinalMatch = externalFinalName ? fuzzyMatch(externalFinalName, allExternals, 0.5) : null;
       if (externalFinalName && !externalFinalMatch) {
         warnings.push(`External Final not found for "${externalFinalName}"`);
       }

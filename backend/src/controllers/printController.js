@@ -221,7 +221,12 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
     </div>`;
 }
 
-function buildMasterFormat(data) {
+/**
+ * Build the master thesis evaluation HTML.
+ * @param {Object} data - thesis data
+ * @param {'supervisor'|'external'|'both'} [scope='both'] - which evaluator pages to include
+ */
+function buildMasterFormat(data, scope = 'both') {
   const { title, name, supervisor, evaluations, student } = data;
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
@@ -243,21 +248,31 @@ function buildMasterFormat(data) {
   const supComments = supEvals.filter(e => e.comment).map(e => e.comment);
   const extComments = extEvals.filter(e => e.comment).map(e => e.comment);
 
-  // Extract feedback comments and suggestions from evaluations
-  const feedbackComments = evaluations.map(e => e.comments).filter(Boolean).join('\n');
-  const feedbackSuggestions = evaluations.map(e => e.suggestions).filter(Boolean).join('\n');
+  // Extract feedback comments and suggestions per role
+  const supFeedbackComments = supEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const supFeedbackSuggestions = supEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+  const extFeedbackComments = extEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const extFeedbackSuggestions = extEvals.map(e => e.suggestions).filter(Boolean).join('\n');
 
   const studentName = name;
   const rollNo = student?.rollNumber || '—';
 
-  const page1 = `
+  const includeSup = scope === 'supervisor' || scope === 'both';
+  const includeExt = scope === 'external' || scope === 'both';
+
+  let pages = '';
+  if (includeSup) {
+    pages += `
     <div style="page-break-after:always;">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, feedbackComments, feedbackSuggestions)}
+      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions)}
     </div>`;
-  const page2 = `
-    <div>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, feedbackComments, feedbackSuggestions)}
+  }
+  if (includeExt) {
+    pages += `
+    <div${includeSup ? '' : ''}>
+      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions)}
     </div>`;
+  }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Thesis Evaluation - ${esc(title)}</title>
   <style>
@@ -265,8 +280,7 @@ function buildMasterFormat(data) {
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
   </style></head><body>
-    ${page1}
-    ${page2}
+    ${pages}
   </body></html>`;
 }
 
@@ -471,16 +485,18 @@ exports.printThesisEvaluation = async (req, res) => {
       };
     });
 
+    const scope = req.query.scope || 'both';
     const html = buildMasterFormat({
       title: thesis.title,
       name: `${thesis.student.firstName} ${thesis.student.lastName}`,
       supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
       evaluations: evalData,
       student: thesis.student || null,
-    });
+    }, scope);
 
     const pdf = await generatePdf(html);
-    sendPdf(res, pdf, `thesis_evaluation_${id}.pdf`);
+    const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : 'full';
+    sendPdf(res, pdf, `thesis_evaluation_${id}_${scopeLabel}.pdf`);
   } catch (error) {
     console.error('printThesisEvaluation error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -585,13 +601,14 @@ exports.previewThesisEvaluation = async (req, res) => {
       };
     });
 
+    const scope = req.query.scope || 'both';
     const html = buildMasterFormat({
       title: thesis.title,
       name: `${thesis.student.firstName} ${thesis.student.lastName}`,
       supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
       evaluations: evalData,
       student: thesis.student || null,
-    });
+    }, scope);
 
     res.setHeader('Content-Type', 'text/html');
     res.send(html);

@@ -6,6 +6,7 @@ const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
+const fuzzyMatch = require('../utils/fuzzyMatch');
 
 exports.getGroups = async (req, res) => {
   try {
@@ -180,17 +181,35 @@ exports.uploadExcel = async (req, res) => {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(sheet);
     const created = [];
-    const skipped = [];
+    const warnings = [];
     const { projectType } = req.body;
     const schemeType = projectType || 'MINOR';
+
+    // Pre-load all supervisors & examiners in this coordinator's department for fuzzy matching
+    const deptId = req.user.departmentId;
+    const [allSupervisors, allExaminers] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'SUPERVISOR', departmentId: deptId },
+        select: { id: true, firstName: true, lastName: true, email: true },
+      }),
+      prisma.user.findMany({
+        where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId },
+        select: { id: true, firstName: true, lastName: true, email: true },
+      }),
+    ]);
+
     for (const row of data) {
       const groupName = row['Group Name'] || row['groupName'];
       const projectTitle = row['Project Title'] || row['projectTitle'];
       const memberNames = (row['Member Names'] || row['memberNames'] || '').toString();
       const rollNumbers = (row['Roll Numbers'] || row['rollNumbers'] || '').toString();
       const yearValue = (row['Academic Year'] || row['academicYear'] || row['year'] || '').toString().trim();
+      const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
+      const examinerName = (row['Examiner'] || row['examiner'] || '').toString().trim();
       const names = memberNames.split(',').map(s => s.trim()).filter(Boolean);
       const rolls = rollNumbers.split(',').map(s => s.trim()).filter(Boolean);
+      const rowWarnings = [];
+
       // Resolve academic year
       const academicYear = await prisma.academicYear.findFirst({
         where: { year: yearValue, departmentId: req.user.departmentId },
@@ -219,7 +238,7 @@ exports.uploadExcel = async (req, res) => {
       }
       // Skip blank rows
       if (!groupName || !projectTitle) {
-        skipped.push({ group: groupName || '(blank)', reason: 'Empty group name or project title' });
+        warnings.push({ group: groupName || '(blank)', reason: 'Empty group name or project title' });
         continue;
       }
       // Skip if group with same name already exists for this academic year
@@ -227,17 +246,37 @@ exports.uploadExcel = async (req, res) => {
         where: { name: groupName, academicYearId: academicYear.id },
       });
       if (existingGroup) {
-        skipped.push({ group: groupName, reason: `Group "${groupName}" already exists for academic year ${yearValue}` });
+        warnings.push({ group: groupName, reason: `Group "${groupName}" already exists for academic year ${yearValue}` });
         continue;
       }
+
+      // Fuzzy match Supervisor
+      let supervisorMatch = null;
+      if (supervisorName) {
+        supervisorMatch = fuzzyMatch(supervisorName, allSupervisors);
+        if (!supervisorMatch) {
+          rowWarnings.push(`Supervisor "${supervisorName}" not found — group created without supervisor`);
+        }
+      }
+
+      // Fuzzy match Examiner
+      let examinerMatch = null;
+      if (examinerName) {
+        examinerMatch = fuzzyMatch(examinerName, allExaminers);
+        if (!examinerMatch) {
+          rowWarnings.push(`Examiner "${examinerName}" not found — group created without examiner`);
+        }
+      }
+
       const group = await prisma.projectGroup.create({
         data: {
           name: groupName,
           projectTitle,
           projectType: schemeType,
-          status: 'ACTIVE',
+          status: supervisorMatch ? 'ACTIVE' : 'PENDING',
           academicYearId: academicYear.id,
           programId: resolvedProgramId,
+          supervisorId: supervisorMatch?.user?.id || null,
         },
       });
       // Create default evaluation components based on project type
@@ -246,6 +285,20 @@ exports.uploadExcel = async (req, res) => {
         await prisma.evaluationComponent.create({
           data: { ...comp, groupId: group.id, createdById: req.user.id },
         });
+      }
+      // Assign examiner if matched
+      if (examinerMatch) {
+        try {
+          await prisma.examinerAssignment.create({
+            data: {
+              externalExaminerId: examinerMatch.user.id,
+              groupId: group.id,
+              assignedById: req.user.id,
+            },
+          });
+        } catch (e) {
+          console.error(`Examiner assignment failed for group ${group.id}:`, e.message);
+        }
       }
       // Create or find students and add as members
       for (let i = 0; i < names.length; i++) {
@@ -290,20 +343,20 @@ exports.uploadExcel = async (req, res) => {
           include: { group: { select: { name: true } } },
         });
         if (activeMembership) {
-          skipped.push({ student: `${student.firstName} ${student.lastName}`, roll, reason: `Already in group "${activeMembership.group.name}" (status: ${activeMembership.group.status})` });
+          warnings.push({ student: `${student.firstName} ${student.lastName}`, roll, reason: `Already in group "${activeMembership.group.name}" (status: ${activeMembership.group.status})` });
           continue;
         }
         await prisma.groupMember.create({
           data: { studentId: student.id, groupId: group.id, rollNumber: roll },
         });
       }
-      created.push(group);
+      created.push({ group, warnings: rowWarnings.length ? rowWarnings : undefined });
     }
-    audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Imported ${created.length} groups via Excel${skipped.length ? `, ${skipped.length} students skipped` : ''}`, performedById: req.user.id });
+    audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Imported ${created.length} groups via Excel${warnings.length ? `, ${warnings.length} warnings` : ''}`, performedById: req.user.id });
     res.status(201).json({
-      message: `${created.length} groups created${skipped.length ? `, ${skipped.length} students skipped` : ''}`,
+      message: `${created.length} groups created${warnings.length ? `, ${warnings.length} warnings` : ''}`,
       groups: created,
-      skipped: skipped.length ? skipped : undefined,
+      warnings: warnings.length ? warnings : undefined,
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });

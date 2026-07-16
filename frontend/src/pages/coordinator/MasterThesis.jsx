@@ -63,6 +63,7 @@ function MasterThesis() {
   const [selectedTheses, setSelectedTheses] = useState([]);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const selectAllRef = useRef(null);
+  const [actionMenuRow, setActionMenuRow] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = useCallback(() => {
@@ -131,6 +132,17 @@ useEffect(() => {
     if (createStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
     return () => document.removeEventListener('mousedown', handleStudentOutside);
   }, [createStudentOpen]);
+
+  // Close action menu on outside click — use 'click' not 'mousedown'
+  // so React's synthetic onClick on menu items fires first (bubbles up),
+  // then the native click listener fires (batches both state updates together).
+  useEffect(() => {
+    const handleClick = () => setActionMenuRow(null);
+    if (actionMenuRow) {
+      document.addEventListener('click', handleClick);
+    }
+    return () => document.removeEventListener('click', handleClick);
+  }, [actionMenuRow]);
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
@@ -211,15 +223,6 @@ const handleComplete = async (id) => {
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
   };
-
-  // Select all on current page
-  useEffect(() => {
-    if (selectAllRef.current) {
-      const allIds = paginatedTheses.map(t => t.id);
-      const selectedOnPage = selectedTheses.filter(id => allIds.includes(id)).length;
-      selectAllRef.current.indeterminate = selectedOnPage > 0 && selectedOnPage < allIds.length;
-    }
-  }, [selectedTheses, paginatedTheses]);
 
   const toggleSelectAll = () => {
     const allIds = paginatedTheses.map(t => t.id);
@@ -339,6 +342,15 @@ const handleComplete = async (id) => {
 
   const totalPages = Math.ceil(sortedTheses.length / PAGE_SIZE);
   const paginatedTheses = sortedTheses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Select all on current page — must be AFTER paginatedTheses is defined (no TDZ issue)
+  useEffect(() => {
+    if (selectAllRef.current) {
+      const allIds = paginatedTheses.map(t => t.id);
+      const selectedOnPage = selectedTheses.filter(id => allIds.includes(id)).length;
+      selectAllRef.current.indeterminate = selectedOnPage > 0 && selectedOnPage < allIds.length;
+    }
+  }, [selectedTheses, paginatedTheses]);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
@@ -776,40 +788,40 @@ return (
                   <th>
                     <input type="checkbox" ref={selectAllRef} onChange={toggleSelectAll} />
                   </th>
-                  <th>Student</th>
+                  <th style={{ width: '25%' }}>Student</th>
                   <th>Thesis Title</th>
-                  <th>Supervisor</th>
-                  <th>Status</th>
-                  <th>Year</th>
-                  <th style={{ textAlign: 'right', width: '1%', whiteSpace: 'nowrap' }}>Actions</th>
+                  <th style={{ width: '22%' }}>Supervisor</th>
+                  <th style={{ width: 65 }}>Status</th>
+                  <th style={{ width: 50 }}>Year</th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedTheses.map(t => (
                   <tr key={t.id} onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)} style={{ cursor: 'pointer' }}>
-                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '8px 12px' }}>
+                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '6px 10px' }}>
                       <input type="checkbox" checked={selectedTheses.includes(t.id)} onChange={() => toggleSelectThesis(t.id)} />
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="default-badge" style={{ width: 28, height: 28, fontSize: 10 }}>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className="default-badge" style={{ width: 24, height: 24, fontSize: 9 }}>
                           {t.student?.firstName?.charAt(0)}{t.student?.lastName?.charAt(0)}
                         </div>
-                        <span style={{ fontWeight: 500 }}>
+                        <span style={{ fontWeight: 500, fontSize: 13 }}>
                           {t.student?.firstName} {t.student?.lastName}
                         </span>
                       </div>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.title}</td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
                       {t.supervisor ? (
-                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 13 }}>
+                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
                           {t.supervisor.firstName} {t.supervisor.lastName}
                         </span>
                       ) : pendingRequests.some(r => r.thesisId === t.id && r.status === 'PENDING') ? (
                         <span className="badge badge-warning" style={{ fontSize: 10 }}>
                           <span className="dot" />
-                          Pending Approval
+                          Pending
                         </span>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
@@ -818,38 +830,51 @@ return (
                         </span>
                       )}
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10 }}>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
                         <span className="dot" />
                         {t.status || 'PENDING'}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(t.academicYear) || '—'}
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-sm btn-outline" title="View" onClick={() => openDetail(t, 'view')} style={{ padding: '3px 5px', minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button className="icon-btn-sm" title="View" aria-label="View thesis details" onClick={() => openDetail(t, 'view')}>
+                          <span className="material-symbols-outlined">visibility</span>
                         </button>
-                        {t.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline-primary" title="Edit" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                        <div style={{ position: 'relative' }}>
+                          <button className="icon-btn-sm" title="More actions" aria-label="More actions" onClick={(e) => { e.stopPropagation(); setActionMenuRow(actionMenuRow === t.id ? null : t.id); }}>
+                            <span className="material-symbols-outlined">more_vert</span>
                           </button>
-                        )}
-                        {t.status === 'ACTIVE' && (
-                          <button className="btn btn-sm btn-success" title="Complete" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-                          </button>
-                        )}
-                        <button className="btn btn-sm btn-outline" title="PDF Preview" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(t); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
-                        </button>
-                        {t.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteThesis(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
-                          </button>
-                        )}
+                          {actionMenuRow === t.id && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
+                              {t.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                  Edit
+                                </div>
+                              )}
+                              {t.status === 'ACTIVE' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                                  Complete
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(t)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                                PDF Preview
+                              </div>
+                              {t.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-error)' }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                  Delete
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

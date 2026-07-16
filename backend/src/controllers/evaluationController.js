@@ -97,10 +97,7 @@ exports.submitComponentMarks = async (req, res) => {
       ? prisma.evaluation.update({ where: { id: existing.id }, data })
       : prisma.evaluation.create({ data }));
     const auditAction = isUpdate ? 'UPDATE_MARKS' : 'SUBMIT_MARKS';
-    const auditDetails = isUpdate
-      ? `Updated ${component.evaluationType.replace('_', ' ').toLowerCase()} marks to ${data.marks ?? 'null'}/${component.maxMarks}`
-      : `Submitted ${data.marks ?? 'null'}/${component.maxMarks} marks for ${component.evaluationType.replace('_', ' ').toLowerCase()}`;
-    audit.log({ action: auditAction, entity: 'Evaluation', entityId: evaluation.id, details: auditDetails, performedById: req.user.id });
+    audit.log({ action: auditAction, entity: 'Evaluation', entityId: evaluation.id, details: 'Marks updated', performedById: req.user.id });
 
     // Build the new summary so the caller doesn't have to refetch
     const components = await prisma.evaluationComponent.findMany({

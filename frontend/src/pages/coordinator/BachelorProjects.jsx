@@ -62,9 +62,11 @@ function BachelorProjects() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
+  const selectAllRef = useRef(null);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
+  const [actionMenuRow, setActionMenuRow] = useState(null);
 
   const loadData = useCallback(() => {
     const controller = new AbortController();
@@ -131,6 +133,15 @@ useEffect(() => {
     if (newStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
     return () => document.removeEventListener('mousedown', handleStudentOutside);
   }, [newStudentOpen]);
+
+  // Close action menu on outside click
+  useEffect(() => {
+    const handleClick = () => setActionMenuRow(null);
+    if (actionMenuRow) {
+      document.addEventListener('click', handleClick);
+    }
+    return () => document.removeEventListener('click', handleClick);
+  }, [actionMenuRow]);
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
@@ -345,6 +356,27 @@ const filteredGroups = useMemo(() => {
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
   }, [totalPages, currentPage]);
+
+  // Select all on current page
+  useEffect(() => {
+    if (selectAllRef.current) {
+      const allIds = paginatedGroups.map(g => g.id);
+      const selectedIds = selectedGroups.map(g => g.id);
+      const selectedOnPage = selectedGroups.filter(g => allIds.includes(g.id)).length;
+      selectAllRef.current.indeterminate = selectedOnPage > 0 && selectedOnPage < allIds.length;
+    }
+  }, [selectedGroups, paginatedGroups]);
+
+  const toggleSelectAll = () => {
+    const allIds = paginatedGroups.map(g => g.id);
+    const allSelected = allIds.every(id => selectedGroups.some(g => g.id === id));
+    if (allSelected) {
+      setSelectedGroups(prev => prev.filter(g => !allIds.includes(g.id)));
+    } else {
+      const newGroups = paginatedGroups.filter(g => !selectedGroups.some(sg => sg.id === g.id));
+      setSelectedGroups(prev => [...prev, ...newGroups]);
+    }
+  };
 
   const pendingCount = groups.filter(g => !g.supervisor).length;
   const assignedCount = groups.filter(g => g.supervisor).length;
@@ -806,74 +838,88 @@ const filteredGroups = useMemo(() => {
               </colgroup>
               <thead>
                 <tr>
-                  <th></th>
+                  <th>
+                    <input type="checkbox" ref={selectAllRef} onChange={toggleSelectAll} />
+                  </th>
                   <th>Group</th>
                   <th>Project Title</th>
                   <th>Type</th>
-                  <th>Members</th>
+                  <th style={{ width: 60 }}>Members</th>
                   <th>Status</th>
-                  <th>Year</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th style={{ width: 50 }}>Year</th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                   {paginatedGroups.map(g => (
                   <tr key={g.id} onClick={() => navigate(`/coordinator/project/group/${g.id}`)} style={{ cursor: 'pointer' }}>
-                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '8px 12px' }}>
+                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '6px 10px' }}>
                       <input type="checkbox" checked={selectedGroups.includes(g)} onChange={() => {
                         setSelectedGroups(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
                       }} />
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div className="default-badge" style={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{g.name?.slice(0, 2).toUpperCase()}</div>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{g.name}</span>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="default-badge" style={{ width: 28, height: 28, fontSize: 10 }}>{g.name?.slice(0, 2).toUpperCase()}</div>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{g.name}</span>
                       </div>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 10 }}>
-                        <span className="dot" />
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{g.projectTitle}</td>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <span className={`badge`} style={{ fontSize: 10, background: g.projectType === 'MAJOR' ? 'var(--color-warning-container)' : 'var(--color-tertiary-container)', color: g.projectType === 'MAJOR' ? 'var(--color-on-warning-container)' : 'var(--color-on-tertiary-container)', border: 'none' }}>
                         {g.projectType === 'MAJOR' ? 'Major' : 'Minor'}
                       </span>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>
-                        {safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(', ') || '—'}
+                    <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                      <span className="stat-chip" title={safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join('\n')}>
+                        {safeMembers(g).length}
                       </span>
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10 }}>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
                         <span className="dot" />
                         {g.status || 'PENDING'}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(g.academicYear) || '—'}
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-sm btn-outline" title="View" onClick={() => openDetail(g, 'view')} style={{ padding: '3px 5px', minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button className="icon-btn-sm" title="View" aria-label="View group details" onClick={() => openDetail(g, 'view')}>
+                          <span className="material-symbols-outlined">visibility</span>
                         </button>
-                        {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline-primary" title="Edit" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                        <div style={{ position: 'relative' }}>
+                          <button className="icon-btn-sm" title="More actions" aria-label="More actions" onClick={(e) => { e.stopPropagation(); setActionMenuRow(actionMenuRow === g.id ? null : g.id); }}>
+                            <span className="material-symbols-outlined">more_vert</span>
                           </button>
-                        )}
-                        {g.status === 'ACTIVE' && (
-                          <button className="btn btn-sm btn-success" title="Complete" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-                          </button>
-                        )}
-                        <button className="btn btn-sm btn-outline" title="PDF Preview" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(g); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
-                        </button>
-                        {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteGroup(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
-                          </button>
-                        )}
+                          {actionMenuRow === g.id && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
+                              {g.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                  Edit
+                                </div>
+                              )}
+                              {g.status === 'ACTIVE' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                                  Complete
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(g)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                                PDF Preview
+                              </div>
+                              {g.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-error)' }} onClick={() => { confirmDeleteGroup(g.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                  Delete
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

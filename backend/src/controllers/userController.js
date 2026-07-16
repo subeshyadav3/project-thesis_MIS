@@ -382,19 +382,28 @@ exports.getAuditLogs = async (req, res) => {
     if (req.user.role === 'COORDINATOR') {
       const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
       if (program) {
-        // Program coordinator: only see logs performed by users in their program/department
-        const programUserIds = await prisma.user.findMany({
-          where: {
-            OR: [
-              { programId: program.id },
-              { role: { in: ['SUPERVISOR', 'EXTERNAL_EXAMINER'] }, departmentId: program.departmentId },
-            ],
-          },
-          select: { id: true },
-        });
-        const ids = programUserIds.map(u => u.id);
-        // Also include the coordinator themselves
-        ids.push(req.user.id);
+        // Program coordinator: only see logs relevant to their own program.
+        // Instead of fetching all supervisors/examiners in the department
+        // (which would include cross-program users), we get only:
+        //   1) Users whose programId matches this program (students)
+        //   2) Supervisors assigned to groups/theses in this program
+        //   3) External examiners assigned to groups/theses in this program
+        //   4) The coordinator themselves
+        const [programUsers, groupSup, thesisSup, groupExam, thesisExam] = await Promise.all([
+          prisma.user.findMany({ where: { programId: program.id }, select: { id: true } }),
+          prisma.projectGroup.findMany({ where: { programId: program.id, supervisorId: { not: null } }, select: { supervisorId: true } }),
+          prisma.thesis.findMany({ where: { student: { programId: program.id }, supervisorId: { not: null } }, select: { supervisorId: true } }),
+          prisma.examinerAssignment.findMany({ where: { group: { programId: program.id } }, select: { externalExaminerId: true } }),
+          prisma.examinerAssignment.findMany({ where: { thesis: { student: { programId: program.id } } }, select: { externalExaminerId: true } }),
+        ]);
+        const ids = [...new Set([
+          ...programUsers.map(u => u.id),
+          ...groupSup.map(r => r.supervisorId),
+          ...thesisSup.map(r => r.supervisorId),
+          ...groupExam.map(r => r.externalExaminerId),
+          ...thesisExam.map(r => r.externalExaminerId),
+          req.user.id,
+        ])];
         where.performedById = { in: ids };
       } else {
         // Department-level coordinator: only see logs from their department

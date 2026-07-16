@@ -115,7 +115,7 @@ exports.submitEvaluation = async (req, res) => {
   } else {
     evaluation = await prisma.evaluation.create({ data });
   }
-  audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', entityId: evaluation.id, details: `Submitted ${component.name} marks`, performedById: req.user.id });
+  audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', entityId: evaluation.id, details: 'Marks updated', performedById: req.user.id });
 
   const components = await prisma.evaluationComponent.findMany({
       where: groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) },

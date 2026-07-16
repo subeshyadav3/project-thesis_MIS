@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
@@ -35,12 +35,10 @@ function ProjectDetail() {
   const [uploadStage, setUploadStage] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [recommendationContent, setRecommendationContent] = useState('');
-  const [issuingRecommendation, setIssuingRecommendation] = useState(false);
-  const [feedbackComments, setFeedbackComments] = useState('');
-  const [feedbackSuggestions, setFeedbackSuggestions] = useState('');
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [recommendationContent, setRecommendationContent] = useState('');
+  const [issuingRecommendation, setIssuingRecommendation] = useState(false);
 
   const loadData = useCallback((signal) => {
     setLoading(true);
@@ -54,12 +52,6 @@ function ProjectDetail() {
         setSummary(data.summary || null);
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
-        // Load existing comments/suggestions from evaluations
-        const evals = data.evaluations || [];
-        const existingComments = evals.map(e => e.comments).filter(Boolean).join('\n');
-        const existingSuggestions = evals.map(e => e.suggestions).filter(Boolean).join('\n');
-        if (existingComments) setFeedbackComments(existingComments);
-        if (existingSuggestions) setFeedbackSuggestions(existingSuggestions);
       })
       .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load evaluations'); })
       .finally(() => setLoading(false));
@@ -74,43 +66,86 @@ function ProjectDetail() {
   const componentByType = (evalType) => components.find(c => c.evaluationType === evalType);
   const evaluationForComponent = (compId) => evaluations.find(e => e.componentId === compId);
 
-  const handleSaveComponent = async (component, marksValue, comment) => {
+  // Compute progress
+  const orderedComponents = useMemo(() => [...components].sort((a, b) => {
+    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
+    return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
+  }), [components]);
+
+  const currentUserComponents = useMemo(() =>
+    components.filter(c => c.evaluatorRole === user.role), [components, user.role]);
+
+  const progress = useMemo(() => {
+    const visible = isCoordinator ? orderedComponents : currentUserComponents;
+    const total = visible.reduce((s, c) => s + c.maxMarks, 0);
+    const earned = visible.reduce((s, c) => {
+      const e = evaluationForComponent(c.id);
+      return s + (e?.marks ?? 0);
+    }, 0);
+    const completed = visible.filter(c => {
+      const e = evaluationForComponent(c.id);
+      return e?.marks !== null && e?.marks !== undefined;
+    }).length;
+    return { total, earned, completed, count: visible.length, pct: total > 0 ? Math.round((earned / total) * 100) : 0 };
+  }, [orderedComponents, currentUserComponents, evaluations, isCoordinator]);
+
+  const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
+  const title = type === 'group' ? item?.projectTitle : item?.title;
+  const backPath = isSupervisor
+    ? (type === 'group' ? '/supervisor/bachelor' : '/supervisor/master')
+    : isCoordinator
+      ? (type === 'group' ? '/coordinator/bachelor' : '/coordinator/master')
+      : '/external/evaluations';
+
+  // Mark saving handler
+  const handleSaveComponent = async (component, marksValue) => {
     if (marksValue === '' || marksValue === null || marksValue === undefined) {
-      toast.warning('Please enter marks');
-      return;
+      toast.warning('Please enter marks'); return;
     }
     const m = parseFloat(marksValue);
     if (Number.isNaN(m) || m < 0 || m > component.maxMarks) {
-      toast.warning(`Marks must be between 0 and ${component.maxMarks}`);
-      return;
+      toast.warning(`Marks must be between 0 and ${component.maxMarks}`); return;
     }
+    // Build feedback from existing evaluations for this user
+    const existingEval = evaluationForComponent(component.id);
     try {
       const payload = {
         componentId: component.id,
         marks: m,
-        comment: comment || null,
+        comments: existingEval?.comments || null,
+        suggestions: existingEval?.suggestions || null,
       };
       if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
       await api.post('/evaluations/marks', payload);
-      toast.success(`${component.name} marks saved`);
+      toast.success(`✓ ${component.name} marks saved`);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || `Failed to save ${component.name}`);
     }
   };
 
+  // Feedback save for all user components
+  const [feedbackComments, setFeedbackComments] = useState('');
+  const [feedbackSuggestions, setFeedbackSuggestions] = useState('');
+  useEffect(() => {
+    const evals = evaluations.filter(e => currentUserComponents.some(c => c.id === e.componentId));
+    const comments = evals.map(e => e.comments).filter(Boolean).join('\n');
+    const suggestions = evals.map(e => e.suggestions).filter(Boolean).join('\n');
+    setFeedbackComments(comments || '');
+    setFeedbackSuggestions(suggestions || '');
+  }, [evaluations, currentUserComponents]);
+
   const handleSaveFeedback = async () => {
     if (!feedbackComments.trim() && !feedbackSuggestions.trim()) {
-      toast.warning('Please enter comments or suggestions');
-      return;
+      toast.warning('Please enter comments or suggestions'); return;
     }
     setSavingFeedback(true);
     try {
-      // Save feedback to all user's evaluation components
       for (const comp of currentUserComponents) {
+        const e = evaluationForComponent(comp.id);
         const payload = {
           componentId: comp.id,
-          marks: evaluationForComponent(comp.id)?.marks ?? null,
+          marks: e?.marks ?? null,
           comments: feedbackComments || null,
           suggestions: feedbackSuggestions || null,
         };
@@ -121,9 +156,7 @@ function ProjectDetail() {
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to save feedback');
-    } finally {
-      setSavingFeedback(false);
-    }
+    } finally { setSavingFeedback(false); }
   };
 
   const doFinalize = async () => {
@@ -131,44 +164,11 @@ function ProjectDetail() {
     try {
       const endpoint = type === 'group' ? `/groups/${id}/status` : `/theses/${id}/status`;
       await api.put(endpoint, { status: 'COMPLETED' });
-      toast.success(`${type === 'group' ? 'Project' : 'Thesis'} marked as completed`);
+      toast.success(`${type === 'group' ? 'Project' : 'Thesis'} completed`);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to finalize');
-    } finally {
-      setFinalizing(false);
-    }
-  };
-
-  const handleFinalize = () => {
-    setConfirmDialog({
-      open: true,
-      title: 'Finalize Project',
-      message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED? This will finalize it at the project level.`,
-      danger: true,
-      confirmLabel: 'Finalize',
-      onConfirm: () => doFinalize(),
-    });
-  };
-
-  const handleIssueRecommendation = async () => {
-    const content = recommendationContent.trim();
-    if (!content) return toast.warning('Write the recommendation letter first');
-    setIssuingRecommendation(true);
-    try {
-      const payload = { content };
-      if (type === 'group') payload.groupId = parseInt(id);
-      else payload.thesisId = parseInt(id);
-      await api.post('/supervisors/recommendation', payload);
-      toast.success('Recommendation issued');
-      setRecommendationContent('');
-      // Reload to show the new entry
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to issue recommendation');
-    } finally {
-      setIssuingRecommendation(false);
-    }
+    } finally { setFinalizing(false); }
   };
 
   const handleUploadProposal = async () => {
@@ -181,283 +181,356 @@ function ProjectDetail() {
       formData.append(type === 'group' ? 'groupId' : 'thesisId', id);
       await api.post('/upload/proposal', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Proposal uploaded');
-      setUploadFile(null);
-      setUploadStage('');
-      loadData();
+      setUploadFile(null); setUploadStage(''); loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
 
-  const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
-  const title = type === 'group' ? item?.projectTitle : item?.title;
-  const backPath = isSupervisor
-    ? (type === 'group' ? '/supervisor/bachelor' : '/supervisor/master')
-    : isCoordinator
-      ? (type === 'group' ? '/coordinator/bachelor' : '/coordinator/master')
-      : '/external/evaluations';
-
-  const orderedComponents = [...components].sort((a, b) => {
-    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
-    return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
-  });
-
-  const currentUserComponents = components.filter(c => c.evaluatorRole === user.role);
-
-  const visibleComponents = isCoordinator ? orderedComponents : currentUserComponents;
-  const visibleSummary = {
-    total: visibleComponents.reduce((s, c) => {
-      const e = evaluationForComponent(c.id);
-      return s + (e?.marks ?? 0);
-    }, 0),
-    maxTotal: visibleComponents.reduce((s, c) => s + c.maxMarks, 0),
-    completedCount: visibleComponents.filter(c => {
-      const e = evaluationForComponent(c.id);
-      return e?.marks !== null && e?.marks !== undefined;
-    }).length,
-    totalCount: visibleComponents.length,
+  const handleIssueRecommendation = async () => {
+    const content = recommendationContent.trim();
+    if (!content) return toast.warning('Write the recommendation first');
+    setIssuingRecommendation(true);
+    try {
+      const payload = { content };
+      if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
+      await api.post('/supervisors/recommendation', payload);
+      toast.success('Recommendation issued');
+      setRecommendationContent(''); loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed');
+    } finally { setIssuingRecommendation(false); }
   };
+
+  const tabs = [
+    { key: 'overview', icon: 'overview', label: 'Overview' },
+    { key: 'evaluation', icon: 'grading', label: 'Evaluation' },
+    { key: 'recommendations', icon: 'verified', label: 'Recommendations' },
+  ];
+
+  if (loading && !item) {
+    return <PageLayout title="" user={user}><SkeletonPage type={type} /></PageLayout>;
+  }
 
   return (
-    <ErrorBoundary><PageLayout title={title} subtitle={name || ''} user={user}
-      actions={
-        <button className="btn btn-outline btn-sm" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back
-        </button>
-      }
-    >
-      {/* Horizontal tab bar */}
-      <div className="tabs" style={{ marginBottom: 24 }}>
-        <div className={`tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-          <span className="material-symbols-outlined">overview</span> Overview
-        </div>
-        <div className={`tab ${activeTab === 'evaluation' ? 'active' : ''}`} onClick={() => setActiveTab('evaluation')}>
-          <span className="material-symbols-outlined">grading</span> Evaluation
-        </div>
-        <div className={`tab ${activeTab === 'recommendations' ? 'active' : ''}`} onClick={() => setActiveTab('recommendations')}>
-          <span className="material-symbols-outlined">verified</span> Recommendations
-        </div>
-      </div>
-
-      {/* ============ OVERVIEW TAB ============ */}
-      {activeTab === 'overview' && (
-        <>
-          {/* Project Overview */}
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-header"><h3>Project Overview</h3></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 24px', padding: '12px 16px', fontSize: 14 }}>
-              {type === 'group' && (
-                <>
-                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Group:</span>
-                  <span>{item?.name}</span>
-                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Group Members:</span>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {item?.members?.length > 0 ? item.members.map(m => (
-                      <span key={m.id} className="badge badge-info" style={{ fontSize: 12 }}>
-                        {m.student?.firstName} {m.student?.lastName} ({m.rollNumber})
-                      </span>
-                    )) : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}
-                  </div>
-                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Project Type:</span>
-                  <span><span className={`badge badge-${item?.projectType === 'MAJOR' ? 'warning' : 'info'}`}>{item?.projectType || 'MINOR'}</span></span>
-                </>
-              )}
-              {type === 'thesis' && (
-                <>
-                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Student:</span>
-                  <span>{item?.student?.firstName} {item?.student?.lastName}</span>
-                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Email:</span>
-                  <span>{item?.student?.email || '—'}</span>
-                </>
-              )}
-              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
-              <span>{title}</span>
-              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Supervisor:</span>
-              <span>{item?.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
-              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Internal Examiner:</span>
-              <span>
-                {item?.examinerAssignments?.length > 0
-                  ? item.examinerAssignments.map(a => (
-                    <span key={a.id} className="badge badge-info" style={{ fontSize: 12 }}>
-                      {a.externalExaminer?.designation ? a.externalExaminer.designation + ' ' : ''}{a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
-                    </span>
-                  ))
-                  : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
-                }
+    <ErrorBoundary>
+      <PageLayout title="" user={user}>
+        {/* ─── HERO HEADER ─── */}
+        <div style={{
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f172a 100%)',
+          borderRadius: 16, padding: '28px 32px', marginBottom: 24,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span className={`badge`} style={{
+                background: item?.status === 'ACTIVE' ? 'rgba(22,163,74,0.2)' : item?.status === 'COMPLETED' ? 'rgba(59,130,246,0.2)' : 'rgba(234,88,12,0.2)',
+                color: item?.status === 'ACTIVE' ? '#86efac' : item?.status === 'COMPLETED' ? '#93c5fd' : '#fdba74',
+                fontSize: 11, padding: '3px 10px', border: 'none',
+              }}>
+                <span className="dot" style={{ background: 'currentColor' }} />
+                {item?.status || 'PENDING'}
               </span>
-              <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Status:</span>
-              <span><span className={`badge badge-${item?.status?.toLowerCase() || 'pending'}`}>{item?.status || 'PENDING'}</span></span>
+              <span style={{
+                background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontSize: 11,
+                padding: '3px 10px', borderRadius: 50, fontWeight: 500,
+              }}>
+                {type === 'group' ? (item?.projectType === 'MAJOR' ? 'Major Project' : 'Minor Project') : 'Master Thesis'}
+              </span>
+              {item?.batch && (
+                <span style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: 11, padding: '3px 8px', borderRadius: 50 }}>
+                  Batch {item.batch}
+                </span>
+              )}
+              {item?.cluster && (
+                <span style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: 11, padding: '3px 8px', borderRadius: 50 }}>
+                  {item.cluster}
+                </span>
+              )}
             </div>
+            <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 4px', lineHeight: 1.3 }}>
+              {title || 'Loading...'}
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>
+              {name}
+              {item?.academicYear && ` · ${item.academicYear.year || ''}`}
+            </p>
           </div>
-
-          {/* Stats Summary */}
-          <div className="stats-grid" style={{ marginBottom: 24 }}>
-            <div className="stat-card bento-card">
-              <div className="stat-icon"><span className="material-symbols-outlined">score</span></div>
-              <div className="stat-number">{visibleSummary ? visibleSummary.total : 0}</div>
-              <div className="stat-label">Total Marks / {visibleSummary?.maxTotal || (type === 'group' ? 100 : 200)}</div>
-            </div>
-            <div className="stat-card bento-card">
-              <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
-              <div className="stat-number">{visibleSummary?.completedCount || 0}<span style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>/{visibleSummary?.totalCount || components.length}</span></div>
-              <div className="stat-label">Components Evaluated</div>
-            </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button className="btn" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
+              onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back
+            </button>
+            {(isSupervisor || isCoordinator) && item?.status === 'ACTIVE' && (
+              <button className="btn" style={{ background: 'rgba(34,197,94,0.2)', color: '#86efac', border: '1px solid rgba(34,197,94,0.3)' }}
+                onClick={() => setConfirmDialog({ open: true, title: 'Finalize', message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED?`, confirmLabel: 'Finalize', onConfirm: doFinalize, danger: true })}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span> Finalize
+              </button>
+            )}
           </div>
+        </div>
 
-          {/* Evaluation Breakdown (read-only) */}
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-header"><h3>Evaluation Breakdown</h3></div>
-            {orderedComponents.length === 0 ? (
-              <p style={{ color: 'var(--color-on-surface-variant)' }}>No evaluation components yet.</p>
-            ) : (() => {
-              const visibleComponents = isCoordinator
-                ? orderedComponents
-                : orderedComponents.filter(c => c.evaluatorRole === user.role);
-              if (visibleComponents.length === 0) {
-                return <p style={{ color: 'var(--color-on-surface-variant)', padding: 16 }}>No evaluation components for your role.</p>;
-              }
-              return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visibleComponents.map(c => {
-                  const e = evaluationForComponent(c.id);
-                  const hasMarks = e && e.marks !== null && e.marks !== undefined;
-                  const isCompleted = e?.status === 'COMPLETED';
-                  return (
-                    <div key={c.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: 12,
-                      borderRadius: 8,
-                      background: isCompleted ? 'var(--color-surface-container-low)' : 'transparent',
-                      border: `1px solid ${isCompleted ? 'var(--color-success)' : 'var(--color-outline-variant)'}`,
-                    }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: 10,
-                        background: isCompleted ? 'var(--color-success-container)' : hasMarks ? 'var(--color-tertiary-container)' : 'var(--color-surface-container)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: isCompleted ? 'var(--color-on-success-container)' : hasMarks ? 'var(--color-on-tertiary-container)' : 'var(--color-on-surface-variant)',
-                        flexShrink: 0,
-                      }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {isCompleted ? 'check_circle' : hasMarks ? 'check_circle' : 'pending'}
-                        </span>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>
-                          {c.name}
-                          {isCompleted && <span className="badge" style={{ marginLeft: 8, fontSize: 10, background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          Evaluated by {ROLE_LABEL[c.evaluatorRole]} · Max {c.maxMarks} marks
-                        </div>
-                        {e?.comment && (
-                          <div style={{ fontSize: 12, fontStyle: 'italic', marginTop: 4, color: 'var(--color-on-surface-variant)' }}>
-                            "{e.comment}"
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ textAlign: 'right', minWidth: 70 }}>
-                        <div style={{ fontSize: 20, fontWeight: 700, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                          {hasMarks ? e.marks : '—'}
-                          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {c.maxMarks}</span>
-                        </div>
-                        {e?.submittedBy && (
-                          <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>
-                            by {e.submittedBy.firstName} {e.submittedBy.lastName}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 14, borderRadius: 8, background: 'var(--color-primary-grand)', border: '2px solid var(--color-primary)' }}>
-                  <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-on-primary)' }}>Grand Total</span>
-                  <span style={{ fontWeight: 800, fontSize: 24, color: 'var(--color-on-primary)' }}>
-                    {visibleSummary?.total ?? 0} <span style={{ fontWeight: 400, fontSize: 14 }}>/ {visibleSummary?.maxTotal ?? (type === 'group' ? 100 : 200)}</span>
-                  </span>
+        {/* ─── TABS ─── */}
+        <div className="tabs" style={{ marginBottom: 24 }}>
+          {tabs.map(t => (
+            <div key={t.key} className={`tab ${activeTab === t.key ? 'active' : ''}`} onClick={() => setActiveTab(t.key)}>
+              <span className="material-symbols-outlined">{t.icon}</span> {t.label}
+            </div>
+          ))}
+        </div>
+
+        {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Summary cards */}
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
+              <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
+                <div className="stat-icon" style={{ background: 'var(--color-primary-container)' }}>
+                  <span className="material-symbols-outlined">score</span>
+                </div>
+                <div className="stat-number">
+                  {progress.earned}
+                  <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{progress.total}</span>
+                </div>
+                <div className="stat-label">Total Marks</div>
+              </div>
+              <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-success)' }}>
+                <div className="stat-icon" style={{ background: 'var(--color-success-container)' }}>
+                  <span className="material-symbols-outlined">checklist</span>
+                </div>
+                <div className="stat-number">
+                  {progress.completed}
+                  <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{progress.count}</span>
+                </div>
+                <div className="stat-label">Components Evaluated</div>
+              </div>
+              <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-tertiary)' }}>
+                <div className="stat-icon" style={{ background: 'var(--color-tertiary-container)' }}>
+                  <span className="material-symbols-outlined">trending_up</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <div className="stat-number">{progress.pct}%</div>
+                </div>
+                <div className="stat-label">Completion</div>
+                <div style={{ marginTop: 8, height: 4, background: 'var(--color-outline-variant)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${progress.pct}%`, background: progress.pct === 100 ? 'var(--color-success)' : 'var(--color-primary)', borderRadius: 2, transition: 'width 0.5s ease' }} />
                 </div>
               </div>
-              );
-            })()}
-          </div>
-
-          {/* COORDINATOR: assign / change supervisor */}
-          {isCoordinator && (
-            <div style={{ marginBottom: 24 }}>
-              <SupervisorAssignmentSection
-                type={type}
-                id={parseInt(id)}
-                currentSupervisor={item?.supervisor}
-                onRefresh={loadData}
-                disabled={false}
-              />
             </div>
-          )}
 
-          {/* COORDINATOR: assign internal examiner */}
-          {isCoordinator && (
-            <div style={{ marginBottom: 24 }}>
-              <ExaminerAssignmentSection
-                type={type}
-                id={parseInt(id)}
-                currentAssignments={item?.examinerAssignments || []}
-                onRefresh={loadData}
-                disabled={false}
-              />
+            {/* Project info card */}
+            <div className="card" style={{ marginBottom: 24, overflow: 'hidden' }}>
+              <div className="card-header">
+                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>info</span>Project Details</h3>
+              </div>
+              <div style={{ padding: '8px 0' }}>
+                <InfoRow label="Title" value={title} />
+                {type === 'group' && (
+                  <>
+                    <InfoRow label="Group" value={item?.name} />
+                    <InfoRow label="Members" value={
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {item?.members?.length > 0 ? item.members.map(m => (
+                          <span key={m.id} className="badge badge-info" style={{ fontSize: 11, padding: '3px 8px' }}>
+                            {m.student?.firstName} {m.student?.lastName}
+                            {m.rollNumber && <span style={{ opacity: 0.6, marginLeft: 4 }}>({m.rollNumber})</span>}
+                          </span>
+                        )) : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}
+                      </div>
+                    } />
+                  </>
+                )}
+                {type === 'thesis' && (
+                  <InfoRow label="Student" value={`${item?.student?.firstName || ''} ${item?.student?.lastName || ''}`} />
+                )}
+                <InfoRow label="Supervisor" value={item?.supervisor
+                  ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
+                  : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                } />
+                <InfoRow label="Internal Examiner" value={
+                  item?.examinerAssignments?.length > 0
+                    ? item.examinerAssignments.map(a => (
+                      <span key={a.id} className="badge badge-info" style={{ fontSize: 11, marginRight: 6 }}>
+                        {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                      </span>
+                    ))
+                    : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                } />
+                {item?.description && <InfoRow label="Description" value={item.description} />}
+              </div>
             </div>
-          )}
 
-          {/* Submitted documents */}
-          <div style={{ marginBottom: 24 }}>
-            {/* Proposal Upload — coordinator only */}
+            {/* Evaluation breakdown */}
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>assignment</span>Evaluation Breakdown</h3>
+              </div>
+              <div style={{ padding: '4px 0' }}>
+                {orderedComponents.length === 0 ? (
+                  <div className="empty-state" style={{ padding: 24 }}>
+                    <span className="material-symbols-outlined">info</span>
+                    <p>No evaluation components yet.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {orderedComponents.map(c => {
+                      const e = evaluationForComponent(c.id);
+                      const hasMarks = e && e.marks !== null && e.marks !== undefined;
+                      const pct = hasMarks ? Math.round((e.marks / c.maxMarks) * 100) : 0;
+                      return (
+                        <div key={c.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '10px 20px', borderBottom: '1px solid var(--color-outline-variant)',
+                          opacity: hasMarks ? 1 : 0.65,
+                        }}>
+                          <div style={{
+                            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                            background: hasMarks ? 'var(--color-success-container)' : 'var(--color-surface-container)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: hasMarks ? 'var(--color-on-success-container)' : 'var(--color-on-surface-variant)',
+                          }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                              {hasMarks ? 'check_circle' : 'radio_button_unchecked'}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface)' }}>{c.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                              {ROLE_LABEL[c.evaluatorRole]} · Max {c.maxMarks}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 60, height: 4, background: 'var(--color-outline-variant)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: hasMarks ? 'var(--color-success)' : 'var(--color-outline)', borderRadius: 2, transition: 'width 0.4s' }} />
+                            </div>
+                            <div style={{ minWidth: 50, textAlign: 'right' }}>
+                              <span style={{ fontWeight: 700, fontSize: 15, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                                {hasMarks ? e.marks : '—'}
+                              </span>
+                              <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>/{c.maxMarks}</span>
+                            </div>
+                          </div>
+                          {e?.submittedBy && (
+                            <div className="submitted-by-label" style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', maxWidth: 100, textAlign: 'right' }}>
+                              {e.submittedBy.firstName}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {/* Grand total bar */}
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '16px 20px', margin: '8px 12px', borderRadius: 10,
+                      background: 'linear-gradient(135deg, var(--color-primary-grand) 0%, var(--color-primary) 100%)',
+                    }}>
+                      <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Grand Total</span>
+                      <span style={{ fontWeight: 800, fontSize: 22, color: '#fff' }}>
+                        {progress.earned}{' '}
+                        <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.7 }}>/ {progress.total}</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Coordinator sections */}
+            {isCoordinator && (
+              <div style={{ display: 'grid', gap: 24, marginBottom: 24 }}>
+                <SupervisorAssignmentSection
+                  type={type} id={parseInt(id)}
+                  currentSupervisor={item?.supervisor} onRefresh={loadData} disabled={false}
+                />
+                <ExaminerAssignmentSection
+                  type={type} id={parseInt(id)}
+                  currentAssignments={item?.examinerAssignments || []} onRefresh={loadData} disabled={false}
+                />
+              </div>
+            )}
+
+            {/* Proposal upload */}
             {isCoordinator && (item?.status === 'ACTIVE' || item?.status === 'PENDING') && (
-              <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-                <h4 style={{ margin: '0 0 12px' }}>Upload Proposal</h4>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
-                    <label style={{ fontSize: 11 }}>Stage</label>
+              <div className="card" style={{ marginBottom: 24 }}>
+                <div className="card-header">
+                  <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>upload_file</span>Upload Document</h3>
+                </div>
+                <div style={{ padding: '0 20px 20px', display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ marginBottom: 0, minWidth: 160, flex: 1 }}>
+                    <label style={{ fontSize: 12 }}>Stage</label>
                     <select className="form-input" value={uploadStage} onChange={e => setUploadStage(e.target.value)}>
-                      <option value="">Select stage...</option>
+                      <option value="">Select...</option>
                       <option value="PROPOSAL">Proposal</option>
                       <option value="MID_TERM">Mid Term</option>
                       <option value="FINAL">Final</option>
                     </select>
                   </div>
-                  <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
-                    <label style={{ fontSize: 11 }}>File</label>
+                  <div className="form-group" style={{ marginBottom: 0, flex: 2 }}>
+                    <label style={{ fontSize: 12 }}>File (PDF/DOC)</label>
                     <input type="file" className="form-input" onChange={e => setUploadFile(e.target.files[0])} accept=".pdf,.doc,.docx" />
                   </div>
                   <button className="btn btn-primary" onClick={handleUploadProposal} disabled={!uploadFile || !uploadStage || uploading}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{uploading ? 'progress_activity' : 'upload'}</span>
                     {uploading ? 'Uploading...' : 'Upload'}
                   </button>
                 </div>
               </div>
             )}
-            <ProposalsSection proposals={item?.proposals || []} user={user} />
-          </div>
-        </>
-      )}
 
-      {/* ============ EVALUATION TAB ============ */}
-      {activeTab === 'evaluation' && (
-        <>
-          {/* Supervisor / External Examiner: evaluation form(s) */}
-          {!isCoordinator && currentUserComponents.length > 0 && (() => {
-            return (
+            {/* Proposals */}
+            <ProposalsSection proposals={item?.proposals || []} user={user} />
+          </>
+        )}
+
+        {/* ═══════════════ EVALUATION TAB ═══════════════ */}
+        {activeTab === 'evaluation' && (
+          <>
+            {/* Evaluation progress summary */}
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
+              <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
+                <div className="stat-icon"><span className="material-symbols-outlined">score</span></div>
+                <div className="stat-number">{progress.earned}<span style={{ fontSize: 16, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{progress.total}</span></div>
+                <div className="stat-label">Your Total</div>
+              </div>
+              <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-success)' }}>
+                <div className="stat-icon"><span className="material-symbols-outlined">checklist</span></div>
+                <div className="stat-number">{progress.completed}<span style={{ fontSize: 16, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{progress.count}</span></div>
+                <div className="stat-label">Components Done</div>
+              </div>
+              <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-secondary)' }}>
+                <div className="stat-icon"><span className="material-symbols-outlined">download</span></div>
+                <div style={{ marginBottom: 8 }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setShowPdfPreview(true)}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span> PDF Preview
+                  </button>
+                </div>
+                <div className="stat-label">Download Evaluation Sheet</div>
+              </div>
+            </div>
+
+            {/* Non-coordinator: evaluation form(s) */}
+            {!isCoordinator && currentUserComponents.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
                 {currentUserComponents.map(comp => {
                   const e = evaluationForComponent(comp.id);
                   return (
-                    <div key={comp.id} className="card">
-                      <div className="card-header">
+                    <div key={comp.id} className="card" style={{ overflow: 'hidden' }}>
+                      <div style={{
+                        padding: '14px 20px', background: 'var(--color-surface-container-low)',
+                        borderBottom: '1px solid var(--color-outline-variant)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
                         <div>
-                          <h3 style={{ margin: 0 }}>{comp.name}</h3>
+                          <h3 style={{ margin: 0, fontSize: 15 }}>{comp.name}</h3>
                           <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                            {ROLE_LABEL[comp.evaluatorRole]} evaluation · Max {comp.maxMarks} marks
+                            {ROLE_LABEL[comp.evaluatorRole]} · Max {comp.maxMarks} marks
                           </span>
                         </div>
+                        {e?.status === 'COMPLETED' && (
+                          <span className="badge badge-completed" style={{ fontSize: 10 }}>Completed</span>
+                        )}
                       </div>
-                      <div style={{ padding: '0 16px 16px' }}>
+                      <div style={{ padding: 16 }}>
                         <DefenseCard
                           component={comp}
                           evaluation={e}
@@ -468,45 +541,32 @@ function ProjectDetail() {
                   );
                 })}
 
-                {/* Comments + Suggestions feedback section */}
+                {/* Feedback section */}
                 <div className="card">
-                  <div className="card-header">
-                    <div>
-                      <h3 style={{ margin: 0 }}>Feedback</h3>
-                      <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                        Overall comments and suggestions for this evaluation
-                      </span>
-                    </div>
+                  <div style={{
+                    padding: '14px 20px', background: 'var(--color-surface-container-low)',
+                    borderBottom: '1px solid var(--color-outline-variant)',
+                  }}>
+                    <h3 style={{ margin: 0, fontSize: 15 }}>Feedback</h3>
                   </div>
-                  <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600 }}>Comments</label>
-                      <textarea
-                        rows={3}
-                        value={feedbackComments}
-                        onChange={e => setFeedbackComments(e.target.value)}
-                        placeholder="Enter your overall comments about this evaluation..."
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
+                      <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Comments</label>
+                      <textarea rows={3} value={feedbackComments} onChange={e => setFeedbackComments(e.target.value)}
+                        placeholder="Overall comments about this evaluation..."
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
                       />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600 }}>Suggestions & Recommendations</label>
-                      <textarea
-                        rows={3}
-                        value={feedbackSuggestions}
-                        onChange={e => setFeedbackSuggestions(e.target.value)}
-                        placeholder="Enter suggestions and recommendations..."
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
+                      <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Suggestions & Recommendations</label>
+                      <textarea rows={3} value={feedbackSuggestions} onChange={e => setFeedbackSuggestions(e.target.value)}
+                        placeholder="What improvements would you recommend?"
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
                       />
                     </div>
-                    <div>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={handleSaveFeedback}
-                        disabled={savingFeedback}
-                        style={{ padding: '6px 16px', fontSize: 13 }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button className="btn btn-primary btn-sm" onClick={handleSaveFeedback} disabled={savingFeedback}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                           {savingFeedback ? 'progress_activity' : 'save'}
                         </span>
                         {savingFeedback ? 'Saving...' : 'Save Feedback'}
@@ -515,137 +575,120 @@ function ProjectDetail() {
                   </div>
                 </div>
               </div>
-            );
-          })()}
+            )}
 
-          {/* Coordinator: defense evaluation forms (always show, read-only when done) */}
-          {isCoordinator && (() => {
-            const defenseTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE'];
-            const defenseComps = defenseTypes.map(t => componentByType(t)).filter(Boolean);
-            if (defenseComps.length === 0) {
-              if (type === 'thesis') {
-                const supervisorComps = orderedComponents.filter(c => c.evaluatorRole === 'SUPERVISOR');
-                const externalComps = orderedComponents.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
-                const allEvalComps = [...supervisorComps, ...externalComps];
-                if (allEvalComps.length === 0) {
-                  return (
-                    <div className="card" style={{ marginBottom: 24, textAlign: 'center', padding: 32 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-primary)' }}>info</span>
-                      <h3 style={{ marginTop: 12 }}>Coordinator Evaluation</h3>
-                      <p style={{ color: 'var(--color-on-surface-variant)' }}>Master theses are evaluated by the Supervisor and External Examiner.</p>
-                    </div>
-                  );
-                }
-                return (
-                  <>
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-                      {allEvalComps.map(comp => {
-                        const e = evaluationForComponent(comp.id);
-                        const hasMarks = e?.marks !== null && e?.marks !== undefined;
-                        return (
-                          <div key={comp.id} className="card" style={{ flex: '1 1 280px' }}>
-                            <div className="card-header">
-                              <h3 style={{ fontSize: 13 }}>{comp.name}</h3>
-                              <span className="badge badge-info" style={{ fontSize: 10 }}>
-                                {comp.evaluatorRole === 'SUPERVISOR' ? 'Supervisor' : 'External Examiner'}
-                              </span>
-                            </div>
-                            <div style={{ padding: 16, textAlign: 'center' }}>
-                              <div style={{ fontSize: 28, fontWeight: 700, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                                {hasMarks ? e.marks : '—'}
-                                <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {comp.maxMarks}</span>
-                              </div>
-                              {e?.comment && (
-                                <p style={{ fontStyle: 'italic', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
-                                  "{e.comment}"
-                                </p>
-                              )}
-                              {!hasMarks && (
-                                <p style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>Not evaluated</p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="card" style={{ marginBottom: 24, background: 'var(--color-primary-grand)', border: '2px solid var(--color-primary)' }}>
-                      <div style={{ padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-on-primary)' }}>Total</span>
-                        <span style={{ fontWeight: 800, fontSize: 24, color: 'var(--color-on-primary)' }}>
-                          {visibleSummary?.total ?? 0} <span style={{ fontWeight: 400, fontSize: 14 }}>/ {visibleSummary?.maxTotal ?? 200}</span>
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                );
-              }
-              return null;
-            }
-            return (
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-                {defenseComps.map(c => {
-                  const e = evaluationForComponent(c.id);
-                  return (
-                    <div key={c.id} className="card" style={{ flex: 1, minWidth: 240 }}>
-                      <div className="card-header">
-                        <h3>{c.name}</h3>
-                      </div>
-                      <div style={{ padding: '0 12px 12px' }}>
-                        <DefenseCard
-                          component={c}
-                          evaluation={e}
-                          onSave={(marks) => handleSaveComponent(c, marks)}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Coordinator evaluation view */}
+            {isCoordinator && (
+              <CoordinatorEvaluationView
+                type={type}
+                orderedComponents={orderedComponents}
+                componentByType={componentByType}
+                evaluationForComponent={evaluationForComponent}
+                progress={progress}
+                handleSaveComponent={handleSaveComponent}
+              />
+            )}
+
+            {/* No component fallback */}
+            {currentUserComponents.length === 0 && !isCoordinator && (
+              <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>info</span>
+                <h3 style={{ marginTop: 12 }}>No Evaluation Component</h3>
+                <p style={{ color: 'var(--color-on-surface-variant)', maxWidth: 400, margin: '0 auto' }}>
+                  You don't have an evaluation component assigned for this {type === 'group' ? 'project' : 'thesis'}.
+                </p>
               </div>
-            );
-          })()}
+            )}
+          </>
+        )}
 
-          {/* Print Evaluation Form */}
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-header"><h3>Download Evaluation</h3></div>
-            <div style={{ padding: 16 }}>
-              <button className="btn btn-outline" onClick={() => setShowPdfPreview(true)}>
-                <span className="material-symbols-outlined">picture_as_pdf</span>
-                Open PDF Preview
-              </button>
+        {/* ═══════════════ RECOMMENDATIONS TAB ═══════════════ */}
+        {activeTab === 'recommendations' && (
+          <div style={{ display: 'grid', gridTemplateColumns: isSupervisor ? '1.5fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
+            {/* Recommendation list */}
+            <div className="card">
+              <div className="card-header">
+                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>verified</span>Issued Recommendations</h3>
+                {(item?.recommendations?.length || 0) > 0 && (
+                  <span className="badge badge-primary" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
+                    {item?.recommendations?.length}
+                  </span>
+                )}
+              </div>
+              <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {(!item?.recommendations || item.recommendations.length === 0) ? (
+                  <div className="empty-state" style={{ padding: 32 }}>
+                    <span className="material-symbols-outlined">verified</span>
+                    <h3>No recommendations yet</h3>
+                    <p>Issued recommendations will appear here and be visible to the student.</p>
+                  </div>
+                ) : (
+                  item.recommendations.map((r, i) => (
+                    <div key={r.id} style={{
+                      display: 'flex', gap: 14, padding: 16,
+                      border: '1px solid var(--color-outline-variant)', borderRadius: 12,
+                      background: 'var(--color-surface-container-lowest)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                        background: `hsl(${i * 47 + 210}, 30%, 45%)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff',
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.6, color: 'var(--color-on-surface)' }}>{r.content}</p>
+                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                          Issued {new Date(r.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {' at '}
+                          {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
+
+            {/* Issue recommendation form (supervisor only) */}
+            {isSupervisor && (
+              <div className="card">
+                <div className="card-header">
+                  <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>edit_note</span>Issue Recommendation</h3>
+                </div>
+                <div style={{ padding: '0 20px 20px' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: 12 }}>Letter of Recommendation</label>
+                    <textarea className="form-input" rows={8}
+                      placeholder="Write the recommendation letter for this student/group..."
+                      value={recommendationContent} onChange={e => setRecommendationContent(e.target.value)}
+                      style={{ minHeight: 180, resize: 'vertical', fontSize: 13 }}
+                    />
+                  </div>
+                  <button className="btn btn-primary btn-block" onClick={handleIssueRecommendation}
+                    disabled={!recommendationContent.trim() || issuingRecommendation}>
+                    <span className="material-symbols-outlined">send</span>
+                    {issuingRecommendation ? 'Issuing...' : 'Issue Recommendation'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+        )}
+      </PageLayout>
 
-          {/* If no user component found */}
-          {currentUserComponents.length === 0 && !isCoordinator && (
-            <div className="card" style={{ marginBottom: 24, textAlign: 'center', padding: 32 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>info</span>
-              <h3 style={{ marginTop: 12 }}>No evaluation component assigned</h3>
-              <p style={{ color: 'var(--color-on-surface-variant)' }}>You don't have an evaluation component assigned for this project.</p>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ============ RECOMMENDATIONS TAB ============ */}
-      {activeTab === 'recommendations' && (
-        <RecommendationsTab
-          item={item}
-          isSupervisor={isSupervisor}
-          recommendationContent={recommendationContent}
-          setRecommendationContent={setRecommendationContent}
-          issuingRecommendation={issuingRecommendation}
-          onIssue={handleIssueRecommendation}
-        />
-      )}
-    </PageLayout>
+      {/* PDF Preview modal */}
       {showPdfPreview && (
         <EvaluationPdfPreview
-          type={type}
-          id={id}
+          type={type} id={id}
           onClose={() => setShowPdfPreview(false)}
-          onSave={() => { setShowPdfPreview(false); loadData(); }}
+
         />
       )}
+
+      {/* Confirm dialog */}
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}
@@ -656,6 +699,24 @@ function ProjectDetail() {
         confirmLabel={confirmDialog.confirmLabel}
       />
     </ErrorBoundary>
+  );
+}
+
+// ─── Sub-components ───
+
+function InfoRow({ label, value }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 16,
+      padding: '10px 20px', borderBottom: '1px solid var(--color-outline-variant)',
+    }}>
+      <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', minWidth: 130, textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>
+        {label}
+      </span>
+      <div style={{ fontSize: 14, color: 'var(--color-on-surface)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+        {value || '—'}
+      </div>
+    </div>
   );
 }
 
@@ -674,126 +735,158 @@ function DefenseCard({ component, evaluation, onSave }) {
     finally { setSaving(false); }
   };
 
+  const hasValue = marks !== '' && marks !== null && marks !== undefined;
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, minWidth: 160 }}>
         <div style={{
-          width: 40, height: 40, borderRadius: 10,
-          background: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-primary-container)' : 'var(--color-surface-container)',
+          width: 44, height: 44, borderRadius: 12,
+          background: hasValue ? 'var(--color-primary-container)' : 'var(--color-surface-container)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
-          flexShrink: 0,
+          color: hasValue ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
+          flexShrink: 0, transition: 'all 0.2s',
         }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-            {(marks !== '' && marks !== null && marks !== undefined) ? 'check_circle' : 'edit'}
+          <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
+            {hasValue ? 'check_circle' : 'edit_note'}
           </span>
         </div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{component.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-            Max {component.maxMarks} marks
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-on-surface)' }}>{component.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Max {component.maxMarks} marks</div>
+        </div>                          {evaluation?.comment && (
+                            <div className="evaluation-comment-desktop" style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--color-on-surface-variant)', maxWidth: 200 }}>
+            "{evaluation.comment}"
           </div>
-        </div>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input
-          type="number"
-          value={marks}
-          onChange={e => setMarks(e.target.value)}
-          max={component.maxMarks}
-          min="0"
-          step="0.5"
-          placeholder="0"
-          style={{ width: 70, padding: '8px 10px', fontSize: 14, textAlign: 'center', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}
-        />
-        <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', fontWeight: 500 }}>/ {component.maxMarks}</span>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={submit}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '4px 8px', borderRadius: 8,
+          border: hasValue ? '2px solid var(--color-primary-container)' : '1px solid var(--color-outline)',
+          background: hasValue ? 'var(--color-surface-container-lowest)' : 'transparent',
+        }}>
+          <input type="number" value={marks}
+            onChange={e => setMarks(e.target.value)}
+            max={component.maxMarks} min="0" step="0.5" placeholder="0"
+            style={{
+              width: 60, padding: '6px 4px', fontSize: 14, textAlign: 'center',
+              border: 'none', background: 'transparent', outline: 'none',
+              fontWeight: 600, color: hasValue ? 'var(--color-primary)' : 'var(--color-on-surface)',
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', fontWeight: 500 }}>/ {component.maxMarks}</span>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={submit}
           disabled={saving || marks === '' || marks === null || marks === undefined}
-          style={{ padding: '6px 14px', fontSize: 13 }}
-        >
+          style={{ padding: '7px 14px', minWidth: 70 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
             {saving ? 'progress_activity' : 'save'}
           </span>
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? 'Saving' : 'Save'}
         </button>
       </div>
     </div>
   );
 }
 
-function RecommendationsTab({ item, isSupervisor, recommendationContent, setRecommendationContent, issuingRecommendation, onIssue }) {
-  const list = item?.recommendations || [];
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: isSupervisor ? '1.4fr 1fr' : '1fr', gap: 16 }}>
-      <div className="card">
-        <div className="card-header">
-          <h3>Issued Recommendations</h3>
-          {list.length > 0 && <span className="badge" style={{ background: 'var(--color-tertiary-container)', color: 'var(--color-on-tertiary-container)' }}>{list.length}</span>}
+function CoordinatorEvaluationView({ type, orderedComponents, componentByType, evaluationForComponent, progress, handleSaveComponent }) {
+  const defenseTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE'];
+  const defenseComps = defenseTypes.map(t => componentByType(t)).filter(Boolean);
+
+  // For thesis: show supervisor + external examiner component cards
+  if (type === 'thesis') {
+    const supervisorComps = orderedComponents.filter(c => c.evaluatorRole === 'SUPERVISOR');
+    const externalComps = orderedComponents.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+    const allEvalComps = [...supervisorComps, ...externalComps];
+    if (allEvalComps.length === 0) {
+      return (
+        <div className="card" style={{ textAlign: 'center', padding: 40, marginBottom: 24 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-primary)' }}>info</span>
+          <h3 style={{ marginTop: 12 }}>Coordinator View</h3>
+          <p style={{ color: 'var(--color-on-surface-variant)' }}>Master theses are evaluated by the Supervisor and External Examiner.</p>
         </div>
-        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {list.length === 0 ? (
-            <div className="empty-state" style={{ padding: 24 }}>
-              <span className="material-symbols-outlined">verified</span>
-              <h3>No recommendations yet</h3>
-              <p>Recommendations you issue will appear here and be visible to the student.</p>
-            </div>
-          ) : (
-            list.map((r) => (
-              <div key={r.id} style={{
-                display: 'flex', gap: 12, padding: 14,
-                border: '1px solid var(--color-outline-variant)',
-                borderRadius: 10,
-                background: 'var(--color-surface-container-low)',
-              }}>
+      );
+    }
+    return (
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 24 }}>
+          {allEvalComps.map(comp => {
+            const e = evaluationForComponent(comp.id);
+            const hasMarks = e?.marks !== null && e?.marks !== undefined;
+            return (
+              <div key={comp.id} className="card" style={{ marginBottom: 0 }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                  background: 'var(--color-primary)', color: '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '12px 16px', background: 'var(--color-surface-container-low)',
+                  borderBottom: '1px solid var(--color-outline-variant)',
                 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
+                  <h3 style={{ margin: 0, fontSize: 13 }}>{comp.name}</h3>
+                  <span className="badge badge-info" style={{ fontSize: 10, marginTop: 4 }}>
+                    {comp.evaluatorRole === 'SUPERVISOR' ? 'Supervisor' : 'External'}
+                  </span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>{r.content}</p>
-                  <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 6 }}>
-                    Issued {new Date(r.createdAt).toLocaleDateString()} at {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div style={{ padding: 20, textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                    {hasMarks ? e.marks : '—'}
+                    <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{comp.maxMarks}</span>
                   </div>
+                  {hasMarks && e?.submittedBy && (
+                    <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
+                      by {e.submittedBy.firstName} {e.submittedBy.lastName}
+                    </div>
+                  )}
+                  {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 6 }}>"{e.comment}"</p>}
                 </div>
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
-      </div>
+        <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, var(--color-primary-grand) 0%, var(--color-primary) 100%)', border: 'none' }}>
+          <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>Total</span>
+            <span style={{ fontWeight: 800, fontSize: 22, color: '#fff' }}>
+              {progress.earned} <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.7 }}>/{progress.total}</span>
+            </span>
+          </div>
+        </div>
+      </>
+    );
+  }
 
-      {isSupervisor && (
-        <div className="card">
-          <div className="card-header">
-            <h3>Issue New Recommendation</h3>
-          </div>
-          <div style={{ padding: 12 }}>
-            <div className="form-group">
-              <label>Letter of Recommendation</label>
-              <textarea
-                className="form-input"
-                rows={8}
-                placeholder="Write the recommendation letter or short note for this group/thesis..."
-                value={recommendationContent}
-                onChange={(e) => setRecommendationContent(e.target.value)}
-                style={{ minHeight: 160, resize: 'vertical', fontSize: 13 }}
-              />
+  // For bachelor: defense cards
+  if (defenseComps.length === 0) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 24 }}>
+      {defenseComps.map(c => {
+        const e = evaluationForComponent(c.id);
+        return (
+          <div key={c.id} className="card" style={{ marginBottom: 0 }}>
+            <div style={{
+              padding: '12px 16px', background: 'var(--color-surface-container-low)',
+              borderBottom: '1px solid var(--color-outline-variant)',
+            }}>
+              <h3 style={{ margin: 0, fontSize: 13 }}>{c.name}</h3>
             </div>
-            <button
-              className="btn btn-primary btn-block"
-              onClick={onIssue}
-              disabled={!recommendationContent.trim() || issuingRecommendation}
-            >
-              <span className="material-symbols-outlined">send</span>
-              {issuingRecommendation ? 'Issuing...' : 'Issue Recommendation'}
-            </button>
+            <div style={{ padding: 16 }}>
+              <DefenseCard component={c} evaluation={e} onSave={(marks) => handleSaveComponent(c, marks)} />
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })}
+    </div>
+  );
+}
+
+function SkeletonPage() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="skeleton" style={{ height: 120, borderRadius: 16 }} />
+      <div className="stats-grid">
+        {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 110, borderRadius: 12 }} />)}
+      </div>
+      <div className="skeleton" style={{ height: 300, borderRadius: 12 }} />
     </div>
   );
 }
