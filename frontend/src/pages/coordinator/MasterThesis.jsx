@@ -850,7 +850,7 @@ return (
                           </button>
                           {actionMenuRow === t.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                                   Edit
                                 </div>
@@ -864,7 +864,7 @@ return (
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
                                 PDF Preview
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-error)' }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                                 Delete
                               </div>
