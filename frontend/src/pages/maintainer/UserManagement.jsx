@@ -228,7 +228,7 @@ function UserManagement() {
           <FilterDropdown
             name="batch" label="Batch" value={filters.batch}
             onChange={handleFilterChange}
-            options={uniqueBatches.map(b => ({ value: b, label: b.startsWith('0') ? `20${b}` : b }))}
+            options={uniqueBatches.map(b => ({ value: b, label: b.startsWith('0') ? `20${b.replace(/^0+/, '')}` : b }))}
             allLabel="All Batches"
           />
         </div>
@@ -310,7 +310,7 @@ function UserManagement() {
                     <td style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
                       {extractBatch(u.rollNumber) ? (
                         <span className="badge badge-info" style={{ fontSize: 10 }}>
-                          {extractBatch(u.rollNumber).startsWith('0') ? `20${extractBatch(u.rollNumber)}` : extractBatch(u.rollNumber)}
+                          {extractBatch(u.rollNumber).startsWith('0') ? `20${extractBatch(u.rollNumber).replace(/^0+/, '')}` : extractBatch(u.rollNumber)}
                         </span>
                       ) : '—'}
                     </td>
