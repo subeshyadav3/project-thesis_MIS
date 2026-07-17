@@ -22,33 +22,42 @@ function SupervisorList() {
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
-  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isBachelorCoordinator = user.program?.degreeType === 'BACHELOR';
+  const isMasterCoordinator = user.program?.degreeType === 'MASTER';
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
+    const promises = [
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    ];
+    // Only fetch theses for Master coordinators
+    if (isMasterCoordinator) {
+      promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+    }
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [isMasterCoordinator]);
 
   const loadData = () => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
+    const promises = [
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
+    ];
+    if (isMasterCoordinator) {
+      promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+    }
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
 
   const handleCreateSupervisor = async (e) => {
@@ -57,7 +66,7 @@ function SupervisorList() {
       await api.post('/users', { ...createForm, role: 'SUPERVISOR' });
       toast.success('Supervisor created successfully');
       setShowCreate(false);
-      setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10) });
+      setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -74,7 +83,7 @@ function SupervisorList() {
       }
     }
     try {
-      const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email };
+      const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, designation: editForm.designation };
       if (editForm.password) payload.password = editForm.password;
       await api.put(`/users/${showEdit.id}`, payload);
       if (editForm.active !== showEdit.active) {
@@ -87,7 +96,7 @@ function SupervisorList() {
   };
 
   const openEdit = (sup) => {
-    setEditForm({ firstName: sup.firstName, lastName: sup.lastName, email: sup.email, password: '', active: sup.active });
+    setEditForm({ firstName: sup.firstName, lastName: sup.lastName, email: sup.email, password: '', active: sup.active, designation: sup.designation || '' });
     setShowEdit(sup);
   };
 
@@ -95,12 +104,12 @@ function SupervisorList() {
     return supervisors.map(s => ({
       ...s,
       groupCount: groups.filter(g => g.supervisorId === s.id).length,
-      thesisCount: theses.filter(t => t.supervisorId === s.id).length,
-      totalCount: groups.filter(g => g.supervisorId === s.id).length + theses.filter(t => t.supervisorId === s.id).length,
+      thesisCount: isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id).length : 0,
+      totalCount: groups.filter(g => g.supervisorId === s.id).length + (isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id).length : 0),
       assignedGroups: groups.filter(g => g.supervisorId === s.id),
-      assignedTheses: theses.filter(t => t.supervisorId === s.id),
+      assignedTheses: isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id) : [],
     }));
-  }, [supervisors, groups, theses]);
+  }, [supervisors, groups, theses, isMasterCoordinator]);
 
   const filteredSupervisors = useMemo(() => {
     if (!searchQuery) return enriched;
@@ -120,7 +129,7 @@ function SupervisorList() {
   const totalGroups = groups.length;
   const totalTheses = theses.length;
   const unassignedGroups = groups.filter(g => !g.supervisorId).length;
-  const unassignedTheses = theses.filter(t => !t.supervisorId).length;
+  const unassignedTheses = isMasterCoordinator ? theses.filter(t => !t.supervisorId).length : 0;
 
   const actions = (
     <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
@@ -161,6 +170,18 @@ function SupervisorList() {
               <div className="form-group">
                 <label>Password</label>
                 <input value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} required placeholder="Default: subesh" />
+              </div>
+              <div className="form-group">
+                <label>Designation</label>
+                <select value={createForm.designation} onChange={e => setCreateForm({...createForm, designation: e.target.value})}>
+                  <option value="">Select designation...</option>
+                  <option value="Asst. Prof.">Asst. Prof.</option>
+                  <option value="Asst. Prof. Dr.">Asst. Prof. Dr.</option>
+                  <option value="Assoc. Prof.">Assoc. Prof.</option>
+                  <option value="Assoc. Prof. Dr.">Assoc. Prof. Dr.</option>
+                  <option value="Prof.">Prof.</option>
+                  <option value="Prof. Dr.">Prof. Dr.</option>
+                </select>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
@@ -224,36 +245,38 @@ function SupervisorList() {
                 </table>
               )}
             </div>
-            <div className="detail-section">
-              <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
-              {showDetail.assignedTheses.length === 0 ? (
-                <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses assigned.</p>
-              ) : (
-                <table className="detail-table">
-                  <thead>
-                    <tr>
-                      <th>Student</th>
-                      <th>Thesis Title</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {showDetail.assignedTheses.map(t => (
-                      <tr key={t.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
-                        <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
-                        <td>
-                          <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
-                            <span className="dot" />
-                            {t.status || 'PENDING'}
-                          </span>
-                        </td>
+            {isMasterCoordinator && (
+              <div className="detail-section">
+                <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
+                {showDetail.assignedTheses.length === 0 ? (
+                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses assigned.</p>
+                ) : (
+                  <table className="detail-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Thesis Title</th>
+                        <th>Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                    </thead>
+                    <tbody>
+                      {showDetail.assignedTheses.map(t => (
+                        <tr key={t.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)}>
+                          <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
+                          <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
+                          <td>
+                            <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
+                              <span className="dot" />
+                              {t.status || 'PENDING'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowDetail(null)}>
                 <span className="material-symbols-outlined">close</span>
@@ -295,6 +318,18 @@ function SupervisorList() {
                 <input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="New password" />
               </div>
               <div className="form-group">
+                <label>Designation</label>
+                <select value={editForm.designation} onChange={e => setEditForm({...editForm, designation: e.target.value})}>
+                  <option value="">Select designation...</option>
+                  <option value="Asst. Prof.">Asst. Prof.</option>
+                  <option value="Asst. Prof. Dr.">Asst. Prof. Dr.</option>
+                  <option value="Assoc. Prof.">Assoc. Prof.</option>
+                  <option value="Assoc. Prof. Dr.">Assoc. Prof. Dr.</option>
+                  <option value="Prof.">Prof.</option>
+                  <option value="Prof. Dr.">Prof. Dr.</option>
+                </select>
+              </div>
+              <div className="form-group">
                 <label>Status</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: editForm.active ? 'var(--color-success)' : 'var(--color-error)' }}>
@@ -332,11 +367,13 @@ function SupervisorList() {
           <div className="stat-number">{totalGroups}</div>
           <div className="stat-label">Bachelor Projects</div>
         </div>
-        <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
-          <div className="stat-number">{totalTheses}</div>
-          <div className="stat-label">Master Theses</div>
-        </div>
+        {isMasterCoordinator && (
+          <div className="stat-card bento-card">
+            <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
+            <div className="stat-number">{totalTheses}</div>
+            <div className="stat-label">Master Theses</div>
+          </div>
+        )}
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">person_add</span></div>
           <div className="stat-number">{unassignedGroups + unassignedTheses}</div>
@@ -366,15 +403,16 @@ function SupervisorList() {
           <>
             <table>
               <thead>
-                <tr>
-                  <th>Supervisor</th>
-                  <th>Email</th>
-                  <th>Status</th>
-                  <th>Bachelor Groups</th>
-                  <th>Master Theses</th>
-                  <th>Total</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
+                  <tr>
+                    <th>Supervisor</th>
+                    <th>Designation</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Bachelor Groups</th>
+                    {isMasterCoordinator && <th>Master Theses</th>}
+                    <th>Total</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
               </thead>
               <tbody>
                 {paginated.map(s => (
@@ -385,6 +423,7 @@ function SupervisorList() {
                         <span style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</span>
                       </div>
                     </td>
+                    <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.designation || '—'}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
                     <td>
                       <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
@@ -392,7 +431,7 @@ function SupervisorList() {
                       </span>
                     </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
-                    <td><span className="stat-chip">{s.thesisCount}</span></td>
+                    {isMasterCoordinator && <td><span className="stat-chip">{s.thesisCount}</span></td>}
                     <td><span className="stat-chip stat-chip-primary">{s.totalCount}</span></td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>

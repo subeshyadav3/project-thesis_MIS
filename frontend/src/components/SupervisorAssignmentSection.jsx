@@ -89,7 +89,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
               <select value={selectedSupId} onChange={e => setSelectedSupId(e.target.value)}>
                 <option value="">— Choose a supervisor —</option>
                 {availableSupervisors.map(s => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.email})</option>
+                  <option key={s.id} value={s.id}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName} ({s.email})</option>
                 ))}
               </select>
             </div>
@@ -127,7 +127,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>
-                {currentSupervisor.firstName} {currentSupervisor.lastName}
+                {currentSupervisor.designation ? currentSupervisor.designation + ' ' : ''}{currentSupervisor.firstName} {currentSupervisor.lastName}
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
                 {currentSupervisor.email}

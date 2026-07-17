@@ -6,6 +6,7 @@ import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -54,6 +55,15 @@ function MasterThesis() {
   const [createStudentOpen, setCreateStudentOpen] = useState(false);
   const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [bulkPreview, setBulkPreview] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkYearId, setBulkYearId] = useState('');
+  const [selectedTheses, setSelectedTheses] = useState([]);
+  const [bulkSupervisorId, setBulkSupervisorId] = useState('');
+  const selectAllRef = useRef(null);
+  const [actionMenuRow, setActionMenuRow] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const loadData = useCallback(() => {
@@ -66,6 +76,7 @@ function MasterThesis() {
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
+      api.get('/assignment-requests', { signal }).then(({ data }) => setPendingRequests(data.filter(r => r.status === 'PENDING'))).catch(() => setPendingRequests([])),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -122,18 +133,64 @@ useEffect(() => {
     return () => document.removeEventListener('mousedown', handleStudentOutside);
   }, [createStudentOpen]);
 
+  // Close action menu on outside click — use 'click' not 'mousedown'
+  // so React's synthetic onClick on menu items fires first (bubbles up),
+  // then the native click listener fires (batches both state updates together).
+  useEffect(() => {
+    const handleClick = () => setActionMenuRow(null);
+    if (actionMenuRow) {
+      document.addEventListener('click', handleClick);
+    }
+    return () => document.removeEventListener('click', handleClick);
+  }, [actionMenuRow]);
+
   const handleFileUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile) { toast.warning('Select a file'); return; }
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+    if (!bulkYearId) { toast.warning('Select an academic year'); return; }
+    setBulkLoading(true);
     try {
-      await api.post('/theses/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Theses imported successfully');
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('academicYearId', bulkYearId);
+      const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBulkPreview(data);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkPreview?.preview) return;
+    setBulkLoading(true);
+    try {
+      const rows = bulkPreview.preview.map(p => ({
+        row: p.row,
+        name: p.name,
+        roll: p.roll,
+        title: p.title,
+        batch: p.batch,
+        cluster: p.cluster,
+        programId: p.programId,
+        studentMatch: p.studentMatch,
+        supervisorMatch: p.supervisorMatch,
+        externalMidTermMatch: p.externalMidTermMatch,
+        externalFinalMatch: p.externalFinalMatch,
+      }));
+      await api.post('/theses/bulk-import/confirm', { rows, academicYearId: parseInt(bulkYearId) });
+      toast.success(`${bulkPreview.stats.matched} theses imported`);
       setShowUpload(false);
+      setBulkPreview(null);
       setSelectedFile(null);
+      setBulkYearId('');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Import failed');
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
 const handleComplete = async (id) => {
@@ -165,6 +222,20 @@ const handleComplete = async (id) => {
       setShowDetail(null);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+  };
+
+  const toggleSelectAll = () => {
+    const allIds = paginatedTheses.map(t => t.id);
+    const allSelected = allIds.every(id => selectedTheses.includes(id));
+    if (allSelected) {
+      setSelectedTheses(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedTheses(prev => [...new Set([...prev, ...allIds])]);
+    }
+  };
+
+  const toggleSelectThesis = (id) => {
+    setSelectedTheses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const confirmComplete = (id) => {
@@ -200,7 +271,19 @@ const handleComplete = async (id) => {
       if (editSupId !== undefined) {
         const currentSup = showDetail?.supervisorId?.toString();
         if (editSupId !== currentSup) {
-          promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: parseInt(editSupId) || null }));
+          if (!editSupId) {
+            promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: null }));
+          } else {
+            promises.push(
+              api.post('/assignment-requests', { thesisId, supervisorId: parseInt(editSupId) })
+                .then(res => {
+                  if (res.data?.crossProgram) {
+                    setPendingRequests(prev => [...prev, res.data.request]);
+                  }
+                  return res;
+                })
+            );
+          }
         }
       }
       if (editExamId !== undefined) {
@@ -222,8 +305,13 @@ const handleComplete = async (id) => {
           }
         }
       }
-      await Promise.all(promises);
-      toast.success('Changes saved successfully');
+      const results = await Promise.all(promises);
+      const hasCrossProgram = results.some(r => r?.data?.crossProgram);
+      if (hasCrossProgram) {
+        toast.info('Cross-program supervisor request sent for approval.');
+      } else {
+        toast.success('Changes saved successfully');
+      }
       setShowDetail(null);
       loadData();
     } catch (err) {
@@ -254,6 +342,15 @@ const handleComplete = async (id) => {
 
   const totalPages = Math.ceil(sortedTheses.length / PAGE_SIZE);
   const paginatedTheses = sortedTheses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Select all on current page — must be AFTER paginatedTheses is defined (no TDZ issue)
+  useEffect(() => {
+    if (selectAllRef.current) {
+      const allIds = paginatedTheses.map(t => t.id);
+      const selectedOnPage = selectedTheses.filter(id => allIds.includes(id)).length;
+      selectAllRef.current.indeterminate = selectedOnPage > 0 && selectedOnPage < allIds.length;
+    }
+  }, [selectedTheses, paginatedTheses]);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
@@ -329,7 +426,7 @@ const handleComplete = async (id) => {
     { value: 'NONE', label: 'Unassigned' },
     ...supervisors.map(s => ({
       value: s.id.toString(),
-      label: `${s.firstName} ${s.lastName}`,
+      label: `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName}`,
     })),
   ];
 
@@ -372,10 +469,26 @@ return (
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Supervisor</span>
-                  <span>{showDetail.supervisor
-                    ? `${showDetail.supervisor.firstName} ${showDetail.supervisor.lastName}`
-                    : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
-                  }</span>
+                  <span>
+                    {showDetail.supervisor ? (
+                      <>
+                        {showDetail.supervisor.firstName} {showDetail.supervisor.lastName}
+                        {pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') && (
+                          <span className="badge badge-warning" style={{ marginLeft: 8, fontSize: 10 }}>
+                            <span className="dot" />Pending Approval
+                          </span>
+                        )}
+                      </>
+                    ) : pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') ? (
+                      <span className="badge badge-warning" style={{ fontSize: 10 }}>
+                        <span className="dot" />Pending Approval
+                      </span>
+                    ) : (
+                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="dot" />Unassigned
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
@@ -431,7 +544,7 @@ return (
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editSupId ? allSupervisors.find(s => s.id.toString() === editSupId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === editSupId)?.lastName || 'Search supervisor...' : 'No supervisor'}
+                          placeholder={editSupId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === editSupId)) : 'No supervisor'}
                           value={editSupSearch}
                           onChange={e => { setEditSupSearch(e.target.value); setEditSupOpen(true); }}
                           onFocus={() => setEditSupOpen(true)}
@@ -445,10 +558,10 @@ return (
                       </div>
                       {editSupOpen && (
                         <div className="sup-dropdown">
-                          {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
+                          {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No supervisors found</div>
                           ) : (
-                            allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
+                            allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
                               const selected = editSupId === s.id.toString();
                               return (
                                 <div
@@ -458,7 +571,7 @@ return (
                                 >
                                   <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                     <div className="sup-dropdown-item-email">{s.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: s.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: s.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -479,7 +592,7 @@ return (
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editExamId ? examiners.find(e => e.id.toString() === editExamId)?.firstName + ' ' + examiners.find(e => e.id.toString() === editExamId)?.lastName || 'Search examiner...' : 'No examiner'}
+                          placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
                           value={editExamSearch}
                           onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
                           onFocus={() => setEditExamOpen(true)}
@@ -493,10 +606,10 @@ return (
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
                               const selected = editExamId === e.id.toString();
                               return (
                                 <div
@@ -506,7 +619,7 @@ return (
                                 >
                                   <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                     <div className="sup-dropdown-item-email">{e.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -570,6 +683,70 @@ return (
         </div>
       </div>
 
+      {selectedTheses.length > 1 && (
+        <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Actions ({selectedTheses.length} theses)</span>
+            <select className="form-input" style={{ width: 200 }} value={bulkSupervisorId} onChange={e => setBulkSupervisorId(e.target.value)}>
+              <option value="">Select supervisor...</option>
+              {supervisors.map(s => <option key={s.id} value={s.id}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</option>)}
+            </select>
+            <button className="btn btn-primary btn-sm" onClick={async () => {
+              if (!bulkSupervisorId) return toast.warning('Select a supervisor');
+              try {
+                for (const id of selectedTheses) {
+                  await api.post('/assignment-requests', { thesisId: id, supervisorId: parseInt(bulkSupervisorId) });
+                }
+                toast.success(`Assigned supervisor to ${selectedTheses.length} theses`);
+                setSelectedTheses([]);
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Bulk assign failed'); }
+            }}>Assign Supervisor</button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const pending = selectedTheses.filter(id => {
+                const t = theses.find(th => th.id === id);
+                return t && (t.status === 'PENDING' || t.status === 'ACTIVE');
+              });
+              if (pending.length === 0) return toast.warning('No pending/active theses selected');
+              try {
+                await Promise.all(pending.map(id => api.put(`/theses/${id}/status`, { status: 'ACTIVE' })));
+                toast.success(`Activated ${pending.length} theses`);
+                setSelectedTheses([]);
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Bulk activate failed'); }
+            }}>
+              <span className="material-symbols-outlined">play_arrow</span>
+              Make Active
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={() => {
+              const pending = selectedTheses.filter(id => {
+                const t = theses.find(th => th.id === id);
+                return t && t.status === 'PENDING';
+              });
+              if (pending.length === 0) return toast.warning('No pending theses selected');
+              setConfirmDialog({
+                open: true,
+                title: 'Delete Theses',
+                message: `Are you sure you want to delete ${pending.length} pending theses? This cannot be undone.`,
+                onConfirm: async () => {
+                  try {
+                    await Promise.all(pending.map(id => api.delete(`/theses/${id}`)));
+                    toast.success(`Deleted ${pending.length} theses`);
+                    setSelectedTheses([]);
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                    loadData();
+                  } catch (err) { toast.error(err.response?.data?.error || 'Bulk delete failed'); }
+                },
+                danger: true,
+              });
+            }}>
+              <span className="material-symbols-outlined">delete</span>
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
@@ -596,35 +773,55 @@ return (
           </div>
         ) : (
           <>
-            <table style={{ minWidth: 0 }}>
+            <table style={{ tableLayout: 'fixed', minWidth: 0 }}>
+              <colgroup>
+                <col style={{ width: 32 }} />
+                <col />
+                <col />
+                <col />
+                <col style={{ width: 95 }} />
+                <col style={{ width: 60 }} />
+                <col style={{ width: 155 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Student</th>
+                  <th>
+                    <input type="checkbox" ref={selectAllRef} onChange={toggleSelectAll} />
+                  </th>
+                  <th style={{ width: '25%' }}>Student</th>
                   <th>Thesis Title</th>
-                  <th>Supervisor</th>
-                  <th>Status</th>
-                  <th>Year</th>
-                  <th style={{ textAlign: 'right', width: '1%', whiteSpace: 'nowrap' }}>Actions</th>
+                  <th style={{ width: '22%' }}>Supervisor</th>
+                  <th style={{ width: 65 }}>Status</th>
+                  <th style={{ width: 50 }}>Year</th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedTheses.map(t => (
                   <tr key={t.id} onClick={() => navigate(`/coordinator/project/thesis/${t.id}`)} style={{ cursor: 'pointer' }}>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="default-badge" style={{ width: 28, height: 28, fontSize: 10 }}>
+                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '6px 10px' }}>
+                      <input type="checkbox" checked={selectedTheses.includes(t.id)} onChange={() => toggleSelectThesis(t.id)} />
+                    </td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className="default-badge" style={{ width: 24, height: 24, fontSize: 9 }}>
                           {t.student?.firstName?.charAt(0)}{t.student?.lastName?.charAt(0)}
                         </div>
-                        <span style={{ fontWeight: 500 }}>
+                        <span style={{ fontWeight: 500, fontSize: 13 }}>
                           {t.student?.firstName} {t.student?.lastName}
                         </span>
                       </div>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.title}</td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
                       {t.supervisor ? (
-                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 13 }}>
+                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
                           {t.supervisor.firstName} {t.supervisor.lastName}
+                        </span>
+                      ) : pendingRequests.some(r => r.thesisId === t.id && r.status === 'PENDING') ? (
+                        <span className="badge badge-warning" style={{ fontSize: 10 }}>
+                          <span className="dot" />
+                          Pending
                         </span>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
@@ -633,47 +830,51 @@ return (
                         </span>
                       )}
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10 }}>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
                         <span className="dot" />
                         {t.status || 'PENDING'}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(t.academicYear) || '—'}
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-sm btn-outline" title="View" onClick={() => openDetail(t, 'view')} style={{ padding: '3px 5px', minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button className="icon-btn-sm" title="View" aria-label="View thesis details" onClick={() => openDetail(t, 'view')}>
+                          <span className="material-symbols-outlined">visibility</span>
                         </button>
-                        {t.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline-primary" title="Edit" onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                        <div style={{ position: 'relative' }}>
+                          <button className="icon-btn-sm" title="More actions" aria-label="More actions" onClick={(e) => { e.stopPropagation(); setActionMenuRow(actionMenuRow === t.id ? null : t.id); }}>
+                            <span className="material-symbols-outlined">more_vert</span>
                           </button>
-                        )}
-                        {t.status === 'ACTIVE' && (
-                          <button className="btn btn-sm btn-success" title="Complete" onClick={(e) => { e.stopPropagation(); confirmComplete(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-                          </button>
-                        )}
-                        {t.status === 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline" title="Download PDF" onClick={() => {
-                            const a = document.createElement('a');
-                            a.href = `/api/print/thesis/${t.id}`;
-                            a.download = `evaluation_${t.id}.pdf`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                          </button>
-                        )}
-                        {t.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteThesis(t.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
-                          </button>
-                        )}
+                          {actionMenuRow === t.id && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
+                              {t.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                  Edit
+                                </div>
+                              )}
+                              {t.status === 'ACTIVE' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                                  Complete
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(t)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                                PDF Preview
+                              </div>
+                              {t.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-error)' }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                  Delete
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -693,36 +894,87 @@ return (
       </div>
 
       {showUpload && (
-        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => { setShowUpload(false); setBulkPreview(null); }}>
+          <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
                 <span className="material-symbols-outlined">upload_file</span>
               </div>
               <div className="modal-header-text">
-                <h2>Upload Excel</h2>
-                <p>Import theses from an Excel spreadsheet</p>
+                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Import Theses'}</h2>
+                <p>{bulkPreview ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched` : 'Upload Excel with Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch'}</p>
               </div>
             </div>
-            <form onSubmit={handleFileUpload}>
-              <div className="form-group">
-                <label>Excel File (.xlsx)</label>
-                <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
-                <a href="/master_upload_template.xlsx" download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span> Download blank template
-                </a>
+
+            {!bulkPreview ? (
+              <form onSubmit={handleFileUpload}>
+                <div className="form-group">
+                  <label>Academic Year</label>
+                  <select value={bulkYearId} onChange={e => setBulkYearId(e.target.value)} required>
+                    <option value="">Select year...</option>
+                    {academicYears.map(y => <option key={y.id} value={y.id}>{y.year} {y.semester}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Excel File (.xlsx)</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
+                  <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Columns: Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch</span>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
+                    <span className="material-symbols-outlined">close</span>Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                    {bulkLoading ? 'Analyzing...' : 'Preview'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
+                  <table style={{ width: '100%', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Roll</th>
+                        <th>Title</th>
+                        <th>Student</th>
+                        <th>Supervisor</th>
+                        <th>Ext (Mid)</th>
+                        <th>Ext (Final)</th>
+                        <th>Cluster</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPreview.preview.map(p => (
+                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
+                          <td>{p.row}</td>
+                          <td>{p.name}</td>
+                          <td style={{ fontSize: 11 }}>{p.roll}</td>
+                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</td>
+                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.cluster || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
+                    <span className="material-symbols-outlined">arrow_back</span>Back
+                  </button>
+                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} theses`}
+                  </button>
+                </div>
               </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
-                  <span className="material-symbols-outlined">close</span>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">upload</span>
-                  Upload
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -791,7 +1043,7 @@ return (
                             >
                               <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                 <div className="sup-dropdown-item-email">{s.email || ''}</div>
                               </div>
                               {isSelected && (
@@ -819,7 +1071,7 @@ return (
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.supervisorId ? allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.lastName || 'Search supervisor...' : 'Search supervisor...'}
+                      placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
                       value={createSupSearch}
                       onChange={e => { setCreateSupSearch(e.target.value); setCreateSupOpen(true); }}
                       onFocus={() => setCreateSupOpen(true)}
@@ -833,10 +1085,10 @@ return (
                   </div>
                   {createSupOpen && (
                     <div className="sup-dropdown">
-                      {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
+                      {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No supervisors found</div>
                       ) : (
-                        allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
+                        allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
                           const selected = createForm.supervisorId === s.id.toString();
                           return (
                             <div
@@ -848,7 +1100,7 @@ return (
                                 {s.firstName?.[0]}{s.lastName?.[0]}
                               </div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                 <div className="sup-dropdown-item-email">{s.email}</div>
                               </div>
                               {selected && (
@@ -869,7 +1121,7 @@ return (
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.examinerId ? examiners.find(e => e.id.toString() === createForm.examinerId)?.firstName + ' ' + examiners.find(e => e.id.toString() === createForm.examinerId)?.lastName || 'Search examiner...' : 'Search examiner...'}
+                      placeholder={createForm.examinerId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createForm.examinerId)) : 'Search examiner...'}
                       value={examSearch}
                       onChange={e => { setExamSearch(e.target.value); setExamOpen(true); }}
                       onFocus={() => setExamOpen(true)}
@@ -883,10 +1135,10 @@ return (
                   </div>
                   {examOpen && (
                     <div className="sup-dropdown">
-                      {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
+                      {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No examiners found</div>
                       ) : (
-                        examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
+                        examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
                           const selected = createForm.examinerId === e.id.toString();
                           return (
                             <div
@@ -898,7 +1150,7 @@ return (
                                 {e.firstName?.[0]}{e.lastName?.[0]}
                               </div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                 <div className="sup-dropdown-item-email">{e.email}</div>
                               </div>
                               {selected && (
@@ -925,6 +1177,14 @@ return (
             </form>
           </div>
         </div>
+      )}
+            {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type="thesis"
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+          onSave={loadData}
+        />
       )}
       <ConfirmDialog
         open={confirmDialog.open}

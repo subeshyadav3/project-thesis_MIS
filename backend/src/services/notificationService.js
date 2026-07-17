@@ -101,11 +101,10 @@ async function notifyProposalUpload({ groupId, thesisId, stage, uploaderId, stud
 
 /**
  * Someone submitted/updated evaluation marks.
- * Notify: students + supervisor + coordinators (excluding the submitter).
+ * Notify: coordinators only (excluding the submitter).
  */
 async function notifyMarksSubmitted({ groupId, thesisId, componentName, marks, maxMarks, evaluatorRole, itemTitle, submitterId }) {
   const recipients = [
-    ...(groupId ? await getGroupNotifyIds(groupId) : await getThesisNotifyIds(thesisId)),
     ...await getCoordinatorIds(),
   ].filter(id => id !== submitterId);
   const roleLabel = ROLE_LABEL[evaluatorRole] || evaluatorRole;

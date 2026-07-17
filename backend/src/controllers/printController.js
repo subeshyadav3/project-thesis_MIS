@@ -82,7 +82,7 @@ function buildBlankLines(count) {
   return out;
 }
 
-function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments) {
+function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions) {
   const totalMarks = supCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -95,7 +95,8 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       <td style="text-align:center;padding:4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
     </tr>`).join('');
 
-  const commentText = comments.join('; ');
+  const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
+  const suggestionText = feedbackSuggestions || '';
 
   return `
     ${buildPageHeader()}
@@ -140,7 +141,8 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
     </div>
     <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>${buildBlankLines(8)}
+      <strong>Suggestions &amp; recommendations:</strong>
+      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
     </div>
 
     <div style="font-size:12px;margin-top:16px;">
@@ -153,7 +155,7 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -165,7 +167,8 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
       <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
     </tr>`).join('');
 
-  const commentText = comments.join('; ');
+  const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
+  const suggestionText = feedbackSuggestions || '';
 
   return `
     ${buildPageHeader()}
@@ -205,7 +208,8 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
       ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
     </div>
     <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>${buildBlankLines(8)}
+      <strong>Suggestions &amp; recommendations:</strong>
+      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
     </div>
 
     <div style="font-size:12px;margin-top:16px;">
@@ -217,7 +221,12 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments) {
     </div>`;
 }
 
-function buildMasterFormat(data) {
+/**
+ * Build the master thesis evaluation HTML.
+ * @param {Object} data - thesis data
+ * @param {'supervisor'|'external'|'both'} [scope='both'] - which evaluator pages to include
+ */
+function buildMasterFormat(data, scope = 'both') {
   const { title, name, supervisor, evaluations, student } = data;
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
@@ -239,17 +248,31 @@ function buildMasterFormat(data) {
   const supComments = supEvals.filter(e => e.comment).map(e => e.comment);
   const extComments = extEvals.filter(e => e.comment).map(e => e.comment);
 
+  // Extract feedback comments and suggestions per role
+  const supFeedbackComments = supEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const supFeedbackSuggestions = supEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+  const extFeedbackComments = extEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const extFeedbackSuggestions = extEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+
   const studentName = name;
   const rollNo = student?.rollNumber || '—';
 
-  const page1 = `
+  const includeSup = scope === 'supervisor' || scope === 'both';
+  const includeExt = scope === 'external' || scope === 'both';
+
+  let pages = '';
+  if (includeSup) {
+    pages += `
     <div style="page-break-after:always;">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments)}
+      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions)}
     </div>`;
-  const page2 = `
-    <div>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments)}
+  }
+  if (includeExt) {
+    pages += `
+    <div${includeSup ? '' : ''}>
+      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions)}
     </div>`;
+  }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Thesis Evaluation - ${esc(title)}</title>
   <style>
@@ -257,8 +280,7 @@ function buildMasterFormat(data) {
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
   </style></head><body>
-    ${page1}
-    ${page2}
+    ${pages}
   </body></html>`;
 }
 
@@ -330,9 +352,47 @@ function sendPdf(res, pdf, filename) {
   res.send(pdf);
 }
 
+/** Verify the requesting user has access to the given group/thesis.
+ *  Sends a 403 response directly if access is denied.
+ *  Returns true if access is granted. */
+async function checkPrintAccess(req, res, type, id) {
+  if (req.user.role === 'MAINTAINER') return true;
+  if (req.user.role === 'COORDINATOR') {
+    const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+    if (program) {
+      let itemProgramId = null;
+      if (type === 'group') {
+        const g = await prisma.projectGroup.findUnique({ where: { id }, select: { programId: true } });
+        itemProgramId = g?.programId;
+      } else {
+        const t = await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { programId: true } } } });
+        itemProgramId = t?.student?.programId;
+      }
+      if (itemProgramId && itemProgramId !== program.id) {
+        res.status(403).json({ error: 'Access denied. Item belongs to another program.' });
+        return false;
+      }
+    } else {
+      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
+      if (dept) {
+        const ay = type === 'group'
+          ? await prisma.academicYear.findFirst({ where: { projectGroups: { some: { id } } }, select: { departmentId: true } })
+          : await prisma.academicYear.findFirst({ where: { theses: { some: { id } } }, select: { departmentId: true } });
+        if (ay && ay.departmentId !== dept.id) {
+          res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 exports.printGroupEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'group', id);
+    if (!granted) return;
     const group = await prisma.projectGroup.findUnique({
       where: { id },
       include: {
@@ -364,6 +424,8 @@ exports.printGroupEvaluation = async (req, res) => {
         maxMarks: c.maxMarks,
         marks: e?.marks ?? null,
         comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
         submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
       };
     });
@@ -391,6 +453,8 @@ exports.printGroupEvaluation = async (req, res) => {
 exports.printThesisEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'thesis', id);
+    if (!granted) return;
     const thesis = await prisma.thesis.findUnique({
       where: { id },
       include: {
@@ -415,22 +479,141 @@ exports.printThesisEvaluation = async (req, res) => {
         maxMarks: c.maxMarks,
         marks: e?.marks ?? null,
         comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
         submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
       };
     });
 
+    const scope = req.query.scope || 'both';
     const html = buildMasterFormat({
       title: thesis.title,
       name: `${thesis.student.firstName} ${thesis.student.lastName}`,
       supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
       evaluations: evalData,
       student: thesis.student || null,
-    });
+    }, scope);
 
     const pdf = await generatePdf(html);
-    sendPdf(res, pdf, `thesis_evaluation_${id}.pdf`);
+    const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : 'full';
+    sendPdf(res, pdf, `thesis_evaluation_${id}_${scopeLabel}.pdf`);
   } catch (error) {
     console.error('printThesisEvaluation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Preview endpoint - returns HTML instead of PDF
+exports.previewGroupEvaluation = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'group', id);
+    if (!granted) return;
+    const group = await prisma.projectGroup.findUnique({
+      where: { id },
+      include: {
+        supervisor: { select: { firstName: true, lastName: true } },
+        academicYear: true,
+        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
+        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+        evaluationComponents: true,
+      },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const evaluations = group.evaluations;
+    const projectType = group.projectType;
+    const maxTotal = projectType === 'MAJOR' ? 100 : 50;
+    const total = evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+
+    const memberList = group.members.map(m =>
+      `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
+    ).join(', ');
+
+    const evalData = group.evaluationComponents.map(c => {
+      const e = evaluations.find(ev => ev.componentId === c.id);
+      return {
+        name: c.name,
+        evaluatorRole: c.evaluatorRole === 'COORDINATOR' ? 'Coordinator'
+          : c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner' : c.evaluatorRole,
+        maxMarks: c.maxMarks,
+        marks: e?.marks ?? null,
+        comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
+        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+      };
+    });
+
+    const html = buildBachelorFormat({
+      title: group.projectTitle,
+      name: group.name,
+      supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
+      academicYear: group.academicYear?.year || 'N/A',
+      members: memberList,
+      evaluations: evalData,
+      projectType,
+      total: total.toFixed(1),
+      maxTotal,
+    });
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('previewGroupEvaluation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.previewThesisEvaluation = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const granted = await checkPrintAccess(req, res, 'thesis', id);
+    if (!granted) return;
+    const thesis = await prisma.thesis.findUnique({
+      where: { id },
+      include: {
+        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
+        supervisor: { select: { firstName: true, lastName: true } },
+        academicYear: true,
+        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+        evaluationComponents: true,
+      },
+    });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    const evaluations = thesis.evaluations;
+
+    const evalData = thesis.evaluationComponents.map(c => {
+      const e = evaluations.find(ev => ev.componentId === c.id);
+      return {
+        name: c.name,
+        evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
+          : 'Coordinator',
+        maxMarks: c.maxMarks,
+        marks: e?.marks ?? null,
+        comment: e?.comment || null,
+        comments: e?.comments || null,
+        suggestions: e?.suggestions || null,
+        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+      };
+    });
+
+    const scope = req.query.scope || 'both';
+    const html = buildMasterFormat({
+      title: thesis.title,
+      name: `${thesis.student.firstName} ${thesis.student.lastName}`,
+      supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+      evaluations: evalData,
+      student: thesis.student || null,
+    }, scope);
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('previewThesisEvaluation error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

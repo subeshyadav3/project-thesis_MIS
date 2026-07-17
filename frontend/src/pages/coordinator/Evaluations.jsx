@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -39,7 +40,6 @@ function Evaluations() {
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('bachelor');
   const [showForward, setShowForward] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -47,18 +47,26 @@ function Evaluations() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isBachelorCoordinator = user.program?.degreeType === 'BACHELOR';
+  const isMasterCoordinator = user.program?.degreeType === 'MASTER';
+  const [viewMode, setViewMode] = useState(isMasterCoordinator ? 'master' : 'bachelor');
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
-      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.message || 'Failed to load data'); }).finally(() => setLoading(false));
+    const promises = [];
+    if (isBachelorCoordinator || viewMode === 'bachelor') {
+      promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
+    }
+    if (isMasterCoordinator || viewMode === 'master') {
+      promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+    }
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.message || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [isBachelorCoordinator, isMasterCoordinator, viewMode, toast]);
 
 
   const handleForward = async () => {
@@ -165,19 +173,6 @@ function Evaluations() {
     </>
   );
 
-  // Download single evaluation as PDF
-  const handlePrintSingle = (item) => {
-    const endpoint = viewMode === 'bachelor'
-      ? `/api/print/group/${item.id}`
-      : `/api/print/thesis/${item.id}`;
-    const a = document.createElement('a');
-    a.href = endpoint;
-    a.download = `evaluation_${item.id}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
   // Download all evaluated results (one by one)
   const handlePrintAll = () => {
     const evaluated = filteredItems.filter(i => computeStatus(i) === 'COMPLETE' || computeStatus(i) === 'PARTIAL');
@@ -232,12 +227,16 @@ function Evaluations() {
       <div className="card">
         <div className="card-header">
           <div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
-            <div className={`tab ${viewMode === 'bachelor' ? 'active' : ''}`} onClick={() => setViewMode('bachelor')}>
-              <span className="material-symbols-outlined">school</span>Bachelor Projects
-            </div>
-            <div className={`tab ${viewMode === 'master' ? 'active' : ''}`} onClick={() => setViewMode('master')}>
-              <span className="material-symbols-outlined">library_books</span>Master's Thesis
-            </div>
+            {isBachelorCoordinator && (
+              <div className={`tab ${viewMode === 'bachelor' ? 'active' : ''}`} onClick={() => setViewMode('bachelor')}>
+                <span className="material-symbols-outlined">school</span>Bachelor Projects
+              </div>
+            )}
+            {isMasterCoordinator && (
+              <div className={`tab ${viewMode === 'master' ? 'active' : ''}`} onClick={() => setViewMode('master')}>
+                <span className="material-symbols-outlined">library_books</span>Master's Thesis
+              </div>
+            )}
           </div>
         </div>
 
@@ -330,8 +329,8 @@ function Evaluations() {
                           <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all components" style={{ minWidth: 32, padding: '6px 8px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
                           </button>
-                          <button className="btn btn-outline btn-sm" onClick={() => handlePrintSingle(item)} title="Print / Save PDF" disabled={done === 0} style={{ minWidth: 32, padding: '6px 8px' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>print</span>
+                          <button className="btn btn-outline btn-sm" onClick={() => setPdfPreviewItem(item)} title="Open PDF Preview" style={{ minWidth: 32, padding: '6px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>picture_as_pdf</span>
                           </button>
                         </div>
                       </td>
@@ -399,7 +398,7 @@ function Evaluations() {
             </div>
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowSummaryModal(false)}><span className="material-symbols-outlined">close</span>Close</button>
-              <button className="btn btn-primary" onClick={() => handlePrintSingle(selectedItem)}><span className="material-symbols-outlined">download</span>Download PDF</button>
+              <button className="btn btn-primary" onClick={() => { setShowSummaryModal(false); setPdfPreviewItem(selectedItem); }}><span className="material-symbols-outlined">picture_as_pdf</span>Open PDF Preview</button>
             </div>
           </div>
         </div>
@@ -421,6 +420,15 @@ function Evaluations() {
             </div>
           </div>
         </div>
+      )}
+
+      {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type={viewMode === 'bachelor' ? 'group' : 'thesis'}
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+          onSave={() => { setPdfPreviewItem(null); setSelectedItem(null); setShowSummaryModal(false); }}
+        />
       )}
 
       <ConfirmDialog

@@ -6,6 +6,7 @@ import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -18,6 +19,7 @@ function SupervisorBachelorProjects() {
   const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(null);
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
@@ -37,27 +39,6 @@ function SupervisorBachelorProjects() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  const handleComplete = async (id) => {
-    try {
-      // Find the supervisor component for this group
-      const { data } = await api.get(`/evaluations/group/${id}`);
-      const supervisorComp = (data.components || []).find(c => c.evaluatorRole === 'SUPERVISOR');
-      if (!supervisorComp) {
-        toast.error('No supervisor evaluation component found');
-        return;
-      }
-      const evaluation = (data.evaluations || []).find(e => e.componentId === supervisorComp.id);
-      if (!evaluation || evaluation.marks === null || evaluation.marks === undefined) {
-        const confirmed = window.confirm('No marks submitted yet. Complete without marks?');
-        if (!confirmed) return;
-      }
-      await api.put(`/evaluations/${supervisorComp.id}/complete`, { groupId: id });
-      toast.success('Supervisor evaluation finalized');
-      setShowDetail(null);
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to complete evaluation'); }
-  };
 
   const filteredGroups = useMemo(() => {
     return groups.filter(g => {
@@ -121,6 +102,7 @@ function SupervisorBachelorProjects() {
   );
 
   return (
+    <>
     <ErrorBoundary><PageLayout title="Bachelor Projects" subtitle="Your assigned project groups" user={user}>
       {showDetail && (
         <div className="modal-overlay" onClick={() => setShowDetail(null)}>
@@ -200,12 +182,10 @@ function SupervisorBachelorProjects() {
                 <span className="material-symbols-outlined">close</span>
                 Close
               </button>
-              {showDetail.status !== 'COMPLETED' && (
-                <button className="btn btn-success" onClick={() => handleComplete(showDetail.id)}>
-                  <span className="material-symbols-outlined">check_circle</span>
-                  Mark Complete
-                </button>
-              )}
+              <button className="btn btn-outline" onClick={() => { setPdfPreviewItem(showDetail); setShowDetail(null); }}>
+                <span className="material-symbols-outlined">picture_as_pdf</span>
+                PDF
+              </button>
             </div>
           </div>
         </div>
@@ -302,12 +282,10 @@ function SupervisorBachelorProjects() {
                           <span className="material-symbols-outlined">visibility</span>
                           View
                         </button>
-                        {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleComplete(g.id); }}>
-                            <span className="material-symbols-outlined">check_circle</span>
-                            Complete
-                          </button>
-                        )}
+                        <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(g); }}>
+                          <span className="material-symbols-outlined">picture_as_pdf</span>
+                          PDF
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -326,6 +304,10 @@ function SupervisorBachelorProjects() {
         )}
       </div>
     </PageLayout></ErrorBoundary>
+      {pdfPreviewItem && (
+        <EvaluationPdfPreview type="group" id={pdfPreviewItem.id} onClose={() => setPdfPreviewItem(null)} onSave={loadData} />
+      )}
+    </>
   );
 }
 

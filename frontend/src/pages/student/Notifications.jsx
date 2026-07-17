@@ -6,6 +6,7 @@ import api from '../../services/api';
 function StudentNotifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -18,6 +19,14 @@ function StudentNotifications() {
   };
 
   useEffect(() => { loadNotifications(); }, []);
+
+  useEffect(() => {
+    if (user.role === 'COORDINATOR') {
+      api.get('/assignment-requests')
+        .then(({ data }) => setPendingRequests(data))
+        .catch(() => {});
+    }
+  }, []);
 
   const markRead = async (id) => {
     try {
@@ -36,6 +45,30 @@ function StudentNotifications() {
       loadNotifications();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed');
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    try {
+      await api.put(`/assignment-requests/${requestId}/approve`);
+      toast.success('Request approved. Supervisor assigned to thesis.');
+      setPendingRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'APPROVED' } : r));
+      loadNotifications();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to approve request');
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (reason === null) return;
+    try {
+      await api.put(`/assignment-requests/${requestId}/reject`, { rejectReason: reason || 'No reason provided' });
+      toast.success('Request rejected.');
+      setPendingRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'REJECTED' } : r));
+      loadNotifications();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reject request');
     }
   };
 
@@ -79,6 +112,22 @@ function StudentNotifications() {
                   Mark as read
                 </button>
               )}
+              {n.type === 'CROSS_PROGRAM_REQUEST' && user.role === 'COORDINATOR' && (() => {
+                const req = pendingRequests.find(r => r.notificationId === n.id && r.status === 'PENDING');
+                if (!req) return null;
+                return (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn btn-sm btn-success" onClick={() => handleApprove(req.id)}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>
+                      Approve
+                    </button>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleReject(req.id)}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                      Reject
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -21,9 +21,11 @@ function ExternalExaminerEvaluationPage() {
   const [components, setComponents] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: null });
+  const [feedbackComments, setFeedbackComments] = useState('');
+  const [feedbackSuggestions, setFeedbackSuggestions] = useState('');
+  const [savingFeedback, setSavingFeedback] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -39,6 +41,12 @@ function ExternalExaminerEvaluationPage() {
         setSummary(data.summary || null);
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
+        // Load existing feedback
+        const evals = data.evaluations || [];
+        const existingComments = evals.map(e => e.comments).filter(Boolean).join('\n');
+        const existingSuggestions = evals.map(e => e.suggestions).filter(Boolean).join('\n');
+        if (existingComments) setFeedbackComments(existingComments);
+        if (existingSuggestions) setFeedbackSuggestions(existingSuggestions);
       })
       .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
       .finally(() => setLoading(false));
@@ -78,35 +86,30 @@ function ExternalExaminerEvaluationPage() {
     }
   };
 
-  const doComplete = async (componentId) => {
-    setCompleting(componentId);
-    try {
-      const payload = {};
-      if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
-      await api.put(`/evaluations/${componentId}/complete`, payload);
-      toast.success('Evaluation marked as complete');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to complete evaluation');
-    } finally {
-      setCompleting(null);
-    }
-  };
-
-  const handleComplete = async (componentId) => {
-    const e = evaluationForComponent(componentId);
-    if (!e || e.marks === null || e.marks === undefined || e.marks === 0) {
-      setConfirmDialog({
-        open: true,
-        message: 'Warning: The marks for this component are zero or not set. Do you still want to mark it as complete?',
-        onConfirm: () => {
-          setConfirmDialog({ open: false, message: '', onConfirm: null });
-          doComplete(componentId);
-        }
-      });
+  const handleSaveFeedback = async () => {
+    if (!feedbackComments.trim() && !feedbackSuggestions.trim()) {
+      toast.warning('Please enter comments or suggestions');
       return;
     }
-    await doComplete(componentId);
+    setSavingFeedback(true);
+    try {
+      for (const comp of currentUserComponents) {
+        const payload = {
+          componentId: comp.id,
+          marks: evaluationForComponent(comp.id)?.marks ?? null,
+          comments: feedbackComments || null,
+          suggestions: feedbackSuggestions || null,
+        };
+        if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
+        await api.post('/evaluations/marks', payload);
+      }
+      toast.success('Feedback saved');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save feedback');
+    } finally {
+      setSavingFeedback(false);
+    }
   };
 
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
@@ -139,9 +142,14 @@ function ExternalExaminerEvaluationPage() {
     <ErrorBoundary>
     <PageLayout title="Internal Examiner Evaluation" subtitle={title} user={user}
       actions={
-        <button className="btn btn-outline btn-sm" onClick={() => navigate('/external/evaluations')}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back to List
-        </button>
+        <>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowPdfPreview(true)}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>picture_as_pdf</span> PDF Preview
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={() => navigate('/external/evaluations')}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back to List
+          </button>
+        </>
       }
     >
       {/* Horizontal tab bar */}
@@ -188,7 +196,7 @@ function ExternalExaminerEvaluationPage() {
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
               <span>{title}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Supervisor:</span>
-              <span>{item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
+              <span>{item?.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Status:</span>
               <span><span className={`badge badge-${item?.status?.toLowerCase() || 'pending'}`}>{item?.status || 'PENDING'}</span></span>
               {item?.examinerAssignments?.length > 0 && (
@@ -248,7 +256,7 @@ function ExternalExaminerEvaluationPage() {
                         flexShrink: 0,
                       }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {isCompleted ? 'lock' : hasMarks ? 'check_circle' : 'pending'}
+                          {isCompleted ? 'check_circle' : hasMarks ? 'check_circle' : 'pending'}
                         </span>
                       </div>
                       <div style={{ flex: 1 }}>
@@ -301,36 +309,76 @@ function ExternalExaminerEvaluationPage() {
       {activeTab === 'evaluation' && (
         <>
           {currentUserComponents.length > 0 && (
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
               {currentUserComponents.map(comp => {
                 const e = evaluationForComponent(comp.id);
-                const isCompleted = e?.status === 'COMPLETED';
                 return (
-                  <div key={comp.id} className="card" style={{ flex: '1 1 300px', opacity: isCompleted ? 0.85 : 1 }}>
+                  <div key={comp.id} className="card">
                     <div className="card-header">
-                      <h3>{comp.name}</h3>
-                      {isCompleted && <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
-                    </div>
-                    {isCompleted || item?.status === 'COMPLETED' ? (
-                      <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lock</span>
-                        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--color-primary)' }}>
-                          Marks: {e?.marks ?? '—'} / {comp.maxMarks}
-                        </div>
-                        {e?.comment && <p style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4 }}>"{e.comment}"</p>}
+                      <div>
+                        <h3 style={{ margin: 0 }}>{comp.name}</h3>
+                        <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                          {ROLE_LABEL[comp.evaluatorRole]} evaluation · Max {comp.maxMarks} marks
+                        </span>
                       </div>
-                    ) : (
+                    </div>
+                    <div style={{ padding: '0 16px 16px' }}>
                       <ExaminerEvaluationForm
                         component={comp}
                         evaluation={e}
-                        onSave={(marks, comment) => handleSaveComponent(comp, marks, comment)}
-                        onComplete={() => handleComplete(comp.id)}
-                        completing={completing === comp.id}
+                        onSave={(marks) => handleSaveComponent(comp, marks)}
                       />
-                    )}
+                    </div>
                   </div>
                 );
               })}
+
+              {/* Comments + Suggestions feedback section */}
+              <div className="card">
+                <div className="card-header">
+                  <div>
+                    <h3 style={{ margin: 0 }}>Feedback</h3>
+                    <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                      Overall comments and suggestions for this evaluation
+                    </span>
+                  </div>
+                </div>
+                <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600 }}>Comments</label>
+                    <textarea
+                      rows={3}
+                      value={feedbackComments}
+                      onChange={e => setFeedbackComments(e.target.value)}
+                      placeholder="Enter your overall comments about this evaluation..."
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600 }}>Suggestions & Recommendations</label>
+                    <textarea
+                      rows={3}
+                      value={feedbackSuggestions}
+                      onChange={e => setFeedbackSuggestions(e.target.value)}
+                      placeholder="Enter suggestions and recommendations..."
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
+                    />
+                  </div>
+                  <div>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveFeedback}
+                      disabled={savingFeedback}
+                      style={{ padding: '6px 16px', fontSize: 13 }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+                        {savingFeedback ? 'progress_activity' : 'save'}
+                      </span>
+                      {savingFeedback ? 'Saving...' : 'Save Feedback'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -343,32 +391,27 @@ function ExternalExaminerEvaluationPage() {
           )}
         </>
       )}
-      <ConfirmDialog
-        open={confirmDialog.open}
-        title="Confirm"
-        message={confirmDialog.message}
-        onConfirm={() => {
-          const fn = confirmDialog.onConfirm;
-          setConfirmDialog({ open: false, message: '', onConfirm: null });
-          fn?.();
-        }}
-        onCancel={() => setConfirmDialog({ open: false, message: '', onConfirm: null })}
-      />
     </PageLayout>
+    {showPdfPreview && (
+      <EvaluationPdfPreview
+        type={type}
+        id={id}
+        onClose={() => setShowPdfPreview(false)}
+        onSave={() => { setShowPdfPreview(false); loadData(); }}
+      />
+    )}
     </ErrorBoundary>
   );
 }
 
-function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, completing }) {
+function ExaminerEvaluationForm({ component, evaluation, onSave }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
-  const [comment, setComment] = useState(evaluation?.comment ?? '');
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     setMarks(evaluation?.marks?.toString() ?? '');
-    setComment(evaluation?.comment ?? '');
-  }, [evaluation?.id, evaluation?.marks, evaluation?.comment]);
+  }, [evaluation?.id, evaluation?.marks]);
 
   const submit = async () => {
     if (marks === '' || marks === null || marks === undefined) {
@@ -381,52 +424,49 @@ function ExaminerEvaluationForm({ component, evaluation, onSave, onComplete, com
       return;
     }
     setSaving(true);
-    try { await onSave(marks, comment); }
+    try { await onSave(marks); }
     finally { setSaving(false); }
   };
 
   return (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16, alignItems: 'start', padding: '0 16px 12px' }}>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label style={{ fontSize: 12 }}>Marks (out of {component.maxMarks})</label>
-          <input
-            type="number"
-            value={marks}
-            onChange={e => setMarks(e.target.value)}
-            max={component.maxMarks}
-            min="0"
-            step="0.5"
-            placeholder="0"
-            style={{ fontSize: 20, fontWeight: 700, textAlign: 'center' }}
-          />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 10,
+          background: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-primary-container)' : 'var(--color-surface-container)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
+          flexShrink: 0,
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+            {(marks !== '' && marks !== null && marks !== undefined) ? 'check_circle' : 'edit'}
+          </span>
         </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label style={{ fontSize: 12 }}>Comment (optional)</label>
-          <textarea
-            value={comment}
-            onChange={e => setComment(e.target.value)}
-            placeholder="Enter your evaluation comment..."
-            style={{ minHeight: 80, width: '100%' }}
-          />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{component.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+            Max {component.maxMarks} marks
+          </div>
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '0 16px 16px' }}>
-        <button className="btn btn-primary" onClick={submit} disabled={saving}>
-          <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'save'}</span>
-          {saving ? 'Saving...' : 'Save Marks'}
-        </button>
-        <button
-          className="btn"
-          style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}
-          onClick={onComplete}
-          disabled={completing}
-        >
-          <span className="material-symbols-outlined">{completing ? 'progress_activity' : 'lock'}</span>
-          {completing ? 'Completing...' : 'Complete'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input
+          type="number"
+          value={marks}
+          onChange={e => setMarks(e.target.value)}
+          max={component.maxMarks}
+          min="0"
+          step="0.5"
+          placeholder="0"
+          style={{ width: 70, padding: '8px 10px', fontSize: 14, textAlign: 'center', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}
+        />
+        <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', fontWeight: 500 }}>/ {component.maxMarks}</span>
+        <button className="btn btn-primary btn-sm" onClick={submit} disabled={saving || marks === '' || marks === null || marks === undefined} style={{ padding: '6px 14px', fontSize: 13 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>{saving ? 'progress_activity' : 'save'}</span>
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -6,6 +6,7 @@ import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -27,7 +28,7 @@ function BachelorProjects() {
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedProjectType, setSelectedProjectType] = useState('MINOR');
   const [uploadProjectType, setUploadProjectType] = useState('MINOR');
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,12 +59,14 @@ function BachelorProjects() {
   const [newStudentOpen, setNewStudentOpen] = useState(false);
   const newStudentRef = useRef(null);
   const [programs, setPrograms] = useState([]);
-  const [selectedProgramId, setSelectedProgramId] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
+  const selectAllRef = useRef(null);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
+  const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
+  const [actionMenuRow, setActionMenuRow] = useState(null);
 
   const loadData = useCallback(() => {
     const controller = new AbortController();
@@ -74,8 +77,7 @@ function BachelorProjects() {
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
-      api.get('/users/role/STUDENT?all=true&degreeType=BACHELOR', { signal }).then(({ data }) => setAllStudents(data)),
-      api.get('/departments/programs', { signal }).then(({ data }) => setPrograms(data)),
+      api.get(`/users/role/STUDENT?all=true&degreeType=BACHELOR${user.program?.id ? '&programId=' + user.program.id : ''}`, { signal }).then(({ data }) => setAllStudents(data)),
     ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -131,6 +133,15 @@ useEffect(() => {
     if (newStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
     return () => document.removeEventListener('mousedown', handleStudentOutside);
   }, [newStudentOpen]);
+
+  // Close action menu on outside click
+  useEffect(() => {
+    const handleClick = () => setActionMenuRow(null);
+    if (actionMenuRow) {
+      document.addEventListener('click', handleClick);
+    }
+    return () => document.removeEventListener('click', handleClick);
+  }, [actionMenuRow]);
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
@@ -248,7 +259,7 @@ useEffect(() => {
       const payload = {
         ...createForm,
         students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
-        programId: selectedProgramId || undefined,
+        programId: user.program?.id,
       };
       const { data: group } = await api.post('/groups', payload);
       if (createForm.examinerId) {
@@ -257,7 +268,6 @@ useEffect(() => {
       toast.success('Group created successfully');
       setShowCreate(false);
       setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
-      setSelectedProgramId('');
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -317,7 +327,7 @@ const filteredGroups = useMemo(() => {
       const searchStr = (
         g.name + ' ' +
         g.projectTitle + ' ' +
-        (g.supervisor ? `${g.supervisor.firstName} ${g.supervisor.lastName}` : '') + ' ' +
+        (g.supervisor ? `${g.supervisor.designation ? g.supervisor.designation + ' ' : ''}${g.supervisor.firstName} ${g.supervisor.lastName}` : '') + ' ' +
         (g.members || []).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(' ')
       ).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
@@ -346,6 +356,27 @@ const filteredGroups = useMemo(() => {
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
   }, [totalPages, currentPage]);
+
+  // Select all on current page
+  useEffect(() => {
+    if (selectAllRef.current) {
+      const allIds = paginatedGroups.map(g => g.id);
+      const selectedIds = selectedGroups.map(g => g.id);
+      const selectedOnPage = selectedGroups.filter(g => allIds.includes(g.id)).length;
+      selectAllRef.current.indeterminate = selectedOnPage > 0 && selectedOnPage < allIds.length;
+    }
+  }, [selectedGroups, paginatedGroups]);
+
+  const toggleSelectAll = () => {
+    const allIds = paginatedGroups.map(g => g.id);
+    const allSelected = allIds.every(id => selectedGroups.some(g => g.id === id));
+    if (allSelected) {
+      setSelectedGroups(prev => prev.filter(g => !allIds.includes(g.id)));
+    } else {
+      const newGroups = paginatedGroups.filter(g => !selectedGroups.some(sg => sg.id === g.id));
+      setSelectedGroups(prev => [...prev, ...newGroups]);
+    }
+  };
 
   const pendingCount = groups.filter(g => !g.supervisor).length;
   const assignedCount = groups.filter(g => g.supervisor).length;
@@ -428,7 +459,7 @@ const filteredGroups = useMemo(() => {
     { value: 'NONE', label: 'Unassigned' },
     ...supervisors.map(s => ({
       value: s.id.toString(),
-      label: `${s.firstName} ${s.lastName}`,
+      label: `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName}`,
     })),
   ];
 
@@ -480,7 +511,7 @@ const filteredGroups = useMemo(() => {
                 <div className="detail-item">
                   <span className="detail-label">Supervisor</span>
                   <span>{showDetail.supervisor
-                    ? `${showDetail.supervisor.firstName} ${showDetail.supervisor.lastName}`
+                    ? `${showDetail.supervisor.designation ? showDetail.supervisor.designation + ' ' : ''}${showDetail.supervisor.firstName} ${showDetail.supervisor.lastName}`
                     : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
                   }</span>
                 </div>
@@ -557,7 +588,7 @@ const filteredGroups = useMemo(() => {
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editSupId ? allSupervisors.find(s => s.id.toString() === editSupId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === editSupId)?.lastName || 'Search supervisor...' : 'No supervisor'}
+                          placeholder={editSupId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === editSupId)) : 'No supervisor'}
                           value={editSupSearch}
                           onChange={e => { setEditSupSearch(e.target.value); setEditSupOpen(true); }}
                           onFocus={() => setEditSupOpen(true)}
@@ -571,10 +602,10 @@ const filteredGroups = useMemo(() => {
                       </div>
                       {editSupOpen && (
                         <div className="sup-dropdown">
-                          {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
+                          {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No supervisors found</div>
                           ) : (
-                            allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
+                            allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(editSupSearch.toLowerCase())).map(s => {
                               const selected = editSupId === s.id.toString();
                               return (
                                 <div
@@ -584,7 +615,7 @@ const filteredGroups = useMemo(() => {
                                 >
                                   <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                     <div className="sup-dropdown-item-email">{s.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: s.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: s.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -605,7 +636,7 @@ const filteredGroups = useMemo(() => {
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editExamId ? examiners.find(e => e.id.toString() === editExamId)?.firstName + ' ' + examiners.find(e => e.id.toString() === editExamId)?.lastName || 'Search examiner...' : 'No examiner'}
+                          placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
                           value={editExamSearch}
                           onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
                           onFocus={() => setEditExamOpen(true)}
@@ -619,10 +650,10 @@ const filteredGroups = useMemo(() => {
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
                               const selected = editExamId === e.id.toString();
                               return (
                                 <div
@@ -632,7 +663,7 @@ const filteredGroups = useMemo(() => {
                                 >
                                   <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                     <div className="sup-dropdown-item-email">{e.email}</div>
                                   </div>
                                   <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
@@ -711,7 +742,7 @@ const filteredGroups = useMemo(() => {
             <span style={{ fontSize: 13, fontWeight: 600 }}>Bulk Actions ({selectedGroups.length} groups)</span>
             <select className="form-input" style={{ width: 200 }} value={bulkSupervisorId} onChange={e => setBulkSupervisorId(e.target.value)}>
               <option value="">Select supervisor...</option>
-              {supervisors.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+              {supervisors.map(s => <option key={s.id} value={s.id}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</option>)}
             </select>
             <button className="btn btn-primary btn-sm" onClick={async () => {
               if (!bulkSupervisorId) return toast.warning('Select a supervisor');
@@ -807,83 +838,88 @@ const filteredGroups = useMemo(() => {
               </colgroup>
               <thead>
                 <tr>
-                  <th></th>
+                  <th>
+                    <input type="checkbox" ref={selectAllRef} onChange={toggleSelectAll} />
+                  </th>
                   <th>Group</th>
                   <th>Project Title</th>
                   <th>Type</th>
-                  <th>Members</th>
+                  <th style={{ width: 60 }}>Members</th>
                   <th>Status</th>
-                  <th>Year</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th style={{ width: 50 }}>Year</th>
+                  <th style={{ textAlign: 'right', width: 90 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                   {paginatedGroups.map(g => (
                   <tr key={g.id} onClick={() => navigate(`/coordinator/project/group/${g.id}`)} style={{ cursor: 'pointer' }}>
-                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '8px 12px' }}>
+                    <td onClick={e => e.stopPropagation()} style={{ width: 32, padding: '6px 10px' }}>
                       <input type="checkbox" checked={selectedGroups.includes(g)} onChange={() => {
                         setSelectedGroups(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
                       }} />
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div className="default-badge" style={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{g.name?.slice(0, 2).toUpperCase()}</div>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{g.name}</span>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="default-badge" style={{ width: 28, height: 28, fontSize: 10 }}>{g.name?.slice(0, 2).toUpperCase()}</div>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{g.name}</span>
                       </div>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`} style={{ fontSize: 10 }}>
-                        <span className="dot" />
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{g.projectTitle}</td>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <span className={`badge`} style={{ fontSize: 10, background: g.projectType === 'MAJOR' ? 'var(--color-warning-container)' : 'var(--color-tertiary-container)', color: g.projectType === 'MAJOR' ? 'var(--color-on-warning-container)' : 'var(--color-on-tertiary-container)', border: 'none' }}>
                         {g.projectType === 'MAJOR' ? 'Major' : 'Minor'}
                       </span>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>
-                        {safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(', ') || '—'}
+                    <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                      <span className="stat-chip" title={safeMembers(g).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join('\n')}>
+                        {safeMembers(g).length}
                       </span>
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '8px 12px' }}>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10 }}>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
+                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
                         <span className="dot" />
                         {g.status || 'PENDING'}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '8px 12px', color: 'var(--color-on-surface-variant)' }}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(g.academicYear) || '—'}
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-sm btn-outline" title="View" onClick={() => openDetail(g, 'view')} style={{ padding: '3px 5px', minWidth: 0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button className="icon-btn-sm" title="View" aria-label="View group details" onClick={() => openDetail(g, 'view')}>
+                          <span className="material-symbols-outlined">visibility</span>
                         </button>
-                        {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline-primary" title="Edit" onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                        <div style={{ position: 'relative' }}>
+                          <button className="icon-btn-sm" title="More actions" aria-label="More actions" onClick={(e) => { e.stopPropagation(); setActionMenuRow(actionMenuRow === g.id ? null : g.id); }}>
+                            <span className="material-symbols-outlined">more_vert</span>
                           </button>
-                        )}
-                        {g.status === 'ACTIVE' && (
-                          <button className="btn btn-sm btn-success" title="Complete" onClick={(e) => { e.stopPropagation(); confirmComplete(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-                          </button>
-                        )}
-                        {g.status === 'COMPLETED' && (
-                          <button className="btn btn-sm btn-outline" title="Download PDF" onClick={() => {
-                            const a = document.createElement('a');
-                            a.href = `/api/print/group/${g.id}`;
-                            a.download = `evaluation_${g.id}.pdf`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                          </button>
-                        )}
-                        {g.status !== 'COMPLETED' && (
-                          <button className="btn btn-sm btn-danger" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteGroup(g.id); }} style={{ padding: '3px 5px', minWidth: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
-                          </button>
-                        )}
+                          {actionMenuRow === g.id && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
+                              {g.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                  Edit
+                                </div>
+                              )}
+                              {g.status === 'ACTIVE' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                                  Complete
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(g)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                                PDF Preview
+                              </div>
+                              {g.status !== 'COMPLETED' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-error)' }} onClick={() => { confirmDeleteGroup(g.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                  Delete
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -980,11 +1016,9 @@ const filteredGroups = useMemo(() => {
                 </select>
               </div>
               <div className="form-group">
-                <label>Program</label>
-                <select value={selectedProgramId} onChange={e => setSelectedProgramId(e.target.value)} required>
-                  <option value="">Select program...</option>
-                  {programs.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                </select>
+                <label>Batch</label>
+                <input value={createForm.batch} onChange={e => setCreateForm({...createForm, batch: e.target.value})} placeholder="e.g. 080" />
+                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Auto-derived from student roll numbers</span>
               </div>
 
               <div className="form-group" ref={createSupRef}>
@@ -994,7 +1028,7 @@ const filteredGroups = useMemo(() => {
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.supervisorId ? allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.firstName + ' ' + allSupervisors.find(s => s.id.toString() === createForm.supervisorId)?.lastName || 'Search supervisor...' : 'Search supervisor...'}
+                      placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
                       value={createSupSearch}
                       onChange={e => { setCreateSupSearch(e.target.value); setCreateSupOpen(true); }}
                       onFocus={() => setCreateSupOpen(true)}
@@ -1008,10 +1042,10 @@ const filteredGroups = useMemo(() => {
                   </div>
                   {createSupOpen && (
                     <div className="sup-dropdown">
-                      {allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
+                      {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No supervisors found</div>
                       ) : (
-                        allSupervisors.filter(s => `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
+                        allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
                           const selected = createForm.supervisorId === s.id.toString();
                           return (
                             <div
@@ -1023,7 +1057,7 @@ const filteredGroups = useMemo(() => {
                                 {s.firstName?.[0]}{s.lastName?.[0]}
                               </div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
                                 <div className="sup-dropdown-item-email">{s.email}</div>
                               </div>
                               {selected && (
@@ -1045,7 +1079,7 @@ const filteredGroups = useMemo(() => {
                     <span className="material-symbols-outlined">search</span>
                     <input
                       type="text"
-                      placeholder={createForm.examinerId ? examiners.find(e => e.id.toString() === createForm.examinerId)?.firstName + ' ' + examiners.find(e => e.id.toString() === createForm.examinerId)?.lastName || 'Search examiner...' : 'Search examiner...'}
+                      placeholder={createForm.examinerId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createForm.examinerId)) : 'Search examiner...'}
                       value={examSearch}
                       onChange={e => { setExamSearch(e.target.value); setExamOpen(true); }}
                       onFocus={() => setExamOpen(true)}
@@ -1059,10 +1093,10 @@ const filteredGroups = useMemo(() => {
                   </div>
                   {examOpen && (
                     <div className="sup-dropdown">
-                      {examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
+                      {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No examiners found</div>
                       ) : (
-                        examiners.filter(e => `${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
+                        examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
                           const selected = createForm.examinerId === e.id.toString();
                           return (
                             <div
@@ -1074,7 +1108,7 @@ const filteredGroups = useMemo(() => {
                                 {e.firstName?.[0]}{e.lastName?.[0]}
                               </div>
                               <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{e.firstName} {e.lastName}</div>
+                                <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
                                 <div className="sup-dropdown-item-email">{e.email}</div>
                               </div>
                               {selected && (
@@ -1132,7 +1166,7 @@ const filteredGroups = useMemo(() => {
                 ) : (() => {
                   const filteredStudents = allStudents.filter(s => {
                     if (String(st.studentId) === String(s.id)) return false;
-                    if (selectedProgramId && String(s.programId) !== String(selectedProgramId)) return false;
+                    if (user.program?.id && String(s.programId) !== String(user.program.id)) return false;
                     const q = newStudentSearch.toLowerCase().trim();
                     if (!q) return true;
                     return `${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q);
@@ -1190,6 +1224,14 @@ const filteredGroups = useMemo(() => {
         </div>
       )}
     </PageLayout>
+      {pdfPreviewItem && (
+        <EvaluationPdfPreview
+          type="group"
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+          onSave={loadData}
+        />
+      )}
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}

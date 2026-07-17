@@ -58,7 +58,7 @@ exports.getAssignedTheses = async (req, res) => {
 // Internal Examiner marks (the 10-mark component, evaluatorRole = EXTERNAL_EXAMINER)
 exports.submitEvaluation = async (req, res) => {
   try {
-    const { componentId, marks, comment, groupId, thesisId } = req.body;
+    const { componentId, marks, comment, comments, suggestions, groupId, thesisId } = req.body;
 
     let component;
     if (componentId) {
@@ -101,6 +101,8 @@ exports.submitEvaluation = async (req, res) => {
       evaluationType: 'EXTERNAL_EXAMINER',
       marks: marks !== null && marks !== undefined && marks !== '' ? parseFloat(marks) : null,
       comment: comment || null,
+      comments: comments || null,
+      suggestions: suggestions || null,
       submittedById: req.user.id,
       ...(groupId ? { groupId: parseInt(groupId) } : {}),
       ...(thesisId ? { thesisId: parseInt(thesisId) } : {}),
@@ -113,7 +115,7 @@ exports.submitEvaluation = async (req, res) => {
   } else {
     evaluation = await prisma.evaluation.create({ data });
   }
-  audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', entityId: evaluation.id, details: `Submitted ${component.name} marks`, performedById: req.user.id });
+  audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', entityId: evaluation.id, details: 'Marks updated', performedById: req.user.id });
 
   const components = await prisma.evaluationComponent.findMany({
       where: groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) },

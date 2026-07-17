@@ -3,24 +3,91 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
+const { computeCurrentYearSemester } = require('../utils/computeYearSemester');
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
   role: true, degreeType: true, active: true,
   departmentId: true, programId: true,
-  rollNumber: true,
+  rollNumber: true, designation: true, batch: true,
   createdAt: true, updatedAt: true,
 };
 
 const VALID_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'STUDENT', 'EXTERNAL_EXAMINER'];
 const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
 
+/**
+ * Extract batch from roll number. Roll "080BCT001" → "080".
+ */
+function extractBatchFromRoll(rollNumber) {
+  if (!rollNumber) return null;
+  const match = rollNumber.match(/^(\d{2,3})/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Compute current year and semester from batch.
+ * batch "080" → year 2080, then compute year/semester based on current date.
+ * Academic year starts in Mangshir (≈ November, month 11).
+ */
+function computeCurrentYearSemesterFromBatch(batch, degreeType) {
+  if (!batch) return { currentYear: null, currentSemester: null };
+
+  const offset = parseInt(batch);
+  const batchYear = offset < 100 ? 2000 + offset : offset;
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  // Academic year starts Nov (month 11)
+  let academicYearStart;
+  if (currentMonth >= 11) {
+    academicYearStart = currentYear;
+  } else {
+    academicYearStart = currentYear - 1;
+  }
+
+  const monthsSinceStart = currentMonth >= 11
+    ? currentMonth - 11
+    : (12 - 11) + currentMonth;
+
+  const semInYear = monthsSinceStart < 6 ? 1 : 2;
+  const yearsSinceBatch = academicYearStart - batchYear;
+  const totalSemesters = yearsSinceBatch * 2 + (semInYear - 1);
+
+  const maxYear = degreeType === 'MASTER' ? 2 : 4;
+  const year = Math.min(Math.max(1, Math.ceil((totalSemesters + 1) / 2)), maxYear);
+  const semester = Math.min(Math.max(1, totalSemesters - (year - 1) * 2 + 1), 2);
+
+  return { currentYear: year, currentSemester: semester };
+}
+
+function enrichWithComputedYearSemester(user) {
+  if (user.role !== 'STUDENT' || !user.batch) return user;
+  const maxYear = user.degreeType === 'MASTER' ? 2 : 4;
+  const computed = computeCurrentYearSemesterFromBatch(user.batch, user.degreeType);
+  if (computed.currentYear) {
+    user.currentYear = computed.currentYear;
+    user.currentSemester = computed.currentSemester;
+  }
+  return user;
+}
+
 exports.getUsers = async (req, res) => {
   try {
     const where = {};
-    // Coordinator can only see users in their department
     if (req.user.role === 'COORDINATOR') {
-      where.departmentId = req.user.departmentId;
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        where.OR = [
+          { role: 'STUDENT', programId: program.id },
+          { role: { in: ['SUPERVISOR', 'EXTERNAL_EXAMINER'] }, departmentId: req.user.departmentId },
+        ];
+      } else {
+        where.role = { in: ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'] };
+        where.departmentId = req.user.departmentId;
+      }
     }
     const users = await prisma.user.findMany({
       where,
@@ -29,7 +96,7 @@ exports.getUsers = async (req, res) => {
         program: { select: { id: true, name: true, code: true } },
       },
     });
-    res.json(users);
+    res.json(users.map(enrichWithComputedYearSemester));
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -37,7 +104,7 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, degreeType, departmentId, programId } = req.body;
+    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber } = req.body;
     if (!email || !password || !firstName || !lastName || !role) {
       return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
     }
@@ -48,18 +115,23 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
     }
     // Coordinator can only create users in their own department
-    const targetDeptId = departmentId || req.user.departmentId;
+    const targetDeptId = departmentId ? parseInt(departmentId) : req.user.departmentId;
     if (req.user.role === 'COORDINATOR' && targetDeptId !== req.user.departmentId) {
       return res.status(403).json({ error: 'Cannot create users outside your department' });
     }
-    // Coordinator cannot create MAINTAINER or COORDINATOR roles
+    // Coordinator cannot create MAINTAINER or COORDINATOR roles (MAINTAINER can create any role)
     if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role)) {
       return res.status(403).json({ error: 'Coordinator can only create supervisors, examiners, and students' });
     }
 
     const hash = await bcrypt.hash(password, 10);
+    const batch = extractBatchFromRoll(rollNumber);
     const user = await prisma.user.create({
-      data: { email, password: hash, firstName, lastName, role, degreeType, departmentId: targetDeptId, programId },
+      data: {
+        email, password: hash, firstName, lastName, role, degreeType,
+        departmentId: targetDeptId, programId: programId ? parseInt(programId) : undefined,
+        designation, rollNumber, batch,
+      },
       select: USER_SELECT,
     });
   audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Created ${role} ${email}`, performedById: req.user.id });
@@ -101,9 +173,11 @@ exports.updateUser = async (req, res) => {
     if (req.body.email !== undefined) data.email = req.body.email;
     if (req.body.role) data.role = req.body.role;
     if (req.body.degreeType) data.degreeType = req.body.degreeType;
-    if (req.body.programId) data.programId = req.body.programId;
+    if (req.body.programId) data.programId = parseInt(req.body.programId);
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
-
+    if (req.body.designation !== undefined) data.designation = req.body.designation;
+    if (req.body.currentYear !== undefined) data.enrollmentYear = req.body.enrollmentYear ? parseInt(req.body.enrollmentYear) : null;
+    if (req.body.currentSemester !== undefined) data.enrollmentSemester = req.body.enrollmentSemester ? parseInt(req.body.enrollmentSemester) : null;
     const user = await prisma.user.update({
       where: { id: userId },
       data,
@@ -150,9 +224,12 @@ exports.getUsersByRole = async (req, res) => {
     if (req.query.programId) {
       where.programId = parseInt(req.query.programId);
     }
-    // Coordinator can only see users in their department
     if (req.user.role === 'COORDINATOR') {
       where.departmentId = req.user.departmentId;
+      // Coordinators can only fetch SUPERVISOR, EXTERNAL_EXAMINER, STUDENT roles
+      if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(req.params.role.toUpperCase())) {
+        return res.json([]);
+      }
     }
     const users = await prisma.user.findMany({
       where,
@@ -161,7 +238,7 @@ exports.getUsersByRole = async (req, res) => {
         program: { select: { id: true, name: true, code: true } },
       },
     });
-    res.json(users);
+    res.json(users.map(enrichWithComputedYearSemester));
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -229,13 +306,117 @@ exports.toggleActive = async (req, res) => {
   }
 };
 
+exports.bulkCreateUsers = async (req, res) => {
+  try {
+    const { users } = req.body;
+    if (!users || !Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ error: 'users array is required and must not be empty' });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (const u of users) {
+      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
+      if (!email || !password || !firstName || !lastName || !role) {
+        errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
+        continue;
+      }
+      if (!VALID_ROLES.includes(role)) {
+        errors.push({ email, error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
+        continue;
+      }
+      if (degreeType && !VALID_DEGREE_TYPES.includes(degreeType)) {
+        errors.push({ email, error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
+        continue;
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        errors.push({ email, error: 'Duplicate email' });
+        continue;
+      }
+
+      try {
+        const hash = await bcrypt.hash(password, 10);
+        const batch = extractBatchFromRoll(rollNumber);
+        const user = await prisma.user.create({
+          data: {
+            email, password: hash, firstName, lastName, role,
+            degreeType: degreeType || null,
+            departmentId: departmentId ? parseInt(departmentId) : null,
+            programId: programId ? parseInt(programId) : null,
+            designation: designation || null,
+            rollNumber: rollNumber || null,
+            batch,
+          },
+          select: USER_SELECT,
+        });
+        created.push(user);
+        audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Bulk created ${role} ${email}`, performedById: req.user.id });
+        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+      } catch (err) {
+        errors.push({ email, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      message: `Successfully created ${created.length} user(s)`,
+      created: created.length,
+      failed: errors.length,
+      errors,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.getAuditLogs = async (req, res) => {
   try {
     const where = {};
     if (req.query.entity) where.entity = req.query.entity;
     if (req.query.entityId) where.entityId = parseInt(req.query.entityId);
     if (req.query.action) where.action = req.query.action;
-    // Coordinator sees all audit logs for full oversight
+
+    // Scope audit logs to the coordinator's own program/department
+    if (req.user.role === 'COORDINATOR') {
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (program) {
+        // Program coordinator: only see logs relevant to their own program.
+        // Instead of fetching all supervisors/examiners in the department
+        // (which would include cross-program users), we get only:
+        //   1) Users whose programId matches this program (students)
+        //   2) Supervisors assigned to groups/theses in this program
+        //   3) External examiners assigned to groups/theses in this program
+        //   4) The coordinator themselves
+        const [programUsers, groupSup, thesisSup, groupExam, thesisExam] = await Promise.all([
+          prisma.user.findMany({ where: { programId: program.id }, select: { id: true } }),
+          prisma.projectGroup.findMany({ where: { programId: program.id, supervisorId: { not: null } }, select: { supervisorId: true } }),
+          prisma.thesis.findMany({ where: { student: { programId: program.id }, supervisorId: { not: null } }, select: { supervisorId: true } }),
+          prisma.examinerAssignment.findMany({ where: { group: { programId: program.id } }, select: { externalExaminerId: true } }),
+          prisma.examinerAssignment.findMany({ where: { thesis: { student: { programId: program.id } } }, select: { externalExaminerId: true } }),
+        ]);
+        const ids = [...new Set([
+          ...programUsers.map(u => u.id),
+          ...groupSup.map(r => r.supervisorId),
+          ...thesisSup.map(r => r.supervisorId),
+          ...groupExam.map(r => r.externalExaminerId),
+          ...thesisExam.map(r => r.externalExaminerId),
+          req.user.id,
+        ])];
+        where.performedById = { in: ids };
+      } else {
+        // Department-level coordinator: only see logs from their department
+        const deptUserIds = await prisma.user.findMany({
+          where: { departmentId: req.user.departmentId },
+          select: { id: true },
+        });
+        const ids = deptUserIds.map(u => u.id);
+        ids.push(req.user.id);
+        where.performedById = { in: ids };
+      }
+    }
+
     const logs = await prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },

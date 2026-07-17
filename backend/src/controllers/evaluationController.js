@@ -9,7 +9,7 @@ const audit = require('../services/auditService');
 // One Evaluation per component (upsert by componentId).
 exports.submitComponentMarks = async (req, res) => {
   try {
-    const { componentId, marks, comment, groupId, thesisId } = req.body;
+    const { componentId, marks, comment, comments, suggestions, groupId, thesisId } = req.body;
 
     if (!componentId || (groupId == null && thesisId == null)) {
       return res.status(400).json({ error: 'componentId and groupId/thesisId are required' });
@@ -26,8 +26,9 @@ exports.submitComponentMarks = async (req, res) => {
     });
     if (!component) return res.status(404).json({ error: 'Evaluation component not found' });
 
-    // The user role must match the component's evaluatorRole
-    if (req.user.role !== component.evaluatorRole) {
+    // Coordinators can correct any mark; evaluators remain limited to their own role.
+    const canManageAll = ['COORDINATOR', 'MAINTAINER'].includes(req.user.role);
+    if (!canManageAll && req.user.role !== component.evaluatorRole) {
       return res.status(403).json({
         error: `${req.user.role} cannot evaluate the "${component.name}" component (evaluator: ${component.evaluatorRole}).`,
       });
@@ -67,21 +68,14 @@ exports.submitComponentMarks = async (req, res) => {
       }
     }
 
-    // Prevent editing if parent project/thesis is COMPLETED
-    const groupIdNum = groupId ? parseInt(groupId) : null;
-    const thesisIdNum = thesisId ? parseInt(thesisId) : null;
-    if (groupIdNum) {
-      const grp = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { status: true } });
-      if (grp?.status === 'COMPLETED') return res.status(400).json({ error: 'Cannot edit marks: project is already completed.' });
-    }
-    if (thesisIdNum) {
-      const th = await prisma.thesis.findUnique({ where: { id: thesisIdNum }, select: { status: true } });
-      if (th?.status === 'COMPLETED') return res.status(400).json({ error: 'Cannot edit marks: thesis is already completed.' });
-    }
-
     // Validate marks (allow null to clear)
     const marksValidation = validateMarks(marks, component.maxMarks);
     if (!marksValidation.valid) return res.status(400).json({ error: marksValidation.error });
+
+    const scopeWhere = groupId ? { groupId: parseInt(groupId, 10) } : { thesisId: parseInt(thesisId, 10) };
+    const existing = await prisma.evaluation.findFirst({
+      where: { componentId: component.id, ...scopeWhere },
+    });
 
     const data = {
       componentId: component.id,
@@ -90,30 +84,20 @@ exports.submitComponentMarks = async (req, res) => {
       evaluationType: component.evaluationType,
       marks: marks !== null && marks !== undefined && marks !== '' ? parseFloat(marks) : null,
       comment: comment || null,
-      submittedById: req.user.id,
+      comments: comments || null,
+      suggestions: suggestions || null,
+      // Preserve the original evaluator when a coordinator corrects a saved mark.
+      submittedById: existing?.submittedById || req.user.id,
       ...(groupId ? { groupId: parseInt(groupId) } : {}),
       ...(thesisId ? { thesisId: parseInt(thesisId) } : {}),
     };
-
-    const scopeWhere = groupId ? { groupId: parseInt(groupId, 10) } : { thesisId: parseInt(thesisId, 10) };
-    const existing = await prisma.evaluation.findFirst({
-      where: { componentId: component.id, ...scopeWhere },
-    });
-
-    // Prevent editing if already completed
-    if (existing && existing.status === 'COMPLETED') {
-      return res.status(400).json({ error: 'Evaluation is already completed and cannot be edited.' });
-    }
 
     const isUpdate = !!existing;
     const evaluation = await (isUpdate
       ? prisma.evaluation.update({ where: { id: existing.id }, data })
       : prisma.evaluation.create({ data }));
     const auditAction = isUpdate ? 'UPDATE_MARKS' : 'SUBMIT_MARKS';
-    const auditDetails = isUpdate
-      ? `Updated ${component.evaluationType.replace('_', ' ').toLowerCase()} marks to ${data.marks ?? 'null'}/${component.maxMarks}`
-      : `Submitted ${data.marks ?? 'null'}/${component.maxMarks} marks for ${component.evaluationType.replace('_', ' ').toLowerCase()}`;
-    audit.log({ action: auditAction, entity: 'Evaluation', entityId: evaluation.id, details: auditDetails, performedById: req.user.id });
+    audit.log({ action: auditAction, entity: 'Evaluation', entityId: evaluation.id, details: 'Marks updated', performedById: req.user.id });
 
     // Build the new summary so the caller doesn't have to refetch
     const components = await prisma.evaluationComponent.findMany({
@@ -154,28 +138,6 @@ exports.submitComponentMarks = async (req, res) => {
         itemTitle: itemTitle || 'project',
         submitterId: req.user.id,
       });
-      // Email notification to students
-      try {
-        const emailService = require('../services/emailService');
-        if (groupId) {
-          const grp = await prisma.projectGroup.findUnique({
-            where: { id: parseInt(groupId) },
-            include: { members: { include: { student: { select: { email: true } } } } },
-          });
-          const studentEmails = grp?.members?.map(m => m.student.email).filter(Boolean) || [];
-          if (studentEmails.length) {
-            emailService.notifyEvaluationSubmitted(studentEmails, grp.name, itemTitle, `${submitter.firstName} ${submitter.lastName}`, component.evaluationType, `${data.marks ?? '-'}/${component.maxMarks}`);
-          }
-        } else if (thesisId) {
-          const th = await prisma.thesis.findUnique({
-            where: { id: parseInt(thesisId) },
-            include: { student: { select: { email: true } } },
-          });
-          if (th?.student?.email) {
-            emailService.notifyEvaluationSubmitted([th.student.email], `${th.student.firstName} ${th.student.lastName} (Thesis)`, itemTitle, `${submitter.firstName} ${submitter.lastName}`, component.evaluationType, `${data.marks ?? '-'}/${component.maxMarks}`);
-          }
-        }
-      } catch (e) { console.error('email notification error:', e.message); }
     } catch (e) { console.error('notifyMarksSubmitted:', e.message); }
 
     res.status(existing ? 200 : 201).json({ evaluation, summary });
@@ -329,17 +291,26 @@ exports.completeEvaluation = async (req, res) => {
     const componentId = parseInt(req.params.id);
     const { groupId, thesisId } = req.body;
 
-    const evaluation = await prisma.evaluation.findUnique({
-      where: { componentId },
+    if (!groupId && !thesisId) {
+      return res.status(400).json({ error: 'groupId or thesisId is required' });
+    }
+
+    // Scope the query to the specific group or thesis
+    const scopeWhere = groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) };
+
+    const evaluation = await prisma.evaluation.findFirst({
+      where: { componentId, ...scopeWhere },
       include: { component: true },
     });
     if (!evaluation) {
       return res.status(404).json({ error: 'Evaluation not found. Submit marks first.' });
     }
-    if (evaluation.status === 'COMPLETED') {
+
+    // Prevent re-completing an already completed evaluation
+    if (evaluation.status === 'COMPLETED' && !['COORDINATOR', 'MAINTAINER'].includes(req.user.role)) {
       return res.status(400).json({ error: 'Evaluation already completed.' });
     }
-    if (req.user.role !== evaluation.component.evaluatorRole) {
+    if (!['COORDINATOR', 'MAINTAINER'].includes(req.user.role) && req.user.role !== evaluation.component.evaluatorRole) {
       return res.status(403).json({ error: 'You cannot complete this evaluation.' });
     }
 

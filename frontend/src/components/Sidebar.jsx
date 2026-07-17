@@ -21,10 +21,14 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/maintainer/departments', label: 'Departments', icon: 'account_balance' },
   ];
 
+  const degreeType = user?.program?.degreeType;
+  const isBachelor = degreeType === 'BACHELOR';
+  const isMaster = degreeType === 'MASTER';
+
   const coordinatorLinks = [
     { path: '/coordinator', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/coordinator/bachelor', label: 'Bachelor Projects', icon: 'school' },
-    { path: '/coordinator/master', label: "Master's Thesis", icon: 'library_books' },
+    ...(!isMaster ? [{ path: '/coordinator/bachelor', label: 'Bachelor Projects', icon: 'school' }] : []),
+    ...(!isBachelor ? [{ path: '/coordinator/master', label: "Master's Thesis", icon: 'library_books' }] : []),
     { path: '/coordinator/evaluations', label: 'Evaluations', icon: 'grading' },
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
     { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },

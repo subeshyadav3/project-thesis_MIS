@@ -1,15 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
+import { formatYearSemester } from '../utils/romanNumerals';
 
 function Profile() {
   const navigate = useNavigate();
   const toast = useToast();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [showResetForm, setShowResetForm] = useState(false);
+
+  useEffect(() => {
+    api.get('/auth/me').then(({ data }) => {
+      setUserData(data);
+      localStorage.setItem('user', JSON.stringify(data));
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const cachedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = userData || cachedUser;
   const [resetForm, setResetForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [resetting, setResetting] = useState(false);
 
@@ -78,10 +90,34 @@ function Profile() {
                 <span className="detail-label">Role</span>
                 <span>{roleLabel}</span>
               </div>
+              {user.role === 'STUDENT' && (
+                <div className="detail-item">
+                  <span className="detail-label">Degree Type</span>
+                  <span>{user?.degreeType}</span>
+                </div>
+              )}
+              {user.designation && (
+                <div className="detail-item">
+                  <span className="detail-label">Designation</span>
+                  <span>{user.designation}</span>
+                </div>
+              )}
               <div className="detail-item">
-                <span className="detail-label">Degree Type</span>
-                <span>{user?.degreeType}</span>
+                <span className="detail-label">Program</span>
+                <span>{user.program?.name ? `${user.program.name} (${user.program.code})` : '—'}</span>
               </div>
+              <div className="detail-item">
+                <span className="detail-label">Department</span>
+                <span>{user.department?.name || '—'}</span>
+              </div>
+              {user.role === 'STUDENT' && user.currentYear && (
+                <div className="detail-item">
+                  <span className="detail-label">Year / Semester</span>
+                  <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--color-primary)' }}>
+                    {formatYearSemester(user.currentYear, user.currentSemester)}
+                  </span>
+                </div>
+              )}
 
             </div>
           </div>
