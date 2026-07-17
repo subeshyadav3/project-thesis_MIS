@@ -34,11 +34,11 @@ function StudentProjectDetail() {
       .then(({ data }) => setAssignment(data))
       .catch(err => { toast.error(err.response?.data?.error || 'Failed to load assignment'); setAssignment(null); });
 
-    // Also pull the canonical component list + evaluations to show progress
+    // Also pull evaluations (for progress overview) — silently handle permission errors
     const evalEndpoint = isGroup ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint)
       .then(({ data }) => setEvaluationsData(data))
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load evaluations'); setEvaluationsData(null); })
+      .catch(() => { setEvaluationsData(null); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
@@ -382,10 +382,28 @@ function StudentProjectDetail() {
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>{r.content}</p>
+                  <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.5 }}>{r.content}</p>
                   <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 6 }}>
                     Issued {new Date(r.createdAt).toLocaleDateString()} at {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
+                </div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
+                    onClick={() => window.open(`/api/supervisors/recommendation/${r.id}/pdf`, '_blank')}
+                    title="View Recommendation PDF">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                  </button>
+                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const a = document.createElement('a');
+                      a.href = `/api/supervisors/recommendation/${r.id}/pdf`;
+                      a.download = `recommendation_${r.id}.pdf`;
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    }}
+                    title="Download PDF">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                  </button>
                 </div>
               </div>
             ))}
