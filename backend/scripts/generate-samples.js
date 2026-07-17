@@ -29,8 +29,11 @@ for (const f of OLD_FILES) {
 }
 
 // ── Helper: generate Nepali-style roll numbers ──
+// Bachelor uses 3-digit suffix (e.g. 080BCT001), master uses 2-digit (e.g. 080MSNCS01)
 function roll(code, i, batch = '078') {
-  return `${batch}${code}${String(i).padStart(3, '0')}`;
+  const isMaster = ['MSNCS','MSICE','MSDSA','MSCSKE','MSCS'].some(c => code.startsWith(c));
+  const digits = isMaster ? 2 : 3;
+  return `${batch}${code}${String(i).padStart(digits, '0')}`;
 }
 
 // ── Sample supervisor/examiner names for templates ──

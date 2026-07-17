@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
-const { computeCurrentYearSemester } = require('../utils/computeYearSemester');
+const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
@@ -25,47 +25,10 @@ function extractBatchFromRoll(rollNumber) {
   return match ? match[1] : null;
 }
 
-/**
- * Compute current year and semester from batch.
- * batch "080" → year 2080, then compute year/semester based on current date.
- * Academic year starts in Mangshir (≈ November, month 11).
- */
-function computeCurrentYearSemesterFromBatch(batch, degreeType) {
-  if (!batch) return { currentYear: null, currentSemester: null };
 
-  const offset = parseInt(batch);
-  const batchYear = offset < 100 ? 2000 + offset : offset;
-
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-
-  // Academic year starts Nov (month 11)
-  let academicYearStart;
-  if (currentMonth >= 11) {
-    academicYearStart = currentYear;
-  } else {
-    academicYearStart = currentYear - 1;
-  }
-
-  const monthsSinceStart = currentMonth >= 11
-    ? currentMonth - 11
-    : (12 - 11) + currentMonth;
-
-  const semInYear = monthsSinceStart < 6 ? 1 : 2;
-  const yearsSinceBatch = academicYearStart - batchYear;
-  const totalSemesters = yearsSinceBatch * 2 + (semInYear - 1);
-
-  const maxYear = degreeType === 'MASTER' ? 2 : 4;
-  const year = Math.min(Math.max(1, Math.ceil((totalSemesters + 1) / 2)), maxYear);
-  const semester = Math.min(Math.max(1, totalSemesters - (year - 1) * 2 + 1), 2);
-
-  return { currentYear: year, currentSemester: semester };
-}
 
 function enrichWithComputedYearSemester(user) {
   if (user.role !== 'STUDENT' || !user.batch) return user;
-  const maxYear = user.degreeType === 'MASTER' ? 2 : 4;
   const computed = computeCurrentYearSemesterFromBatch(user.batch, user.degreeType);
   if (computed.currentYear) {
     user.currentYear = computed.currentYear;
