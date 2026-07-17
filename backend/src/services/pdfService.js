@@ -11,26 +11,15 @@ function generateRecommendationPDF({ studentName, projectTitle, thesisTitle, sup
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
     // ── Letterhead ──
-    // IOE Logo (left) + TPMS header
-    const logoSize = 50;
-    try {
-      // Try to embed the IOE logo from URL (will be downloaded in browser when viewing)
-      const logoUrl = 'https://ioe.tu.edu.np/assets/logo.png';
-      doc.image(logoUrl, doc.page.margins.left, doc.page.margins.top - 10, { width: logoSize, height: logoSize });
-    } catch (e) {
-      // Logo unavailable — just skip it
-    }
-
-    // TPMS Header — right-aligned
-    const headerX = doc.page.margins.left + logoSize + 20;
-    doc.fontSize(20).font('Helvetica-Bold').fillColor('#1a237e')
-      .text('THESIS / PROJECT MANAGEMENT SYSTEM', headerX, doc.page.margins.top - 5, { width: pageWidth - logoSize - 20, align: 'center' });
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('#1a237e')
+      .text('THESIS / PROJECT MANAGEMENT SYSTEM', { align: 'center' });
+    doc.moveDown(0.1);
     doc.fontSize(10).font('Helvetica').fillColor('#444')
-      .text('Department of Electronics and Computer Engineering', headerX, doc.page.margins.top + 18, { width: pageWidth - logoSize - 20, align: 'center' });
+      .text('Department of Electronics and Computer Engineering', { align: 'center' });
     doc.fontSize(9).fillColor('#666')
-      .text('Institute of Engineering, Tribhuvan University — Pulchowk Campus, Lalitpur, Nepal', headerX, doc.page.margins.top + 33, { width: pageWidth - logoSize - 20, align: 'center' });
+      .text('Institute of Engineering, Tribhuvan University — Pulchowk Campus, Lalitpur, Nepal', { align: 'center' });
 
-    doc.moveDown(4);
+    doc.moveDown(0.5);
     const lineY = doc.y;
 
     // Decorative horizontal line
