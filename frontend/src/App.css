@@ -1088,6 +1088,9 @@
   .btn-danger { background: var(--color-error); color: var(--color-on-error); }
   .btn-danger:hover { background: #b91c1c; }
 
+  .btn-warning { background: var(--color-warning); color: var(--color-on-warning); }
+  .btn-warning:hover { background: #c2410c; }
+
   .btn-success { background: var(--color-success); color: var(--color-on-success); }
   .btn-success:hover { background: #15803d; }
 
@@ -3206,6 +3209,20 @@ a:focus-visible {
 
 .notification-item.unread:hover {
   background: var(--color-secondary-container);
+}
+
+.notification-item-rejected {
+  background: var(--color-error-container) !important;
+}
+.notification-item-rejected:hover {
+  background: #fecaca !important;
+}
+.notification-item-rejected .notification-item-icon {
+  background: var(--color-error-container);
+  color: var(--color-on-error-container);
+}
+.notification-item-rejected .notification-item-text {
+  color: var(--color-on-error-container);
 }
 
 .notification-item-icon {

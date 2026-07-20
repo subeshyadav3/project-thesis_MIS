@@ -13,9 +13,23 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   const [downloading, setDownloading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState('');
-  const isScopeLocked = !!initialScope;
-  const [pdfScope, setPdfScope] = useState(initialScope || 'both');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isScopeLocked = !!initialScope;
+  // Auto-detect: if initialScope is 'external' but current user is the thesis's final external examiner, default to external-final
+  const computedInitial = useMemo(() => {
+    if (initialScope === 'external' && user.role === 'EXTERNAL_EXAMINER' && item) {
+      if (item.externalFinal?.id === user.id) return 'external-final';
+    }
+    return initialScope;
+  }, [initialScope, user.role, user.id, item]);
+  const [pdfScope, setPdfScope] = useState(computedInitial || 'both');
+
+  // Keep scope in sync when computedInitial changes (data loads)
+  useEffect(() => {
+    if (computedInitial && isScopeLocked) {
+      setPdfScope(computedInitial);
+    }
+  }, [computedInitial, isScopeLocked]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +63,9 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
       ? components.filter(c =>
           pdfScope === 'supervisor'
             ? c.evaluatorRole === 'SUPERVISOR'
-            : c.evaluatorRole === 'EXTERNAL_EXAMINER'
+            : pdfScope === 'external'
+              ? c.evaluationType === 'EXTERNAL_MIDTERM'
+              : c.evaluationType === 'EXTERNAL_FINAL'
         )
       : components;
     return ['COORDINATOR', 'MAINTAINER'].includes(user.role)
@@ -204,7 +220,10 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
                   {/* Section header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                      {ROLE_LABEL[role] || role}
+                      {role === 'SUPERVISOR' ? 'Supervisor' :
+                       role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)' :
+                       role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)' :
+                       ROLE_LABEL[role] || role}
                     </span>
                     <div style={{ flex: 1, height: 1, background: 'var(--color-outline-variant)' }} />
                   </div>

@@ -175,6 +175,7 @@ model User {
   assignmentRequestsSent      AssignmentRequest[]      @relation("AssignmentRequestFrom")
   assignmentRequestsReceived  AssignmentRequest[]      @relation("AssignmentRequestTo")
   assignmentRequestSupervisor AssignmentRequest[]      @relation("AssignmentRequestSupervisor")
+  crossProgramRequestedTheses Thesis[]                 @relation("CrossProgramRequester")
   invitationsSent             GroupInvitation[]        @relation("GroupInviter")
   invitationsReceived         GroupInvitation[]        @relation("GroupInvitee")
   groupsFormed                ProjectGroup[]           @relation("GroupFormer")
@@ -294,6 +295,8 @@ model Thesis {
   externalMidTerm   User?    @relation("ExternalMidTerm", fields: [externalMidTermId], references: [id], onDelete: SetNull)
   externalFinalId   Int?
   externalFinal     User?    @relation("ExternalFinal", fields: [externalFinalId], references: [id], onDelete: SetNull)
+  crossProgramRequestedById Int?
+  crossProgramRequestedBy   User?   @relation("CrossProgramRequester", fields: [crossProgramRequestedById], references: [id], onDelete: SetNull)
   cluster        String?
   batch          String?
   academicYearId Int

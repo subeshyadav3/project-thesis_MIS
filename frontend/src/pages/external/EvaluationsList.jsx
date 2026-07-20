@@ -14,6 +14,46 @@ function ExternalEvaluationsList() {
   const [activeTab, setActiveTab] = useState('groups');
   const [loading, setLoading] = useState(true);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadProjectType, setUploadProjectType] = useState('MINOR');
+  const [uploading, setUploading] = useState(false);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [bulkYearId, setBulkYearId] = useState('');
+
+  const handleFileUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) { toast.warning('Select a file'); return; }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      if (activeTab === 'groups') {
+        formData.append('projectType', uploadProjectType);
+        await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        toast.success('Groups imported successfully');
+      } else {
+        if (!bulkYearId) { toast.warning('Select an academic year'); setUploading(false); return; }
+        formData.append('academicYearId', bulkYearId);
+        const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        toast.success(`${data.stats?.matched || 0} theses matched`);
+      }
+      setShowUpload(false);
+      setSelectedFile(null);
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const loadData = () => {
+    setLoading(true);
+    Promise.all([
+      api.get('/external-examiners/groups').then(({ data }) => setGroups(data)).catch(() => {}),
+      api.get('/external-examiners/theses').then(({ data }) => setTheses(data)).catch(() => {}),
+      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)).catch(() => {}),
+    ]).catch((err) => toast.error(err.response?.data?.error || 'Failed to load data'))
+      .finally(() => setLoading(false));
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const toast = useToast();
   const navigate = useNavigate();
@@ -26,6 +66,7 @@ function ExternalEvaluationsList() {
     Promise.all([
       api.get('/external-examiners/groups', { signal }).then(({ data }) => setGroups(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
       api.get('/external-examiners/theses', { signal }).then(({ data }) => setTheses(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
+      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)).catch(() => {}),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
       .finally(() => setLoading(false));
     return () => controller.abort();
@@ -79,6 +120,12 @@ function ExternalEvaluationsList() {
         <TableSkeleton rows={5} cols={6} />
       ) : (
         <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
+              <span className="material-symbols-outlined">upload_file</span>
+              Upload Excel
+            </button>
+          </div>
           <div className="tabs" style={{ marginBottom: 24 }}>
             <div className={`tab ${activeTab === 'groups' ? 'active' : ''}`} onClick={() => setActiveTab('groups')}>
               <span className="material-symbols-outlined">school</span> Bachelor Projects ({groups.length})
@@ -199,6 +246,54 @@ function ExternalEvaluationsList() {
           onSave={() => { setPdfPreviewItem(null); window.location.reload(); }}
           {...(pdfPreviewItem.title ? { initialScope: 'external' } : {})}
         />
+      )}
+
+      {showUpload && (
+        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-icon info">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Upload Excel</h2>
+                <p>{activeTab === 'groups' ? 'Import groups from an Excel spreadsheet' : 'Import theses from an Excel spreadsheet'}</p>
+              </div>
+            </div>
+            <form onSubmit={handleFileUpload}>
+              {activeTab === 'groups' ? (
+                <div className="form-group">
+                  <label>Project Type</label>
+                  <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
+                    <option value="MINOR">Minor Project</option>
+                    <option value="MAJOR">Major Project</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Academic Year</label>
+                  <select value={bulkYearId} onChange={e => setBulkYearId(e.target.value)} required>
+                    <option value="">Select year...</option>
+                    {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="form-group">
+                <label>Excel File (.xlsx)</label>
+                <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
+                  <span className="material-symbols-outlined">close</span>Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={uploading || !selectedFile}>
+                  <span className="material-symbols-outlined">{uploading ? 'progress_activity' : 'upload'}</span>
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </PageLayout>
     </ErrorBoundary>

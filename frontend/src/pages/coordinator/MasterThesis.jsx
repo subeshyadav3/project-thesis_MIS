@@ -268,8 +268,12 @@ const handleComplete = async (id) => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/theses', createForm);
-      toast.success('Thesis created successfully');
+      const res = await api.post('/theses', createForm);
+      if (res.data?.crossProgram) {
+        toast.info('Cross-program thesis created. The student\'s coordinator has been notified for approval.');
+      } else {
+        toast.success('Thesis created successfully');
+      }
       setShowCreate(false);
       setCreateForm({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
       loadData();
@@ -919,11 +923,44 @@ return (
                         </span>
                       )}
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
-                        <span className="dot" />
-                        {t.status || 'PENDING'}
-                      </span>
+                    <td style={{ padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                        <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+                          <span className="dot" />
+                          {t.status || 'PENDING'}
+                        </span>
+                        {t.crossProgramRequestedBy && (
+                          <>
+                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 9, verticalAlign: 'middle' }}>swap_horiz</span>
+                              Cross-Program
+                            </span>
+                            {t.crossProgramRequestedBy.id === user.id && (
+                              <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
+                                <span className="dot" />Awaiting Approval
+                              </span>
+                            )}
+                            {t.crossProgramRequestedBy.id !== user.id && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button
+                                  className="icon-btn-sm success"
+                                  title="Approve cross-program thesis"
+                                  onClick={async (e) => { e.stopPropagation(); try { await api.put(`/theses/${t.id}/approve-cross-program`); toast.success('Cross-program thesis approved'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Approve failed'); } }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check</span>
+                                </button>
+                                <button
+                                  className="icon-btn-sm danger"
+                                  title="Reject cross-program thesis"
+                                  onClick={async (e) => { e.stopPropagation(); if (window.confirm('Reject this cross-program thesis? It will be removed.')) { try { await api.put(`/theses/${t.id}/reject-cross-program`); toast.success('Cross-program thesis rejected'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Reject failed'); } } }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {formatAcademicYear(t.academicYear) || '—'}

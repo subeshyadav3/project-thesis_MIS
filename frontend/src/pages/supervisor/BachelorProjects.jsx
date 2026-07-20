@@ -25,7 +25,28 @@ function SupervisorBachelorProjects() {
   const [yearFilter, setYearFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
+  const [showUpload, setShowUpload] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadProjectType, setUploadProjectType] = useState('MINOR');
+  const [uploading, setUploading] = useState(false);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const handleFileUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) { toast.warning('Select a file'); return; }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('projectType', uploadProjectType);
+      await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Groups imported successfully');
+      setShowUpload(false);
+      setSelectedFile(null);
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
 
   const loadData = useCallback(() => {
     const controller = new AbortController();
@@ -81,6 +102,7 @@ function SupervisorBachelorProjects() {
   const statusOptions = [
     { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
 
@@ -214,7 +236,11 @@ function SupervisorBachelorProjects() {
           <div className="table-toolbar-left">
             <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search groups, members, titles..." />
           </div>
-          <div className="table-toolbar-right">
+          <div className="table-toolbar-right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
+              <span className="material-symbols-outlined">upload_file</span>
+              Upload Excel
+            </button>
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
           </div>
         </div>
@@ -306,6 +332,44 @@ function SupervisorBachelorProjects() {
     </PageLayout></ErrorBoundary>
       {pdfPreviewItem && (
         <EvaluationPdfPreview type="group" id={pdfPreviewItem.id} onClose={() => setPdfPreviewItem(null)} onSave={loadData} />
+      )}
+
+      {showUpload && (
+        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-icon info">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Upload Excel</h2>
+                <p>Import groups from an Excel spreadsheet</p>
+              </div>
+            </div>
+            <form onSubmit={handleFileUpload}>
+              <div className="form-group">
+                <label>Project Type</label>
+                <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
+                  <option value="MINOR">Minor Project</option>
+                  <option value="MAJOR">Major Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Excel File (.xlsx)</label>
+                <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
+                  <span className="material-symbols-outlined">close</span>Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={uploading || !selectedFile}>
+                  <span className="material-symbols-outlined">{uploading ? 'progress_activity' : 'upload'}</span>
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </>
   );

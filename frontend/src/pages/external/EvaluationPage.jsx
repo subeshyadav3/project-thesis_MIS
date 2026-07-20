@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
@@ -115,12 +115,30 @@ function ExternalExaminerEvaluationPage() {
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
   const title = type === 'group' ? item?.projectTitle : item?.title;
 
+  // Auto-detect if this user is the mid-term or final external examiner for this thesis
+  const externalType = useMemo(() => {
+    if (type !== 'thesis' || !item) return null;
+    if (item.externalMidTerm?.id === user.id) return 'MIDTERM';
+    if (item.externalFinal?.id === user.id) return 'FINAL';
+    return null;
+  }, [item, user.id, type]);
+
   const orderedComponents = [...components].sort((a, b) => {
-    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
+    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER', 'EXTERNAL_MIDTERM', 'EXTERNAL_FINAL'];
     return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
   });
 
-  const currentUserComponents = components.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  // Filter components: for thesis with mid-term/final distinction, show only the relevant ones
+  const currentUserComponents = useMemo(() => {
+    if (type === 'thesis' && externalType === 'MIDTERM') {
+      return components.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM');
+    }
+    if (type === 'thesis' && externalType === 'FINAL') {
+      return components.filter(c => c.evaluationType === 'EXTERNAL_FINAL');
+    }
+    // Fallback for group projects or older theses without mid-term/final distinction
+    return components.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  }, [components, externalType, type]);
 
   if (loading) {
     return (
@@ -140,7 +158,7 @@ function ExternalExaminerEvaluationPage() {
 
   return (
     <ErrorBoundary>
-    <PageLayout title="Internal Examiner Evaluation" subtitle={title} user={user}
+    <PageLayout title={type === 'thesis' && externalType === 'FINAL' ? 'External (Final) Evaluation' : type === 'thesis' && externalType === 'MIDTERM' ? 'External (Mid-Term) Evaluation' : 'Internal Examiner Evaluation'} subtitle={title} user={user}
       actions={
         <>
           <button className="btn btn-outline btn-sm" onClick={() => setShowPdfPreview(true)}>

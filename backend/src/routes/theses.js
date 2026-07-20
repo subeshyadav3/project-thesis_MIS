@@ -17,6 +17,8 @@ router.put('/:id/status', authenticate, authorize('COORDINATOR'), thesisControll
 router.put('/:id/external-midterm', authenticate, authorize('COORDINATOR'), thesisController.assignMidTermExternal);
 router.put('/:id/external-final', authenticate, authorize('COORDINATOR'), thesisController.assignFinalExternal);
 router.post('/export', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.exportTheses);
+router.put('/:id/approve-cross-program', authenticate, authorize('COORDINATOR'), thesisController.approveCrossProgramThesis);
+router.put('/:id/reject-cross-program', authenticate, authorize('COORDINATOR'), thesisController.rejectCrossProgramThesis);
 router.delete('/:id', authenticate, authorize('COORDINATOR'), thesisController.deleteThesis);
 
 module.exports = router;
