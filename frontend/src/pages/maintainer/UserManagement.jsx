@@ -20,14 +20,30 @@ function UserManagement() {
   const [departments, setDepartments] = useState([]);
   const [showBulk, setShowBulk] = useState(false);
   const [bulkJson, setBulkJson] = useState('');
+  const [showExcelBulk, setShowExcelBulk] = useState(false);
+  const [excelUserType, setExcelUserType] = useState('STUDENT');
+  const [excelFile, setExcelFile] = useState(null);
+  const [excelUploading, setExcelUploading] = useState(false);
+  const [excelResult, setExcelResult] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isCoordinator = user.role === 'COORDINATOR';
   const isMaintainer = user.role === 'MAINTAINER';
+  const isMasterCoordinator = isCoordinator && user.program?.degreeType === 'MASTER';
   const toast = useToast();
 
   const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
+
+  const excelTemplateHref = excelUserType === 'STUDENT'
+    ? '/student_users_template.xlsx'
+    : excelUserType === 'SUPERVISOR'
+      ? '/supervisor_users_template.xlsx'
+      : '/external_users_template.xlsx';
+
+  const excelColumnsHint = excelUserType === 'STUDENT'
+    ? 'email, password, firstName, lastName, rollNumber, programCode, degreeType'
+    : 'email, password, firstName, lastName, designation';
 
   const loadUsers = () => {
     setLoading(true);
@@ -145,6 +161,12 @@ function UserManagement() {
         <button className="btn btn-outline btn-sm" onClick={() => setShowBulk(true)}>
           <span className="material-symbols-outlined">upload_file</span>
           Bulk Import
+        </button>
+      )}
+      {isMasterCoordinator && (
+        <button className="btn btn-secondary btn-sm" onClick={() => { setShowExcelBulk(true); setExcelResult(null); setExcelFile(null); }}>
+          <span className="material-symbols-outlined">upload_file</span>
+          Bulk Upload
         </button>
       )}
       <button className="btn btn-primary btn-sm" onClick={openCreate}>
@@ -400,6 +422,107 @@ function UserManagement() {
           </div>
         </div>
       )}
+
+      {showExcelBulk && (
+        <div className="modal-overlay" onClick={() => setShowExcelBulk(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <div className="modal-header-icon info">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Bulk Upload Users</h2>
+                <p>Choose user type, download the template, then upload Excel</p>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>User type</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[
+                  { value: 'STUDENT', label: 'Student' },
+                  { value: 'SUPERVISOR', label: 'Supervisor' },
+                  { value: 'EXTERNAL_EXAMINER', label: 'External Examiner' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { setExcelUserType(opt.value); setExcelResult(null); setExcelFile(null); }}
+                    style={{
+                      flex: 1, padding: '8px 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
+                      border: excelUserType === opt.value ? '2px solid var(--color-primary)' : '1px solid var(--color-outline)',
+                      background: excelUserType === opt.value ? 'var(--color-primary-container)' : 'var(--color-surface)',
+                      fontWeight: excelUserType === opt.value ? 600 : 400,
+                      minWidth: 0,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 8 }}>
+                Columns: {excelColumnsHint}
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>Excel file (.xlsx)</label>
+              <input type="file" accept=".xlsx,.xls" onChange={e => setExcelFile(e.target.files[0])} />
+              <a href={excelTemplateHref} download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, display: 'inline-block' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+                {' '}Download blank template
+              </a>
+            </div>
+
+            {excelResult && (
+              <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'var(--color-surface-container-low)', fontSize: 13 }}>
+                <div>Created: <strong>{excelResult.created}</strong> · Failed: <strong>{excelResult.failed}</strong></div>
+                {excelResult.errors?.length > 0 && (
+                  <ul style={{ margin: '8px 0 0', paddingLeft: 18, maxHeight: 120, overflow: 'auto', fontSize: 12 }}>
+                    {excelResult.errors.slice(0, 20).map((err, i) => (
+                      <li key={i}>Row {err.row || '?'}: {err.email} — {err.error}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => setShowExcelBulk(false)}>
+                <span className="material-symbols-outlined">close</span>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={excelUploading || !excelFile}
+                onClick={async () => {
+                  if (!excelFile) { toast.warning('Select a file'); return; }
+                  setExcelUploading(true);
+                  setExcelResult(null);
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', excelFile);
+                    formData.append('role', excelUserType);
+                    const { data } = await api.post('/users/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    setExcelResult(data);
+                    toast.success(data.message || `Created ${data.created} user(s)`);
+                    loadUsers();
+                  } catch (err) {
+                    toast.error(err.response?.data?.error || 'Upload failed');
+                  } finally {
+                    setExcelUploading(false);
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined">{excelUploading ? 'progress_activity' : 'upload'}</span>
+                {excelUploading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>

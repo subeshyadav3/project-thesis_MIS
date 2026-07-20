@@ -82,14 +82,24 @@ function ExternalEvaluationsList() {
 
   const thesesWithStatus = useMemo(() => {
     return theses.map(t => {
-      const extComps = (t.evaluationComponents || []).filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+      const isMid = t.externalRole === 'MIDTERM' || t.externalRole === 'BOTH' || t.externalMidTermId === user.id;
+      const isFinal = t.externalRole === 'FINAL' || t.externalRole === 'BOTH' || t.externalFinalId === user.id;
+      const externalRole = t.externalRole || (isMid && isFinal ? 'BOTH' : isMid ? 'MIDTERM' : isFinal ? 'FINAL' : null);
+
+      // Only count components for this examiner's phase(s)
+      const extComps = (t.evaluationComponents || []).filter(c => {
+        if (c.evaluatorRole !== 'EXTERNAL_EXAMINER') return false;
+        if (externalRole === 'MIDTERM') return c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_EXAMINER';
+        if (externalRole === 'FINAL') return c.evaluationType === 'EXTERNAL_FINAL' || c.evaluationType === 'EXTERNAL_EXAMINER';
+        return true;
+      });
       const statuses = extComps.map(c => t.evaluations?.find(e => e.componentId === c.id)?.status || 'DRAFT');
       const allCompleted = statuses.length > 0 && statuses.every(s => s === 'COMPLETED');
       const hasMarks = extComps.some(c => t.evaluations?.find(e => e.componentId === c.id)?.marks != null);
       const evalStatus = allCompleted ? 'COMPLETED' : 'DRAFT';
-      return { ...t, evalStatus, hasMarks };
+      return { ...t, evalStatus, hasMarks, externalRole };
     });
-  }, [theses]);
+  }, [theses, user.id]);
 
   const filteredGroups = useMemo(() => {
     if (!searchQuery) return groupsWithStatus;
@@ -201,6 +211,7 @@ function ExternalEvaluationsList() {
                     <tr>
                       <th>Student</th>
                       <th>Thesis Title</th>
+                      <th>Role</th>
                       <th>Status</th>
                       <th>Eval Status</th>
                       <th>Supervisor</th>
@@ -212,6 +223,20 @@ function ExternalEvaluationsList() {
                       <tr key={t.id} onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)} style={{ cursor: 'pointer' }}>
                         <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
                         <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
+                        <td>
+                          {t.externalRole === 'BOTH' ? (
+                            <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                              <span className="badge badge-info" style={{ fontSize: 11 }}>Mid-Term</span>
+                              <span className="badge badge-warning" style={{ fontSize: 11 }}>Final</span>
+                            </span>
+                          ) : t.externalRole === 'FINAL' ? (
+                            <span className="badge badge-warning" style={{ fontSize: 11 }}>Final</span>
+                          ) : t.externalRole === 'MIDTERM' ? (
+                            <span className="badge badge-info" style={{ fontSize: 11 }}>Mid-Term</span>
+                          ) : (
+                            <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>—</span>
+                          )}
+                        </td>
                         <td><span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}><span className="dot" />{t.status}</span></td>
                         <td>
                           <span className={`badge ${t.evalStatus === 'COMPLETED' ? 'badge-success' : ''}`} style={{ fontSize: 11 }}>
@@ -244,7 +269,13 @@ function ExternalEvaluationsList() {
           id={pdfPreviewItem.id}
           onClose={() => setPdfPreviewItem(null)}
           onSave={() => { setPdfPreviewItem(null); window.location.reload(); }}
-          {...(pdfPreviewItem.title ? { initialScope: 'external' } : {})}
+          {...(pdfPreviewItem.title ? {
+            initialScope: pdfPreviewItem.externalRole === 'FINAL'
+              ? 'external-final'
+              : pdfPreviewItem.externalRole === 'BOTH'
+                ? undefined
+                : 'external',
+          } : {})}
         />
       )}
 
