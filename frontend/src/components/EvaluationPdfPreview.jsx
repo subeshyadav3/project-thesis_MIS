@@ -17,8 +17,16 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   const isScopeLocked = !!initialScope;
   // Auto-detect: if initialScope is 'external' but current user is the thesis's final external examiner, default to external-final
   const computedInitial = useMemo(() => {
-    if (initialScope === 'external' && user.role === 'EXTERNAL_EXAMINER' && item) {
-      if (item.externalFinal?.id === user.id) return 'external-final';
+    if (initialScope === 'external') {
+      if (user.role === 'EXTERNAL_EXAMINER' && item) {
+        if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
+        if (item.externalMidTerm?.id === user.id && item.externalFinal?.id !== user.id) return 'external';
+      }
+      // Fallback: pick the one that has an assignment for this user
+      if (user.role === 'EXTERNAL_EXAMINER' && item) {
+        if (item.externalMidTerm?.id === user.id) return 'external';
+        if (item.externalFinal?.id === user.id) return 'external-final';
+      }
     }
     return initialScope;
   }, [initialScope, user.role, user.id, item]);
@@ -215,21 +223,28 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {displayedRoles.map((role, ri) => {
               const rf = roleFeedback[role] || { comments: '', suggestions: '' };
               const components = groupedByRole[role];
-              return (
-                <div key={role} style={{ marginBottom: ri < displayedRoles.length - 1 ? 18 : 0 }}>
+              // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
+              const sections = role === 'EXTERNAL_EXAMINER' && pdfScope === 'both'
+                ? [
+                    { key: 'mid', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
+                    { key: 'final', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
+                  ].filter(s => components.some(s.filter))
+                : [{ key: 'all', label: role === 'SUPERVISOR' ? 'Supervisor'
+                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)'
+                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)'
+                    : (ROLE_LABEL[role] || role), filter: () => true }];
+              return sections.map((section, si) => (
+                <div key={`${role}-${section.key}`} style={{ marginBottom: (ri < displayedRoles.length - 1 || si < sections.length - 1) ? 18 : 0 }}>
                   {/* Section header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                      {role === 'SUPERVISOR' ? 'Supervisor' :
-                       role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)' :
-                       role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)' :
-                       ROLE_LABEL[role] || role}
+                      {section.label}
                     </span>
                     <div style={{ flex: 1, height: 1, background: 'var(--color-outline-variant)' }} />
                   </div>
 
-                  {/* Marks for this role */}
-                  {components.map(component => (
+                  {/* Marks for this section */}
+                  {components.filter(section.filter).map(component => (
                     <div key={component.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '6px 8px', border: '1px solid var(--color-outline-variant)', borderRadius: 8 }}>
                       <label style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{component.name}<small style={{ display: 'block', fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>Max {component.maxMarks}</small></label>
                       <input type="number" min="0" max={component.maxMarks} step="0.01" value={marks[component.id] ?? ''} onChange={e => setMarks(prev => ({ ...prev, [component.id]: e.target.value }))} style={{ width: 72, padding: '5px 6px', fontSize: 13 }} />
@@ -238,16 +253,16 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
 
                   {/* Per-role comments & suggestions */}
                   <label style={{ display: 'block', marginTop: 10, fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
-                    Comments {displayedRoles.length > 1 ? `(${ROLE_LABEL[role] || role})` : ''}
+                    Comments {displayedRoles.length > 1 ? `(${section.label})` : ''}
                   </label>
                   <textarea rows={2} value={rf.comments} onChange={e => updateRoleFeedback(role, 'comments', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
 
                   <label style={{ display: 'block', marginTop: 8, fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
-                    Suggestions & recommendations {displayedRoles.length > 1 ? `(${ROLE_LABEL[role] || role})` : ''}
+                    Suggestions & recommendations {displayedRoles.length > 1 ? `(${section.label})` : ''}
                   </label>
                   <textarea rows={2} value={rf.suggestions} onChange={e => updateRoleFeedback(role, 'suggestions', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
                 </div>
-              );
+              ));
             })}
 
             {editableComponents.length > 0 && (

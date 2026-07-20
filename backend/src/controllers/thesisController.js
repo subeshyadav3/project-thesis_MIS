@@ -212,24 +212,31 @@ function generateEmail(firstName, lastName, role) {
 exports.bulkImportPreview = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const academicYearId = req.body.academicYearId ? parseInt(req.body.academicYearId) : null;
-    if (!academicYearId) return res.status(400).json({ error: 'academicYearId is required' });
 
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet);
 
-    // Load all candidates in the coordinator's department
+    // Derive academicYearId from Batch column (e.g. "080" → year "2080")
     const deptId = req.user.departmentId;
     const coordinatorProgram = req.user.role === 'COORDINATOR'
       ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
       : null;
-    const [allStudents, allSupervisors, allExternals, programs] = await Promise.all([
+    const [allStudents, allSupervisors, allExternals, programs, allAcademicYears] = await Promise.all([
       prisma.user.findMany({ where: { role: 'STUDENT', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } }),
       prisma.user.findMany({ where: { role: 'SUPERVISOR', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.user.findMany({ where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.program.findMany({ where: { departmentId: deptId }, select: { id: true, name: true, code: true, degreeType: true, cluster: true } }),
+      prisma.academicYear.findMany({ where: { departmentId: deptId }, select: { id: true, year: true } }),
     ]);
+
+    function resolveAcademicYearId(rawBatch) {
+      if (!rawBatch) return null;
+      let batch = rawBatch.replace(/^0+/, '');
+      const yearStr = '2' + batch.padStart(3, '0');
+      const found = allAcademicYears.find(a => a.year === yearStr);
+      return found ? found.id : null;
+    }
 
     const preview = [];
     let matchCount = 0;
@@ -254,6 +261,14 @@ exports.bulkImportPreview = async (req, res) => {
         ? programs.find(p => p.code.toLowerCase() === programValue.toLowerCase() || p.name.toLowerCase() === programValue.toLowerCase())
         : null;
       if (programValue && !importedProgram) warnings.push(`Program not found for "${programValue}"`);
+
+      const rowAcademicYearId = resolveAcademicYearId(batch);
+      const academicYearLabel = rowAcademicYearId
+        ? (allAcademicYears.find(a => a.id === rowAcademicYearId)?.year)
+        : null;
+      if (batch && !rowAcademicYearId) {
+        warnings.push(`Academic year not found for batch "${batch}" (no matching year registered for this department)`);
+      }
 
       // Match student
       let studentMatch = null;
@@ -332,6 +347,8 @@ exports.bulkImportPreview = async (req, res) => {
         title,
         batch,
         cluster,
+        academicYearId: rowAcademicYearId,
+        academicYearLabel,
         program: importedProgram ? { id: importedProgram.id, code: importedProgram.code, name: importedProgram.name, cluster: importedProgram.cluster } : null,
         programId: studentMatch?.user?.programId || null,
         studentMatch: studentMatch ? { id: studentMatch.user.id, name: `${studentMatch.user.firstName} ${studentMatch.user.lastName}`, score: studentMatch.score, status: 'matched' } : null,
@@ -358,11 +375,10 @@ exports.bulkImportPreview = async (req, res) => {
 // Step 2: Confirm import → create theses + assignments
 exports.bulkImportConfirm = async (req, res) => {
   try {
-    const { rows, academicYearId } = req.body;
+    const { rows } = req.body;
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return res.status(400).json({ error: 'rows array is required' });
     }
-    if (!academicYearId) return res.status(400).json({ error: 'academicYearId is required' });
 
     const created = [];
     const skipped = [];
@@ -375,7 +391,7 @@ exports.bulkImportConfirm = async (req, res) => {
         studentMatch, supervisorMatch, supervisorWillCreate,
         externalMidTermMatch, externalMidTermWillCreate,
         externalFinalMatch, externalFinalWillCreate,
-        title, batch, cluster,
+        title, batch, cluster, academicYearId,
       } = row;
 
       if (!studentMatch?.id && !row.studentMatch?.id) {
@@ -386,8 +402,13 @@ exports.bulkImportConfirm = async (req, res) => {
         skipped.push({ row: row.row, reason: 'No thesis title' });
         continue;
       }
+      if (!academicYearId) {
+        skipped.push({ row: row.row, reason: 'Academic year could not be resolved from batch' });
+        continue;
+      }
 
       const effectiveStudentId = studentMatch?.id || row.studentMatch?.id;
+      const effectiveAcademicYearId = parseInt(academicYearId);
 
       // Helper to auto-create a user and return the ID
       const autoCreateUser = async (willCreate, role) => {
@@ -459,7 +480,7 @@ exports.bulkImportConfirm = async (req, res) => {
 
         // Check for duplicate within the transaction
         const duplicate = await tx.thesis.findFirst({
-          where: { title, studentId: effectiveStudentId, academicYearId: parseInt(academicYearId) },
+          where: { title, studentId: effectiveStudentId, academicYearId: effectiveAcademicYearId },
         });
         if (duplicate) {
           skipped.push({ row: row.row, studentId: effectiveStudentId, reason: `Duplicate thesis: "${title}"` });
@@ -473,7 +494,7 @@ exports.bulkImportConfirm = async (req, res) => {
             projectType: 'MASTER',
             studentId: effectiveStudentId,
             status: resolvedSupervisorId ? 'ACTIVE' : 'PENDING',
-            academicYearId: parseInt(academicYearId),
+            academicYearId: effectiveAcademicYearId,
             supervisorId: resolvedSupervisorId,
             externalMidTermId: resolvedMidTermId,
             externalFinalId: resolvedFinalId,
@@ -512,7 +533,7 @@ exports.bulkImportConfirm = async (req, res) => {
             where: {
               type: 'THESIS',
               degreeType: 'MASTER',
-              academicYearId: parseInt(academicYearId),
+              academicYearId: effectiveAcademicYearId,
             },
           });
           if (activeAnnouncements.length > 0) {

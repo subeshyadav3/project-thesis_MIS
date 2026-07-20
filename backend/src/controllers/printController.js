@@ -233,29 +233,36 @@ function buildMasterFormat(data, scope = 'both') {
   const { title, name, supervisor, evaluations, student } = data;
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
-  const extEvals = evaluations.filter(e => e.evaluatorRole === 'External Examiner');
+  const midEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_MIDTERM');
+  const finalEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_FINAL');
+  // Fall back to legacy "External Examiner" label and split evenly if no evaluationType is set
+  const legacyExt = evaluations.filter(e => e.evaluatorRole === 'External Examiner' && !e.evaluationType);
 
   const supCriteria = supEvals.map(e => ({
-    name: e.name,
-    max: e.maxMarks,
+    name: e.name, max: e.maxMarks,
     marks: e.marks !== null && e.marks !== undefined ? e.marks : null,
     comment: e.comment || '',
   }));
-  const extCriteria = extEvals.map(e => ({
-    name: e.name,
-    max: e.maxMarks,
+
+  const buildExtCriteria = (evals) => evals.map(e => ({
+    name: e.name, max: e.maxMarks,
     marks: e.marks !== null && e.marks !== undefined ? e.marks : null,
     comment: e.comment || '',
   }));
+  const midCriteria = buildExtCriteria(midEvals.length ? midEvals : legacyExt);
+  const finalCriteria = buildExtCriteria(finalEvals.length ? finalEvals : legacyExt);
 
   const supComments = supEvals.filter(e => e.comment).map(e => e.comment);
-  const extComments = extEvals.filter(e => e.comment).map(e => e.comment);
-
-  // Extract feedback comments and suggestions per role
   const supFeedbackComments = supEvals.map(e => e.comments).filter(Boolean).join('\n');
   const supFeedbackSuggestions = supEvals.map(e => e.suggestions).filter(Boolean).join('\n');
-  const extFeedbackComments = extEvals.map(e => e.comments).filter(Boolean).join('\n');
-  const extFeedbackSuggestions = extEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+
+  const midComments = midEvals.filter(e => e.comment).map(e => e.comment);
+  const midFeedbackComments = midEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const midFeedbackSuggestions = midEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+
+  const finalComments = finalEvals.filter(e => e.comment).map(e => e.comment);
+  const finalFeedbackComments = finalEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const finalFeedbackSuggestions = finalEvals.map(e => e.suggestions).filter(Boolean).join('\n');
 
   const studentName = name;
   const rollNo = student?.rollNumber || '—';
@@ -273,14 +280,14 @@ function buildMasterFormat(data, scope = 'both') {
   }
   if (includeExt) {
     pages += `
-    <div${includeSup ? '' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions, 'midterm')}
+    <div${includeSup ? ' style="page-break-after:always;"' : ''}>
+      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm')}
     </div>`;
   }
   if (includeExtFinal) {
     pages += `
     <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions, 'final')}
+      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final')}
     </div>`;
   }
 

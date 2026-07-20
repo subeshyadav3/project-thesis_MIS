@@ -97,8 +97,8 @@ function computeSummary(evaluations, components, projectType) {
       evaluationType: c.evaluationType,
       name: c.name,
       evaluatorRole: c.evaluatorRole,
-      stage: c.evaluationType === 'SUPERVISOR' || c.evaluationType === 'EXTERNAL_EXAMINER' || c.evaluationType === 'FINAL_DEFENSE' ? 'FINAL'
-        : c.evaluationType === 'MIDTERM_DEFENSE' ? 'MID_TERM' : 'PROPOSAL',
+      stage: c.evaluationType === 'SUPERVISOR' || c.evaluationType === 'EXTERNAL_EXAMINER' || c.evaluationType === 'FINAL_DEFENSE' || c.evaluationType === 'EXTERNAL_FINAL' ? 'FINAL'
+        : c.evaluationType === 'MIDTERM_DEFENSE' || c.evaluationType === 'EXTERNAL_MIDTERM' ? 'MID_TERM' : 'PROPOSAL',
       maxMarks: c.maxMarks,
       marks: evalRec ? evalRec.marks : null,
       comment: evalRec ? evalRec.comment : null,
