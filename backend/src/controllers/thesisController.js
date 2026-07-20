@@ -25,6 +25,8 @@ exports.getTheses = async (req, res) => {
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
@@ -45,6 +47,8 @@ exports.getThesis = async (req, res) => {
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true, programId: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
@@ -471,6 +475,107 @@ exports.deleteThesis = async (req, res) => {
     audit.log({ action: 'DELETE', entity: 'Thesis', entityId: id, details: `Deleted thesis "${thesis.title}"`, performedById: req.user.id });
     res.json({ message: 'Thesis deleted' });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.assignMidTermExternal = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { externalExaminerId } = req.body;
+    const thesis = await prisma.thesis.findUnique({ where: { id } });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    // Remove old examiner assignment if exists
+    if (thesis.externalMidTermId) {
+      await prisma.examinerAssignment.deleteMany({
+        where: { externalExaminerId: thesis.externalMidTermId, thesisId: id },
+      }).catch(() => {});
+    }
+
+    if (externalExaminerId) {
+      const extId = parseInt(externalExaminerId);
+      // Create new examiner assignment
+      await prisma.examinerAssignment.create({
+        data: { externalExaminerId: extId, thesisId: id, assignedById: req.user.id },
+      }).catch((err) => {
+        if (err.code === 'P2002') {
+          // Reassign — update instead
+          return prisma.examinerAssignment.upsert({
+            where: { externalExaminerId_thesisId: { externalExaminerId: extId, thesisId: id } },
+            update: { assignedById: req.user.id },
+            create: { externalExaminerId: extId, thesisId: id, assignedById: req.user.id },
+          });
+        }
+        throw err;
+      });
+      // Update thesis
+      await prisma.thesis.update({
+        where: { id },
+        data: { externalMidTermId: extId },
+      });
+    } else {
+      // Remove midterm external
+      await prisma.thesis.update({
+        where: { id },
+        data: { externalMidTermId: null },
+      });
+    }
+
+    audit.log({ action: 'ASSIGN_MIDTERM_EXTERNAL', entity: 'Thesis', entityId: id, details: `Mid-term external examiner ${externalExaminerId ? 'assigned' : 'removed'} for thesis "${thesis.title}"`, performedById: req.user.id });
+    res.json({ message: externalExaminerId ? 'Mid-term external examiner assigned' : 'Mid-term external examiner removed' });
+  } catch (error) {
+    console.error('assignMidTermExternal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.assignFinalExternal = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { externalExaminerId } = req.body;
+    const thesis = await prisma.thesis.findUnique({ where: { id } });
+    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    // Remove old examiner assignment if exists
+    if (thesis.externalFinalId) {
+      await prisma.examinerAssignment.deleteMany({
+        where: { externalExaminerId: thesis.externalFinalId, thesisId: id },
+      }).catch(() => {});
+    }
+
+    if (externalExaminerId) {
+      const extId = parseInt(externalExaminerId);
+      // Create new examiner assignment
+      await prisma.examinerAssignment.create({
+        data: { externalExaminerId: extId, thesisId: id, assignedById: req.user.id },
+      }).catch((err) => {
+        if (err.code === 'P2002') {
+          return prisma.examinerAssignment.upsert({
+            where: { externalExaminerId_thesisId: { externalExaminerId: extId, thesisId: id } },
+            update: { assignedById: req.user.id },
+            create: { externalExaminerId: extId, thesisId: id, assignedById: req.user.id },
+          });
+        }
+        throw err;
+      });
+      // Update thesis
+      await prisma.thesis.update({
+        where: { id },
+        data: { externalFinalId: extId },
+      });
+    } else {
+      // Remove final external
+      await prisma.thesis.update({
+        where: { id },
+        data: { externalFinalId: null },
+      });
+    }
+
+    audit.log({ action: 'ASSIGN_FINAL_EXTERNAL', entity: 'Thesis', entityId: id, details: `Final external examiner ${externalExaminerId ? 'assigned' : 'removed'} for thesis "${thesis.title}"`, performedById: req.user.id });
+    res.json({ message: externalExaminerId ? 'Final external examiner assigned' : 'Final external examiner removed' });
+  } catch (error) {
+    console.error('assignFinalExternal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

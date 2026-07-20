@@ -38,15 +38,19 @@ function MasterThesis() {
   const createSupRef = useRef(null);
   const [examiners, setExaminers] = useState([]);
   const [editSupId, setEditSupId] = useState('');
-  const [editExamId, setEditExamId] = useState('');
+  const [editMidTermExamId, setEditMidTermExamId] = useState('');
+  const [editFinalExamId, setEditFinalExamId] = useState('');
   const [editSupSearch, setEditSupSearch] = useState('');
-  const [editExamSearch, setEditExamSearch] = useState('');
+  const [editMidTermExamSearch, setEditMidTermExamSearch] = useState('');
+  const [editFinalExamSearch, setEditFinalExamSearch] = useState('');
   const [editSupOpen, setEditSupOpen] = useState(false);
-  const [editExamOpen, setEditExamOpen] = useState(false);
+  const [editMidTermExamOpen, setEditMidTermExamOpen] = useState(false);
+  const [editFinalExamOpen, setEditFinalExamOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const editSupRef = useRef(null);
-  const editExamRef = useRef(null);
+  const editMidTermExamRef = useRef(null);
+  const editFinalExamRef = useRef(null);
   const [examSearch, setExamSearch] = useState('');
   const [examOpen, setExamOpen] = useState(false);
   const examRef = useRef(null);
@@ -104,14 +108,24 @@ useEffect(() => {
   }, [editSupOpen]);
 
   useEffect(() => {
-    const handleEditExamOutside = (e) => {
-      if (editExamRef.current && !editExamRef.current.contains(e.target)) {
-        setEditExamOpen(false);
+    const handleEditMidTermExamOutside = (e) => {
+      if (editMidTermExamRef.current && !editMidTermExamRef.current.contains(e.target)) {
+        setEditMidTermExamOpen(false);
       }
     };
-    if (editExamOpen) document.addEventListener('mousedown', handleEditExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditExamOutside);
-  }, [editExamOpen]);
+    if (editMidTermExamOpen) document.addEventListener('mousedown', handleEditMidTermExamOutside);
+    return () => document.removeEventListener('mousedown', handleEditMidTermExamOutside);
+  }, [editMidTermExamOpen]);
+
+  useEffect(() => {
+    const handleEditFinalExamOutside = (e) => {
+      if (editFinalExamRef.current && !editFinalExamRef.current.contains(e.target)) {
+        setEditFinalExamOpen(false);
+      }
+    };
+    if (editFinalExamOpen) document.addEventListener('mousedown', handleEditFinalExamOutside);
+    return () => document.removeEventListener('mousedown', handleEditFinalExamOutside);
+  }, [editFinalExamOpen]);
 
   useEffect(() => {
     const handleExamOutside = (e) => {
@@ -286,23 +300,16 @@ const handleComplete = async (id) => {
           }
         }
       }
-      if (editExamId !== undefined) {
-        const currentExam = showDetail?.examinerAssignments?.[0]?.externalExaminerId?.toString();
-        if (editExamId !== currentExam) {
-          if (editExamId) {
-            if (currentExam) {
-              const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
-              if (assignmentId) {
-                promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
-              }
-            }
-            promises.push(api.post('/examiner-assignments/thesis', { thesisId, externalExaminerId: parseInt(editExamId) }));
-          } else if (currentExam) {
-            const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
-            if (assignmentId) {
-              promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
-            }
-          }
+      if (editMidTermExamId !== undefined) {
+        const currentMidTerm = showDetail?.externalMidTerm?.id?.toString();
+        if (editMidTermExamId !== currentMidTerm) {
+          promises.push(api.put(`/theses/${thesisId}/external-midterm`, { externalExaminerId: editMidTermExamId ? parseInt(editMidTermExamId) : null }));
+        }
+      }
+      if (editFinalExamId !== undefined) {
+        const currentFinal = showDetail?.externalFinal?.id?.toString();
+        if (editFinalExamId !== currentFinal) {
+          promises.push(api.put(`/theses/${thesisId}/external-final`, { externalExaminerId: editFinalExamId ? parseInt(editFinalExamId) : null }));
         }
       }
       const results = await Promise.all(promises);
@@ -365,6 +372,12 @@ const handleComplete = async (id) => {
     if (mode === 'edit') {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
+      setEditSupId(t.supervisorId ? t.supervisorId.toString() : '');
+      setEditMidTermExamId(t.externalMidTerm?.id?.toString() || '');
+      setEditFinalExamId(t.externalFinal?.id?.toString() || '');
+      setEditSupSearch('');
+      setEditMidTermExamSearch('');
+      setEditFinalExamSearch('');
     }
   };
 
@@ -497,6 +510,30 @@ return (
                     {showDetail.status || 'PENDING'}
                   </span>
                 </div>
+                <div className="detail-item">
+                  <span className="detail-label">External (Mid-Term)</span>
+                  <span>
+                    {showDetail.externalMidTerm ? (
+                      <>{showDetail.externalMidTerm.firstName} {showDetail.externalMidTerm.lastName}</>
+                    ) : (
+                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="dot" />Not Assigned
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">External (Final)</span>
+                  <span>
+                    {showDetail.externalFinal ? (
+                      <>{showDetail.externalFinal.firstName} {showDetail.externalFinal.lastName}</>
+                    ) : (
+                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="dot" />Not Assigned
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -585,37 +622,85 @@ return (
                       )}
                     </div>
                   </div>
-                  <div className="form-group" ref={editExamRef} style={{ flex: 1, minWidth: 250 }}>
-                    <label>Internal Examiner</label>
+                  <div className="form-group" ref={editMidTermExamRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>External Examiner (Mid-Term)</label>
                     <div className="sup-dropdown-trigger">
-                      <div className="sup-search-wrapper" onClick={() => setEditExamOpen(true)}>
+                      <div className="sup-search-wrapper" onClick={() => setEditMidTermExamOpen(true)}>
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
-                          value={editExamSearch}
-                          onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
-                          onFocus={() => setEditExamOpen(true)}
+                          placeholder={editMidTermExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editMidTermExamId)) : 'No mid-term examiner'}
+                          value={editMidTermExamSearch}
+                          onChange={e => { setEditMidTermExamSearch(e.target.value); setEditMidTermExamOpen(true); }}
+                          onFocus={() => setEditMidTermExamOpen(true)}
                         />
-                        {editExamId && (
-                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditExamId(''); setEditExamSearch(''); }}>
+                        {editMidTermExamId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditMidTermExamId(''); setEditMidTermExamSearch(''); }}>
                             <span className="material-symbols-outlined">close</span>
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
                       </div>
-                      {editExamOpen && (
+                      {editMidTermExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
-                              const selected = editExamId === e.id.toString();
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
+                              const selected = editMidTermExamId === e.id.toString();
                               return (
                                 <div
                                   key={e.id}
                                   className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                                  onClick={() => { setEditExamId(e.id.toString()); setEditExamSearch(''); setEditExamOpen(false); }}
+                                  onClick={() => { setEditMidTermExamId(e.id.toString()); setEditMidTermExamSearch(''); setEditMidTermExamOpen(false); }}
+                                >
+                                  <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
+                                  <div className="sup-dropdown-item-info">
+                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-email">{e.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                    {e.active ? 'Active' : 'Inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-group" ref={editFinalExamRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>External Examiner (Final)</label>
+                    <div className="sup-dropdown-trigger">
+                      <div className="sup-search-wrapper" onClick={() => setEditFinalExamOpen(true)}>
+                        <span className="material-symbols-outlined">search</span>
+                        <input
+                          type="text"
+                          placeholder={editFinalExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editFinalExamId)) : 'No final examiner'}
+                          value={editFinalExamSearch}
+                          onChange={e => { setEditFinalExamSearch(e.target.value); setEditFinalExamOpen(true); }}
+                          onFocus={() => setEditFinalExamOpen(true)}
+                        />
+                        {editFinalExamId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditFinalExamId(''); setEditFinalExamSearch(''); }}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editFinalExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                      </div>
+                      {editFinalExamOpen && (
+                        <div className="sup-dropdown">
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).length === 0 ? (
+                            <div className="sup-dropdown-empty">No examiners found</div>
+                          ) : (
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).map(e => {
+                              const selected = editFinalExamId === e.id.toString();
+                              return (
+                                <div
+                                  key={e.id}
+                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                  onClick={() => { setEditFinalExamId(e.id.toString()); setEditFinalExamSearch(''); setEditFinalExamOpen(false); }}
                                 >
                                   <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
@@ -850,7 +935,7 @@ return (
                           </button>
                           {actionMenuRow === t.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                                   Edit
                                 </div>

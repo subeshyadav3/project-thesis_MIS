@@ -163,28 +163,31 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {type === 'thesis' && !isScopeLocked && (
               <div style={{ marginBottom: 14, padding: 10, background: 'var(--color-surface-container-low)', borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Print scope</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {[
                     { value: 'supervisor', label: 'Supervisor' },
-                    { value: 'external', label: 'External' },
-                    { value: 'both', label: 'Both' },
+                    { value: 'external', label: 'External (Mid-Term)' },
+                    { value: 'external-final', label: 'External (Final)' },
+                    { value: 'both', label: 'All Pages' },
                   ].map(opt => (
                     <button key={opt.value}
                       onClick={() => setPdfScope(opt.value)}
                       style={{
-                        flex: 1, padding: '6px 8px', fontSize: 12, borderRadius: 6,
+                        flex: 1, padding: '6px 8px', fontSize: 11, borderRadius: 6,
                         border: pdfScope === opt.value ? '2px solid var(--color-primary)' : '1px solid var(--color-outline)',
                         background: pdfScope === opt.value ? 'var(--color-primary-container)' : 'var(--color-surface)',
                         color: pdfScope === opt.value ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
                         fontWeight: pdfScope === opt.value ? 600 : 400,
                         cursor: 'pointer', transition: 'all 0.15s',
+                        minWidth: 0,
                       }}
                     >{opt.label}</button>
                   ))}
                 </div>
                 <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '6px 0 0' }}>
                   {pdfScope === 'supervisor' ? 'Only supervisor components shown below' :
-                   pdfScope === 'external' ? 'Only external examiner components shown below' :
+                   pdfScope === 'external' ? 'Only mid-term external examiner components shown below' :
+                   pdfScope === 'external-final' ? 'Only final external examiner components shown below' :
                    'All evaluation components shown below'}
                 </p>
               </div>

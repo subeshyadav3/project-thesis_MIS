@@ -155,7 +155,7 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -170,9 +170,12 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
+  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
+  const titleLabel = phase === 'final' ? 'M. Sc. - Thesis Evaluation: External (Final)' : 'M. Sc. - Project Evaluation: External';
+
   return `
     ${buildPageHeader()}
-    <div style="font-weight:700;font-size:13px;text-align:center;">M. Sc. - Project Evaluation: External</div>
+    <div style="font-weight:700;font-size:13px;text-align:center;">${titleLabel}</div>
     <div style="font-size:12px;margin:4px 0;"><strong>Credit: 4 | Full Marks: 100</strong></div>
 
     <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
@@ -258,7 +261,8 @@ function buildMasterFormat(data, scope = 'both') {
   const rollNo = student?.rollNumber || '—';
 
   const includeSup = scope === 'supervisor' || scope === 'both';
-  const includeExt = scope === 'external' || scope === 'both';
+  const includeExt = scope === 'external' || scope === 'external-midterm' || scope === 'both';
+  const includeExtFinal = scope === 'external-final' || scope === 'both';
 
   let pages = '';
   if (includeSup) {
@@ -270,7 +274,13 @@ function buildMasterFormat(data, scope = 'both') {
   if (includeExt) {
     pages += `
     <div${includeSup ? '' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions)}
+      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions, 'midterm')}
+    </div>`;
+  }
+  if (includeExtFinal) {
+    pages += `
+    <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
+      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions, 'final')}
     </div>`;
   }
 
@@ -495,7 +505,7 @@ exports.printThesisEvaluation = async (req, res) => {
     }, scope);
 
     const pdf = await generatePdf(html);
-    const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : 'full';
+    const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : scope === 'external-midterm' ? 'external-midterm' : scope === 'external-final' ? 'external-final' : 'full';
     sendPdf(res, pdf, `thesis_evaluation_${id}_${scopeLabel}.pdf`);
   } catch (error) {
     console.error('printThesisEvaluation error:', error);

@@ -14,6 +14,8 @@ router.post('/bulk-import/confirm', authenticate, authorize('COORDINATOR'), thes
 router.put('/:id', authenticate, authorize('COORDINATOR'), thesisController.updateThesis);
 router.put('/:id/supervisor', authenticate, authorize('COORDINATOR'), thesisController.assignSupervisor);
 router.put('/:id/status', authenticate, authorize('COORDINATOR'), thesisController.updateThesisStatus);
+router.put('/:id/external-midterm', authenticate, authorize('COORDINATOR'), thesisController.assignMidTermExternal);
+router.put('/:id/external-final', authenticate, authorize('COORDINATOR'), thesisController.assignFinalExternal);
 router.post('/export', authenticate, authorize('COORDINATOR', 'MAINTAINER'), thesisController.exportTheses);
 router.delete('/:id', authenticate, authorize('COORDINATOR'), thesisController.deleteThesis);
 
