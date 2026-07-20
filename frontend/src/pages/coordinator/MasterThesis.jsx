@@ -190,8 +190,11 @@ useEffect(() => {
         programId: p.programId,
         studentMatch: p.studentMatch,
         supervisorMatch: p.supervisorMatch,
+        supervisorWillCreate: p.supervisorWillCreate,
         externalMidTermMatch: p.externalMidTermMatch,
+        externalMidTermWillCreate: p.externalMidTermWillCreate,
         externalFinalMatch: p.externalFinalMatch,
+        externalFinalWillCreate: p.externalFinalWillCreate,
       }));
       await api.post('/theses/bulk-import/confirm', { rows, academicYearId: parseInt(bulkYearId) });
       toast.success(`${bulkPreview.stats.matched} theses imported`);
@@ -1037,9 +1040,9 @@ return (
                           <td style={{ fontSize: 11 }}>{p.roll}</td>
                           <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</td>
                           <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : p.externalMidTermWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalMidTermWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : p.externalFinalWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalFinalWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
                           <td>{p.cluster || '—'}</td>
                         </tr>
                       ))}

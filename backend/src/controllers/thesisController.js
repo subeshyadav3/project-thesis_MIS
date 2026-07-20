@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const XLSX = require('xlsx');
 const prisma = new PrismaClient();
@@ -120,6 +121,28 @@ exports.createThesis = async (req, res) => {
   }
 };
 
+/**
+ * Helper: parse a full name string into { firstName, lastName }.
+ * e.g. "Dr. Ram Acharya" → { firstName: "Ram", lastName: "Acharya" }
+ *      "Hari Pd. Poudel" → { firstName: "Hari", lastName: "Pd. Poudel" }
+ */
+function parseName(inputName) {
+  if (!inputName || !inputName.trim()) return { firstName: '', lastName: '' };
+  const cleaned = inputName.trim().replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*/i, '');
+  const parts = cleaned.split(/\s+/);
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+/**
+ * Helper: generate a simple email from a name for auto-created users.
+ */
+function generateEmail(firstName, lastName, role) {
+  const base = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/[^a-z.]/g, '');
+  const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
+  return `${base}.${suffix}@pcampus.edu.np`;
+}
+
 // Step 1: Parse Excel + fuzzy match → return preview
 exports.bulkImportPreview = async (req, res) => {
   try {
@@ -189,22 +212,52 @@ exports.bulkImportPreview = async (req, res) => {
         }
       }
 
-      // Match supervisor
-      const supervisorMatch = supervisorName ? fuzzyMatch(supervisorName, allSupervisors, 0.5) : null;
-      if (supervisorName && !supervisorMatch) {
-        warnings.push(`Supervisor not found for "${supervisorName}"`);
+      // Match supervisor — if not found, mark for auto-create
+      let supervisorMatch = null;
+      let supervisorWillCreate = null;
+      if (supervisorName) {
+        supervisorMatch = fuzzyMatch(supervisorName, allSupervisors, 0.5);
+        if (!supervisorMatch) {
+          const parsed = parseName(supervisorName);
+          supervisorWillCreate = {
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            name: supervisorName,
+          };
+          warnings.push(`Supervisor "${supervisorName}" will be auto-created`);
+        }
       }
 
-      // Match external mid-term
-      const externalMidTermMatch = externalMidTermName ? fuzzyMatch(externalMidTermName, allExternals, 0.5) : null;
-      if (externalMidTermName && !externalMidTermMatch) {
-        warnings.push(`External Mid-Term not found for "${externalMidTermName}"`);
+      // Match external mid-term — if not found, mark for auto-create
+      let externalMidTermMatch = null;
+      let externalMidTermWillCreate = null;
+      if (externalMidTermName) {
+        externalMidTermMatch = fuzzyMatch(externalMidTermName, allExternals, 0.5);
+        if (!externalMidTermMatch) {
+          const parsed = parseName(externalMidTermName);
+          externalMidTermWillCreate = {
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            name: externalMidTermName,
+          };
+          warnings.push(`External Mid-Term "${externalMidTermName}" will be auto-created`);
+        }
       }
 
-      // Match external final
-      const externalFinalMatch = externalFinalName ? fuzzyMatch(externalFinalName, allExternals, 0.5) : null;
-      if (externalFinalName && !externalFinalMatch) {
-        warnings.push(`External Final not found for "${externalFinalName}"`);
+      // Match external final — if not found, mark for auto-create
+      let externalFinalMatch = null;
+      let externalFinalWillCreate = null;
+      if (externalFinalName) {
+        externalFinalMatch = fuzzyMatch(externalFinalName, allExternals, 0.5);
+        if (!externalFinalMatch) {
+          const parsed = parseName(externalFinalName);
+          externalFinalWillCreate = {
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            name: externalFinalName,
+          };
+          warnings.push(`External Final "${externalFinalName}" will be auto-created`);
+        }
       }
 
       preview.push({
@@ -218,8 +271,11 @@ exports.bulkImportPreview = async (req, res) => {
         programId: studentMatch?.user?.programId || null,
         studentMatch: studentMatch ? { id: studentMatch.user.id, name: `${studentMatch.user.firstName} ${studentMatch.user.lastName}`, score: studentMatch.score, status: 'matched' } : null,
         supervisorMatch: supervisorMatch ? { id: supervisorMatch.user.id, name: `${supervisorMatch.user.firstName} ${supervisorMatch.user.lastName}`, score: supervisorMatch.score, status: 'matched' } : null,
+        supervisorWillCreate,
         externalMidTermMatch: externalMidTermMatch ? { id: externalMidTermMatch.user.id, name: `${externalMidTermMatch.user.firstName} ${externalMidTermMatch.user.lastName}`, score: externalMidTermMatch.score, status: 'matched' } : null,
+        externalMidTermWillCreate,
         externalFinalMatch: externalFinalMatch ? { id: externalFinalMatch.user.id, name: `${externalFinalMatch.user.firstName} ${externalFinalMatch.user.lastName}`, score: externalFinalMatch.score, status: 'matched' } : null,
+        externalFinalWillCreate,
         warnings,
       });
     }
@@ -250,9 +306,14 @@ exports.bulkImportConfirm = async (req, res) => {
       : null;
 
     for (const row of rows) {
-      const { studentMatch, supervisorMatch, externalMidTermMatch, externalFinalMatch, title, batch, cluster } = row;
+      const {
+        studentMatch, supervisorMatch, supervisorWillCreate,
+        externalMidTermMatch, externalMidTermWillCreate,
+        externalFinalMatch, externalFinalWillCreate,
+        title, batch, cluster,
+      } = row;
 
-      if (!studentMatch?.id) {
+      if (!studentMatch?.id && !row.studentMatch?.id) {
         skipped.push({ row: row.row, reason: 'No student matched' });
         continue;
       }
@@ -261,9 +322,58 @@ exports.bulkImportConfirm = async (req, res) => {
         continue;
       }
 
+      const effectiveStudentId = studentMatch?.id || row.studentMatch?.id;
+
+      // Helper to auto-create a user and return the ID
+      const autoCreateUser = async (willCreate, role) => {
+        if (!willCreate) return null;
+        try {
+          const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
+          const hash = await bcrypt.hash('password123', 10);
+          const newUser = await prisma.user.upsert({
+            where: { email },
+            update: {},
+            create: {
+              email,
+              password: hash,
+              firstName: willCreate.firstName,
+              lastName: willCreate.lastName || willCreate.firstName,
+              role,
+              departmentId: req.user.departmentId,
+              active: true,
+            },
+          }).catch(() => null);
+          if (newUser) {
+            audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newUser.id, details: `Auto-created ${role} via bulk import` });
+            return newUser.id;
+          }
+        } catch (e) {
+          console.error(`auto-create ${role} error:`, e.message);
+        }
+        return null;
+      };
+
+      // Resolve supervisor: auto-create if needed
+      let resolvedSupervisorId = supervisorMatch?.id || null;
+      if (!resolvedSupervisorId && supervisorWillCreate) {
+        resolvedSupervisorId = await autoCreateUser(supervisorWillCreate, 'SUPERVISOR');
+      }
+
+      // Resolve external mid-term: auto-create if needed
+      let resolvedMidTermId = externalMidTermMatch?.id || null;
+      if (!resolvedMidTermId && externalMidTermWillCreate) {
+        resolvedMidTermId = await autoCreateUser(externalMidTermWillCreate, 'EXTERNAL_EXAMINER');
+      }
+
+      // Resolve external final: auto-create if needed
+      let resolvedFinalId = externalFinalMatch?.id || null;
+      if (!resolvedFinalId && externalFinalWillCreate) {
+        resolvedFinalId = await autoCreateUser(externalFinalWillCreate, 'EXTERNAL_EXAMINER');
+      }
+
       // Wrap the race-condition-prone check+create in a transaction
       const thesis = await prisma.$transaction(async (tx) => {
-        const student = await tx.user.findUnique({ where: { id: studentMatch.id }, include: { program: true } });
+        const student = await tx.user.findUnique({ where: { id: effectiveStudentId }, include: { program: true } });
         if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
           skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
           return null;
@@ -275,19 +385,19 @@ exports.bulkImportConfirm = async (req, res) => {
 
         // Check for active thesis within the transaction
         const activeThesis = await tx.thesis.findFirst({
-          where: { studentId: studentMatch.id, status: { in: ['PENDING', 'ACTIVE'] } },
+          where: { studentId: effectiveStudentId, status: { in: ['PENDING', 'ACTIVE'] } },
         });
         if (activeThesis) {
-          skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Already has active thesis: "${activeThesis.title}"` });
+          skipped.push({ row: row.row, studentId: effectiveStudentId, reason: `Already has active thesis: "${activeThesis.title}"` });
           return null;
         }
 
         // Check for duplicate within the transaction
         const duplicate = await tx.thesis.findFirst({
-          where: { title, studentId: studentMatch.id, academicYearId: parseInt(academicYearId) },
+          where: { title, studentId: effectiveStudentId, academicYearId: parseInt(academicYearId) },
         });
         if (duplicate) {
-          skipped.push({ row: row.row, studentId: studentMatch.id, reason: `Duplicate thesis: "${title}"` });
+          skipped.push({ row: row.row, studentId: effectiveStudentId, reason: `Duplicate thesis: "${title}"` });
           return null;
         }
 
@@ -296,12 +406,12 @@ exports.bulkImportConfirm = async (req, res) => {
           data: {
             title,
             projectType: 'MASTER',
-            studentId: studentMatch.id,
-            status: supervisorMatch?.id ? 'ACTIVE' : 'PENDING',
+            studentId: effectiveStudentId,
+            status: resolvedSupervisorId ? 'ACTIVE' : 'PENDING',
             academicYearId: parseInt(academicYearId),
-            supervisorId: supervisorMatch?.id || null,
-            externalMidTermId: externalMidTermMatch?.id || null,
-            externalFinalId: externalFinalMatch?.id || null,
+            supervisorId: resolvedSupervisorId,
+            externalMidTermId: resolvedMidTermId,
+            externalFinalId: resolvedFinalId,
             cluster: cluster || student.program?.cluster || null,
             batch: batch || student.batch || null,
           },
@@ -316,18 +426,18 @@ exports.bulkImportConfirm = async (req, res) => {
         }
 
         // Create ExaminerAssignment records for externals
-        if (externalMidTermMatch?.id) {
+        if (resolvedMidTermId) {
           await tx.examinerAssignment.upsert({
-            where: { externalExaminerId_thesisId: { externalExaminerId: externalMidTermMatch.id, thesisId: newThesis.id } },
+            where: { externalExaminerId_thesisId: { externalExaminerId: resolvedMidTermId, thesisId: newThesis.id } },
             update: {},
-            create: { externalExaminerId: externalMidTermMatch.id, thesisId: newThesis.id, assignedById: req.user.id },
+            create: { externalExaminerId: resolvedMidTermId, thesisId: newThesis.id, assignedById: req.user.id },
           }).catch(() => {});
         }
-        if (externalFinalMatch?.id) {
+        if (resolvedFinalId) {
           await tx.examinerAssignment.upsert({
-            where: { externalExaminerId_thesisId: { externalExaminerId: externalFinalMatch.id, thesisId: newThesis.id } },
+            where: { externalExaminerId_thesisId: { externalExaminerId: resolvedFinalId, thesisId: newThesis.id } },
             update: {},
-            create: { externalExaminerId: externalFinalMatch.id, thesisId: newThesis.id, assignedById: req.user.id },
+            create: { externalExaminerId: resolvedFinalId, thesisId: newThesis.id, assignedById: req.user.id },
           }).catch(() => {});
         }
 
