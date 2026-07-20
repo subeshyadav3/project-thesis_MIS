@@ -1330,6 +1330,13 @@
   }
   .badge-danger .dot { background: var(--color-error); }
 
+  .badge-overdue {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+    border-color: #fecaca;
+  }
+  .badge-overdue .dot { background: var(--color-error); }
+
   .badge-inactive {
     background: var(--color-surface-container-high);
     color: var(--color-on-surface-variant);

@@ -7,9 +7,12 @@ const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
+const { markOverdueItems } = require('../utils/checkOverdue');
 
 exports.getGroups = async (req, res) => {
   try {
+    // Check for overdue items before fetching
+    await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     const where = {};
     if (req.user.role === 'COORDINATOR') {
       const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
@@ -42,6 +45,7 @@ exports.getGroups = async (req, res) => {
 
 exports.getGroup = async (req, res) => {
   try {
+    await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     const group = await prisma.projectGroup.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
@@ -167,6 +171,10 @@ exports.createGroup = async (req, res) => {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
+    // Check if the linked announcement's expirationDate has passed
+    if (group.announcementId) {
+      await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
+    }
     audit.log({ action: 'CREATE', entity: 'ProjectGroup', entityId: group.id, details: `Created group "${group.name}"`, performedById: req.user.id });
     res.status(201).json(created);
   } catch (error) {

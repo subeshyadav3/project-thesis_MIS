@@ -21,6 +21,7 @@ function CoordinatorAnnouncements() {
     programIds: user.program?.id ? [user.program.id] : [],
     studentIds: [],
     academicYearId: '', allowGroupFormation: false,
+    startDate: '', expirationDate: '',
     expiresAt: '',
   });
   const [selectedStudents, setSelectedStudents] = useState([]);
@@ -65,10 +66,12 @@ function CoordinatorAnnouncements() {
         degreeType: user.program?.degreeType || '',
         programIds: user.program?.id ? [user.program.id] : [],
         studentIds: selectedStudents,
+        startDate: form.startDate || undefined,
+        expirationDate: form.expirationDate || undefined,
       });
       toast.success('Announcement created');
       setShowCreate(false);
-      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, expiresAt: '' });
+      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, startDate: '', expirationDate: '', expiresAt: '' });
       setSelectedStudents([]);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to create'); }
@@ -152,7 +155,7 @@ function CoordinatorAnnouncements() {
                     <th>Type</th>
                     <th>Audience</th>
                     <th>Form Groups?</th>
-                    <th>Year</th>
+                    <th>Period</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
@@ -170,10 +173,16 @@ function CoordinatorAnnouncements() {
                         <td><span className={`badge badge-${a.type === 'THESIS' ? 'warning' : a.type === 'MINOR' ? 'info' : a.type === 'MAJOR' ? 'warning' : 'default'}`}>{TYPE_LABELS[a.type] || a.type}</span></td>
                         <td style={{ fontSize: 13 }}>{AUDIENCE_LABELS[a.audience]}</td>
                         <td>{hasGF ? <span className="badge badge-active"><span className="dot" /> Yes (max {a.groupSizeMax})</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
-                        <td style={{ fontSize: 13 }}>{a.academicYear?.year || '—'}</td>
+                        <td style={{ fontSize: 12 }}>
+                          {a.startDate ? new Date(a.startDate).toLocaleDateString() : '—'} ~ {a.expirationDate ? new Date(a.expirationDate).toLocaleDateString() : '—'}
+                        </td>
                         <td>
                           {active ? (
-                            <span className="badge badge-active"><span className="dot" />Active</span>
+                            a.expirationDate && new Date(a.expirationDate) <= new Date() ? (
+                              <span className="badge badge-danger"><span className="dot" />OVERDUE</span>
+                            ) : (
+                              <span className="badge badge-active"><span className="dot" />Active</span>
+                            )
                           ) : (
                             <span className="badge badge-pending">Expired</span>
                           )}
@@ -313,6 +322,16 @@ function CoordinatorAnnouncements() {
                             (Thesis=1, Bachelor=4)
                           </span>
                         </div>
+                      </div>
+                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                        <label style={{ fontSize: 12 }}>Start Date (optional)</label>
+                        <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
+                        <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
+                      </div>
+                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                        <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
+                        <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
+                        <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
                       </div>
                       <div className="form-group" style={{ flex: 1, margin: 0 }}>
                         <label style={{ fontSize: 12 }}>Expires At (optional)</label>

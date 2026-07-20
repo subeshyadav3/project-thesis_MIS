@@ -342,7 +342,7 @@ const handleComplete = async (id) => {
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
-      const statusOrder = { PENDING: 0, ACTIVE: 1, COMPLETED: 2 };
+      const statusOrder = { PENDING: 0, ACTIVE: 1, OVERDUE: 1, COMPLETED: 2 };
       return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
     });
   }, [filteredTheses]);
@@ -427,6 +427,7 @@ const handleComplete = async (id) => {
   const statusOptions = [
     { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
 

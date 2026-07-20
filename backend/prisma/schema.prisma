@@ -29,12 +29,14 @@ enum GroupStatus {
   PENDING
   ACTIVE
   COMPLETED
+  OVERDUE
 }
 
 enum ThesisStatus {
   PENDING
   ACTIVE
   COMPLETED
+  OVERDUE
 }
 
 enum EvaluationStatus {
@@ -83,6 +85,8 @@ model Announcement {
   academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id])
   departmentId    Int
   department      Department          @relation(fields: [departmentId], references: [id])
+  startDate       DateTime?
+  expirationDate  DateTime?
   allowGroupFormation Boolean          @default(false)
   groupSizeMin    Int                 @default(1)
   groupSizeMax    Int                 @default(4)

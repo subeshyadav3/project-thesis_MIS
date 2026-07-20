@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
 const { resolveAudience, listEligibleAnnouncementsForStudent, isStudentAlreadyInAGroupAnnouncement } = require('../services/announcementService');
+const { markOverdueForAnnouncement } = require('../utils/checkOverdue');
 const { RULES } = require('../config/yearSemesterRules');
 
 function asCleanAudience(body) {
@@ -19,7 +20,7 @@ function asCleanAudience(body) {
 exports.create = async (req, res) => {
   try {
     const body = asCleanAudience(req.body);
-    const { title, message, type, audience, degreeType, programIds, studentIds, academicYearId, allowGroupFormation, groupSizeMin, groupSizeMax, expiresAt } = body;
+    const { title, message, type, audience, degreeType, programIds, studentIds, academicYearId, allowGroupFormation, groupSizeMin, groupSizeMax, startDate, expirationDate, expiresAt } = body;
 
     if (!title?.trim() || !message?.trim() || !academicYearId) {
       return res.status(400).json({ error: 'title, message, and academicYearId are required' });
@@ -64,6 +65,8 @@ exports.create = async (req, res) => {
         allowGroupFormation: !!allowGroupFormation,
         groupSizeMin: computedMin,
         groupSizeMax: type === 'THESIS' ? 1 : Math.max(1, Math.min(4, Number(computedMax))),
+        startDate: startDate ? new Date(startDate) : new Date(),
+        expirationDate: expirationDate ? new Date(expirationDate) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         createdById: req.user.id,
       },
@@ -174,6 +177,8 @@ exports.deactivate = async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const updated = await prisma.announcement.update({ where: { id }, data: { expiresAt: new Date() } });
+    // Mark all associated PENDING/ACTIVE groups and theses as OVERDUE
+    await markOverdueForAnnouncement(id).catch(e => console.error('markOverdueForAnnouncement error:', e.message));
     audit.log({ action: 'UPDATE', entity: 'Announcement', entityId: id, details: 'Announcement deactivated', performedById: req.user.id });
     res.json(updated);
   } catch (e) {

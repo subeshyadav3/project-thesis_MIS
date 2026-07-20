@@ -5,9 +5,12 @@ const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
+const { markOverdueItems } = require('../utils/checkOverdue');
 
 exports.getTheses = async (req, res) => {
   try {
+    // Check for overdue items before fetching
+    await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     const where = {};
     if (req.user.role === 'COORDINATOR') {
       const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
@@ -42,6 +45,7 @@ exports.getTheses = async (req, res) => {
 
 exports.getThesis = async (req, res) => {
   try {
+    await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     const thesis = await prisma.thesis.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
@@ -104,6 +108,10 @@ exports.createThesis = async (req, res) => {
       await prisma.evaluationComponent.create({
         data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
       });
+    }
+    // Check if the linked announcement's expirationDate has passed
+    if (thesis.announcementId) {
+      await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     }
     audit.log({ action: 'CREATE', entity: 'Thesis', entityId: thesis.id, details: `Created thesis "${thesis.title}"`, performedById: req.user.id });
     res.status(201).json(thesis);
