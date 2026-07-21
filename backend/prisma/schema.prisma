@@ -56,6 +56,8 @@ enum EvaluationType {
   MIDTERM_DEFENSE
   FINAL_DEFENSE
   EXTERNAL_EXAMINER
+  EXTERNAL_MIDTERM
+  EXTERNAL_FINAL
 }
 
 enum AnnouncementType {
@@ -226,7 +228,6 @@ model AcademicYear {
   createdAt    DateTime     @default(now())
 
   groups ProjectGroup[]
-  theses Thesis[]
   announcements Announcement[]
 
   @@index([departmentId])
