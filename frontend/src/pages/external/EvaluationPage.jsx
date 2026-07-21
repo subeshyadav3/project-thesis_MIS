@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
@@ -115,12 +115,36 @@ function ExternalExaminerEvaluationPage() {
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
   const title = type === 'group' ? item?.projectTitle : item?.title;
 
+  // Auto-detect if this user is the mid-term or final external examiner for this thesis
+  const externalType = useMemo(() => {
+    if (type !== 'thesis' || !item) return null;
+    const isMid = item.externalMidTerm?.id === user.id;
+    const isFinal = item.externalFinal?.id === user.id;
+    if (isMid && isFinal) return 'BOTH';
+    if (isMid) return 'MIDTERM';
+    if (isFinal) return 'FINAL';
+    return null;
+  }, [item, user.id, type]);
+
   const orderedComponents = [...components].sort((a, b) => {
-    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
+    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER', 'EXTERNAL_MIDTERM', 'EXTERNAL_FINAL'];
     return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
   });
 
-  const currentUserComponents = components.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  // Filter components: for thesis with mid-term/final distinction, show only the relevant ones
+  const currentUserComponents = useMemo(() => {
+    if (type === 'thesis' && externalType === 'MIDTERM') {
+      return components.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM');
+    }
+    if (type === 'thesis' && externalType === 'FINAL') {
+      return components.filter(c => c.evaluationType === 'EXTERNAL_FINAL');
+    }
+    if (type === 'thesis' && externalType === 'BOTH') {
+      return components.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL');
+    }
+    // Fallback for group projects or older theses without mid-term/final distinction
+    return components.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER');
+  }, [components, externalType, type]);
 
   if (loading) {
     return (
@@ -140,7 +164,7 @@ function ExternalExaminerEvaluationPage() {
 
   return (
     <ErrorBoundary>
-    <PageLayout title="Internal Examiner Evaluation" subtitle={title} user={user}
+    <PageLayout title={type === 'thesis' && externalType === 'FINAL' ? 'External (Final) Evaluation' : type === 'thesis' && externalType === 'MIDTERM' ? 'External (Mid-Term) Evaluation' : type === 'thesis' && externalType === 'BOTH' ? 'External (Mid-Term & Final) Evaluation' : 'Internal Examiner Evaluation'} subtitle={title} user={user}
       actions={
         <>
           <button className="btn btn-outline btn-sm" onClick={() => setShowPdfPreview(true)}>
@@ -191,6 +215,21 @@ function ExternalExaminerEvaluationPage() {
                   <span>{item?.student?.firstName} {item?.student?.lastName}</span>
                   <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Email:</span>
                   <span>{item?.student?.email || '—'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Your role:</span>
+                  <span>
+                    {externalType === 'BOTH' ? (
+                      <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                        <span className="badge badge-info" style={{ fontSize: 12 }}>External (Mid-Term)</span>
+                        <span className="badge badge-warning" style={{ fontSize: 12 }}>External (Final)</span>
+                      </span>
+                    ) : externalType === 'FINAL' ? (
+                      <span className="badge badge-warning" style={{ fontSize: 12 }}>External (Final)</span>
+                    ) : externalType === 'MIDTERM' ? (
+                      <span className="badge badge-info" style={{ fontSize: 12 }}>External (Mid-Term)</span>
+                    ) : (
+                      <span className="badge badge-info" style={{ fontSize: 12 }}>Internal Examiner</span>
+                    )}
+                  </span>
                 </>
               )}
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Title:</span>
@@ -398,6 +437,9 @@ function ExternalExaminerEvaluationPage() {
         id={id}
         onClose={() => setShowPdfPreview(false)}
         onSave={() => { setShowPdfPreview(false); loadData(); }}
+        {...(type === 'thesis' && externalType === 'FINAL' ? { initialScope: 'external-final' }
+          : type === 'thesis' && externalType === 'MIDTERM' ? { initialScope: 'external' }
+          : {})}
       />
     )}
     </ErrorBoundary>

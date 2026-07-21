@@ -16,6 +16,9 @@ const TYPE_ICON = {
   CROSS_PROGRAM_REQUEST: 'contact_support',
   CROSS_PROGRAM_APPROVED: 'check_circle',
   CROSS_PROGRAM_REJECTED: 'cancel',
+  CROSS_PROGRAM_THESIS: 'swap_horiz',
+  CROSS_PROGRAM_THESIS_APPROVED: 'check_circle',
+  CROSS_PROGRAM_THESIS_REJECTED: 'cancel',
 };
 
 function NotificationBell() {
@@ -130,7 +133,7 @@ function NotificationBell() {
               notifications.slice(0, 20).map(n => (
                 <div
                   key={n.id}
-                  className={`notification-item ${n.read ? 'read' : 'unread'}`}
+                  className={`notification-item ${n.read ? 'read' : 'unread'} ${!n.read && (n.type === 'CROSS_PROGRAM_THESIS_REJECTED' || n.type === 'CROSS_PROGRAM_REJECTED') ? 'notification-item-rejected' : ''}`}
                   onClick={() => { if (!n.read) handleMarkRead(n.id, { stopPropagation: () => {} }); }}
                 >
                   <div className="notification-item-icon">

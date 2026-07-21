@@ -8,6 +8,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 
 const PAGE_SIZE = 10;
 
@@ -23,6 +24,8 @@ function ExaminerList() {
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [academicYears, setAcademicYears] = useState([]);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,6 +44,7 @@ function ExaminerList() {
     // Only fetch theses for Master coordinators
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+      promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
@@ -56,6 +60,7 @@ function ExaminerList() {
     ];
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+      promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
@@ -154,14 +159,28 @@ function ExaminerList() {
   const unassignedTheses = isMasterCoordinator ? theses.filter(t => !t.examinerAssignments?.length).length : 0;
 
   const actions = (
-    <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-      <span className="material-symbols-outlined">add</span>
-      Add Examiner
-    </button>
+    <>
+      {isMasterCoordinator && (
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
+          <span className="material-symbols-outlined">upload_file</span>
+          Upload Excel
+        </button>
+      )}
+      <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+        <span className="material-symbols-outlined">add</span>
+        Add Examiner
+      </button>
+    </>
   );
 
   return (
     <ErrorBoundary><PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
+      <MasterThesisBulkUploadModal
+        open={showUpload}
+        onClose={() => setShowUpload(false)}
+        onSuccess={loadData}
+        title="Bulk Upload Theses (External Examiners)"
+      />
       {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>

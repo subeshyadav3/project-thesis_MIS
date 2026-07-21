@@ -1088,6 +1088,9 @@
   .btn-danger { background: var(--color-error); color: var(--color-on-error); }
   .btn-danger:hover { background: #b91c1c; }
 
+  .btn-warning { background: var(--color-warning); color: var(--color-on-warning); }
+  .btn-warning:hover { background: #c2410c; }
+
   .btn-success { background: var(--color-success); color: var(--color-on-success); }
   .btn-success:hover { background: #15803d; }
 
@@ -1329,6 +1332,13 @@
     border-color: #fecaca;
   }
   .badge-danger .dot { background: var(--color-error); }
+
+  .badge-overdue {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+    border-color: #fecaca;
+  }
+  .badge-overdue .dot { background: var(--color-error); }
 
   .badge-inactive {
     background: var(--color-surface-container-high);
@@ -3201,6 +3211,20 @@ a:focus-visible {
   background: var(--color-secondary-container);
 }
 
+.notification-item-rejected {
+  background: var(--color-error-container) !important;
+}
+.notification-item-rejected:hover {
+  background: #fecaca !important;
+}
+.notification-item-rejected .notification-item-icon {
+  background: var(--color-error-container);
+  color: var(--color-on-error-container);
+}
+.notification-item-rejected .notification-item-text {
+  color: var(--color-on-error-container);
+}
+
 .notification-item-icon {
   flex-shrink: 0;
   width: 32px;
@@ -3253,6 +3277,38 @@ a:focus-visible {
     left: 8px;
     width: auto;
   }
+}
+
+/* ─── Pagination Wrapper ──────────────────── */
+.pagination-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.pagination-wrapper .page-size-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.pagination-wrapper .page-size-selector select {
+  padding: 2px 6px;
+  border: 1px solid var(--color-outline);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font-size: 11px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+}
+
+.pagination-wrapper .page-size-selector select:focus {
+  border-color: var(--color-primary);
 }
 
 /* spin animation for loading */

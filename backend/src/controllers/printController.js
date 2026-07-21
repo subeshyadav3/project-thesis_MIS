@@ -155,7 +155,7 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -170,9 +170,12 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
+  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
+  const titleLabel = phase === 'final' ? 'M. Sc. - Thesis Evaluation: External (Final)' : 'M. Sc. - Project Evaluation: External';
+
   return `
     ${buildPageHeader()}
-    <div style="font-weight:700;font-size:13px;text-align:center;">M. Sc. - Project Evaluation: External</div>
+    <div style="font-weight:700;font-size:13px;text-align:center;">${titleLabel}</div>
     <div style="font-size:12px;margin:4px 0;"><strong>Credit: 4 | Full Marks: 100</strong></div>
 
     <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
@@ -230,35 +233,43 @@ function buildMasterFormat(data, scope = 'both') {
   const { title, name, supervisor, evaluations, student } = data;
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
-  const extEvals = evaluations.filter(e => e.evaluatorRole === 'External Examiner');
+  const midEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_MIDTERM');
+  const finalEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_FINAL');
+  // Fall back to legacy "External Examiner" label and split evenly if no evaluationType is set
+  const legacyExt = evaluations.filter(e => e.evaluatorRole === 'External Examiner' && !e.evaluationType);
 
   const supCriteria = supEvals.map(e => ({
-    name: e.name,
-    max: e.maxMarks,
+    name: e.name, max: e.maxMarks,
     marks: e.marks !== null && e.marks !== undefined ? e.marks : null,
     comment: e.comment || '',
   }));
-  const extCriteria = extEvals.map(e => ({
-    name: e.name,
-    max: e.maxMarks,
+
+  const buildExtCriteria = (evals) => evals.map(e => ({
+    name: e.name, max: e.maxMarks,
     marks: e.marks !== null && e.marks !== undefined ? e.marks : null,
     comment: e.comment || '',
   }));
+  const midCriteria = buildExtCriteria(midEvals.length ? midEvals : legacyExt);
+  const finalCriteria = buildExtCriteria(finalEvals.length ? finalEvals : legacyExt);
 
   const supComments = supEvals.filter(e => e.comment).map(e => e.comment);
-  const extComments = extEvals.filter(e => e.comment).map(e => e.comment);
-
-  // Extract feedback comments and suggestions per role
   const supFeedbackComments = supEvals.map(e => e.comments).filter(Boolean).join('\n');
   const supFeedbackSuggestions = supEvals.map(e => e.suggestions).filter(Boolean).join('\n');
-  const extFeedbackComments = extEvals.map(e => e.comments).filter(Boolean).join('\n');
-  const extFeedbackSuggestions = extEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+
+  const midComments = midEvals.filter(e => e.comment).map(e => e.comment);
+  const midFeedbackComments = midEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const midFeedbackSuggestions = midEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+
+  const finalComments = finalEvals.filter(e => e.comment).map(e => e.comment);
+  const finalFeedbackComments = finalEvals.map(e => e.comments).filter(Boolean).join('\n');
+  const finalFeedbackSuggestions = finalEvals.map(e => e.suggestions).filter(Boolean).join('\n');
 
   const studentName = name;
   const rollNo = student?.rollNumber || '—';
 
   const includeSup = scope === 'supervisor' || scope === 'both';
-  const includeExt = scope === 'external' || scope === 'both';
+  const includeExt = scope === 'external' || scope === 'external-midterm' || scope === 'both';
+  const includeExtFinal = scope === 'external-final' || scope === 'both';
 
   let pages = '';
   if (includeSup) {
@@ -269,8 +280,14 @@ function buildMasterFormat(data, scope = 'both') {
   }
   if (includeExt) {
     pages += `
-    <div${includeSup ? '' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, extCriteria, extComments, extFeedbackComments, extFeedbackSuggestions)}
+    <div${includeSup ? ' style="page-break-after:always;"' : ''}>
+      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm')}
+    </div>`;
+  }
+  if (includeExtFinal) {
+    pages += `
+    <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
+      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final')}
     </div>`;
   }
 
@@ -285,7 +302,7 @@ function buildMasterFormat(data, scope = 'both') {
 }
 
 function buildBachelorFormat(data) {
-  const { title, name, supervisor, academicYear, members, evaluations, projectType, total, maxTotal } = data;
+  const { title, name, supervisor, members, evaluations, projectType, total, maxTotal } = data;
   const isMajor = projectType === 'MAJOR';
   const projectLabel = isMajor ? 'Major Project' : 'Minor Project';
   const credit = isMajor ? '6' : '3';
@@ -321,7 +338,6 @@ function buildBachelorFormat(data) {
       <tr><td><strong>Group / Student:</strong></td><td>${esc(name)}</td></tr>
       <tr><td><strong>Supervisor:</strong></td><td>${esc(supervisor)}</td></tr>
       <tr><td><strong>Credit:</strong></td><td>${credit} | Full Marks: ${maxTotal}</td></tr>
-      <tr><td><strong>Academic Year:</strong></td><td>${esc(academicYear)}</td></tr>
       ${members ? `<tr><td><strong>Members:</strong></td><td>${members}</td></tr>` : ''}
     </table>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
@@ -375,10 +391,11 @@ async function checkPrintAccess(req, res, type, id) {
     } else {
       const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
       if (dept) {
-        const ay = type === 'group'
-          ? await prisma.academicYear.findFirst({ where: { projectGroups: { some: { id } } }, select: { departmentId: true } })
-          : await prisma.academicYear.findFirst({ where: { theses: { some: { id } } }, select: { departmentId: true } });
-        if (ay && ay.departmentId !== dept.id) {
+        const item = type === 'group'
+          ? await prisma.projectGroup.findUnique({ where: { id }, include: { program: { select: { departmentId: true } } } })
+          : await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { program: { select: { departmentId: true } } } } } });
+        const itemDeptId = type === 'group' ? item?.program?.departmentId : item?.student?.program?.departmentId;
+        if (itemDeptId && itemDeptId !== dept.id) {
           res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
           return false;
         }
@@ -397,7 +414,6 @@ exports.printGroupEvaluation = async (req, res) => {
       where: { id },
       include: {
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
@@ -434,7 +450,6 @@ exports.printGroupEvaluation = async (req, res) => {
       title: group.projectTitle,
       name: group.name,
       supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
-      academicYear: group.academicYear?.year || 'N/A',
       members: memberList,
       evaluations: evalData,
       projectType,
@@ -460,7 +475,6 @@ exports.printThesisEvaluation = async (req, res) => {
       include: {
         student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -495,7 +509,7 @@ exports.printThesisEvaluation = async (req, res) => {
     }, scope);
 
     const pdf = await generatePdf(html);
-    const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : 'full';
+    const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : scope === 'external-midterm' ? 'external-midterm' : scope === 'external-final' ? 'external-final' : 'full';
     sendPdf(res, pdf, `thesis_evaluation_${id}_${scopeLabel}.pdf`);
   } catch (error) {
     console.error('printThesisEvaluation error:', error);
@@ -513,7 +527,6 @@ exports.previewGroupEvaluation = async (req, res) => {
       where: { id },
       include: {
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
@@ -550,7 +563,6 @@ exports.previewGroupEvaluation = async (req, res) => {
       title: group.projectTitle,
       name: group.name,
       supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
-      academicYear: group.academicYear?.year || 'N/A',
       members: memberList,
       evaluations: evalData,
       projectType,
@@ -576,7 +588,6 @@ exports.previewThesisEvaluation = async (req, res) => {
       include: {
         student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },

@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const userController = require('../controllers/userController');
 const { authenticate, authorize } = require('../middleware/auth');
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get('/', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getUsers);
 router.post('/', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.createUser);
@@ -11,5 +14,6 @@ router.get('/role/:role', authenticate, authorize('MAINTAINER', 'COORDINATOR'), 
 router.put('/:id/toggle-active', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.toggleActive);
 router.get('/audit-logs', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getAuditLogs);
 router.post('/bulk', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.bulkCreateUsers);
+router.post('/bulk-import', authenticate, authorize('MAINTAINER', 'COORDINATOR'), upload.single('file'), userController.bulkImportUsersExcel);
 
 module.exports = router;

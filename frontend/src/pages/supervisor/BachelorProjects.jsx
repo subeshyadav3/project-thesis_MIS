@@ -16,13 +16,11 @@ function SupervisorBachelorProjects() {
   const toast = useToast();
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(null);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [yearFilter, setYearFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -31,10 +29,10 @@ function SupervisorBachelorProjects() {
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
-    Promise.all([
-      api.get('/supervisors/groups', { signal }).then(({ data }) => setGroups(data)),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    api.get('/supervisors/groups', { signal })
+      .then(({ data }) => setGroups(data))
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
+      .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -49,10 +47,9 @@ function SupervisorBachelorProjects() {
       ).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
-      const matchesYear = yearFilter === 'ALL' || g.academicYearId?.toString() === yearFilter;
-      return matchesSearch && matchesStatus && matchesYear;
+      return matchesSearch && matchesStatus;
     });
-  }, [groups, searchTerm, statusFilter, yearFilter]);
+  }, [groups, searchTerm, statusFilter]);
 
   const sortedGroups = useMemo(() => {
     return [...filteredGroups].sort((a, b) => {
@@ -73,21 +70,12 @@ function SupervisorBachelorProjects() {
   const activeCount = groups.filter(g => g.status !== 'COMPLETED').length;
   const safeMembers = (g) => (g.members || []).filter(m => m.student);
 
-  const formatAcademicYear = (ay) => {
-    if (!ay) return '';
-    return ay.year || '';
-  };
-
   const statusOptions = [
     { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
-
-  const yearOptions = academicYears.map(y => ({
-    value: y.id.toString(),
-    label: `${y.year}`,
-  }));
 
   const FilterDropdown = ({ value, onChange, label, options, allLabel }) => (
     <div className="filter-item">
@@ -134,8 +122,8 @@ function SupervisorBachelorProjects() {
                   </span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Academic Year</span>
-                  <span>{formatAcademicYear(showDetail.academicYear) || '—'}</span>
+                  <span className="detail-label">Batch</span>
+                  <span>{showDetail.batch || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
@@ -214,14 +202,13 @@ function SupervisorBachelorProjects() {
           <div className="table-toolbar-left">
             <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search groups, members, titles..." />
           </div>
-          <div className="table-toolbar-right">
+          <div className="table-toolbar-right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
           </div>
         </div>
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
-          <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
         </div>
 
         {loading ? (
@@ -230,7 +217,7 @@ function SupervisorBachelorProjects() {
           <div className="empty-state">
             <span className="material-symbols-outlined">school</span>
             <h3>No groups assigned</h3>
-            <p>{searchTerm || statusFilter !== 'ALL' || yearFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any bachelor project groups yet."}</p>
+            <p>{searchTerm || statusFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any bachelor project groups yet."}</p>
           </div>
         ) : (
           <>
@@ -242,7 +229,7 @@ function SupervisorBachelorProjects() {
                   <th>Type</th>
                   <th>Members</th>
                   <th>Status</th>
-                  <th>Year</th>
+                  <th>Batch</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -274,7 +261,7 @@ function SupervisorBachelorProjects() {
                       </span>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
-                      {formatAcademicYear(g.academicYear) || '—'}
+                      {g.batch || '—'}
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>

@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
-const { computeCurrentYearSemester } = require('../utils/computeYearSemester');
+const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
@@ -25,47 +25,10 @@ function extractBatchFromRoll(rollNumber) {
   return match ? match[1] : null;
 }
 
-/**
- * Compute current year and semester from batch.
- * batch "080" → year 2080, then compute year/semester based on current date.
- * Academic year starts in Mangshir (≈ November, month 11).
- */
-function computeCurrentYearSemesterFromBatch(batch, degreeType) {
-  if (!batch) return { currentYear: null, currentSemester: null };
 
-  const offset = parseInt(batch);
-  const batchYear = offset < 100 ? 2000 + offset : offset;
-
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-
-  // Academic year starts Nov (month 11)
-  let academicYearStart;
-  if (currentMonth >= 11) {
-    academicYearStart = currentYear;
-  } else {
-    academicYearStart = currentYear - 1;
-  }
-
-  const monthsSinceStart = currentMonth >= 11
-    ? currentMonth - 11
-    : (12 - 11) + currentMonth;
-
-  const semInYear = monthsSinceStart < 6 ? 1 : 2;
-  const yearsSinceBatch = academicYearStart - batchYear;
-  const totalSemesters = yearsSinceBatch * 2 + (semInYear - 1);
-
-  const maxYear = degreeType === 'MASTER' ? 2 : 4;
-  const year = Math.min(Math.max(1, Math.ceil((totalSemesters + 1) / 2)), maxYear);
-  const semester = Math.min(Math.max(1, totalSemesters - (year - 1) * 2 + 1), 2);
-
-  return { currentYear: year, currentSemester: semester };
-}
 
 function enrichWithComputedYearSemester(user) {
   if (user.role !== 'STUDENT' || !user.batch) return user;
-  const maxYear = user.degreeType === 'MASTER' ? 2 : 4;
   const computed = computeCurrentYearSemesterFromBatch(user.batch, user.degreeType);
   if (computed.currentYear) {
     user.currentYear = computed.currentYear;
@@ -367,6 +330,146 @@ exports.bulkCreateUsers = async (req, res) => {
       errors,
     });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const EXCEL_BULK_ROLES = ['STUDENT', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
+
+/**
+ * Excel bulk import for coordinators/maintainers.
+ * Query/body field `role` must be STUDENT | SUPERVISOR | EXTERNAL_EXAMINER.
+ * Columns depend on role (see generate-samples.js templates).
+ */
+exports.bulkImportUsersExcel = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Excel file is required' });
+
+    const role = (req.body.role || req.query.role || '').toString().toUpperCase();
+    if (!EXCEL_BULK_ROLES.includes(role)) {
+      return res.status(400).json({ error: 'role must be STUDENT, SUPERVISOR, or EXTERNAL_EXAMINER' });
+    }
+
+    if (req.user.role === 'COORDINATOR' && !EXCEL_BULK_ROLES.includes(role)) {
+      return res.status(403).json({ error: 'Coordinator can only import students, supervisors, and examiners' });
+    }
+
+    const XLSX = require('xlsx');
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+    if (!rows.length) return res.status(400).json({ error: 'Excel file has no data rows' });
+
+    let coordinatorProgram = null;
+    if (req.user.role === 'COORDINATOR') {
+      coordinatorProgram = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+    }
+
+    const allPrograms = await prisma.program.findMany({ select: { id: true, code: true, name: true, degreeType: true } });
+    const findProgram = (codeOrName) => {
+      if (!codeOrName) return null;
+      const q = codeOrName.toString().trim().toLowerCase();
+      return allPrograms.find(p => p.code.toLowerCase() === q || p.name.toLowerCase() === q) || null;
+    };
+
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2; // header is row 1
+      const email = (row.email || row.Email || '').toString().trim();
+      const password = (row.password || row.Password || '').toString().trim();
+      const firstName = (row.firstName || row.FirstName || row['First Name'] || '').toString().trim();
+      const lastName = (row.lastName || row.LastName || row['Last Name'] || '').toString().trim();
+      const designation = (row.designation || row.Designation || '').toString().trim() || null;
+      const rollNumber = (row.rollNumber || row.RollNumber || row.Roll || row.roll || '').toString().trim() || null;
+      const programRaw = (row.programCode || row.ProgramCode || row.Program || row.program || '').toString().trim();
+      let degreeType = (row.degreeType || row.DegreeType || row.Degree || '').toString().trim().toUpperCase() || null;
+      let programId = row.programId ? parseInt(row.programId) : null;
+
+      if (!email || !password || !firstName || !lastName) {
+        errors.push({ row: rowNum, email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName)' });
+        continue;
+      }
+
+      if (role === 'STUDENT') {
+        if (!rollNumber) {
+          errors.push({ row: rowNum, email, error: 'rollNumber is required for students' });
+          continue;
+        }
+        if (!programId && programRaw) {
+          const prog = findProgram(programRaw);
+          if (prog) programId = prog.id;
+        }
+        if (!programId && coordinatorProgram) {
+          programId = coordinatorProgram.id;
+        }
+        if (!programId) {
+          errors.push({ row: rowNum, email, error: 'programCode/programId is required for students' });
+          continue;
+        }
+        if (!degreeType) {
+          const prog = allPrograms.find(p => p.id === programId);
+          degreeType = prog?.degreeType || (coordinatorProgram?.degreeType) || 'MASTER';
+        }
+        if (!VALID_DEGREE_TYPES.includes(degreeType)) {
+          errors.push({ row: rowNum, email, error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
+          continue;
+        }
+        // Master coordinators: only MASTER students in this pass
+        if (req.user.role === 'COORDINATOR' && coordinatorProgram?.degreeType && degreeType !== coordinatorProgram.degreeType) {
+          errors.push({ row: rowNum, email, error: `degreeType must be ${coordinatorProgram.degreeType} for your program` });
+          continue;
+        }
+        if (req.user.role === 'COORDINATOR' && coordinatorProgram && programId !== coordinatorProgram.id) {
+          errors.push({ row: rowNum, email, error: 'Students must belong to your program' });
+          continue;
+        }
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        errors.push({ row: rowNum, email, error: 'Duplicate email' });
+        continue;
+      }
+
+      try {
+        const hash = await bcrypt.hash(password, 10);
+        const batch = extractBatchFromRoll(rollNumber);
+        const departmentId = req.user.departmentId || null;
+        const user = await prisma.user.create({
+          data: {
+            email,
+            password: hash,
+            firstName,
+            lastName,
+            role,
+            degreeType: role === 'STUDENT' ? degreeType : null,
+            departmentId,
+            programId: role === 'STUDENT' ? programId : null,
+            designation: role === 'STUDENT' ? null : designation,
+            rollNumber: role === 'STUDENT' ? rollNumber : null,
+            batch: role === 'STUDENT' ? batch : null,
+          },
+          select: USER_SELECT,
+        });
+        created.push(user);
+        audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Excel bulk created ${role} ${email}`, performedById: req.user.id });
+        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+      } catch (err) {
+        errors.push({ row: rowNum, email, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      message: `Successfully created ${created.length} user(s)`,
+      created: created.length,
+      failed: errors.length,
+      errors,
+    });
+  } catch (error) {
+    console.error('bulkImportUsersExcel error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

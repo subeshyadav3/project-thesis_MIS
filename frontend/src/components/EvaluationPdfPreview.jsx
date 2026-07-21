@@ -13,9 +13,31 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   const [downloading, setDownloading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState('');
-  const isScopeLocked = !!initialScope;
-  const [pdfScope, setPdfScope] = useState(initialScope || 'both');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isScopeLocked = !!initialScope;
+  // Auto-detect: if initialScope is 'external' but current user is the thesis's final external examiner, default to external-final
+  const computedInitial = useMemo(() => {
+    if (initialScope === 'external') {
+      if (user.role === 'EXTERNAL_EXAMINER' && item) {
+        if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
+        if (item.externalMidTerm?.id === user.id && item.externalFinal?.id !== user.id) return 'external';
+      }
+      // Fallback: pick the one that has an assignment for this user
+      if (user.role === 'EXTERNAL_EXAMINER' && item) {
+        if (item.externalMidTerm?.id === user.id) return 'external';
+        if (item.externalFinal?.id === user.id) return 'external-final';
+      }
+    }
+    return initialScope;
+  }, [initialScope, user.role, user.id, item]);
+  const [pdfScope, setPdfScope] = useState(computedInitial || 'both');
+
+  // Keep scope in sync when computedInitial changes (data loads)
+  useEffect(() => {
+    if (computedInitial && isScopeLocked) {
+      setPdfScope(computedInitial);
+    }
+  }, [computedInitial, isScopeLocked]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +71,9 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
       ? components.filter(c =>
           pdfScope === 'supervisor'
             ? c.evaluatorRole === 'SUPERVISOR'
-            : c.evaluatorRole === 'EXTERNAL_EXAMINER'
+            : pdfScope === 'external'
+              ? c.evaluationType === 'EXTERNAL_MIDTERM'
+              : c.evaluationType === 'EXTERNAL_FINAL'
         )
       : components;
     return ['COORDINATOR', 'MAINTAINER'].includes(user.role)
@@ -163,28 +187,31 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {type === 'thesis' && !isScopeLocked && (
               <div style={{ marginBottom: 14, padding: 10, background: 'var(--color-surface-container-low)', borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Print scope</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {[
                     { value: 'supervisor', label: 'Supervisor' },
-                    { value: 'external', label: 'External' },
-                    { value: 'both', label: 'Both' },
+                    { value: 'external', label: 'External (Mid-Term)' },
+                    { value: 'external-final', label: 'External (Final)' },
+                    { value: 'both', label: 'All Pages' },
                   ].map(opt => (
                     <button key={opt.value}
                       onClick={() => setPdfScope(opt.value)}
                       style={{
-                        flex: 1, padding: '6px 8px', fontSize: 12, borderRadius: 6,
+                        flex: 1, padding: '6px 8px', fontSize: 11, borderRadius: 6,
                         border: pdfScope === opt.value ? '2px solid var(--color-primary)' : '1px solid var(--color-outline)',
                         background: pdfScope === opt.value ? 'var(--color-primary-container)' : 'var(--color-surface)',
                         color: pdfScope === opt.value ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
                         fontWeight: pdfScope === opt.value ? 600 : 400,
                         cursor: 'pointer', transition: 'all 0.15s',
+                        minWidth: 0,
                       }}
                     >{opt.label}</button>
                   ))}
                 </div>
                 <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '6px 0 0' }}>
                   {pdfScope === 'supervisor' ? 'Only supervisor components shown below' :
-                   pdfScope === 'external' ? 'Only external examiner components shown below' :
+                   pdfScope === 'external' ? 'Only mid-term external examiner components shown below' :
+                   pdfScope === 'external-final' ? 'Only final external examiner components shown below' :
                    'All evaluation components shown below'}
                 </p>
               </div>
@@ -196,18 +223,28 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {displayedRoles.map((role, ri) => {
               const rf = roleFeedback[role] || { comments: '', suggestions: '' };
               const components = groupedByRole[role];
-              return (
-                <div key={role} style={{ marginBottom: ri < displayedRoles.length - 1 ? 18 : 0 }}>
+              // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
+              const sections = role === 'EXTERNAL_EXAMINER' && pdfScope === 'both'
+                ? [
+                    { key: 'mid', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
+                    { key: 'final', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
+                  ].filter(s => components.some(s.filter))
+                : [{ key: 'all', label: role === 'SUPERVISOR' ? 'Supervisor'
+                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)'
+                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)'
+                    : (ROLE_LABEL[role] || role), filter: () => true }];
+              return sections.map((section, si) => (
+                <div key={`${role}-${section.key}`} style={{ marginBottom: (ri < displayedRoles.length - 1 || si < sections.length - 1) ? 18 : 0 }}>
                   {/* Section header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                      {ROLE_LABEL[role] || role}
+                      {section.label}
                     </span>
                     <div style={{ flex: 1, height: 1, background: 'var(--color-outline-variant)' }} />
                   </div>
 
-                  {/* Marks for this role */}
-                  {components.map(component => (
+                  {/* Marks for this section */}
+                  {components.filter(section.filter).map(component => (
                     <div key={component.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '6px 8px', border: '1px solid var(--color-outline-variant)', borderRadius: 8 }}>
                       <label style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{component.name}<small style={{ display: 'block', fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>Max {component.maxMarks}</small></label>
                       <input type="number" min="0" max={component.maxMarks} step="0.01" value={marks[component.id] ?? ''} onChange={e => setMarks(prev => ({ ...prev, [component.id]: e.target.value }))} style={{ width: 72, padding: '5px 6px', fontSize: 13 }} />
@@ -216,16 +253,16 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
 
                   {/* Per-role comments & suggestions */}
                   <label style={{ display: 'block', marginTop: 10, fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
-                    Comments {displayedRoles.length > 1 ? `(${ROLE_LABEL[role] || role})` : ''}
+                    Comments {displayedRoles.length > 1 ? `(${section.label})` : ''}
                   </label>
                   <textarea rows={2} value={rf.comments} onChange={e => updateRoleFeedback(role, 'comments', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
 
                   <label style={{ display: 'block', marginTop: 8, fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
-                    Suggestions & recommendations {displayedRoles.length > 1 ? `(${ROLE_LABEL[role] || role})` : ''}
+                    Suggestions & recommendations {displayedRoles.length > 1 ? `(${section.label})` : ''}
                   </label>
                   <textarea rows={2} value={rf.suggestions} onChange={e => updateRoleFeedback(role, 'suggestions', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
                 </div>
-              );
+              ));
             })}
 
             {editableComponents.length > 0 && (

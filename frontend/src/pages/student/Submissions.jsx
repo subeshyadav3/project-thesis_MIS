@@ -117,7 +117,7 @@ function StudentSubmissions() {
           >
             {items.map(i => (
               <option key={i.id} value={i.id}>
-                {activeTab === 'groups' ? i.projectTitle : i.title} ({i.academicYear?.year || '—'})
+                {activeTab === 'groups' ? i.projectTitle : i.title} ({i.batch || '—'})
               </option>
             ))}
           </select>

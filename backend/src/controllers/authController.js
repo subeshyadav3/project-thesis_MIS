@@ -4,24 +4,7 @@ const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const audit = require('../services/auditService');
-
-function computeCurrentYearSemesterFromBatch(batch, degreeType) {
-  if (!batch) return { currentYear: null, currentSemester: null };
-  const offset = parseInt(batch);
-  const batchYear = offset < 100 ? 2000 + offset : offset;
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-  let academicYearStart = currentMonth >= 11 ? currentYear : currentYear - 1;
-  const monthsSinceStart = currentMonth >= 11 ? currentMonth - 11 : (12 - 11) + currentMonth;
-  const semInYear = monthsSinceStart < 6 ? 1 : 2;
-  const yearsSinceBatch = academicYearStart - batchYear;
-  const totalSemesters = yearsSinceBatch * 2 + (semInYear - 1);
-  const maxYear = degreeType === 'MASTER' ? 2 : 4;
-  const year = Math.min(Math.max(1, Math.ceil((totalSemesters + 1) / 2)), maxYear);
-  const semester = Math.min(Math.max(1, totalSemesters - (year - 1) * 2 + 1), 2);
-  return { currentYear: year, currentSemester: semester };
-}
+const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -63,7 +46,6 @@ exports.login = async (req, res) => {
     const { password: _, ...userData } = user;
     // Enrich students with computed year/semester from batch
     if (userData.role === 'STUDENT' && userData.batch) {
-      const maxYear = userData.degreeType === 'MASTER' ? 2 : 4;
       const computed = computeCurrentYearSemesterFromBatch(userData.batch, userData.degreeType);
       if (computed.currentYear) {
         userData.currentYear = computed.currentYear;
@@ -97,15 +79,13 @@ exports.getMe = async (req, res) => {
   }
   const { password: _, ...userData } = user;
   // Enrich students with computed year/semester from batch
-  if (userData.role === 'STUDENT' && userData.batch) {
-    const maxYear = userData.degreeType === 'MASTER' ? 2 : 4;
-    const computed = computeCurrentYearSemesterFromBatch(userData.batch, userData.degreeType);
-    if (computed.currentYear) {
-      userData.currentYear = computed.currentYear;
-      userData.currentSemester = computed.currentSemester;
+  if (userData.role === 'STUDENT' && userData.batch) {      const computed = computeCurrentYearSemesterFromBatch(userData.batch, userData.degreeType);
+      if (computed.currentYear) {
+        userData.currentYear = computed.currentYear;
+        userData.currentSemester = computed.currentSemester;
+      }
     }
-  }
-  res.json(userData);
+    res.json(userData);
 };
 
 exports.forgotPassword = async (req, res) => {

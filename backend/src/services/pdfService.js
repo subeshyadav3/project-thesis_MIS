@@ -2,32 +2,50 @@ const PDFDocument = require('pdfkit');
 
 function generateRecommendationPDF({ studentName, projectTitle, thesisTitle, supervisorName, supervisorDesignation, content, date, type }) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 60, bottom: 60, left: 70, right: 70 } });
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 70, right: 70 } });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const centerX = doc.page.margins.left + pageWidth / 2;
 
-    // Header - University Letterhead
-    doc.fontSize(16).font('Helvetica-Bold').text('Electronics and Computer Engineering', { align: 'center' });
-    doc.fontSize(11).font('Helvetica').text('Institute of Engineering, Tribhuvan University', { align: 'center' });
-    doc.fontSize(9).fillColor('#666').text('Pulchowk Campus, Lalitpur, Nepal', { align: 'center' });
+    // ── Letterhead ──
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('#1a237e')
+      .text('THESIS / PROJECT MANAGEMENT SYSTEM', { align: 'center' });
+    doc.moveDown(0.1);
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+      .text('Department of Electronics and Computer Engineering', { align: 'center' });
+    doc.fontSize(9).fillColor('#666')
+      .text('Institute of Engineering, Tribhuvan University — Pulchowk Campus, Lalitpur, Nepal', { align: 'center' });
+
+    doc.moveDown(0.5);
+    const lineY = doc.y;
+
+    // Decorative horizontal line
+    doc.moveTo(doc.page.margins.left, lineY)
+      .lineTo(doc.page.width - doc.page.margins.right, lineY)
+      .strokeColor('#1a237e').lineWidth(2.5).stroke();
+    doc.moveDown(0.8);
+
+    // ── Title ──
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#1a237e')
+      .text('LETTER OF RECOMMENDATION', { align: 'center' });
     doc.moveDown(0.3);
 
-    // Horizontal line
-    doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).strokeColor('#1a237e').lineWidth(2).stroke();
+    // Reference / Date line
+    doc.fontSize(9).font('Helvetica').fillColor('#555')
+      .text(`Ref: TPMS/REC/${Date.now().toString(36).toUpperCase()}`, { align: 'left', continued: true });
+    doc.text(`Date: ${date}`, { align: 'right' });
     doc.moveDown(0.5);
 
-    // Title
-    doc.fontSize(18).font('Helvetica-Bold').fillColor('#1a237e').text('LETTER OF RECOMMENDATION', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(10).font('Helvetica').fillColor('#333').text(`Date: ${date}`, { align: 'right' });
-    doc.moveDown(1);
+    // Thin separator
+    doc.moveTo(doc.page.margins.left, doc.y)
+      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+      .strokeColor('#ccc').lineWidth(0.5).stroke();
+    doc.moveDown(0.8);
 
-    // Body
+    // ── Body ──
     doc.fontSize(11).fillColor('#333');
 
     const itemLabel = type === 'thesis' ? 'Master Thesis' : 'Project';
@@ -36,25 +54,43 @@ function generateRecommendationPDF({ studentName, projectTitle, thesisTitle, sup
     doc.font('Helvetica').text('To Whom It May Concern,', { align: 'left' });
     doc.moveDown(0.5);
 
-    doc.text(`I am pleased to recommend ${studentName}, who has successfully completed their ${itemLabel.toLowerCase()} titled "${itemName}" under my supervision at the Department of Electronics and Computer Engineering, Institute of Engineering, Pulchowk Campus.`, { align: 'justify', lineGap: 4 });
+    doc.text(`I am pleased to recommend ${studentName}, who has successfully completed their ${itemLabel.toLowerCase()} titled "${itemName}" under my supervision at the Department of Electronics and Computer Engineering, Institute of Engineering, Pulchowk Campus.`, { align: 'justify', lineGap: 5 });
     doc.moveDown(0.5);
 
-    // Content body
-    doc.text(content || 'Throughout the duration of this work, the student demonstrated exceptional dedication, analytical thinking, and technical competency. The project was executed with thorough methodology and the outcomes reflect a strong understanding of the subject matter.', { align: 'justify', lineGap: 4 });
-    doc.moveDown(0.5);
+    // Content body — the actual recommendation text
+    if (content) {
+      doc.text(content, { align: 'justify', lineGap: 5 });
+      doc.moveDown(0.5);
+    }
 
-    doc.text('I recommend this student without reservation and am confident that they will excel in their future academic and professional endeavors.', { align: 'justify', lineGap: 4 });
+    doc.text('I recommend this student without reservation and am confident that they will excel in their future academic and professional endeavors.', { align: 'justify', lineGap: 5 });
     doc.moveDown(1.5);
 
-    // Signature block
-    doc.moveDown(2);
-    doc.font('Helvetica-Bold').text('____________________________', { align: 'left' });
-    doc.font('Helvetica').fontSize(10);
+    // ── Signature block ──
+    doc.moveDown(1);
+    const sigY = doc.y + 10;
+
+    // Left side: signature
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#333')
+      .text('____________________________', doc.page.margins.left, sigY);
     const sigName = supervisorDesignation ? `${supervisorDesignation} ${supervisorName}` : supervisorName;
-    doc.text(sigName, { align: 'left' });
-    doc.text('Supervisor', { align: 'left' });
-    doc.text('Department of Electronics and Computer Engineering', { align: 'left' });
-    doc.text('Institute of Engineering, Pulchowk Campus', { align: 'left' });
+    doc.font('Helvetica').fontSize(10).fillColor('#444')
+      .text(sigName, doc.page.margins.left, sigY + 18)
+      .text('Supervisor', doc.page.margins.left, sigY + 32)
+      .text('Department of Electronics and Computer Engineering', doc.page.margins.left, sigY + 46)
+      .text('Institute of Engineering, Pulchowk Campus', doc.page.margins.left, sigY + 60);
+
+    // Right side: date and seal
+    doc.fontSize(10).font('Helvetica').fillColor('#555')
+      .text(`Date: ${date}`, doc.page.margins.left + 300, sigY + 18, { align: 'right' });
+
+    // Footer
+    doc.fontSize(7.5).font('Helvetica').fillColor('#999');
+    doc.text(
+      'This is a system-generated document from TPMS. The electronic record is maintained and can be verified.',
+      doc.page.margins.left, doc.page.height - 40,
+      { width: pageWidth, align: 'center' }
+    );
 
     doc.end();
   });

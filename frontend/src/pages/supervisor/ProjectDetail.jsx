@@ -4,6 +4,7 @@ import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
 import ExaminerAssignmentSection from '../../components/ExaminerAssignmentSection';
 import SupervisorAssignmentSection from '../../components/SupervisorAssignmentSection';
+import ExternalExaminerSection from '../../components/ExternalExaminerSection';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -68,7 +69,7 @@ function ProjectDetail() {
 
   // Compute progress
   const orderedComponents = useMemo(() => [...components].sort((a, b) => {
-    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER'];
+    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER', 'EXTERNAL_MIDTERM', 'EXTERNAL_FINAL'];
     return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
   }), [components]);
 
@@ -253,7 +254,7 @@ function ProjectDetail() {
             </h1>
             <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>
               {name}
-              {item?.academicYear && ` · ${item.academicYear.year || ''}`}
+              {item?.batch ? ` · Batch ${item.batch}` : ''}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -347,15 +348,30 @@ function ProjectDetail() {
                   ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
                   : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                 } />
-                <InfoRow label="Internal Examiner" value={
-                  item?.examinerAssignments?.length > 0
-                    ? item.examinerAssignments.map(a => (
-                      <span key={a.id} className="badge badge-info" style={{ fontSize: 11, marginRight: 6 }}>
-                        {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
-                      </span>
-                    ))
-                    : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
-                } />
+                {type === 'thesis' ? (
+                  <>
+                    <InfoRow label="External (Mid-Term)" value={
+                      item?.externalMidTerm
+                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalMidTerm.firstName} {item.externalMidTerm.lastName}</span>
+                        : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                    } />
+                    <InfoRow label="External (Final)" value={
+                      item?.externalFinal
+                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalFinal.firstName} {item.externalFinal.lastName}</span>
+                        : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                    } />
+                  </>
+                ) : (
+                  <InfoRow label="Internal Examiner" value={
+                    item?.examinerAssignments?.length > 0
+                      ? item.examinerAssignments.map(a => (
+                        <span key={a.id} className="badge badge-info" style={{ fontSize: 11, marginRight: 6 }}>
+                          {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                        </span>
+                      ))
+                      : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                  } />
+                )}
                 {item?.description && <InfoRow label="Description" value={item.description} />}
               </div>
             </div>
@@ -442,10 +458,26 @@ function ProjectDetail() {
                   type={type} id={parseInt(id)}
                   currentSupervisor={item?.supervisor} onRefresh={loadData} disabled={false}
                 />
-                <ExaminerAssignmentSection
-                  type={type} id={parseInt(id)}
-                  currentAssignments={item?.examinerAssignments || []} onRefresh={loadData} disabled={false}
-                />
+                {type === 'thesis' && (
+                  <>
+                    <ExternalExaminerSection
+                      type="midterm" id={parseInt(id)}
+                      currentExaminer={item?.externalMidTerm} label="Mid-Term"
+                      onRefresh={loadData} disabled={false}
+                    />
+                    <ExternalExaminerSection
+                      type="final" id={parseInt(id)}
+                      currentExaminer={item?.externalFinal} label="Final"
+                      onRefresh={loadData} disabled={false}
+                    />
+                  </>
+                )}
+                {type !== 'thesis' && (
+                  <ExaminerAssignmentSection
+                    type={type} id={parseInt(id)}
+                    currentAssignments={item?.examinerAssignments || []} onRefresh={loadData} disabled={false}
+                  />
+                )}
               </div>
             )}
 

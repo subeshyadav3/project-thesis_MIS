@@ -107,7 +107,7 @@ function StudentDashboard() {
                           {g.projectTitle}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          {g.name} · {g.academicYear?.year || '—'}
+                          {g.name} · {g.batch || '—'}
                         </div>
                       </div>
                       <span className={`badge badge-${g.status?.toLowerCase() === 'active' ? 'active' : g.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>
@@ -148,7 +148,7 @@ function StudentDashboard() {
                           {t.title}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          {t.academicYear?.year || '—'}
+                          {t.batch ? `Batch ${t.batch}` : '—'}
                         </div>
                       </div>
                       <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>

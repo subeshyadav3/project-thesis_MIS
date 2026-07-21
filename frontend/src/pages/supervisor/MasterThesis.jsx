@@ -16,16 +16,53 @@ function SupervisorMasterThesis() {
   const toast = useToast();
   const navigate = useNavigate();
   const [theses, setTheses] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(null);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [yearFilter, setYearFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
+  const [showUpload, setShowUpload] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkPreview, setBulkPreview] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const handleFileUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) { toast.warning('Select a file'); return; }
+    setBulkLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBulkPreview(data);
+    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
+    finally { setBulkLoading(false); }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkPreview?.preview) return;
+    setBulkLoading(true);
+    try {
+      const rows = bulkPreview.preview.map(p => ({
+        row: p.row, name: p.name, roll: p.roll, title: p.title,
+        batch: p.batch, cluster: p.cluster, programId: p.programId,
+        studentMatch: p.studentMatch, supervisorMatch: p.supervisorMatch, supervisorWillCreate: p.supervisorWillCreate,
+        externalMidTermMatch: p.externalMidTermMatch, externalMidTermWillCreate: p.externalMidTermWillCreate,
+        externalFinalMatch: p.externalFinalMatch, externalFinalWillCreate: p.externalFinalWillCreate,
+      }));
+      await api.post('/theses/bulk-import/confirm', { rows });
+      toast.success(`${bulkPreview.stats.matched} theses imported`);
+      setShowUpload(false);
+      setBulkPreview(null);
+      setSelectedFile(null);
+      setBulkYearId('');
+      loadData();
+    } catch (err) { toast.error(err.response?.data?.error || 'Import failed'); }
+    finally { setBulkLoading(false); }
+  };
 
   const loadData = useCallback(() => {
     const controller = new AbortController();
@@ -33,7 +70,7 @@ function SupervisorMasterThesis() {
     setLoading(true);
     Promise.all([
       api.get('/supervisors/theses', { signal }).then(({ data }) => setTheses(data)),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -46,10 +83,9 @@ function SupervisorMasterThesis() {
       const searchStr = (studentName + ' ' + (t.title || '')).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      const matchesYear = yearFilter === 'ALL' || t.academicYearId?.toString() === yearFilter;
-      return matchesSearch && matchesStatus && matchesYear;
+      return matchesSearch && matchesStatus;
     });
-  }, [theses, searchTerm, statusFilter, yearFilter]);
+  }, [theses, searchTerm, statusFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -69,21 +105,16 @@ function SupervisorMasterThesis() {
   const completedCount = theses.filter(t => t.status === 'COMPLETED').length;
   const activeCount = theses.filter(t => t.status !== 'COMPLETED').length;
 
-  const formatAcademicYear = (ay) => {
-    if (!ay) return '';
-    return ay.year || '';
+  const formatBatch = (t) => {
+    return t?.batch || '—';
   };
 
   const statusOptions = [
     { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
-
-  const yearOptions = academicYears.map(y => ({
-    value: y.id.toString(),
-    label: `${y.year}`,
-  }));
 
   const FilterDropdown = ({ value, onChange, label, options, allLabel }) => (
     <div className="filter-item">
@@ -131,7 +162,7 @@ function SupervisorMasterThesis() {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Academic Year</span>
-                  <span>{formatAcademicYear(showDetail.academicYear) || '—'}</span>
+                  <span>{showDetail.batch || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Email</span>
@@ -181,14 +212,17 @@ function SupervisorMasterThesis() {
           <div className="table-toolbar-left">
             <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by student name, title..." />
           </div>
-          <div className="table-toolbar-right">
+          <div className="table-toolbar-right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
+              <span className="material-symbols-outlined">upload_file</span>
+              Upload Excel
+            </button>
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedTheses.length} theses</span>
           </div>
         </div>
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
-          <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
         </div>
 
         {loading ? (
@@ -197,7 +231,7 @@ function SupervisorMasterThesis() {
           <div className="empty-state">
             <span className="material-symbols-outlined">library_books</span>
             <h3>No theses assigned</h3>
-            <p>{searchTerm || statusFilter !== 'ALL' || yearFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any master's theses yet."}</p>
+            <p>{searchTerm || statusFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any master's theses yet."}</p>
           </div>
         ) : (
           <>
@@ -232,7 +266,7 @@ function SupervisorMasterThesis() {
                       </span>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
-                      {formatAcademicYear(t.academicYear) || '—'}
+                      {t.batch ? `Batch ${t.batch}` : '—'}
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
@@ -264,6 +298,75 @@ function SupervisorMasterThesis() {
     </PageLayout></ErrorBoundary>
       {pdfPreviewItem && (
         <EvaluationPdfPreview type="thesis" id={pdfPreviewItem.id} onClose={() => setPdfPreviewItem(null)} onSave={loadData} initialScope="supervisor" />
+      )}
+
+      {showUpload && (
+        <div className="modal-overlay" onClick={() => { setShowUpload(false); setBulkPreview(null); }}>
+          <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-icon info">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Import Theses'}</h2>
+                <p>{bulkPreview ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched` : 'Upload Excel with Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch'}</p>
+              </div>
+            </div>
+            {!bulkPreview ? (
+              <form onSubmit={handleFileUpload}>
+                <div className="form-group">
+                  <label>Excel File (.xlsx)</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
+                    <span className="material-symbols-outlined">close</span>Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                    {bulkLoading ? 'Analyzing...' : 'Preview'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
+                  <table style={{ width: '100%', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Name</th><th>Roll</th><th>Title</th><th>Student</th><th>Supervisor</th><th>Ext (Mid)</th><th>Ext (Final)</th><th>Cluster</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPreview.preview.map(p => (
+                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
+                          <td>{p.row}</td>
+                          <td>{p.name}</td>
+                          <td style={{ fontSize: 11 }}>{p.roll}</td>
+                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</td>
+                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : p.externalMidTermWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalMidTermWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : p.externalFinalWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalFinalWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.cluster || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
+                    <span className="material-symbols-outlined">arrow_back</span>Back
+                  </button>
+                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} theses`}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );

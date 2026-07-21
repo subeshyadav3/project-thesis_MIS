@@ -29,8 +29,11 @@ for (const f of OLD_FILES) {
 }
 
 // ── Helper: generate Nepali-style roll numbers ──
+// Bachelor uses 3-digit suffix (e.g. 080BCT001), master uses 2-digit (e.g. 080MSNCS01)
 function roll(code, i, batch = '078') {
-  return `${batch}${code}${String(i).padStart(3, '0')}`;
+  const isMaster = ['MSNCS','MSICE','MSDSA','MSCSKE','MSCS'].some(c => code.startsWith(c));
+  const digits = isMaster ? 2 : 3;
+  return `${batch}${code}${String(i).padStart(digits, '0')}`;
 }
 
 // ── Sample supervisor/examiner names for templates ──
@@ -279,4 +282,58 @@ console.log('✓ Created master_upload_template.xlsx (template with 2 sample row
 safeWrite(masterTestData, 'master_upload_test_data.xlsx', 'Theses');
 console.log(`✓ Created master_upload_test_data.xlsx (${masterTestData.length} thesis rows for testing)`);
 
-console.log('\nDone — all 4 files generated in excel-templates/ and copied to frontend/public/');
+// ====================================================================
+// 5. USER BULK TEMPLATES (people-only Excel for /users/bulk-import)
+// ====================================================================
+const studentUsersTemplate = [
+  {
+    email: '', password: '', firstName: '', lastName: '',
+    rollNumber: '', programCode: '', degreeType: 'MASTER',
+  },
+  {
+    email: 'student.example@pcampus.edu.np',
+    password: 'pass123',
+    firstName: 'Narayan',
+    lastName: 'Bhandari',
+    rollNumber: '080MSNCS01',
+    programCode: 'MSNCS',
+    degreeType: 'MASTER',
+  },
+];
+
+const supervisorUsersTemplate = [
+  {
+    email: '', password: '', firstName: '', lastName: '', designation: '',
+  },
+  {
+    email: 'supervisor.example@pcampus.edu.np',
+    password: 'pass123',
+    firstName: 'Ram',
+    lastName: 'Acharya',
+    designation: 'Assoc. Prof. Dr.',
+  },
+];
+
+const externalUsersTemplate = [
+  {
+    email: '', password: '', firstName: '', lastName: '', designation: '',
+  },
+  {
+    email: 'examiner.example@ioe.edu.np',
+    password: 'pass123',
+    firstName: 'Hari',
+    lastName: 'Adhikari',
+    designation: 'Prof. Dr.',
+  },
+];
+
+safeWrite(studentUsersTemplate, 'student_users_template.xlsx', 'Students');
+console.log('✓ Created student_users_template.xlsx');
+
+safeWrite(supervisorUsersTemplate, 'supervisor_users_template.xlsx', 'Supervisors');
+console.log('✓ Created supervisor_users_template.xlsx');
+
+safeWrite(externalUsersTemplate, 'external_users_template.xlsx', 'Examiners');
+console.log('✓ Created external_users_template.xlsx');
+
+console.log('\nDone — all template files generated in excel-templates/ and copied to frontend/public/');

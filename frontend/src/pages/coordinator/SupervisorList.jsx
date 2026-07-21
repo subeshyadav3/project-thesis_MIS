@@ -8,6 +8,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 
 const PAGE_SIZE = 10;
 
@@ -22,6 +23,8 @@ function SupervisorList() {
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [academicYears, setAcademicYears] = useState([]);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,6 +44,7 @@ function SupervisorList() {
     // Only fetch theses for Master coordinators
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+      promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
@@ -56,6 +60,7 @@ function SupervisorList() {
     ];
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
+      promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
@@ -132,15 +137,29 @@ function SupervisorList() {
   const unassignedTheses = isMasterCoordinator ? theses.filter(t => !t.supervisorId).length : 0;
 
   const actions = (
-    <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-      <span className="material-symbols-outlined">add</span>
-      Add Supervisor
-    </button>
+    <>
+      {isMasterCoordinator && (
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
+          <span className="material-symbols-outlined">upload_file</span>
+          Upload Excel
+        </button>
+      )}
+      <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+        <span className="material-symbols-outlined">add</span>
+        Add Supervisor
+      </button>
+    </>
   );
 
   return (
     <ErrorBoundary>
     <PageLayout title="Supervisors" user={user} actions={actions}>
+      <MasterThesisBulkUploadModal
+        open={showUpload}
+        onClose={() => setShowUpload(false)}
+        onSuccess={loadData}
+        title="Bulk Upload Theses (Supervisors)"
+      />
       {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>

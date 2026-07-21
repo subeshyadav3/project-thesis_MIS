@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import Pagination from '../../components/Pagination';
 import { formatYearSemester } from '../../utils/romanNumerals';
 
 const COORDINATOR_ALLOWED_ROLES = ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
+const PAGE_SIZES = [10, 25, 50, 100];
 
 function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -13,16 +15,35 @@ function UserManagement() {
   const [editUser, setEditUser] = useState(null);
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({ degreeType: '', departmentId: '', programId: '', year: '' });
+  const [filters, setFilters] = useState({ role: '', degreeType: '', departmentId: '', programId: '', batch: '' });
   const [programs, setPrograms] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [showBulk, setShowBulk] = useState(false);
   const [bulkJson, setBulkJson] = useState('');
+  const [showExcelBulk, setShowExcelBulk] = useState(false);
+  const [excelUserType, setExcelUserType] = useState('STUDENT');
+  const [excelFile, setExcelFile] = useState(null);
+  const [excelUploading, setExcelUploading] = useState(false);
+  const [excelResult, setExcelResult] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isCoordinator = user.role === 'COORDINATOR';
+  const isMaintainer = user.role === 'MAINTAINER';
+  const isMasterCoordinator = isCoordinator && user.program?.degreeType === 'MASTER';
   const toast = useToast();
 
   const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
+
+  const excelTemplateHref = excelUserType === 'STUDENT'
+    ? '/student_users_template.xlsx'
+    : excelUserType === 'SUPERVISOR'
+      ? '/supervisor_users_template.xlsx'
+      : '/external_users_template.xlsx';
+
+  const excelColumnsHint = excelUserType === 'STUDENT'
+    ? 'email, password, firstName, lastName, rollNumber, programCode, degreeType'
+    : 'email, password, firstName, lastName, designation';
 
   const loadUsers = () => {
     setLoading(true);
@@ -33,6 +54,9 @@ function UserManagement() {
     api.get('/departments/programs').then(({ data }) => setPrograms(data)).catch(() => {});
     api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => {});
   }, []);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filters]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,18 +104,31 @@ function UserManagement() {
     setShowModal(true);
   };
 
-  const extractYear = (roll) => roll?.match(/^(\d{3})/)?.[1] || '';
+  const extractBatch = (roll) => roll?.match(/^(\d{2,3})/)?.[1] || '';
 
-  const filteredUsers = users.filter(u => {
-    if (!`${u.firstName} ${u.lastName} ${u.email} ${u.role} ${u.rollNumber || ''}`.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    if (filters.degreeType && u.degreeType !== filters.degreeType) return false;
-    if (filters.departmentId && u.departmentId !== parseInt(filters.departmentId)) return false;
-    if (filters.programId && u.programId !== parseInt(filters.programId)) return false;
-    if (filters.year && extractYear(u.rollNumber) !== filters.year) return false;
-    return true;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      if (!`${u.firstName} ${u.lastName} ${u.email} ${u.role} ${u.rollNumber || ''}`.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      if (filters.role && u.role !== filters.role) return false;
+      if (filters.degreeType && u.degreeType !== filters.degreeType) return false;
+      if (filters.departmentId && u.departmentId !== parseInt(filters.departmentId)) return false;
+      if (filters.programId && u.programId !== parseInt(filters.programId)) return false;
+      if (filters.batch && extractBatch(u.rollNumber) !== filters.batch) return false;
+      return true;
+    });
+  }, [users, searchTerm, filters]);
 
-  const uniqueYears = [...new Set(users.map(u => extractYear(u.rollNumber)).filter(Boolean))].sort();
+  const uniqueBatches = useMemo(() =>
+    [...new Set(users.map(u => extractBatch(u.rollNumber)).filter(Boolean))].sort(),
+    [users]
+  );
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
+  }, [totalPages, currentPage]);
 
   const getBadge = (role) => {
     switch (role) {
@@ -102,12 +139,34 @@ function UserManagement() {
     }
   };
 
+  const FilterDropdown = ({ name, value, onChange, label, options, allLabel }) => (
+    <div className="filter-item">
+      <label>{label}</label>
+      <select value={value} onChange={e => onChange(name, e.target.value)}>
+        <option value="">{allLabel || `All ${label}s`}</option>
+        {options.map((o, i) => (
+          <option key={i} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const handleFilterChange = (name, value) => {
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
   const actions = (
     <>
       {!isCoordinator && (
         <button className="btn btn-outline btn-sm" onClick={() => setShowBulk(true)}>
           <span className="material-symbols-outlined">upload_file</span>
           Bulk Import
+        </button>
+      )}
+      {isMasterCoordinator && (
+        <button className="btn btn-secondary btn-sm" onClick={() => { setShowExcelBulk(true); setExcelResult(null); setExcelFile(null); }}>
+          <span className="material-symbols-outlined">upload_file</span>
+          Bulk Upload
         </button>
       )}
       <button className="btn btn-primary btn-sm" onClick={openCreate}>
@@ -153,6 +212,49 @@ function UserManagement() {
           </div>
         </div>
 
+        <div className="filter-bar">
+          <FilterDropdown
+            name="role" label="Role" value={filters.role}
+            onChange={handleFilterChange}
+            options={allowedRoles.map(r => ({ value: r, label: r.replace('_', ' ') }))}
+            allLabel="All Roles"
+          />
+          {/* Degree type filter appears when a role is selected or always for non-students */}
+          {(!filters.role || filters.role === 'STUDENT') && (
+            <FilterDropdown
+              name="degreeType" label="Degree" value={filters.degreeType}
+              onChange={handleFilterChange}
+              options={[
+                { value: 'BACHELOR', label: 'Bachelor' },
+                { value: 'MASTER', label: 'Master' },
+              ]}
+              allLabel="All Degrees"
+            />
+          )}
+          {isMaintainer && (
+            <>
+              <FilterDropdown
+                name="departmentId" label="Dept" value={filters.departmentId}
+                onChange={handleFilterChange}
+                options={departments.map(d => ({ value: String(d.id), label: d.code }))}
+                allLabel="All Depts"
+              />
+              <FilterDropdown
+                name="programId" label="Program" value={filters.programId}
+                onChange={handleFilterChange}
+                options={programs.map(p => ({ value: String(p.id), label: `${p.code} (${p.degreeType === 'BACHELOR' ? 'B' : 'M'})` }))}
+                allLabel="All Programs"
+              />
+            </>
+          )}
+          <FilterDropdown
+            name="batch" label="Batch" value={filters.batch}
+            onChange={handleFilterChange}
+            options={uniqueBatches.map(b => ({ value: b, label: b.startsWith('0') ? `20${b.replace(/^0+/, '')}` : b }))}
+            allLabel="All Batches"
+          />
+        </div>
+
         {loading ? (
           <div className="loading-state">
             <span className="material-symbols-outlined">progress_activity</span>
@@ -174,12 +276,13 @@ function UserManagement() {
                   <th>Role</th>
                   <th>Degree / Program</th>
                   <th>Year/Sem</th>
+                  <th>Batch</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map(u => (
+                {paginatedUsers.map(u => (
                   <tr key={u.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -200,7 +303,7 @@ function UserManagement() {
                     </td>
                     <td style={{ fontSize: 13 }}>
                       {u.role === 'STUDENT' ? (
-                        <>                        {u.degreeType} · {u.program?.code}</>
+                        <>{u.degreeType} · {u.program?.code}</>
                       ) : (
                         <>
                           <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
@@ -226,6 +329,13 @@ function UserManagement() {
                         <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
                       )}
                     </td>
+                    <td style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                      {extractBatch(u.rollNumber) ? (
+                        <span className="badge badge-info" style={{ fontSize: 10 }}>
+                          {extractBatch(u.rollNumber).startsWith('0') ? `20${extractBatch(u.rollNumber).replace(/^0+/, '')}` : extractBatch(u.rollNumber)}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td>
                       <span className={`badge ${u.active ? 'badge-active' : 'badge-pending'}`}>
                         <span className="dot" />{u.active ? 'Active' : 'Inactive'}
@@ -246,7 +356,15 @@ function UserManagement() {
               </tbody>
             </table>
             <div className="table-footer">
-              <span className="font-label text-xs text-on-surface-variant">Showing {filteredUsers.length} of {users.length} users</span>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={PAGE_SIZES}
+                totalItems={filteredUsers.length}
+              />
             </div>
           </>
         )}
@@ -304,6 +422,107 @@ function UserManagement() {
           </div>
         </div>
       )}
+
+      {showExcelBulk && (
+        <div className="modal-overlay" onClick={() => setShowExcelBulk(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <div className="modal-header-icon info">
+                <span className="material-symbols-outlined">upload_file</span>
+              </div>
+              <div className="modal-header-text">
+                <h2>Bulk Upload Users</h2>
+                <p>Choose user type, download the template, then upload Excel</p>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>User type</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[
+                  { value: 'STUDENT', label: 'Student' },
+                  { value: 'SUPERVISOR', label: 'Supervisor' },
+                  { value: 'EXTERNAL_EXAMINER', label: 'External Examiner' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { setExcelUserType(opt.value); setExcelResult(null); setExcelFile(null); }}
+                    style={{
+                      flex: 1, padding: '8px 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
+                      border: excelUserType === opt.value ? '2px solid var(--color-primary)' : '1px solid var(--color-outline)',
+                      background: excelUserType === opt.value ? 'var(--color-primary-container)' : 'var(--color-surface)',
+                      fontWeight: excelUserType === opt.value ? 600 : 400,
+                      minWidth: 0,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 8 }}>
+                Columns: {excelColumnsHint}
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>Excel file (.xlsx)</label>
+              <input type="file" accept=".xlsx,.xls" onChange={e => setExcelFile(e.target.files[0])} />
+              <a href={excelTemplateHref} download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, display: 'inline-block' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+                {' '}Download blank template
+              </a>
+            </div>
+
+            {excelResult && (
+              <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'var(--color-surface-container-low)', fontSize: 13 }}>
+                <div>Created: <strong>{excelResult.created}</strong> · Failed: <strong>{excelResult.failed}</strong></div>
+                {excelResult.errors?.length > 0 && (
+                  <ul style={{ margin: '8px 0 0', paddingLeft: 18, maxHeight: 120, overflow: 'auto', fontSize: 12 }}>
+                    {excelResult.errors.slice(0, 20).map((err, i) => (
+                      <li key={i}>Row {err.row || '?'}: {err.email} — {err.error}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => setShowExcelBulk(false)}>
+                <span className="material-symbols-outlined">close</span>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={excelUploading || !excelFile}
+                onClick={async () => {
+                  if (!excelFile) { toast.warning('Select a file'); return; }
+                  setExcelUploading(true);
+                  setExcelResult(null);
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', excelFile);
+                    formData.append('role', excelUserType);
+                    const { data } = await api.post('/users/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    setExcelResult(data);
+                    toast.success(data.message || `Created ${data.created} user(s)`);
+                    loadUsers();
+                  } catch (err) {
+                    toast.error(err.response?.data?.error || 'Upload failed');
+                  } finally {
+                    setExcelUploading(false);
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined">{excelUploading ? 'progress_activity' : 'upload'}</span>
+                {excelUploading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>

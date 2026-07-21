@@ -7,6 +7,7 @@ import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
+import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 
@@ -18,35 +19,35 @@ function MasterThesis() {
   const [theses, setTheses] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allSupervisors, setAllSupervisors] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedYear, setSelectedYear] = useState('');
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [yearFilter, setYearFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
   const [examiners, setExaminers] = useState([]);
   const [editSupId, setEditSupId] = useState('');
-  const [editExamId, setEditExamId] = useState('');
+  const [editMidTermExamId, setEditMidTermExamId] = useState('');
+  const [editFinalExamId, setEditFinalExamId] = useState('');
   const [editSupSearch, setEditSupSearch] = useState('');
-  const [editExamSearch, setEditExamSearch] = useState('');
+  const [editMidTermExamSearch, setEditMidTermExamSearch] = useState('');
+  const [editFinalExamSearch, setEditFinalExamSearch] = useState('');
   const [editSupOpen, setEditSupOpen] = useState(false);
-  const [editExamOpen, setEditExamOpen] = useState(false);
+  const [editMidTermExamOpen, setEditMidTermExamOpen] = useState(false);
+  const [editFinalExamOpen, setEditFinalExamOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const editSupRef = useRef(null);
-  const editExamRef = useRef(null);
+  const editMidTermExamRef = useRef(null);
+  const editFinalExamRef = useRef(null);
   const [examSearch, setExamSearch] = useState('');
   const [examOpen, setExamOpen] = useState(false);
   const examRef = useRef(null);
@@ -57,9 +58,6 @@ function MasterThesis() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [bulkPreview, setBulkPreview] = useState(null);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkYearId, setBulkYearId] = useState('');
   const [selectedTheses, setSelectedTheses] = useState([]);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const selectAllRef = useRef(null);
@@ -74,7 +72,6 @@ function MasterThesis() {
       api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
       api.get('/assignment-requests', { signal }).then(({ data }) => setPendingRequests(data.filter(r => r.status === 'PENDING'))).catch(() => setPendingRequests([])),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
@@ -104,14 +101,24 @@ useEffect(() => {
   }, [editSupOpen]);
 
   useEffect(() => {
-    const handleEditExamOutside = (e) => {
-      if (editExamRef.current && !editExamRef.current.contains(e.target)) {
-        setEditExamOpen(false);
+    const handleEditMidTermExamOutside = (e) => {
+      if (editMidTermExamRef.current && !editMidTermExamRef.current.contains(e.target)) {
+        setEditMidTermExamOpen(false);
       }
     };
-    if (editExamOpen) document.addEventListener('mousedown', handleEditExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditExamOutside);
-  }, [editExamOpen]);
+    if (editMidTermExamOpen) document.addEventListener('mousedown', handleEditMidTermExamOutside);
+    return () => document.removeEventListener('mousedown', handleEditMidTermExamOutside);
+  }, [editMidTermExamOpen]);
+
+  useEffect(() => {
+    const handleEditFinalExamOutside = (e) => {
+      if (editFinalExamRef.current && !editFinalExamRef.current.contains(e.target)) {
+        setEditFinalExamOpen(false);
+      }
+    };
+    if (editFinalExamOpen) document.addEventListener('mousedown', handleEditFinalExamOutside);
+    return () => document.removeEventListener('mousedown', handleEditFinalExamOutside);
+  }, [editFinalExamOpen]);
 
   useEffect(() => {
     const handleExamOutside = (e) => {
@@ -143,55 +150,6 @@ useEffect(() => {
     }
     return () => document.removeEventListener('click', handleClick);
   }, [actionMenuRow]);
-
-  const handleFileUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) { toast.warning('Select a file'); return; }
-    if (!bulkYearId) { toast.warning('Select an academic year'); return; }
-    setBulkLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('academicYearId', bulkYearId);
-      const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setBulkPreview(data);
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
-  const handleBulkConfirm = async () => {
-    if (!bulkPreview?.preview) return;
-    setBulkLoading(true);
-    try {
-      const rows = bulkPreview.preview.map(p => ({
-        row: p.row,
-        name: p.name,
-        roll: p.roll,
-        title: p.title,
-        batch: p.batch,
-        cluster: p.cluster,
-        programId: p.programId,
-        studentMatch: p.studentMatch,
-        supervisorMatch: p.supervisorMatch,
-        externalMidTermMatch: p.externalMidTermMatch,
-        externalFinalMatch: p.externalFinalMatch,
-      }));
-      await api.post('/theses/bulk-import/confirm', { rows, academicYearId: parseInt(bulkYearId) });
-      toast.success(`${bulkPreview.stats.matched} theses imported`);
-      setShowUpload(false);
-      setBulkPreview(null);
-      setSelectedFile(null);
-      setBulkYearId('');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
-    } finally {
-      setBulkLoading(false);
-    }
-  };
 
 const handleComplete = async (id) => {
     try {
@@ -251,10 +209,14 @@ const handleComplete = async (id) => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/theses', createForm);
-      toast.success('Thesis created successfully');
+      const res = await api.post('/theses', createForm);
+      if (res.data?.crossProgram) {
+        toast.info('Cross-program thesis created. The student\'s coordinator has been notified for approval.');
+      } else {
+        toast.success('Thesis created successfully');
+      }
       setShowCreate(false);
-      setCreateForm({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
+      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -286,23 +248,16 @@ const handleComplete = async (id) => {
           }
         }
       }
-      if (editExamId !== undefined) {
-        const currentExam = showDetail?.examinerAssignments?.[0]?.externalExaminerId?.toString();
-        if (editExamId !== currentExam) {
-          if (editExamId) {
-            if (currentExam) {
-              const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
-              if (assignmentId) {
-                promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
-              }
-            }
-            promises.push(api.post('/examiner-assignments/thesis', { thesisId, externalExaminerId: parseInt(editExamId) }));
-          } else if (currentExam) {
-            const assignmentId = showDetail?.examinerAssignments?.[0]?.id;
-            if (assignmentId) {
-              promises.push(api.delete(`/examiner-assignments/${assignmentId}`));
-            }
-          }
+      if (editMidTermExamId !== undefined) {
+        const currentMidTerm = showDetail?.externalMidTerm?.id?.toString();
+        if (editMidTermExamId !== currentMidTerm) {
+          promises.push(api.put(`/theses/${thesisId}/external-midterm`, { externalExaminerId: editMidTermExamId ? parseInt(editMidTermExamId) : null }));
+        }
+      }
+      if (editFinalExamId !== undefined) {
+        const currentFinal = showDetail?.externalFinal?.id?.toString();
+        if (editFinalExamId !== currentFinal) {
+          promises.push(api.put(`/theses/${thesisId}/external-final`, { externalExaminerId: editFinalExamId ? parseInt(editFinalExamId) : null }));
         }
       }
       const results = await Promise.all(promises);
@@ -323,19 +278,18 @@ const handleComplete = async (id) => {
     return theses.filter(t => {
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      const matchesYear = yearFilter === 'ALL' || t.academicYearId?.toString() === yearFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
         : supervisorFilter === 'NONE'
           ? !t.supervisor
           : t.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesYear && matchesSupervisor;
+      return matchesSearch && matchesStatus && matchesSupervisor;
     });
-  }, [theses, searchQuery, statusFilter, yearFilter, supervisorFilter]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
-      const statusOrder = { PENDING: 0, ACTIVE: 1, COMPLETED: 2 };
+      const statusOrder = { PENDING: 0, ACTIVE: 1, OVERDUE: 1, COMPLETED: 2 };
       return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
     });
   }, [filteredTheses]);
@@ -365,12 +319,17 @@ const handleComplete = async (id) => {
     if (mode === 'edit') {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
+      setEditSupId(t.supervisorId ? t.supervisorId.toString() : '');
+      setEditMidTermExamId(t.externalMidTerm?.id?.toString() || '');
+      setEditFinalExamId(t.externalFinal?.id?.toString() || '');
+      setEditSupSearch('');
+      setEditMidTermExamSearch('');
+      setEditFinalExamSearch('');
     }
   };
 
-  const formatAcademicYear = (ay) => {
-    if (!ay) return '';
-    return ay.year || '';
+  const formatBatch = (t) => {
+    return t?.batch || '—';
   };
 
   const actions = (
@@ -414,13 +373,9 @@ const handleComplete = async (id) => {
   const statusOptions = [
     { value: 'PENDING', label: 'Pending' },
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
-
-  const yearOptions = academicYears.map(y => ({
-    value: y.id.toString(),
-    label: `${y.year}`,
-  }));
 
   const supervisorOptions = [
     { value: 'NONE', label: 'Unassigned' },
@@ -456,8 +411,8 @@ return (
                   </span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Academic Year</span>
-                  <span>{formatAcademicYear(showDetail.academicYear) || '—'}</span>
+                  <span className="detail-label">Batch</span>
+                  <span>{showDetail.batch || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
@@ -495,6 +450,30 @@ return (
                   <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
                     <span className="dot" />
                     {showDetail.status || 'PENDING'}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">External (Mid-Term)</span>
+                  <span>
+                    {showDetail.externalMidTerm ? (
+                      <>{showDetail.externalMidTerm.firstName} {showDetail.externalMidTerm.lastName}</>
+                    ) : (
+                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="dot" />Not Assigned
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">External (Final)</span>
+                  <span>
+                    {showDetail.externalFinal ? (
+                      <>{showDetail.externalFinal.firstName} {showDetail.externalFinal.lastName}</>
+                    ) : (
+                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="dot" />Not Assigned
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -585,37 +564,85 @@ return (
                       )}
                     </div>
                   </div>
-                  <div className="form-group" ref={editExamRef} style={{ flex: 1, minWidth: 250 }}>
-                    <label>Internal Examiner</label>
+                  <div className="form-group" ref={editMidTermExamRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>External Examiner (Mid-Term)</label>
                     <div className="sup-dropdown-trigger">
-                      <div className="sup-search-wrapper" onClick={() => setEditExamOpen(true)}>
+                      <div className="sup-search-wrapper" onClick={() => setEditMidTermExamOpen(true)}>
                         <span className="material-symbols-outlined">search</span>
                         <input
                           type="text"
-                          placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
-                          value={editExamSearch}
-                          onChange={e => { setEditExamSearch(e.target.value); setEditExamOpen(true); }}
-                          onFocus={() => setEditExamOpen(true)}
+                          placeholder={editMidTermExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editMidTermExamId)) : 'No mid-term examiner'}
+                          value={editMidTermExamSearch}
+                          onChange={e => { setEditMidTermExamSearch(e.target.value); setEditMidTermExamOpen(true); }}
+                          onFocus={() => setEditMidTermExamOpen(true)}
                         />
-                        {editExamId && (
-                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditExamId(''); setEditExamSearch(''); }}>
+                        {editMidTermExamId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditMidTermExamId(''); setEditMidTermExamSearch(''); }}>
                             <span className="material-symbols-outlined">close</span>
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
                       </div>
-                      {editExamOpen && (
+                      {editMidTermExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
-                              const selected = editExamId === e.id.toString();
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
+                              const selected = editMidTermExamId === e.id.toString();
                               return (
                                 <div
                                   key={e.id}
                                   className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                                  onClick={() => { setEditExamId(e.id.toString()); setEditExamSearch(''); setEditExamOpen(false); }}
+                                  onClick={() => { setEditMidTermExamId(e.id.toString()); setEditMidTermExamSearch(''); setEditMidTermExamOpen(false); }}
+                                >
+                                  <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
+                                  <div className="sup-dropdown-item-info">
+                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
+                                    <div className="sup-dropdown-item-email">{e.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                    {e.active ? 'Active' : 'Inactive'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-group" ref={editFinalExamRef} style={{ flex: 1, minWidth: 250 }}>
+                    <label>External Examiner (Final)</label>
+                    <div className="sup-dropdown-trigger">
+                      <div className="sup-search-wrapper" onClick={() => setEditFinalExamOpen(true)}>
+                        <span className="material-symbols-outlined">search</span>
+                        <input
+                          type="text"
+                          placeholder={editFinalExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editFinalExamId)) : 'No final examiner'}
+                          value={editFinalExamSearch}
+                          onChange={e => { setEditFinalExamSearch(e.target.value); setEditFinalExamOpen(true); }}
+                          onFocus={() => setEditFinalExamOpen(true)}
+                        />
+                        {editFinalExamId && (
+                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditFinalExamId(''); setEditFinalExamSearch(''); }}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
+                        )}
+                        <span className="material-symbols-outlined sup-dropdown-arrow">{editFinalExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                      </div>
+                      {editFinalExamOpen && (
+                        <div className="sup-dropdown">
+                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).length === 0 ? (
+                            <div className="sup-dropdown-empty">No examiners found</div>
+                          ) : (
+                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).map(e => {
+                              const selected = editFinalExamId === e.id.toString();
+                              return (
+                                <div
+                                  key={e.id}
+                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                  onClick={() => { setEditFinalExamId(e.id.toString()); setEditFinalExamSearch(''); setEditFinalExamOpen(false); }}
                                 >
                                   <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
                                   <div className="sup-dropdown-item-info">
@@ -654,7 +681,7 @@ return (
                   Mark Complete
                 </button>
               )}
-              {showDetail.status !== 'COMPLETED' && detailMode !== 'edit' && (
+              {detailMode !== 'edit' && (
                 <button className="btn btn-danger" onClick={() => confirmDeleteThesis(showDetail.id)}>
                   <span className="material-symbols-outlined">delete</span>
                   Delete
@@ -759,7 +786,6 @@ return (
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
-          <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
 
@@ -769,7 +795,7 @@ return (
           <div className="empty-state">
             <span className="material-symbols-outlined">library_books</span>
             <h3>No theses found</h3>
-            <p>{searchQuery || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
+            <p>{searchQuery || statusFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
           </div>
         ) : (
           <>
@@ -830,14 +856,47 @@ return (
                         </span>
                       )}
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
-                        <span className="dot" />
-                        {t.status || 'PENDING'}
-                      </span>
+                    <td style={{ padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                        <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+                          <span className="dot" />
+                          {t.status || 'PENDING'}
+                        </span>
+                        {t.crossProgramRequestedBy && (
+                          <>
+                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 9, verticalAlign: 'middle' }}>swap_horiz</span>
+                              Cross-Program
+                            </span>
+                            {t.crossProgramRequestedBy.id === user.id && (
+                              <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
+                                <span className="dot" />Awaiting Approval
+                              </span>
+                            )}
+                            {t.crossProgramRequestedBy.id !== user.id && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button
+                                  className="icon-btn-sm success"
+                                  title="Approve cross-program thesis"
+                                  onClick={async (e) => { e.stopPropagation(); try { await api.put(`/theses/${t.id}/approve-cross-program`); toast.success('Cross-program thesis approved'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Approve failed'); } }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check</span>
+                                </button>
+                                <button
+                                  className="icon-btn-sm danger"
+                                  title="Reject cross-program thesis"
+                                  onClick={async (e) => { e.stopPropagation(); if (window.confirm('Reject this cross-program thesis? It will be removed.')) { try { await api.put(`/theses/${t.id}/reject-cross-program`); toast.success('Cross-program thesis rejected'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Reject failed'); } } }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
-                      {formatAcademicYear(t.academicYear) || '—'}
+                      Batch {t.batch || '—'}
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -850,12 +909,10 @@ return (
                           </button>
                           {actionMenuRow === t.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              {t.status !== 'COMPLETED' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditExamId(t.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                                   Edit
                                 </div>
-                              )}
                               {t.status === 'ACTIVE' && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
@@ -866,12 +923,10 @@ return (
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
                                 PDF Preview
                               </div>
-                              {t.status !== 'COMPLETED' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-error)' }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
-                                  Delete
-                                </div>
-                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                Delete
+                              </div>
                             </div>
                           )}
                         </div>
@@ -893,91 +948,12 @@ return (
         )}
       </div>
 
-      {showUpload && (
-        <div className="modal-overlay" onClick={() => { setShowUpload(false); setBulkPreview(null); }}>
-          <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">upload_file</span>
-              </div>
-              <div className="modal-header-text">
-                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Import Theses'}</h2>
-                <p>{bulkPreview ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched` : 'Upload Excel with Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch'}</p>
-              </div>
-            </div>
-
-            {!bulkPreview ? (
-              <form onSubmit={handleFileUpload}>
-                <div className="form-group">
-                  <label>Academic Year</label>
-                  <select value={bulkYearId} onChange={e => setBulkYearId(e.target.value)} required>
-                    <option value="">Select year...</option>
-                    {academicYears.map(y => <option key={y.id} value={y.id}>{y.year} {y.semester}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Excel File (.xlsx)</label>
-                  <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
-                  <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Columns: Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch</span>
-                </div>
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
-                    <span className="material-symbols-outlined">close</span>Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
-                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
-                    {bulkLoading ? 'Analyzing...' : 'Preview'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div>
-                <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
-                  <table style={{ width: '100%', fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Roll</th>
-                        <th>Title</th>
-                        <th>Student</th>
-                        <th>Supervisor</th>
-                        <th>Ext (Mid)</th>
-                        <th>Ext (Final)</th>
-                        <th>Cluster</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkPreview.preview.map(p => (
-                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
-                          <td>{p.row}</td>
-                          <td>{p.name}</td>
-                          <td style={{ fontSize: 11 }}>{p.roll}</td>
-                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</td>
-                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.cluster || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
-                    <span className="material-symbols-outlined">arrow_back</span>Back
-                  </button>
-                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
-                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
-                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} theses`}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <MasterThesisBulkUploadModal
+        open={showUpload}
+        onClose={() => setShowUpload(false)}
+        onSuccess={loadData}
+        title="Bulk Upload Theses"
+      />
 
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
@@ -1058,10 +1034,10 @@ return (
                 </div>
               </div>
               <div className="form-group">
-                <label>Academic Year</label>
-                <select value={createForm.academicYearId} onChange={e => setCreateForm({...createForm, academicYearId: e.target.value})} required>
-                  <option value="">Select academic year...</option>
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+                <label>Status</label>
+                <select value={createForm.status} onChange={e => setCreateForm({...createForm, status: e.target.value})}>
+                  <option value="PENDING">Pending</option>
+                  <option value="ACTIVE">Active</option>
                 </select>
               </div>
               <div className="form-group" ref={createSupRef}>

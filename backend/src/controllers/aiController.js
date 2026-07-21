@@ -82,8 +82,8 @@ async function loadCandidates(req, proposalId, scope) {
   const proposal = await prisma.proposal.findUnique({
     where: { id: proposalId },
     include: {
-      group: { include: { academicYear: { include: { department: true } } } },
-      thesis: { include: { academicYear: { include: { department: true } } } },
+      group: { include: { program: { include: { department: true } } } },
+      thesis: { include: { student: { include: { program: { include: { department: true } } } } } },
     },
   });
   if (!proposal) return { scope, candidates: [] };
@@ -104,38 +104,27 @@ async function loadCandidates(req, proposalId, scope) {
   }
 
   const where = { NOT: { proposalId } };
-  let scopedYearId = null;
   let scopedDeptId = null;
   if (proposal.group) {
-    scopedYearId = proposal.group.academicYearId;
-    scopedDeptId = proposal.group.academicYear?.departmentId;
+    scopedDeptId = proposal.group.program?.departmentId;
   } else if (proposal.thesis) {
-    scopedYearId = proposal.thesis.academicYearId;
-    scopedDeptId = proposal.thesis.academicYear?.departmentId;
+    scopedDeptId = proposal.thesis.student?.program?.departmentId;
   }
 
   // If user is scoped to a department (supervisor/examiner), force-scope.
-  if (userDeptId && (scope === 'all' || scope === 'department' || scope === 'year')) {
-    scope = scope === 'all' ? 'department_scope' : scope === 'year' ? 'year_department' : scope;
+  if (userDeptId && (scope === 'all' || scope === 'department')) {
+    scope = scope === 'all' ? 'department_scope' : scope;
     if (!scopedDeptId || scopedDeptId !== userDeptId) scopedDeptId = userDeptId;
   }
 
-  if ((scope === 'year' || scope === 'year_department') && scopedYearId) {
-    where.proposal = {
-      OR: [
-        { group: { academicYearId: scopedYearId } },
-        { thesis: { academicYearId: scopedYearId } },
-      ],
-    };
-  }
-  if ((scope === 'department' || scope === 'year_department' || scope === 'department_scope') && scopedDeptId) {
+  if ((scope === 'department' || scope === 'department_scope') && scopedDeptId) {
     const deptFilter = {
       OR: [
-        { group: { academicYear: { departmentId: scopedDeptId } } },
-        { thesis: { academicYear: { departmentId: scopedDeptId } } },
+        { group: { program: { departmentId: scopedDeptId } } },
+        { thesis: { student: { program: { departmentId: scopedDeptId } } } },
       ],
     };
-    where.proposal = where.proposal ? { AND: [where.proposal, deptFilter] } : deptFilter;
+    where.proposal = deptFilter;
   }
 
   const candidates = await prisma.documentEmbedding.findMany({
@@ -153,14 +142,15 @@ async function loadCandidates(req, proposalId, scope) {
               id: true,
               name: true,
               projectTitle: true,
-              academicYear: { select: { year: true, department: { select: { name: true, code: true } } } },
+              batch: true,
+              program: { select: { department: { select: { name: true, code: true } } } },
             },
           },
           thesis: {
             select: {
               id: true,
               title: true,
-              academicYear: { select: { year: true, department: { select: { name: true, code: true } } } },
+              student: { select: { program: { select: { department: { select: { name: true, code: true } } } } } },
             },
           },
           submittedBy: { select: { id: true, firstName: true, lastName: true } },
@@ -178,10 +168,10 @@ async function loadCandidates(req, proposalId, scope) {
       title: c.proposal?.group?.projectTitle || c.proposal?.thesis?.title || '(untitled)',
       group: c.proposal?.group ? { id: c.proposal.group.id, name: c.proposal.group.name } : null,
       thesis: c.proposal?.thesis ? { id: c.proposal.thesis.id, title: c.proposal.thesis.title } : null,
-      year: c.proposal?.group?.academicYear?.year || c.proposal?.thesis?.academicYear?.year || null,
+      year: c.proposal?.group?.batch || c.proposal?.thesis?.batch || null,
       department:
-        c.proposal?.group?.academicYear?.department?.name ||
-        c.proposal?.thesis?.academicYear?.department?.name ||
+        c.proposal?.group?.program?.department?.name ||
+        c.proposal?.thesis?.student?.program?.department?.name ||
         null,
       submittedBy: c.proposal?.submittedBy
         ? `${c.proposal.submittedBy.firstName} ${c.proposal.submittedBy.lastName}`

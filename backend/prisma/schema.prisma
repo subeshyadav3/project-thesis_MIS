@@ -29,12 +29,14 @@ enum GroupStatus {
   PENDING
   ACTIVE
   COMPLETED
+  OVERDUE
 }
 
 enum ThesisStatus {
   PENDING
   ACTIVE
   COMPLETED
+  OVERDUE
 }
 
 enum EvaluationStatus {
@@ -54,6 +56,8 @@ enum EvaluationType {
   MIDTERM_DEFENSE
   FINAL_DEFENSE
   EXTERNAL_EXAMINER
+  EXTERNAL_MIDTERM
+  EXTERNAL_FINAL
 }
 
 enum AnnouncementType {
@@ -83,6 +87,8 @@ model Announcement {
   academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id])
   departmentId    Int
   department      Department          @relation(fields: [departmentId], references: [id])
+  startDate       DateTime?
+  expirationDate  DateTime?
   allowGroupFormation Boolean          @default(false)
   groupSizeMin    Int                 @default(1)
   groupSizeMax    Int                 @default(4)
@@ -171,6 +177,7 @@ model User {
   assignmentRequestsSent      AssignmentRequest[]      @relation("AssignmentRequestFrom")
   assignmentRequestsReceived  AssignmentRequest[]      @relation("AssignmentRequestTo")
   assignmentRequestSupervisor AssignmentRequest[]      @relation("AssignmentRequestSupervisor")
+  crossProgramRequestedTheses Thesis[]                 @relation("CrossProgramRequester")
   invitationsSent             GroupInvitation[]        @relation("GroupInviter")
   invitationsReceived         GroupInvitation[]        @relation("GroupInvitee")
   groupsFormed                ProjectGroup[]           @relation("GroupFormer")
@@ -221,7 +228,6 @@ model AcademicYear {
   createdAt    DateTime     @default(now())
 
   groups ProjectGroup[]
-  theses Thesis[]
   announcements Announcement[]
 
   @@index([departmentId])
@@ -240,8 +246,8 @@ model ProjectGroup {
   supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])
   programId      Int?
   program        Program?            @relation(fields: [programId], references: [id])
-  academicYearId Int
-  academicYear   AcademicYear        @relation(fields: [academicYearId], references: [id])
+  academicYearId Int?
+  academicYear   AcademicYear?       @relation(fields: [academicYearId], references: [id])
   announcementId Int?
   announcement   Announcement?       @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   formedById     Int?
@@ -260,7 +266,6 @@ model ProjectGroup {
 
   @@index([status])
   @@index([programId])
-  @@index([academicYearId])
   @@index([announcementId])
 }
 
@@ -290,10 +295,10 @@ model Thesis {
   externalMidTerm   User?    @relation("ExternalMidTerm", fields: [externalMidTermId], references: [id], onDelete: SetNull)
   externalFinalId   Int?
   externalFinal     User?    @relation("ExternalFinal", fields: [externalFinalId], references: [id], onDelete: SetNull)
+  crossProgramRequestedById Int?
+  crossProgramRequestedBy   User?   @relation("CrossProgramRequester", fields: [crossProgramRequestedById], references: [id], onDelete: SetNull)
   cluster        String?
   batch          String?
-  academicYearId Int
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   announcementId Int?
   announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
@@ -308,7 +313,6 @@ model Thesis {
 
   @@index([status])
   @@index([studentId])
-  @@index([academicYearId])
   @@index([announcementId])
 }
 

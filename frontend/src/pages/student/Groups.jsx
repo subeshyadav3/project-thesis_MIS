@@ -34,102 +34,117 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
     `${s.firstName} ${s.lastName} ${s.rollNumber || ''}`.toLowerCase().includes(memberSearch.toLowerCase())
   ).filter(s => !selectedMembers.includes(s.id) && s.id !== user.id);
 
+  const isThesis = announcement.type === 'THESIS';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 360, padding: '16px', background: 'var(--color-surface-container-low)', borderRadius: 'var(--border-radius-md)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12, borderBottom: '1px solid var(--color-outline-variant)' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-primary)' }}>group_add</span>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>Create New Group</span>
-        <span className={`badge badge-${announcement.type === 'THESIS' ? 'warning' : 'info'}`} style={{ marginLeft: 'auto' }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 20, color: isThesis ? 'var(--color-warning)' : 'var(--color-primary)' }}>{isThesis ? 'description' : 'group_add'}</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>{isThesis ? 'Submit Thesis' : 'Create New Group'}</span>
+        <span className={`badge badge-${isThesis ? 'warning' : 'info'}`} style={{ marginLeft: 'auto' }}>
           {TYPE_LABELS[announcement.type]}
         </span>
       </div>
 
-      <div className="form-group" style={{ margin: 0 }}>
-        <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Group Name</label>
-        <input className="form-input" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} placeholder="Enter a name for your group" />
-      </div>
-
-      <div className="form-group" style={{ margin: 0 }}>
-        <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Project Title</label>
-        <input className="form-input" value={createForm.projectTitle} onChange={e => setCreateForm({...createForm, projectTitle: e.target.value})} placeholder="Enter project title" />
-      </div>
-
-      <div className="form-group" style={{ margin: 0 }}>
-        <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-        <textarea className="form-input" rows={3} value={createForm.description || ''} onChange={e => setCreateForm({...createForm, description: e.target.value})} placeholder="Brief description of your project..." />
-      </div>
-
-      <div style={{ borderTop: '1px solid var(--color-outline-variant)', paddingTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-            Add Members — max {announcement.groupSizeMax - 1} more ({announcement.groupSizeMax} including you)
-          </div>
-          <span className="badge badge-info">{selectedMembers.length}/{announcement.groupSizeMax - 1}</span>
+      {!isThesis && (
+        <div className="form-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Group Name</label>
+          <input className="form-input" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} placeholder="Enter a name for your group" />
         </div>
+      )}
 
-        {selectedMembers.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-            {selectedMembers.map(id => {
-              const s = availableStudents.find(x => x.id === id);
-              return s ? (
-                <span key={id} className="badge badge-active" style={{ gap: 4, display: 'inline-flex', alignItems: 'center' }}>
-                  {s.firstName} {s.lastName}
-                  <span onClick={() => removeMember(id)} style={{ cursor: 'pointer', marginLeft: 4 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+      <div className="form-group" style={{ margin: 0 }}>
+        <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{isThesis ? 'Thesis Title' : 'Project Title'}</label>
+        <input className="form-input" value={createForm.projectTitle} onChange={e => setCreateForm({...createForm, projectTitle: e.target.value})} placeholder={isThesis ? 'Enter thesis title' : 'Enter project title'} />
+      </div>
+
+      {!isThesis && (
+        <div className="form-group" style={{ margin: 0 }}>
+          <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+          <textarea className="form-input" rows={3} value={createForm.description || ''} onChange={e => setCreateForm({...createForm, description: e.target.value})} placeholder="Brief description of your project..." />
+        </div>
+      )}
+
+      {!isThesis && (
+        <div style={{ borderTop: '1px solid var(--color-outline-variant)', paddingTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+              Add Members — max {announcement.groupSizeMax - 1} more ({announcement.groupSizeMax} including you)
+            </div>
+            <span className="badge badge-info">{selectedMembers.length}/{announcement.groupSizeMax - 1}</span>
+          </div>
+
+          {selectedMembers.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {selectedMembers.map(id => {
+                const s = availableStudents.find(x => x.id === id);
+                return s ? (
+                  <span key={id} className="badge badge-active" style={{ gap: 4, display: 'inline-flex', alignItems: 'center' }}>
+                    {s.firstName} {s.lastName}
+                    <span onClick={() => removeMember(id)} style={{ cursor: 'pointer', marginLeft: 4 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                    </span>
                   </span>
-                </span>
-              ) : null;
-            })}
-          </div>
-        )}
-
-        <div className="sup-dropdown-trigger" ref={memberRef}>
-          <div className="sup-search-wrapper" onClick={() => setMemberOpen(true)}>
-            <span className="material-symbols-outlined">search</span>
-            <input
-              type="text"
-              placeholder="Search students by name or roll number..."
-              value={memberSearch}
-              onChange={e => { setMemberSearch(e.target.value); setMemberOpen(true); }}
-              onFocus={() => setMemberOpen(true)}
-              style={{ flex: 1 }}
-            />
-            {memberOpen && (
-              <span className="material-symbols-outlined sup-dropdown-arrow">arrow_drop_up</span>
-            )}
-          </div>
-          {memberOpen && (
-            <div className="sup-dropdown" style={{ maxHeight: 220, overflowY: 'auto' }}>
-              {inviteLoading ? (
-                <div className="sup-dropdown-empty">Loading students...</div>
-              ) : filtered.length > 0 ? (
-                filtered.map(s => (
-                  <div key={s.id} className="sup-dropdown-item" onClick={() => selectMember(s)}>
-                    <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
-                    <div className="sup-dropdown-item-info">
-                      <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
-                      <div className="sup-dropdown-item-email">{s.rollNumber || s.email} · {s.program?.code || '—'}</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="sup-dropdown-empty" style={{ padding: 16, textAlign: 'center' }}>
-                  No students found.{availableStudents.length === 0 ? ' Click "Reload" below to load your program mates.' : ''}
-                </div>
-              )}
+                ) : null;
+              })}
             </div>
           )}
-        </div>
 
-        <button className="btn btn-sm btn-outline" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }} onClick={loadAvailableStudents} disabled={inviteLoading}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{inviteLoading ? 'sync' : 'refresh'}</span>
-          {inviteLoading ? 'Loading...' : 'Reload Program Students'}
-        </button>
-      </div>
+          <div className="sup-dropdown-trigger" ref={memberRef}>
+            <div className="sup-search-wrapper" onClick={() => setMemberOpen(true)}>
+              <span className="material-symbols-outlined">search</span>
+              <input
+                type="text"
+                placeholder="Search students by name or roll number..."
+                value={memberSearch}
+                onChange={e => { setMemberSearch(e.target.value); setMemberOpen(true); }}
+                onFocus={() => setMemberOpen(true)}
+                style={{ flex: 1 }}
+              />
+              {memberOpen && (
+                <span className="material-symbols-outlined sup-dropdown-arrow">arrow_drop_up</span>
+              )}
+            </div>
+            {memberOpen && (
+              <div className="sup-dropdown" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                {inviteLoading ? (
+                  <div className="sup-dropdown-empty">Loading students...</div>
+                ) : filtered.length > 0 ? (
+                  filtered.map(s => (
+                    <div key={s.id} className="sup-dropdown-item" onClick={() => selectMember(s)}>
+                      <div className="sup-dropdown-item-avatar">{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                      <div className="sup-dropdown-item-info">
+                        <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
+                        <div className="sup-dropdown-item-email">{s.rollNumber || s.email} · {s.program?.code || '—'}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="sup-dropdown-empty" style={{ padding: 16, textAlign: 'center' }}>
+                    No students found.{availableStudents.length === 0 ? ' Click "Reload" below to load your program mates.' : ''}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <button className="btn btn-sm btn-outline" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }} onClick={loadAvailableStudents} disabled={inviteLoading}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{inviteLoading ? 'sync' : 'refresh'}</span>
+            {inviteLoading ? 'Loading...' : 'Reload Program Students'}
+          </button>
+        </div>
+      )}
+
+      {isThesis && (
+        <div style={{ padding: '12px 0', color: 'var(--color-on-surface-variant)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>info</span>
+          Master theses are individual submissions — no group members needed.
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--color-outline-variant)', paddingTop: 16 }}>
-        <button className="btn btn-primary" onClick={onCreate} disabled={selectedMembers.length > announcement.groupSizeMax - 1}>
-          <span className="material-symbols-outlined">add</span> Create Group
+        <button className={`btn ${isThesis ? 'btn-warning' : 'btn-primary'}`} onClick={onCreate} disabled={!isThesis && selectedMembers.length > announcement.groupSizeMax - 1}>
+          <span className="material-symbols-outlined">{isThesis ? 'description' : 'add'}</span> {isThesis ? 'Submit Thesis' : 'Create Group'}
         </button>
         <button className="btn btn-outline" onClick={onCancel}>Cancel</button>
       </div>
@@ -297,7 +312,7 @@ function StudentGroups() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span className={`badge badge-${a.type === 'THESIS' ? 'warning' : 'info'}`}>{TYPE_LABELS[a.type]}</span>
                           <span>Max {a.groupSizeMax} members</span>
-                          <span>{a.academicYear?.year || '—'}</span>
+                          <span>{a.batch || '—'}</span>
                           {a.program?.code && <span>{a.program.code}</span>}
                         </div>
                     </div>
@@ -315,10 +330,9 @@ function StudentGroups() {
                         onCreate={handleCreate}
                         onCancel={() => { setSelectedAnn(null); setCreateForm({ name: '', projectTitle: '' }); setSelectedMembers([]); }}
                       />
-                    ) : (
-                      <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAnn(a); setCreateForm({ name: `Group of ${user.firstName}`, projectTitle: a.title }); }}>
-                        <span className="material-symbols-outlined">group_add</span> Create Group
-                      </button>
+                    ) : (                        <button className={`btn btn-sm ${a.type === 'THESIS' ? 'btn-warning' : 'btn-primary'}`} onClick={() => { setSelectedAnn(a); setCreateForm({ name: a.type === 'THESIS' ? '' : `Group of ${user.firstName}`, projectTitle: a.title }); }}>
+                          <span className="material-symbols-outlined">{a.type === 'THESIS' ? 'description' : 'group_add'}</span> {a.type === 'THESIS' ? 'Submit Thesis' : 'Create Group'}
+                        </button>
                     )}
                   </div>
                 ))}
