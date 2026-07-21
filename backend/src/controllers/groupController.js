@@ -8,6 +8,7 @@ const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
+const { buildGroupWhereForCoordinator } = require('../utils/coordinatorScope');
 
 exports.getGroups = async (req, res) => {
   try {
@@ -15,13 +16,8 @@ exports.getGroups = async (req, res) => {
     await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     const where = {};
     if (req.user.role === 'COORDINATOR') {
-      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-      if (program) {
-        where.programId = program.id;
-      } else {
-        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-        if (dept) where.academicYear = { departmentId: dept.id };
-      }
+      const { where: scopedWhere } = await buildGroupWhereForCoordinator(req.user, where);
+      Object.assign(where, scopedWhere);
     }
     if (req.query.announcementId) where.announcementId = Number(req.query.announcementId);
     if (req.query.status) where.status = req.query.status;
@@ -63,16 +59,18 @@ exports.getGroup = async (req, res) => {
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
     if (req.user.role === 'COORDINATOR') {
-      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-      if (program) {
-        if (group.programId !== program.id) {
+      const { scope } = await buildGroupWhereForCoordinator(req.user);
+      if (scope.kind === 'program') {
+        if (group.programId !== scope.program.id) {
           return res.status(403).json({ error: 'Access denied. Group belongs to another program.' });
         }
-      } else {
-        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-        if (dept && group.academicYear?.departmentId !== dept.id) {
-          return res.status(403).json({ error: 'Access denied. Group belongs to another department.' });
+      } else if (scope.kind === 'department') {
+        const programIds = scope.programs.map(p => p.id);
+        if (!programIds.includes(group.programId)) {
+          return res.status(403).json({ error: 'Access denied. Group belongs to another department program.' });
         }
+      } else if (scope.kind === 'none') {
+        return res.status(403).json({ error: 'Access denied. No coordinator scope.' });
       }
     }
     res.json(group);

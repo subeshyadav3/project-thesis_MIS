@@ -7,26 +7,19 @@ const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
+const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator } = require('../utils/coordinatorScope');
 
 exports.getTheses = async (req, res) => {
   try {
     // Check for overdue items before fetching
     await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     const where = {};
-    if (req.user.role === 'COORDINATOR') {
-      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-      if (program) {
-        where.OR = [
-          { student: { programId: program.id } },
-          { crossProgramRequestedById: req.user.id },
-        ];
-      } else {
-        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-        if (dept) where.academicYear = { departmentId: dept.id };
-      }
-    }
     if (req.query.announcementId) where.announcementId = Number(req.query.announcementId);
     if (req.query.status) where.status = req.query.status;
+    if (req.user.role === 'COORDINATOR') {
+      const { where: scopedWhere } = await buildThesisWhereForCoordinator(req.user, where);
+      Object.assign(where, scopedWhere);
+    }
     const theses = await prisma.thesis.findMany({
       where,
       include: {
@@ -69,18 +62,9 @@ exports.getThesis = async (req, res) => {
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
-      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-      if (program) {
-        // Allow access if: the thesis belongs to the coordinator's program,
-        // OR the coordinator requested this cross-program thesis
-        if (thesis.student?.programId !== program.id && thesis.crossProgramRequestedById !== req.user.id) {
-          return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
-        }
-      } else {
-        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-        if (dept && thesis.academicYear?.departmentId !== dept.id) {
-          return res.status(403).json({ error: 'Access denied. Thesis belongs to another department.' });
-        }
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
     res.json(thesis);
@@ -564,7 +548,16 @@ exports.bulkImportConfirm = async (req, res) => {
 
 exports.updateThesisStatus = async (req, res) => {
   try {
-    const oldThesis = await prisma.thesis.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, title: true } });
+    const id = parseInt(req.params.id);
+    const existing = await prisma.thesis.findUnique({ where: { id }, include: { student: true } });
+    if (!existing) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(existing, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+      }
+    }
+    const oldThesis = await prisma.thesis.findUnique({ where: { id }, select: { status: true, title: true } });
     const thesis = await prisma.thesis.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
@@ -586,8 +579,17 @@ exports.updateThesisStatus = async (req, res) => {
 
 exports.assignSupervisor = async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    const existing = await prisma.thesis.findUnique({ where: { id }, include: { student: true } });
+    if (!existing) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(existing, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+      }
+    }
     const thesis = await prisma.thesis.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       data: { supervisorId: parseInt(req.body.supervisorId), status: 'ACTIVE' },
       include: { student: true, supervisor: true },
     });
@@ -621,13 +623,8 @@ exports.exportTheses = async (req, res) => {
     const XLSX = require('xlsx');
     const where = {};
     if (req.user.role === 'COORDINATOR') {
-      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-      if (program) {
-        where.student = { programId: program.id };
-      } else {
-        const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-        if (dept) where.academicYear = { departmentId: dept.id };
-      }
+      const { where: scopedWhere } = await buildThesisWhereForCoordinator(req.user, where);
+      Object.assign(where, scopedWhere);
     }
     const theses = await prisma.thesis.findMany({
       where,
@@ -665,6 +662,12 @@ exports.deleteThesis = async (req, res) => {
       include: { proposals: true, evaluations: true },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+      }
+    }
     // Allow delete if PENDING, or if no files uploaded AND no evaluations done
     if (thesis.status !== 'PENDING' && (thesis.proposals.length > 0 || thesis.evaluations.length > 0)) {
       return res.status(400).json({ error: 'Cannot delete: thesis has files uploaded or evaluations completed' });
@@ -687,8 +690,14 @@ exports.assignMidTermExternal = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { externalExaminerId } = req.body;
-    const thesis = await prisma.thesis.findUnique({ where: { id } });
+    const thesis = await prisma.thesis.findUnique({ where: { id }, include: { student: true } });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+      }
+    }
 
     // Remove old examiner assignment if exists
     if (thesis.externalMidTermId) {
@@ -738,8 +747,14 @@ exports.assignFinalExternal = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { externalExaminerId } = req.body;
-    const thesis = await prisma.thesis.findUnique({ where: { id } });
+    const thesis = await prisma.thesis.findUnique({ where: { id }, include: { student: true } });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+      }
+    }
 
     // Remove old examiner assignment if exists
     if (thesis.externalFinalId) {
@@ -787,6 +802,14 @@ exports.assignFinalExternal = async (req, res) => {
 exports.updateThesis = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const existing = await prisma.thesis.findUnique({ where: { id }, include: { student: true } });
+    if (!existing) return res.status(404).json({ error: 'Thesis not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!isThesisVisibleToCoordinator(existing, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
+      }
+    }
     const { title, description } = req.body;
     const data = {};
     if (title !== undefined) data.title = title;
