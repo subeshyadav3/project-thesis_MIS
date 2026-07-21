@@ -28,6 +28,7 @@ function BachelorProjects() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
+  const [updatingStatus, setUpdatingStatus] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -138,6 +139,19 @@ useEffect(() => {
     return () => document.removeEventListener('click', handleClick);
   }, [actionMenuRow]);
 
+  const updateGroupStatus = async (groupId, newStatus) => {
+    setUpdatingStatus(groupId);
+    try {
+      await api.put(`/groups/${groupId}/status`, { status: newStatus });
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: newStatus } : g));
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Status update failed');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   const resetUploadModal = () => {
     setSelectedFile(null);
     setBulkPreview(null);
@@ -169,6 +183,7 @@ useEffect(() => {
         row: p.row,
         groupName: p.groupName,
         projectTitle: p.projectTitle,
+        projectType: p.projectType,
         members: p.members,
         rolls: p.rolls,
         batch: p.batch,
@@ -894,11 +909,17 @@ const filteredGroups = useMemo(() => {
                         {safeMembers(g).length}
                       </span>
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
-                        <span className="dot" />
-                        {g.status || 'PENDING'}
-                      </span>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
+                      <select value={g.status || 'PENDING'}
+                        onChange={e => updateGroupStatus(g.id, e.target.value)}
+                        disabled={updatingStatus === g.id}
+                        style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: g.status === 'COMPLETED' ? 'var(--color-success)' : g.status === 'OVERDUE' ? 'var(--color-error)' : g.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                      >
+                        <option value="PENDING">PENDING</option>
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="OVERDUE">OVERDUE</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                      </select>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {g.batch || '—'}
@@ -965,7 +986,7 @@ const filteredGroups = useMemo(() => {
                 <p>
                   {bulkPreview
                     ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched`
-                    : 'Upload Excel with Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner'}
+                    : 'Upload Excel with Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner. Project type is auto-detected from batch (3rd year → Minor, 4th year → Major) — editable below.'}
                 </p>
               </div>
             </div>
@@ -1010,6 +1031,7 @@ const filteredGroups = useMemo(() => {
                         <th>Students</th>
                         <th>Supervisor</th>
                         <th>Examiner</th>
+                        <th>Type</th>
                         <th>Batch</th>
                       </tr>
                     </thead>
@@ -1031,6 +1053,19 @@ const filteredGroups = useMemo(() => {
                           </td>
                           <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
                           <td>{p.examinerMatch ? <span style={{ color: 'var(--color-success)' }}>{p.examinerMatch.name}</span> : p.examinerWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.examinerWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
+                          <td>
+                            <select value={p.projectType || 'MINOR'}
+                              onChange={e => {
+                                const updated = [...bulkPreview.preview];
+                                updated[p.row - 1] = { ...updated[p.row - 1], projectType: e.target.value };
+                                setBulkPreview({ ...bulkPreview, preview: updated });
+                              }}
+                              style={{ fontSize: 11, padding: '2px 4px' }}
+                            >
+                              <option value="MINOR">Minor</option>
+                              <option value="MAJOR">Major</option>
+                            </select>
+                          </td>
                           <td>{p.batch || '—'}</td>
                         </tr>
                       ))}

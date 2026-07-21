@@ -9,6 +9,7 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildGroupWhereForCoordinator } = require('../utils/coordinatorScope');
+const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 exports.getGroups = async (req, res) => {
   try {
@@ -283,6 +284,13 @@ exports.bulkImportPreview = async (req, res) => {
         }
       }
 
+      // Auto-detect project type from student batch/year
+      let projectType = 'MINOR';
+      if (batch) {
+        const { currentYear } = computeCurrentYearSemesterFromBatch(batch, 'BACHELOR');
+        if (currentYear && currentYear >= 4) projectType = 'MAJOR';
+      }
+
       const existingGroup = await prisma.projectGroup.findFirst({ where: { name: groupName } });
       if (existingGroup && groupName) {
         warnings.push(`Group "${groupName}" already exists`);
@@ -292,6 +300,7 @@ exports.bulkImportPreview = async (req, res) => {
         row: i + 1,
         groupName: groupName || '(unnamed)',
         projectTitle,
+        projectType,
         members: names,
         rolls,
         batch,
@@ -355,7 +364,7 @@ exports.bulkImportConfirm = async (req, res) => {
 
     for (const row of rows) {
       const {
-        groupName, projectTitle, members, rolls, batch, programId,
+        groupName, projectTitle, projectType, members, rolls, batch, programId,
         studentMatches, supervisorMatch, supervisorWillCreate,
         examinerMatch, examinerWillCreate,
       } = row;
@@ -397,11 +406,12 @@ exports.bulkImportConfirm = async (req, res) => {
           return null;
         }
 
+        const pt = (projectType === 'MAJOR' || projectType === 'MINOR') ? projectType : 'MINOR';
         const newGroup = await tx.projectGroup.create({
           data: {
             name: groupName,
             projectTitle,
-            projectType: 'MINOR',
+            projectType: pt,
             status: 'ACTIVE',
             batch: batch || null,
             programId: programId || null,
@@ -409,7 +419,7 @@ exports.bulkImportConfirm = async (req, res) => {
           },
         });
 
-        const defaults = getDefaultComponents('MINOR');
+        const defaults = getDefaultComponents(pt);
         for (const comp of defaults) {
           await tx.evaluationComponent.create({
             data: { ...comp, groupId: newGroup.id, createdById: req.user.id },

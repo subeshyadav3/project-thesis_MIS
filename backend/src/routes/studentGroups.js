@@ -15,7 +15,6 @@ router.post('/', authorize('STUDENT'), ctrl.create);
 router.post('/:id/invite', authorize('STUDENT'), ctrl.invite);
 router.post('/:id/join', authorize('STUDENT'), ctrl.joinOpenGroup);
 router.delete('/:id', authorize('STUDENT'), ctrl.deleteGroup);
-router.get('/students-by-program', authorize('STUDENT'), ctrl.getStudentsByProgram);
 router.put('/invitations/:id', authorize('STUDENT', 'SUPERVISOR', 'COORDINATOR'), ctrl.respondToInvitation);
 
 module.exports = router;

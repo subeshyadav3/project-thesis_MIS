@@ -26,6 +26,7 @@ function MasterThesis() {
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
   const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
+  const [updatingStatus, setUpdatingStatus] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -81,7 +82,20 @@ function MasterThesis() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-useEffect(() => {
+  const updateThesisStatus = async (thesisId, newStatus) => {
+    setUpdatingStatus(thesisId);
+    try {
+      await api.put(`/theses/${thesisId}/status`, { status: newStatus });
+      setTheses(prev => prev.map(t => t.id === thesisId ? { ...t, status: newStatus } : t));
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Status update failed');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  useEffect(() => {
     const handleClickOutside = (e) => {
       if (createSupRef.current && !createSupRef.current.contains(e.target)) {
         setCreateSupOpen(false);
@@ -872,10 +886,17 @@ return (
                     </td>
                     <td style={{ padding: '6px 10px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                        <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px', whiteSpace: 'nowrap' }}>
-                          <span className="dot" />
-                          {t.status || 'PENDING'}
-                        </span>
+                        <select value={t.status || 'PENDING'}
+                          onChange={e => updateThesisStatus(t.id, e.target.value)}
+                          disabled={updatingStatus === t.id}
+                          onClick={e => e.stopPropagation()}
+                          style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: t.status === 'COMPLETED' ? 'var(--color-success)' : t.status === 'OVERDUE' ? 'var(--color-error)' : t.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                        >
+                          <option value="PENDING">PENDING</option>
+                          <option value="ACTIVE">ACTIVE</option>
+                          <option value="OVERDUE">OVERDUE</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                        </select>
                         {t.crossProgramRequestedBy && (
                           <>
                             <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
