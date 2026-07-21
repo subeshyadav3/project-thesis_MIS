@@ -592,15 +592,15 @@ const filteredGroups = useMemo(() => {
                     <label>Description</label>
                     <textarea className="form-input" rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Project description..." />
                   </div>
-                  {showDetail.status === 'PENDING' && (
-                    <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
-                      <label>Status</label>
-                      <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-                        <option value="PENDING">Pending</option>
-                        <option value="ACTIVE">Active</option>
-                      </select>
-                    </div>
-                  )}
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Status</label>
+                    <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                      <option value="PENDING">Pending</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="OVERDUE">Overdue</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
                     <div className="sup-dropdown-trigger">

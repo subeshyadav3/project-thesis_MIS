@@ -45,6 +45,7 @@ function MasterThesis() {
   const [editFinalExamOpen, setEditFinalExamOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editStatus, setEditStatus] = useState('');
   const editSupRef = useRef(null);
   const editMidTermExamRef = useRef(null);
   const editFinalExamRef = useRef(null);
@@ -260,6 +261,9 @@ const handleComplete = async (id) => {
           promises.push(api.put(`/theses/${thesisId}/external-final`, { externalExaminerId: editFinalExamId ? parseInt(editFinalExamId) : null }));
         }
       }
+      if (editStatus && editStatus !== showDetail.status) {
+        promises.push(api.put(`/theses/${thesisId}/status`, { status: editStatus }));
+      }
       const results = await Promise.all(promises);
       const hasCrossProgram = results.some(r => r?.data?.crossProgram);
       if (hasCrossProgram) {
@@ -319,6 +323,7 @@ const handleComplete = async (id) => {
     if (mode === 'edit') {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
+      setEditStatus(t.status || '');
       setEditSupId(t.supervisorId ? t.supervisorId.toString() : '');
       setEditMidTermExamId(t.externalMidTerm?.id?.toString() || '');
       setEditFinalExamId(t.externalFinal?.id?.toString() || '');
@@ -515,6 +520,15 @@ return (
                   <div className="form-group" style={{ flex: 1, minWidth: 300 }}>
                     <label>Description</label>
                     <textarea className="form-input" rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Thesis description..." />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Status</label>
+                    <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                      <option value="PENDING">Pending</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="OVERDUE">Overdue</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>

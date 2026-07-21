@@ -28,8 +28,8 @@ function masterRoll(batch, code, serial) {
 
 // ── Program definitions ────────────────────────────────────────────────
 const BACHELOR_PROGRAMS = [
-  { code: 'BCT', name: 'Bachelor of Computer Engineering', maxStudents: 96 },
-  { code: 'BEI', name: 'Bachelor of Electronics and Information Engineering', maxStudents: 48 },
+  { code: 'BCT', name: 'Bachelor in Computer Engineering', maxStudents: 96 },
+  { code: 'BEI', name: 'Bachelor in Electronics and Information Engineering', maxStudents: 48 },
 ];
 
 const MASTER_PROGRAMS = [
@@ -169,8 +169,8 @@ async function main() {
   // ============================================================
   const programs = {};
   const progDefs = [
-    { code: 'BCT', name: 'Bachelor of Computer Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
-    { code: 'BEI', name: 'Bachelor of Electronics and Information Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
+    { code: 'BCT', name: 'Bachelor in Computer Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
+    { code: 'BEI', name: 'Bachelor in Electronics and Information Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
     { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', cluster: 'Cluster 1', departmentId: eceDept.id },
     { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', cluster: 'Cluster 2', departmentId: eceDept.id },
     { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', cluster: 'Cluster 3', departmentId: eceDept.id },

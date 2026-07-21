@@ -163,7 +163,7 @@ function UserManagement() {
           Bulk Import
         </button>
       )}
-      {isMasterCoordinator && (
+      {isCoordinator && (
         <button className="btn btn-secondary btn-sm" onClick={() => { setShowExcelBulk(true); setExcelResult(null); setExcelFile(null); }}>
           <span className="material-symbols-outlined">upload_file</span>
           Bulk Upload

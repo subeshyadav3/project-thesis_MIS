@@ -9,6 +9,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
+import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
 
 const PAGE_SIZE = 10;
 
@@ -25,6 +26,7 @@ function ExaminerList() {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showExaminerUpload, setShowExaminerUpload] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
@@ -163,9 +165,13 @@ function ExaminerList() {
       {isMasterCoordinator && (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
           <span className="material-symbols-outlined">upload_file</span>
-          Upload Excel
+          Upload Theses
         </button>
       )}
+      <button className="btn btn-secondary btn-sm" onClick={() => setShowExaminerUpload(true)}>
+        <span className="material-symbols-outlined">upload_file</span>
+        Bulk Upload
+      </button>
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
         <span className="material-symbols-outlined">add</span>
         Add Examiner
@@ -180,6 +186,13 @@ function ExaminerList() {
         onClose={() => setShowUpload(false)}
         onSuccess={loadData}
         title="Bulk Upload Theses (External Examiners)"
+      />
+      <UsersBulkUploadModal
+        open={showExaminerUpload}
+        onClose={() => setShowExaminerUpload(false)}
+        onSuccess={loadData}
+        fixedRole="EXTERNAL_EXAMINER"
+        title="Bulk Import External Examiners"
       />
       {/* ── CREATE MODAL ── */}
       {showCreate && (
