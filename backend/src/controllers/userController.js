@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
 const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
@@ -24,8 +24,6 @@ function extractBatchFromRoll(rollNumber) {
   const match = rollNumber.match(/^(\d{2,3})/);
   return match ? match[1] : null;
 }
-
-
 
 function enrichWithComputedYearSemester(user) {
   if (user.role !== 'STUDENT' || !user.batch) return user;

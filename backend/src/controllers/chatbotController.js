@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 
 const AI_CHATBOT_URL = (process.env.AI_CHATBOT_URL || 'http://localhost:8001').replace(/\/$/, '');
 

@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
+
 const XLSX = require('xlsx');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');

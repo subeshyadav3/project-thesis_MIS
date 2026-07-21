@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 
 async function resolveAudience({ type, degreeType, programIds, studentIds, departmentId, academicYearId }) {
   const filter = { role: 'STUDENT', active: true, departmentId };
