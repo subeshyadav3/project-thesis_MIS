@@ -29,7 +29,7 @@ exports.forwardToExamDept = async (req, res) => {
       });
       const yearIds = years.map(y => y.id);
       groupWhere.academicYearId = { in: yearIds };
-      thesisWhere.academicYearId = { in: yearIds };
+      thesisWhere.student = { program: { departmentId } };
     }
 
     const groups = await prisma.projectGroup.findMany({

@@ -77,7 +77,7 @@ function StudentTheses() {
                       {t.title}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
-                      {t.academicYear?.year || '—'}
+                      {t.batch ? `Batch ${t.batch}` : '—'}
                     </div>
                   </div>
                 </div>

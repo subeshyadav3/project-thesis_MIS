@@ -153,12 +153,12 @@ function StudentProjectDetail() {
                 </span>
               </div>
               <div className="detail-item">
-                <span className="detail-label">Academic Year</span>
-                <span>{assignment.academicYear?.year || '—'}</span>
+                <span className="detail-label">Batch</span>
+                <span>{assignment.batch || assignment.academicYear?.year || '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Department</span>
-                <span>{assignment.academicYear?.department?.name || assignment.department?.name || '—'}</span>
+                <span>{assignment.academicYear?.department?.name || assignment.student?.program?.department?.name || assignment.department?.name || '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Program</span>

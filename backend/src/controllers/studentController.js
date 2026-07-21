@@ -154,7 +154,6 @@ exports.getMyTheses = async (req, res) => {
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        academicYear: { include: { department: { select: { id: true, name: true } } } },
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
@@ -203,7 +202,6 @@ exports.getThesisById = async (req, res) => {
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        academicYear: { include: { department: { select: { id: true, name: true } } } },
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },

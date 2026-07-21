@@ -19,19 +19,16 @@ function MasterThesis() {
   const [theses, setTheses] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allSupervisors, setAllSupervisors] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const [selectedYear, setSelectedYear] = useState('');
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'PENDING' });
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [yearFilter, setYearFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
@@ -75,7 +72,6 @@ function MasterThesis() {
       api.get('/theses', { signal }).then(({ data }) => setTheses(data)),
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
       api.get('/assignment-requests', { signal }).then(({ data }) => setPendingRequests(data.filter(r => r.status === 'PENDING'))).catch(() => setPendingRequests([])),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
@@ -220,7 +216,7 @@ const handleComplete = async (id) => {
         toast.success('Thesis created successfully');
       }
       setShowCreate(false);
-      setCreateForm({ title: '', studentId: '', academicYearId: '', supervisorId: '' });
+      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'PENDING' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -282,15 +278,14 @@ const handleComplete = async (id) => {
     return theses.filter(t => {
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      const matchesYear = yearFilter === 'ALL' || t.academicYearId?.toString() === yearFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
         : supervisorFilter === 'NONE'
           ? !t.supervisor
           : t.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesYear && matchesSupervisor;
+      return matchesSearch && matchesStatus && matchesSupervisor;
     });
-  }, [theses, searchQuery, statusFilter, yearFilter, supervisorFilter]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -333,9 +328,8 @@ const handleComplete = async (id) => {
     }
   };
 
-  const formatAcademicYear = (ay) => {
-    if (!ay) return '';
-    return ay.year || '';
+  const formatBatch = (t) => {
+    return t?.batch || '—';
   };
 
   const actions = (
@@ -383,11 +377,6 @@ const handleComplete = async (id) => {
     { value: 'COMPLETED', label: 'Completed' },
   ];
 
-  const yearOptions = academicYears.map(y => ({
-    value: y.id.toString(),
-    label: `${y.year}`,
-  }));
-
   const supervisorOptions = [
     { value: 'NONE', label: 'Unassigned' },
     ...supervisors.map(s => ({
@@ -422,8 +411,8 @@ return (
                   </span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Academic Year</span>
-                  <span>{formatAcademicYear(showDetail.academicYear) || '—'}</span>
+                  <span className="detail-label">Batch</span>
+                  <span>{showDetail.batch || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
@@ -797,7 +786,6 @@ return (
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
-          <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
 
@@ -807,7 +795,7 @@ return (
           <div className="empty-state">
             <span className="material-symbols-outlined">library_books</span>
             <h3>No theses found</h3>
-            <p>{searchQuery || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
+            <p>{searchQuery || statusFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
           </div>
         ) : (
           <>
@@ -908,7 +896,7 @@ return (
                       </div>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
-                      {formatAcademicYear(t.academicYear) || '—'}
+                      Batch {t.batch || '—'}
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -1046,10 +1034,10 @@ return (
                 </div>
               </div>
               <div className="form-group">
-                <label>Academic Year</label>
-                <select value={createForm.academicYearId} onChange={e => setCreateForm({...createForm, academicYearId: e.target.value})} required>
-                  <option value="">Select academic year...</option>
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+                <label>Status</label>
+                <select value={createForm.status} onChange={e => setCreateForm({...createForm, status: e.target.value})}>
+                  <option value="PENDING">Pending</option>
+                  <option value="ACTIVE">Active</option>
                 </select>
               </div>
               <div className="form-group" ref={createSupRef}>

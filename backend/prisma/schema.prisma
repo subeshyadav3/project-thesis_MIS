@@ -299,8 +299,6 @@ model Thesis {
   crossProgramRequestedBy   User?   @relation("CrossProgramRequester", fields: [crossProgramRequestedById], references: [id], onDelete: SetNull)
   cluster        String?
   batch          String?
-  academicYearId Int
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   announcementId Int?
   announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
@@ -315,7 +313,6 @@ model Thesis {
 
   @@index([status])
   @@index([studentId])
-  @@index([academicYearId])
   @@index([announcementId])
 }
 

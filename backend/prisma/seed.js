@@ -450,7 +450,6 @@ async function main() {
             studentId: student.id,
             status: 'ACTIVE',
             supervisorId: supervisors[thesisIndex % supervisors.length].id,
-            academicYearId: ayMap[batchStr].id,
             batch: String(bsYear),
             cluster: prog.cluster,
           },

@@ -13,7 +13,6 @@ exports.getAssignedGroups = async (req, res) => {
           include: {
             members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
             supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-            academicYear: true,
             evaluations: {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
             },
@@ -34,7 +33,6 @@ exports.getAssignedTheses = async (req, res) => {
     const thesisInclude = {
       student: { select: { id: true, firstName: true, lastName: true, email: true } },
       supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
-      academicYear: true,
       evaluations: {
         include: { submittedBy: { select: { firstName: true, lastName: true } } },
       },

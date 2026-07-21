@@ -60,7 +60,6 @@ ctrl.create = async (req, res) => {
           projectType: 'MASTER',
           status: 'PENDING',
           studentId: req.user.id,
-          academicYearId: ann.academicYearId,
           announcementId: ann.id,
         },
       });
@@ -77,7 +76,6 @@ ctrl.create = async (req, res) => {
         include: {
           student: { select: { id: true, firstName: true, lastName: true, email: true } },
           supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
-          academicYear: { include: { department: true } },
           evaluationComponents: true,
           announcement: { select: { id: true, title: true, type: true } },
         },

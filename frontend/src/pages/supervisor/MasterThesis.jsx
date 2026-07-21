@@ -16,18 +16,15 @@ function SupervisorMasterThesis() {
   const toast = useToast();
   const navigate = useNavigate();
   const [theses, setTheses] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(null);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [yearFilter, setYearFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const [showUpload, setShowUpload] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [bulkYearId, setBulkYearId] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkPreview, setBulkPreview] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -35,12 +32,10 @@ function SupervisorMasterThesis() {
   const handleFileUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile) { toast.warning('Select a file'); return; }
-    if (!bulkYearId) { toast.warning('Select an academic year'); return; }
     setBulkLoading(true);
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('academicYearId', bulkYearId);
       const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setBulkPreview(data);
     } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
@@ -58,7 +53,7 @@ function SupervisorMasterThesis() {
         externalMidTermMatch: p.externalMidTermMatch, externalMidTermWillCreate: p.externalMidTermWillCreate,
         externalFinalMatch: p.externalFinalMatch, externalFinalWillCreate: p.externalFinalWillCreate,
       }));
-      await api.post('/theses/bulk-import/confirm', { rows, academicYearId: parseInt(bulkYearId) });
+      await api.post('/theses/bulk-import/confirm', { rows });
       toast.success(`${bulkPreview.stats.matched} theses imported`);
       setShowUpload(false);
       setBulkPreview(null);
@@ -75,7 +70,7 @@ function SupervisorMasterThesis() {
     setLoading(true);
     Promise.all([
       api.get('/supervisors/theses', { signal }).then(({ data }) => setTheses(data)),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
+
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -88,10 +83,9 @@ function SupervisorMasterThesis() {
       const searchStr = (studentName + ' ' + (t.title || '')).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      const matchesYear = yearFilter === 'ALL' || t.academicYearId?.toString() === yearFilter;
-      return matchesSearch && matchesStatus && matchesYear;
+      return matchesSearch && matchesStatus;
     });
-  }, [theses, searchTerm, statusFilter, yearFilter]);
+  }, [theses, searchTerm, statusFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -111,9 +105,8 @@ function SupervisorMasterThesis() {
   const completedCount = theses.filter(t => t.status === 'COMPLETED').length;
   const activeCount = theses.filter(t => t.status !== 'COMPLETED').length;
 
-  const formatAcademicYear = (ay) => {
-    if (!ay) return '';
-    return ay.year || '';
+  const formatBatch = (t) => {
+    return t?.batch || '—';
   };
 
   const statusOptions = [
@@ -122,11 +115,6 @@ function SupervisorMasterThesis() {
     { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
   ];
-
-  const yearOptions = academicYears.map(y => ({
-    value: y.id.toString(),
-    label: `${y.year}`,
-  }));
 
   const FilterDropdown = ({ value, onChange, label, options, allLabel }) => (
     <div className="filter-item">
@@ -174,7 +162,7 @@ function SupervisorMasterThesis() {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Academic Year</span>
-                  <span>{formatAcademicYear(showDetail.academicYear) || '—'}</span>
+                  <span>{showDetail.batch || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Email</span>
@@ -235,7 +223,6 @@ function SupervisorMasterThesis() {
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
-          <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
         </div>
 
         {loading ? (
@@ -244,7 +231,7 @@ function SupervisorMasterThesis() {
           <div className="empty-state">
             <span className="material-symbols-outlined">library_books</span>
             <h3>No theses assigned</h3>
-            <p>{searchTerm || statusFilter !== 'ALL' || yearFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any master's theses yet."}</p>
+            <p>{searchTerm || statusFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any master's theses yet."}</p>
           </div>
         ) : (
           <>
@@ -279,7 +266,7 @@ function SupervisorMasterThesis() {
                       </span>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
-                      {formatAcademicYear(t.academicYear) || '—'}
+                      {t.batch ? `Batch ${t.batch}` : '—'}
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
@@ -327,13 +314,6 @@ function SupervisorMasterThesis() {
             </div>
             {!bulkPreview ? (
               <form onSubmit={handleFileUpload}>
-                <div className="form-group">
-                  <label>Academic Year</label>
-                  <select value={bulkYearId} onChange={e => setBulkYearId(e.target.value)} required>
-                    <option value="">Select year...</option>
-                    {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                  </select>
-                </div>
                 <div className="form-group">
                   <label>Excel File (.xlsx)</label>
                   <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />

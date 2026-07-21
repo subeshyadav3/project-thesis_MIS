@@ -18,9 +18,6 @@ function ExternalEvaluationsList() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadProjectType, setUploadProjectType] = useState('MINOR');
   const [uploading, setUploading] = useState(false);
-  const [academicYears, setAcademicYears] = useState([]);
-  const [bulkYearId, setBulkYearId] = useState('');
-
   const handleFileUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile) { toast.warning('Select a file'); return; }
@@ -33,8 +30,6 @@ function ExternalEvaluationsList() {
         await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success('Groups imported successfully');
       } else {
-        if (!bulkYearId) { toast.warning('Select an academic year'); setUploading(false); return; }
-        formData.append('academicYearId', bulkYearId);
         const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success(`${data.stats?.matched || 0} theses matched`);
       }
@@ -50,7 +45,6 @@ function ExternalEvaluationsList() {
     Promise.all([
       api.get('/external-examiners/groups').then(({ data }) => setGroups(data)).catch(() => {}),
       api.get('/external-examiners/theses').then(({ data }) => setTheses(data)).catch(() => {}),
-      api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)).catch(() => {}),
     ]).catch((err) => toast.error(err.response?.data?.error || 'Failed to load data'))
       .finally(() => setLoading(false));
   };
@@ -292,20 +286,12 @@ function ExternalEvaluationsList() {
               </div>
             </div>
             <form onSubmit={handleFileUpload}>
-              {activeTab === 'groups' ? (
+              {activeTab === 'groups' && (
                 <div className="form-group">
                   <label>Project Type</label>
                   <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
                     <option value="MINOR">Minor Project</option>
                     <option value="MAJOR">Major Project</option>
-                  </select>
-                </div>
-              ) : (
-                <div className="form-group">
-                  <label>Academic Year</label>
-                  <select value={bulkYearId} onChange={e => setBulkYearId(e.target.value)} required>
-                    <option value="">Select year...</option>
-                    {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
                   </select>
                 </div>
               )}

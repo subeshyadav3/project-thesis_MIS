@@ -11,7 +11,6 @@ exports.getMyGroups = async (req, res) => {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
-        academicYear: true,
       },
     });
     res.json(groups);
@@ -28,7 +27,6 @@ exports.getMyTheses = async (req, res) => {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
-        academicYear: true,
       },
     });
     res.json(theses);

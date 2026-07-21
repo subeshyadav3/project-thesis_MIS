@@ -302,7 +302,7 @@ function buildMasterFormat(data, scope = 'both') {
 }
 
 function buildBachelorFormat(data) {
-  const { title, name, supervisor, academicYear, members, evaluations, projectType, total, maxTotal } = data;
+  const { title, name, supervisor, members, evaluations, projectType, total, maxTotal } = data;
   const isMajor = projectType === 'MAJOR';
   const projectLabel = isMajor ? 'Major Project' : 'Minor Project';
   const credit = isMajor ? '6' : '3';
@@ -338,7 +338,6 @@ function buildBachelorFormat(data) {
       <tr><td><strong>Group / Student:</strong></td><td>${esc(name)}</td></tr>
       <tr><td><strong>Supervisor:</strong></td><td>${esc(supervisor)}</td></tr>
       <tr><td><strong>Credit:</strong></td><td>${credit} | Full Marks: ${maxTotal}</td></tr>
-      <tr><td><strong>Academic Year:</strong></td><td>${esc(academicYear)}</td></tr>
       ${members ? `<tr><td><strong>Members:</strong></td><td>${members}</td></tr>` : ''}
     </table>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
@@ -392,10 +391,11 @@ async function checkPrintAccess(req, res, type, id) {
     } else {
       const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
       if (dept) {
-        const ay = type === 'group'
-          ? await prisma.academicYear.findFirst({ where: { projectGroups: { some: { id } } }, select: { departmentId: true } })
-          : await prisma.academicYear.findFirst({ where: { theses: { some: { id } } }, select: { departmentId: true } });
-        if (ay && ay.departmentId !== dept.id) {
+        const item = type === 'group'
+          ? await prisma.projectGroup.findUnique({ where: { id }, select: { academicYear: { select: { departmentId: true } } } })
+          : await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { program: { select: { departmentId: true } } } } } });
+        const itemDeptId = type === 'group' ? item?.academicYear?.departmentId : item?.student?.program?.departmentId;
+        if (itemDeptId && itemDeptId !== dept.id) {
           res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
           return false;
         }
@@ -414,7 +414,6 @@ exports.printGroupEvaluation = async (req, res) => {
       where: { id },
       include: {
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
@@ -451,7 +450,6 @@ exports.printGroupEvaluation = async (req, res) => {
       title: group.projectTitle,
       name: group.name,
       supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
-      academicYear: group.academicYear?.year || 'N/A',
       members: memberList,
       evaluations: evalData,
       projectType,
@@ -477,7 +475,6 @@ exports.printThesisEvaluation = async (req, res) => {
       include: {
         student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -530,7 +527,6 @@ exports.previewGroupEvaluation = async (req, res) => {
       where: { id },
       include: {
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
@@ -567,7 +563,6 @@ exports.previewGroupEvaluation = async (req, res) => {
       title: group.projectTitle,
       name: group.name,
       supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
-      academicYear: group.academicYear?.year || 'N/A',
       members: memberList,
       evaluations: evalData,
       projectType,
@@ -593,7 +588,6 @@ exports.previewThesisEvaluation = async (req, res) => {
       include: {
         student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
         supervisor: { select: { firstName: true, lastName: true } },
-        academicYear: true,
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },

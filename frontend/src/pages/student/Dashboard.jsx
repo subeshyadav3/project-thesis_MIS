@@ -148,7 +148,7 @@ function StudentDashboard() {
                           {t.title}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          {t.academicYear?.year || '—'}
+                          {t.batch ? `Batch ${t.batch}` : '—'}
                         </div>
                       </div>
                       <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>

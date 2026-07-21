@@ -23,7 +23,7 @@ const SCHEMES = {
   },
   MASTER: {
     name: 'Master Thesis',
-    totalMaxMarks: 200,
+    totalMaxMarks: 300,
     components: [
       // Supervisor criteria (5 × 20 = 100)
       { type: 'SUPERVISOR', name: 'Regularity of works (regular reporting of the progress report)', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
@@ -31,18 +31,18 @@ const SCHEMES = {
       { type: 'SUPERVISOR', name: 'Understanding of thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
       { type: 'SUPERVISOR', name: 'Student effort and performance', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
       { type: 'SUPERVISOR', name: 'Organization of study', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
-      // External (Mid-Term) criteria (5 × 10 = 50)
-      { type: 'EXTERNAL_MIDTERM', name: 'Literature Review & Background Study', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Research Methodology & Design', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Preliminary Work & Implementation Progress', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Presentation & Communication', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Overall Progress & Planning', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      // External (Final) criteria (5 × 10 = 50)
-      { type: 'EXTERNAL_FINAL', name: 'Presentation Skills and Flow of Slides', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_FINAL', name: 'Defense & Question Handling', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_FINAL', name: 'Understanding of Thesis work & related theory', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_FINAL', name: 'Research Quality & Originality', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_FINAL', name: 'Report Writing', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      // External (Mid-Term) criteria (5 × 20 = 100)
+      { type: 'EXTERNAL_MIDTERM', name: 'Literature Review & Background Study', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Research Methodology & Design', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Preliminary Work & Implementation Progress', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Presentation & Communication', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Overall Progress & Planning', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      // External (Final) criteria (5 × 20 = 100)
+      { type: 'EXTERNAL_FINAL', name: 'Presentation Skills and Flow of Slides', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Defense & Question Handling', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Understanding of Thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Research Quality & Originality', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Report Writing', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ],
   },
 };

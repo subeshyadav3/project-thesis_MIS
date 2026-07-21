@@ -28,7 +28,6 @@ exports.getTheses = async (req, res) => {
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         crossProgramRequestedBy: { select: { id: true, firstName: true, lastName: true } },
-        academicYear: { include: { department: true } },
         evaluations: true,
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
@@ -52,7 +51,6 @@ exports.getThesis = async (req, res) => {
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         crossProgramRequestedBy: { select: { id: true, firstName: true, lastName: true } },
-        academicYear: { include: { department: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
@@ -75,9 +73,9 @@ exports.getThesis = async (req, res) => {
 
 exports.createThesis = async (req, res) => {
   try {
-    const { title, studentId, academicYearId, supervisorId } = req.body;
-    if (!title || !studentId || !academicYearId) {
-      return res.status(400).json({ error: 'title, studentId, and academicYearId are required' });
+    const { title, studentId, supervisorId, status } = req.body;
+    if (!title || !studentId) {
+      return res.status(400).json({ error: 'title and studentId are required' });
     }
     const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) }, include: { program: true } });
     if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
@@ -109,12 +107,11 @@ exports.createThesis = async (req, res) => {
         title,
         projectType: 'MASTER',
         studentId: parseInt(studentId),
-        academicYearId: parseInt(academicYearId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         batch: student.batch || null,
         cluster: student.program?.cluster || null,
-        status: supervisorId ? 'ACTIVE' : 'PENDING',
+        status: status || 'PENDING',
       },
     });
     const defaults = getDefaultComponents('MASTER');
@@ -201,26 +198,16 @@ exports.bulkImportPreview = async (req, res) => {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet);
 
-    // Derive academicYearId from Batch column (e.g. "080" → year "2080")
     const deptId = req.user.departmentId;
     const coordinatorProgram = req.user.role === 'COORDINATOR'
       ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
       : null;
-    const [allStudents, allSupervisors, allExternals, programs, allAcademicYears] = await Promise.all([
+    const [allStudents, allSupervisors, allExternals, programs] = await Promise.all([
       prisma.user.findMany({ where: { role: 'STUDENT', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } }),
       prisma.user.findMany({ where: { role: 'SUPERVISOR', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.user.findMany({ where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.program.findMany({ where: { departmentId: deptId }, select: { id: true, name: true, code: true, degreeType: true, cluster: true } }),
-      prisma.academicYear.findMany({ where: { departmentId: deptId }, select: { id: true, year: true } }),
     ]);
-
-    function resolveAcademicYearId(rawBatch) {
-      if (!rawBatch) return null;
-      let batch = rawBatch.replace(/^0+/, '');
-      const yearStr = '2' + batch.padStart(3, '0');
-      const found = allAcademicYears.find(a => a.year === yearStr);
-      return found ? found.id : null;
-    }
 
     const preview = [];
     let matchCount = 0;
@@ -245,14 +232,6 @@ exports.bulkImportPreview = async (req, res) => {
         ? programs.find(p => p.code.toLowerCase() === programValue.toLowerCase() || p.name.toLowerCase() === programValue.toLowerCase())
         : null;
       if (programValue && !importedProgram) warnings.push(`Program not found for "${programValue}"`);
-
-      const rowAcademicYearId = resolveAcademicYearId(batch);
-      const academicYearLabel = rowAcademicYearId
-        ? (allAcademicYears.find(a => a.id === rowAcademicYearId)?.year)
-        : null;
-      if (batch && !rowAcademicYearId) {
-        warnings.push(`Academic year not found for batch "${batch}" (no matching year registered for this department)`);
-      }
 
       // Match student
       let studentMatch = null;
@@ -331,8 +310,6 @@ exports.bulkImportPreview = async (req, res) => {
         title,
         batch,
         cluster,
-        academicYearId: rowAcademicYearId,
-        academicYearLabel,
         program: importedProgram ? { id: importedProgram.id, code: importedProgram.code, name: importedProgram.name, cluster: importedProgram.cluster } : null,
         programId: studentMatch?.user?.programId || null,
         studentMatch: studentMatch ? { id: studentMatch.user.id, name: `${studentMatch.user.firstName} ${studentMatch.user.lastName}`, score: studentMatch.score, status: 'matched' } : null,
@@ -375,7 +352,7 @@ exports.bulkImportConfirm = async (req, res) => {
         studentMatch, supervisorMatch, supervisorWillCreate,
         externalMidTermMatch, externalMidTermWillCreate,
         externalFinalMatch, externalFinalWillCreate,
-        title, batch, cluster, academicYearId,
+        title, batch, cluster,
       } = row;
 
       if (!studentMatch?.id && !row.studentMatch?.id) {
@@ -386,13 +363,8 @@ exports.bulkImportConfirm = async (req, res) => {
         skipped.push({ row: row.row, reason: 'No thesis title' });
         continue;
       }
-      if (!academicYearId) {
-        skipped.push({ row: row.row, reason: 'Academic year could not be resolved from batch' });
-        continue;
-      }
 
       const effectiveStudentId = studentMatch?.id || row.studentMatch?.id;
-      const effectiveAcademicYearId = parseInt(academicYearId);
 
       // Helper to auto-create a user and return the ID
       const autoCreateUser = async (willCreate, role) => {
@@ -464,7 +436,7 @@ exports.bulkImportConfirm = async (req, res) => {
 
         // Check for duplicate within the transaction
         const duplicate = await tx.thesis.findFirst({
-          where: { title, studentId: effectiveStudentId, academicYearId: effectiveAcademicYearId },
+          where: { title, studentId: effectiveStudentId },
         });
         if (duplicate) {
           skipped.push({ row: row.row, studentId: effectiveStudentId, reason: `Duplicate thesis: "${title}"` });
@@ -477,8 +449,7 @@ exports.bulkImportConfirm = async (req, res) => {
             title,
             projectType: 'MASTER',
             studentId: effectiveStudentId,
-            status: resolvedSupervisorId ? 'ACTIVE' : 'PENDING',
-            academicYearId: effectiveAcademicYearId,
+            status: 'ACTIVE',
             supervisorId: resolvedSupervisorId,
             externalMidTermId: resolvedMidTermId,
             externalFinalId: resolvedFinalId,
@@ -513,17 +484,14 @@ exports.bulkImportConfirm = async (req, res) => {
 
         // Auto-link to active THESIS announcement
         try {
-          const activeAnnouncements = await tx.announcement.findMany({
-            where: {
-              type: 'THESIS',
-              degreeType: 'MASTER',
-              academicYearId: effectiveAcademicYearId,
-            },
+          const activeAnnouncement = await tx.announcement.findFirst({
+            where: { type: 'THESIS', degreeType: 'MASTER' },
+            orderBy: { createdAt: 'desc' },
           });
-          if (activeAnnouncements.length > 0) {
+          if (activeAnnouncement) {
             await tx.thesis.update({
               where: { id: newThesis.id },
-              data: { announcementId: activeAnnouncements[0].id },
+              data: { announcementId: activeAnnouncement.id },
             });
           }
         } catch (e) { /* ignore announcement linking errors */ }
@@ -590,7 +558,7 @@ exports.assignSupervisor = async (req, res) => {
     }
     const thesis = await prisma.thesis.update({
       where: { id },
-      data: { supervisorId: parseInt(req.body.supervisorId), status: 'ACTIVE' },
+      data: { supervisorId: parseInt(req.body.supervisorId) },
       include: { student: true, supervisor: true },
     });
     const sup = thesis.supervisor;
@@ -631,7 +599,6 @@ exports.exportTheses = async (req, res) => {
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true } },
-        academicYear: true,
       },
     });
     const rows = theses.map(t => ({
@@ -640,7 +607,6 @@ exports.exportTheses = async (req, res) => {
       Status: t.status,
       Student: `${t.student.firstName} ${t.student.lastName}`,
       Supervisor: t.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : 'Not assigned',
-      'Academic Year': t.academicYear ? `${t.academicYear.year} ${t.academicYear.semester}` : '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
