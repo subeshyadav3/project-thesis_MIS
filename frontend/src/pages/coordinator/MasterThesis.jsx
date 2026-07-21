@@ -25,7 +25,7 @@ function MasterThesis() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'PENDING' });
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -216,7 +216,7 @@ const handleComplete = async (id) => {
         toast.success('Thesis created successfully');
       }
       setShowCreate(false);
-      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'PENDING' });
+      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };

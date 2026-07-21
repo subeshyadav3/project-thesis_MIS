@@ -312,7 +312,7 @@ function StudentGroups() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span className={`badge badge-${a.type === 'THESIS' ? 'warning' : 'info'}`}>{TYPE_LABELS[a.type]}</span>
                           <span>Max {a.groupSizeMax} members</span>
-                          <span>{a.academicYear?.year || '—'}</span>
+                          <span>{a.batch || '—'}</span>
                           {a.program?.code && <span>{a.program.code}</span>}
                         </div>
                     </div>

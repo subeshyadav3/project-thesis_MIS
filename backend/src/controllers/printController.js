@@ -392,9 +392,9 @@ async function checkPrintAccess(req, res, type, id) {
       const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
       if (dept) {
         const item = type === 'group'
-          ? await prisma.projectGroup.findUnique({ where: { id }, select: { academicYear: { select: { departmentId: true } } } })
+          ? await prisma.projectGroup.findUnique({ where: { id }, include: { program: { select: { departmentId: true } } } })
           : await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { program: { select: { departmentId: true } } } } } });
-        const itemDeptId = type === 'group' ? item?.academicYear?.departmentId : item?.student?.program?.departmentId;
+        const itemDeptId = type === 'group' ? item?.program?.departmentId : item?.student?.program?.departmentId;
         if (itemDeptId && itemDeptId !== dept.id) {
           res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
           return false;

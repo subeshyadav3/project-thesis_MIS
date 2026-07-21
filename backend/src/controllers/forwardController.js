@@ -24,11 +24,11 @@ exports.forwardToExamDept = async (req, res) => {
       groupWhere.programId = programId;
       thesisWhere.student = { programId };
     } else if (departmentId) {
-      const years = await prisma.academicYear.findMany({
+      const programs = await prisma.program.findMany({
         where: { departmentId }, select: { id: true },
       });
-      const yearIds = years.map(y => y.id);
-      groupWhere.academicYearId = { in: yearIds };
+      const programIds = programs.map(p => p.id);
+      groupWhere.programId = { in: programIds };
       thesisWhere.student = { program: { departmentId } };
     }
 

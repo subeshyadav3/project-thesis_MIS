@@ -111,7 +111,7 @@ exports.createThesis = async (req, res) => {
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         batch: student.batch || null,
         cluster: student.program?.cluster || null,
-        status: status || 'PENDING',
+        status: status || 'ACTIVE',
       },
     });
     const defaults = getDefaultComponents('MASTER');

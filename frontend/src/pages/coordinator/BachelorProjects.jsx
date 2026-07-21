@@ -18,23 +18,20 @@ function BachelorProjects() {
   const [groups, setGroups] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allSupervisors, setAllSupervisors] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedYear, setSelectedYear] = useState('');
-  const [selectedProjectType, setSelectedProjectType] = useState('MINOR');
-  const [uploadProjectType, setUploadProjectType] = useState('MINOR');
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [bulkPreview, setBulkPreview] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [yearFilter, setYearFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
@@ -76,7 +73,6 @@ function BachelorProjects() {
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)),
       api.get(`/users/role/STUDENT?all=true&degreeType=BACHELOR${user.program?.id ? '&programId=' + user.program.id : ''}`, { signal }).then(({ data }) => setAllStudents(data)),
     ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
@@ -134,7 +130,6 @@ useEffect(() => {
     return () => document.removeEventListener('mousedown', handleStudentOutside);
   }, [newStudentOpen]);
 
-  // Close action menu on outside click
   useEffect(() => {
     const handleClick = () => setActionMenuRow(null);
     if (actionMenuRow) {
@@ -143,19 +138,56 @@ useEffect(() => {
     return () => document.removeEventListener('click', handleClick);
   }, [actionMenuRow]);
 
-  const handleFileUpload = async (e) => {
+  const resetUploadModal = () => {
+    setSelectedFile(null);
+    setBulkPreview(null);
+    setBulkLoading(false);
+    setShowUpload(false);
+  };
+
+  const handleBulkPreview = async (e) => {
     e.preventDefault();
     if (!selectedFile) { toast.warning('Select a file'); return; }
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('projectType', uploadProjectType);
+    setBulkLoading(true);
     try {
-      await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Groups imported successfully');
-      setShowUpload(false);
-      setSelectedFile(null);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const { data } = await api.post('/groups/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBulkPreview(data);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkPreview?.preview) return;
+    setBulkLoading(true);
+    try {
+      const rows = bulkPreview.preview.map(p => ({
+        row: p.row,
+        groupName: p.groupName,
+        projectTitle: p.projectTitle,
+        members: p.members,
+        rolls: p.rolls,
+        batch: p.batch,
+        programId: p.programId,
+        studentMatches: p.studentMatches,
+        supervisorMatch: p.supervisorMatch,
+        supervisorWillCreate: p.supervisorWillCreate,
+        examinerMatch: p.examinerMatch,
+        examinerWillCreate: p.examinerWillCreate,
+      }));
+      await api.post('/groups/bulk-import/confirm', { rows });
+      toast.success(`${bulkPreview.stats.matched} groups imported`);
+      resetUploadModal();
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Import failed');
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
   const confirmComplete = (id) => {
@@ -267,7 +299,7 @@ useEffect(() => {
       }
       toast.success('Group created successfully');
       setShowCreate(false);
-      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', academicYearId: '', supervisorId: '', examinerId: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -333,15 +365,14 @@ const filteredGroups = useMemo(() => {
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
       const matchesType = typeFilter === 'ALL' || g.projectType === typeFilter;
-      const matchesYear = yearFilter === 'ALL' || g.academicYearId?.toString() === yearFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
         : supervisorFilter === 'NONE'
           ? !g.supervisor
           : g.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesType && matchesYear && matchesSupervisor;
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor;
     });
-  }, [filteredGroups, searchTerm, statusFilter, typeFilter, yearFilter, supervisorFilter]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter]);
 
   const sortedGroups = useMemo(() => {
     return [...filteredByAdvanced].sort((a, b) => {
@@ -357,7 +388,6 @@ const filteredGroups = useMemo(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
   }, [totalPages, currentPage]);
 
-  // Select all on current page
   useEffect(() => {
     if (selectAllRef.current) {
       const allIds = paginatedGroups.map(g => g.id);
@@ -395,17 +425,11 @@ const filteredGroups = useMemo(() => {
 
   const safeMembers = (g) => (g.members || []).filter(m => m.student);
 
-  const formatAcademicYear = (ay) => {
-    if (!ay) return '';
-    const year = ay.year || '';
-    return year;
-  };
-
   const actions = (
     <>
       <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
         <span className="material-symbols-outlined">upload_file</span>
-        Upload Excel
+        Bulk Upload
       </button>
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
         <span className="material-symbols-outlined">add</span>
@@ -451,11 +475,6 @@ const filteredGroups = useMemo(() => {
     { value: 'COMPLETED', label: 'Completed' },
   ];
 
-  const yearOptions = academicYears.map(y => ({
-    value: y.id.toString(),
-    label: `${y.year}`,
-  }));
-
   const supervisorOptions = [
     { value: 'NONE', label: 'Unassigned' },
     ...supervisors.map(s => ({
@@ -498,8 +517,8 @@ const filteredGroups = useMemo(() => {
                   </span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Academic Year</span>
-                  <span>{formatAcademicYear(showDetail.academicYear) || '—'}</span>
+                  <span className="detail-label">Batch</span>
+                  <span>{showDetail.batch || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
@@ -812,7 +831,6 @@ const filteredGroups = useMemo(() => {
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={typeOptions} allLabel="All Types" />
-          <FilterDropdown label="Year" value={yearFilter} onChange={setYearFilter} options={yearOptions} allLabel="All Years" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
 
@@ -822,7 +840,7 @@ const filteredGroups = useMemo(() => {
           <div className="empty-state">
             <span className="material-symbols-outlined">school</span>
             <h3>No groups found</h3>
-            <p>{searchTerm || statusFilter !== 'ALL' || yearFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a group to get started.'}</p>
+            <p>{searchTerm || statusFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a group to get started.'}</p>
           </div>
         ) : (
           <>
@@ -847,7 +865,7 @@ const filteredGroups = useMemo(() => {
                   <th>Type</th>
                   <th style={{ width: 60 }}>Members</th>
                   <th>Status</th>
-                  <th style={{ width: 50 }}>Year</th>
+                  <th style={{ width: 50 }}>Batch</th>
                   <th style={{ textAlign: 'right', width: 90 }}>Actions</th>
                 </tr>
               </thead>
@@ -883,7 +901,7 @@ const filteredGroups = useMemo(() => {
                       </span>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
-                      {formatAcademicYear(g.academicYear) || '—'}
+                      {g.batch || '—'}
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -936,43 +954,100 @@ const filteredGroups = useMemo(() => {
       </div>
 
       {showUpload && (
-        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={resetUploadModal}>
+          <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
                 <span className="material-symbols-outlined">upload_file</span>
               </div>
               <div className="modal-header-text">
-                <h2>Upload Excel</h2>
-                <p>Import groups from an Excel spreadsheet</p>
+                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Upload Groups'}</h2>
+                <p>
+                  {bulkPreview
+                    ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched`
+                    : 'Upload Excel with Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner'}
+                </p>
               </div>
             </div>
-            <form onSubmit={handleFileUpload}>
-              <div className="form-group">
-                <label>Project Type</label>
-                <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
-                  <option value="MINOR">Minor Project</option>
-                  <option value="MAJOR">Major Project</option>
-                </select>
+
+            {!bulkPreview ? (
+              <form onSubmit={handleBulkPreview}>
+                <div className="form-group">
+                  <label>Excel File (.xlsx)</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
+                  <a
+                    href="/bachelor_upload_template.xlsx"
+                    download
+                    style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+                    {' '}Download blank template
+                  </a>
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
+                    Columns: Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner
+                  </span>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={resetUploadModal}>
+                    <span className="material-symbols-outlined">close</span>Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                    {bulkLoading ? 'Analyzing...' : 'Preview'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
+                  <table style={{ width: '100%', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Group</th>
+                        <th>Title</th>
+                        <th>Members</th>
+                        <th>Students</th>
+                        <th>Supervisor</th>
+                        <th>Examiner</th>
+                        <th>Batch</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkPreview.preview.map(p => (
+                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
+                          <td>{p.row}</td>
+                          <td style={{ fontWeight: 600 }}>{p.groupName}</td>
+                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.projectTitle}</td>
+                          <td>{p.members.join(', ') || '—'}</td>
+                          <td>
+                            {p.studentMatches.filter(Boolean).length > 0
+                              ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatches.filter(Boolean).length} matched</span>
+                              : <span style={{ color: 'var(--color-error)' }}>?</span>
+                            }
+                            {p.studentMatches.filter(m => !m).length > 0 && (
+                              <span style={{ color: 'var(--color-error)', marginLeft: 4 }}>({p.studentMatches.filter(m => !m).length} missing)</span>
+                            )}
+                          </td>
+                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
+                          <td>{p.examinerMatch ? <span style={{ color: 'var(--color-success)' }}>{p.examinerMatch.name}</span> : p.examinerWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.examinerWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
+                          <td>{p.batch || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
+                    <span className="material-symbols-outlined">arrow_back</span>Back
+                  </button>
+                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
+                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} groups`}
+                  </button>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Excel File (.xlsx)</label>
-                <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
-                <a href="/bachelor_upload_template.xlsx" download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span> Download blank template
-                </a>
-              </div>
-            <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
-                  <span className="material-symbols-outlined">close</span>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">upload</span>
-                  Upload
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -999,17 +1074,17 @@ const filteredGroups = useMemo(() => {
                 <input value={createForm.projectTitle} onChange={e => setCreateForm({...createForm, projectTitle: e.target.value})} required placeholder="Enter project title" />
               </div>
               <div className="form-group">
-                <label>Academic Year</label>
-                <select value={createForm.academicYearId} onChange={e => setCreateForm({...createForm, academicYearId: e.target.value})} required>
-                  <option value="">Select academic year...</option>
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
                 <label>Project Type</label>
                 <select value={createForm.projectType} onChange={e => setCreateForm({...createForm, projectType: e.target.value})}>
                   <option value="MINOR">Minor Project</option>
                   <option value="MAJOR">Major Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={createForm.status} onChange={e => setCreateForm({...createForm, status: e.target.value})}>
+                  <option value="ACTIVE">Active</option>
+                  <option value="PENDING">Pending</option>
                 </select>
               </div>
               <div className="form-group">

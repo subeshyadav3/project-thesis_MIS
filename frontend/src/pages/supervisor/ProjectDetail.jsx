@@ -254,7 +254,7 @@ function ProjectDetail() {
             </h1>
             <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>
               {name}
-              {item?.batch ? ` · Batch ${item.batch}` : item?.academicYear ? ` · ${item.academicYear.year || ''}` : ''}
+              {item?.batch ? ` · Batch ${item.batch}` : ''}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>

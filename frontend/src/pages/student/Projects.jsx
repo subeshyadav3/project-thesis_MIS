@@ -77,7 +77,7 @@ function StudentProjects() {
                       {g.projectTitle}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
-                      {g.name} · {g.academicYear?.year || '—'}
+                      {g.name} · {g.batch || '—'}
                     </div>
                   </div>
                 </div>

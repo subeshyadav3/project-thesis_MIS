@@ -246,8 +246,8 @@ model ProjectGroup {
   supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])
   programId      Int?
   program        Program?            @relation(fields: [programId], references: [id])
-  academicYearId Int
-  academicYear   AcademicYear        @relation(fields: [academicYearId], references: [id])
+  academicYearId Int?
+  academicYear   AcademicYear?       @relation(fields: [academicYearId], references: [id])
   announcementId Int?
   announcement   Announcement?       @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   formedById     Int?
@@ -266,7 +266,6 @@ model ProjectGroup {
 
   @@index([status])
   @@index([programId])
-  @@index([academicYearId])
   @@index([announcementId])
 }
 
