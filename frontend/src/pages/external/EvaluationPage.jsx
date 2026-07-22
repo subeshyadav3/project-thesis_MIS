@@ -17,7 +17,6 @@ function ExternalExaminerEvaluationPage() {
   const { type, id } = useParams();
   const navigate = useNavigate();
   const [item, setItem] = useState(null);
-  const [summary, setSummary] = useState(null);
   const [components, setComponents] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +37,6 @@ function ExternalExaminerEvaluationPage() {
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint, { signal })
       .then(({ data }) => {
-        setSummary(data.summary || null);
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
         // Load existing feedback
@@ -58,7 +56,6 @@ function ExternalExaminerEvaluationPage() {
     return () => controller.abort();
   }, [loadData]);
 
-  const componentByType = (evalType) => components.find(c => c.evaluationType === evalType);
   const evaluationForComponent = (compId) => evaluations.find(e => e.componentId === compId);
 
   const handleSaveComponent = async (component, marksValue, comment) => {
@@ -125,11 +122,6 @@ function ExternalExaminerEvaluationPage() {
     if (isFinal) return 'FINAL';
     return null;
   }, [item, user.id, type]);
-
-  const orderedComponents = [...components].sort((a, b) => {
-    const order = ['SUPERVISOR', 'PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'EXTERNAL_EXAMINER', 'EXTERNAL_MIDTERM', 'EXTERNAL_FINAL'];
-    return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
-  });
 
   // Filter components: for thesis with mid-term/final distinction, show only the relevant ones
   const currentUserComponents = useMemo(() => {

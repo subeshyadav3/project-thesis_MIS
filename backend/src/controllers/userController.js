@@ -189,8 +189,6 @@ exports.updateUser = async (req, res) => {
     if (req.body.programId) data.programId = parseInt(req.body.programId);
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
-    if (req.body.currentYear !== undefined) data.enrollmentYear = req.body.enrollmentYear ? parseInt(req.body.enrollmentYear) : null;
-    if (req.body.currentSemester !== undefined) data.enrollmentSemester = req.body.enrollmentSemester ? parseInt(req.body.enrollmentSemester) : null;
     if (req.body.rollNumber !== undefined) {
       const newRoll = req.body.rollNumber.toString().trim();
       if (newRoll) {
