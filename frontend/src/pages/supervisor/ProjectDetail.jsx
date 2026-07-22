@@ -263,7 +263,7 @@ function ProjectDetail() {
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back
             </button>
-            {(isSupervisor || isCoordinator) && item?.status === 'ACTIVE' && (
+            {isCoordinator && item?.status === 'ACTIVE' && (
               <button className="btn" style={{ background: 'rgba(34,197,94,0.2)', color: '#86efac', border: '1px solid rgba(34,197,94,0.3)' }}
                 onClick={() => setConfirmDialog({ open: true, title: 'Finalize', message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED?`, confirmLabel: 'Finalize', onConfirm: doFinalize, danger: true })}>
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span> Finalize
@@ -343,7 +343,7 @@ function ProjectDetail() {
                   </>
                 )}
                 {type === 'thesis' && (
-                  <InfoRow label="Student" value={`${item?.student?.firstName || ''} ${item?.student?.lastName || ''}`} />
+                  <InfoRow label="Student" value={`${item?.student?.firstName || ''} ${item?.student?.lastName || ''}${item?.student?.rollNumber ? ` (${item.student.rollNumber})` : ''}`} />
                 )}
                 <InfoRow label="Supervisor" value={item?.supervisor
                   ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
@@ -377,91 +377,97 @@ function ProjectDetail() {
                 <InfoRow label="End Date" value={item?.endDate ? new Date(item.endDate).toLocaleDateString() : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not Added</span>} />
                 {item?.description && <InfoRow label="Description" value={item.description} />}
               </div>
-            </div>
-
-            {/* Evaluation breakdown */}
+            </div>              {/* Evaluation breakdown — only user's own components for non-coordinators */}
             <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
-                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>assignment</span>Evaluation Breakdown</h3>
+                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>assignment</span>{isCoordinator ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
               </div>
               <div style={{ padding: '4px 0' }}>
-                {orderedComponents.length === 0 ? (
-                  <div className="empty-state" style={{ padding: 24 }}>
-                    <span className="material-symbols-outlined">info</span>
-                    <p>No evaluation components yet.</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {(showAllBreakdown ? orderedComponents : orderedComponents.slice(0, 3)).map(c => {
-                      const e = evaluationForComponent(c.id);
-                      const hasMarks = e && e.marks !== null && e.marks !== undefined;
-                      const pct = hasMarks ? Math.round((e.marks / c.maxMarks) * 100) : 0;
-                      return (
-                        <div key={c.id} style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '10px 20px', borderBottom: '1px solid var(--color-outline-variant)',
-                          opacity: hasMarks ? 1 : 0.65,
-                        }}>
-                          <div style={{
-                            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                            background: hasMarks ? 'var(--color-success-container)' : 'var(--color-surface-container)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: hasMarks ? 'var(--color-on-success-container)' : 'var(--color-on-surface-variant)',
-                          }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                              {hasMarks ? 'check_circle' : 'radio_button_unchecked'}
-                            </span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface)' }}>{c.name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                              {ROLE_LABEL[c.evaluatorRole]} · Max {c.maxMarks}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 60, height: 4, background: 'var(--color-outline-variant)', borderRadius: 2, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: hasMarks ? 'var(--color-success)' : 'var(--color-outline)', borderRadius: 2, transition: 'width 0.4s' }} />
-                            </div>
-                            <div style={{ minWidth: 50, textAlign: 'right' }}>
-                              <span style={{ fontWeight: 700, fontSize: 15, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
-                                {hasMarks ? e.marks : '—'}
-                              </span>
-                              <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>/{c.maxMarks}</span>
-                            </div>
-                          </div>
-                          {e?.submittedBy && (
-                            <div className="submitted-by-label" style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', maxWidth: 100, textAlign: 'right' }}>
-                              {e.submittedBy.firstName}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {orderedComponents.length > 3 && (
-                      <div style={{ textAlign: 'center', padding: '8px 20px' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setShowAllBreakdown(!showAllBreakdown)}
-                          style={{ fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer', border: 'none', background: 'none' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>
-                            {showAllBreakdown ? 'expand_less' : 'expand_more'}
-                          </span>
-                          {showAllBreakdown ? 'Show less' : `Show all (${orderedComponents.length} components)`}
-                        </button>
+                {(() => {
+                  const visibleComponents = isCoordinator ? orderedComponents : currentUserComponents;
+                  if (visibleComponents.length === 0) {
+                    return (
+                      <div className="empty-state" style={{ padding: 24 }}>
+                        <span className="material-symbols-outlined">info</span>
+                        <p>No evaluation components yet.</p>
                       </div>
-                    )}
-                    {/* Grand total bar */}
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '16px 20px', margin: '8px 12px', borderRadius: 10,
-                      background: 'linear-gradient(135deg, var(--color-primary-grand) 0%, var(--color-primary) 100%)',
-                    }}>
-                      <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Grand Total</span>
-                      <span style={{ fontWeight: 800, fontSize: 22, color: '#fff' }}>
-                        {progress.earned}{' '}
-                        <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.7 }}>/ {progress.total}</span>
-                      </span>
+                    );
+                  }
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {(showAllBreakdown ? visibleComponents : visibleComponents.slice(0, 3)).map(c => {
+                        const e = evaluationForComponent(c.id);
+                        const hasMarks = e && e.marks !== null && e.marks !== undefined;
+                        const pct = hasMarks ? Math.round((e.marks / c.maxMarks) * 100) : 0;
+                        return (
+                          <div key={c.id} style={{
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            padding: '10px 20px', borderBottom: '1px solid var(--color-outline-variant)',
+                            opacity: hasMarks ? 1 : 0.65,
+                          }}>
+                            <div style={{
+                              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                              background: hasMarks ? 'var(--color-success-container)' : 'var(--color-surface-container)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: hasMarks ? 'var(--color-on-success-container)' : 'var(--color-on-surface-variant)',
+                            }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                                {hasMarks ? 'check_circle' : 'radio_button_unchecked'}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface)' }}>{c.name}</div>
+                              <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                                {ROLE_LABEL[c.evaluatorRole] !== c.name ? `${ROLE_LABEL[c.evaluatorRole]} · ` : ''}Max {c.maxMarks}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ width: 60, height: 4, background: 'var(--color-outline-variant)', borderRadius: 2, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${pct}%`, background: hasMarks ? 'var(--color-success)' : 'var(--color-outline)', borderRadius: 2, transition: 'width 0.4s' }} />
+                              </div>
+                              <div style={{ minWidth: 50, textAlign: 'right' }}>
+                                <span style={{ fontWeight: 700, fontSize: 15, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                                  {hasMarks ? e.marks : '—'}
+                                </span>
+                                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>/{c.maxMarks}</span>
+                              </div>
+                            </div>
+                            {e?.submittedBy && (
+                              <div className="submitted-by-label" style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', maxWidth: 100, textAlign: 'right' }}>
+                                {e.submittedBy.firstName}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {visibleComponents.length > 3 && (
+                        <div style={{ textAlign: 'center', padding: '8px 20px' }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setShowAllBreakdown(!showAllBreakdown)}
+                            style={{ fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer', border: 'none', background: 'none' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>
+                              {showAllBreakdown ? 'expand_less' : 'expand_more'}
+                            </span>
+                            {showAllBreakdown ? 'Show less' : `Show all (${visibleComponents.length} components)`}
+                          </button>
+                        </div>
+                      )}
+                      {/* Grand total bar — only for coordinator */}
+                      {isCoordinator && (
+                        <div style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '16px 20px', margin: '8px 12px', borderRadius: 10,
+                          background: 'linear-gradient(135deg, var(--color-primary-grand) 0%, var(--color-primary) 100%)',
+                        }}>
+                          <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Grand Total</span>
+                          <span style={{ fontWeight: 800, fontSize: 22, color: '#fff' }}>
+                            {progress.earned}{' '}
+                            <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.7 }}>/ {progress.total}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
 
@@ -575,15 +581,19 @@ function ProjectDetail() {
                         <tr key={comp.id} style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
                           <td style={{ padding: '8px 14px' }}>
                             <div style={{ fontWeight: 500 }}>{comp.name}</div>
-                            <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>{ROLE_LABEL[comp.evaluatorRole]}</span>
+                            {ROLE_LABEL[comp.evaluatorRole] !== comp.name && (
+                              <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>{ROLE_LABEL[comp.evaluatorRole]}</span>
+                            )}
                           </td>
                           <td style={{ padding: '8px 14px', color: 'var(--color-on-surface-variant)', fontSize: 12 }}>{comp.maxMarks}</td>
                           <td style={{ padding: '8px 14px', textAlign: 'center' }}>
-                            {e?.status === 'COMPLETED' ? (
-                              <span className="badge badge-completed" style={{ fontSize: 10 }}>Completed</span>
+                            {hasMarks ? (
+                              <span className="badge badge-completed" style={{ fontSize: 10, cursor: 'pointer' }} title="Marks saved">
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>check_circle</span> Saved
+                              </span>
                             ) : (
-                              <span className="material-symbols-outlined" style={{ fontSize: 18, color: hasMarks ? 'var(--color-success)' : 'var(--color-outline)' }}>
-                                {hasMarks ? 'check_circle' : 'radio_button_unchecked'}
+                              <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>radio_button_unchecked</span> Pending
                               </span>
                             )}
                           </td>
@@ -734,12 +744,18 @@ function ProjectDetail() {
         )}
       </PageLayout>
 
-      {/* PDF Preview modal */}
+      {/* PDF Preview modal — scope locked to user's own role for non-coordinators */}
       {showPdfPreview && (
         <EvaluationPdfPreview
           type={type} id={id}
           onClose={() => setShowPdfPreview(false)}
-
+          {...(!isCoordinator && type === 'thesis'
+            ? isSupervisor
+              ? { initialScope: 'supervisor' }
+              : isExternal
+                ? {} /* handled by external-specific EvaluationPage.jsx */
+                : {}
+            : {})}
         />
       )}
 

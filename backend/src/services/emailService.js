@@ -123,6 +123,67 @@ async function notifyRecommendationIssued(studentEmails, studentName, projectTit
   });
 }
 
+async function notifyUserCreated(userEmail, firstName, role, email, password) {
+  await sendEmail({
+    to: userEmail,
+    subject: 'Account Created - Thesis Management System',
+    title: 'Account Created',
+    contentLines: [
+      `Dear ${firstName},`,
+      `Your account has been created with role <strong>${role}</strong>.`,
+      `<strong>Email:</strong> ${email}`,
+      `<strong>Password:</strong> ${password}`,
+      `Please login and change your password.`,
+    ],
+  });
+}
+
+async function notifyExaminerAssigned(examinerEmail, examinerName, itemTitle, groupOrStudent, type) {
+  const typeLabel = type === 'group' ? 'bachelor project' : 'master thesis';
+  await sendEmail({
+    to: examinerEmail,
+    subject: `Examiner Assignment: ${itemTitle}`,
+    title: 'Examiner Assignment Notification',
+    contentLines: [
+      `Dear ${examinerName},`,
+      `You have been assigned as Internal Examiner for "${itemTitle}" (${typeLabel}).`,
+      groupOrStudent ? `<strong>${type === 'group' ? 'Group' : 'Student'}:</strong> ${groupOrStudent}` : null,
+      `Please log in to the system to start evaluations.`,
+    ].filter(Boolean),
+  });
+}
+
+async function notifyThesisCreated(studentEmail, studentName, title, supervisorName, cluster) {
+  await sendEmail({
+    to: studentEmail,
+    subject: `Thesis Created: ${title}`,
+    title: 'Thesis Created',
+    contentLines: [
+      `Dear ${studentName},`,
+      `Your thesis <strong>${title}</strong> has been created.`,
+      supervisorName ? `<strong>Supervisor:</strong> ${supervisorName}` : null,
+      cluster ? `<strong>Cluster:</strong> ${cluster}` : null,
+      `Please log in to the system to view details and start working.`,
+    ].filter(Boolean),
+  });
+}
+
+async function notifyGroupCreated(studentEmails, groupName, projectTitle, supervisorName, memberDetails) {
+  await sendEmail({
+    to: studentEmails,
+    subject: `Project Group Created: ${groupName}`,
+    title: 'Project Group Created',
+    contentLines: [
+      `Dear Student,`,
+      `Your project group <strong>${groupName}</strong> has been created.`,
+      `<strong>Project Title:</strong> ${projectTitle}`,
+      supervisorName ? `<strong>Supervisor:</strong> ${supervisorName}` : null,
+      memberDetails ? `<strong>Members:</strong> ${memberDetails}` : null,
+      `Please log in to the system to view details.`,
+    ].filter(Boolean),
+  });
+}
+
 module.exports = {
   sendEmail,
   notifySupervisorAssigned,
@@ -130,4 +191,8 @@ module.exports = {
   notifyFeedbackSubmitted,
   notifyEvaluationSubmitted,
   notifyRecommendationIssued,
+  notifyUserCreated,
+  notifyExaminerAssigned,
+  notifyThesisCreated,
+  notifyGroupCreated,
 };

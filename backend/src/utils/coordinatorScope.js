@@ -125,13 +125,16 @@ function isThesisVisibleToCoordinator(thesis, scope, user) {
   if (scope.kind === 'program') {
     if (scope.degreeType === 'MASTER') {
       return thesis.student?.programId === scope.program.id ||
-        thesis.crossProgramRequestedById === user.id;
+        thesis.crossProgramRequestedById === user.id ||
+        (thesis.student && !thesis.student.programId);
     }
-    return thesis.student?.programId === scope.program.id;
+    return thesis.student?.programId === scope.program.id ||
+      (thesis.student && !thesis.student.programId);
   }
   if (scope.kind === 'department') {
     const programIds = scope.programs.map(p => p.id);
-    return programIds.includes(thesis.student?.programId);
+    return programIds.includes(thesis.student?.programId) ||
+      (thesis.student && !thesis.student.programId);
   }
   return false;
 }

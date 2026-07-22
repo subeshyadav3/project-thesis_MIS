@@ -1,5 +1,6 @@
 
 const prisma = require('../utils/prisma');
+const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 
@@ -29,6 +30,11 @@ exports.assignExaminerToGroup = async (req, res) => {
         examinerId: parseInt(externalExaminerId), itemTitle: assignment.group?.projectTitle || 'project',
         type: 'group', assignerName,
       });
+      const exam = assignment.externalExaminer;
+      emailService.notifyExaminerAssigned(
+        exam.email, `${exam.firstName} ${exam.lastName}`,
+        assignment.group?.projectTitle || 'project', '', 'group'
+      );
     } catch (e) { console.error('notifyExaminerAssignment:', e.message); }
     res.status(201).json(assignment);
   } catch (error) {
@@ -65,6 +71,11 @@ exports.assignExaminerToThesis = async (req, res) => {
         examinerId: parseInt(externalExaminerId), itemTitle: assignment.thesis?.title || 'thesis',
         type: 'thesis', assignerName,
       });
+      const exam = assignment.externalExaminer;
+      emailService.notifyExaminerAssigned(
+        exam.email, `${exam.firstName} ${exam.lastName}`,
+        assignment.thesis?.title || 'thesis', '', 'thesis'
+      );
     } catch (e) { console.error('notifyExaminerAssignment:', e.message); }
     res.status(201).json(assignment);
   } catch (error) {
@@ -109,6 +120,21 @@ exports.getAssignedExaminersForThesis = async (req, res) => {
 exports.removeAssignment = async (req, res) => {
   try {
     const { id } = req.params;
+    const assignment = await prisma.examinerAssignment.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        externalExaminer: { select: { id: true, firstName: true, lastName: true } },
+        group: { select: { name: true, projectTitle: true } },
+        thesis: { select: { title: true } },
+      },
+    });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+
+    // Notify examiner
+    const itemName = assignment.group?.name || assignment.thesis?.title || 'project';
+    notifSvc.notify(assignment.externalExaminer.id, 'EXAMINER_REMOVED',
+      `Your examiner assignment for "${itemName}" has been removed by coordinator.`);
+
     await prisma.examinerAssignment.delete({ where: { id: parseInt(id) } });
     audit.log({ action: 'REMOVE', entity: 'ExaminerAssignment', entityId: parseInt(req.params.id), details: 'Removed examiner assignment', performedById: req.user.id });
     res.json({ message: 'Assignment removed' });

@@ -53,31 +53,33 @@ const sampleExaminers = [
 // ====================================================================
 const bachelorTemplate = [
   {
-    'Group Name': '', 'Project Title': '', 'Member Names': '',
-    'Roll Numbers': '', 'Academic Year': '', 'Supervisor': '', 'Examiner': '',
+    'Group Name': '', 'Project Title': '', 'Members': '',
+    'Roll Numbers': '', 'Batch': '', 'Supervisor': '', 'External Examiner': '',
   },
   {
     'Group Name': 'TeamAlpha',
     'Project Title': 'AI-Based Traffic Management System',
-    'Member Names': 'Aarav Khadka, Binita Shrestha, Chandra Thapa',
+    'Members': 'Aarav Khadka, Binita Shrestha, Chandra Thapa',
     'Roll Numbers': `${roll('BCT', 1)}, ${roll('BCT', 2)}, ${roll('BCT', 3)}`,
-    'Academic Year': '2081',
+    'Batch': '078',
     'Supervisor': sampleSupervisors[0],
-    'Examiner': sampleExaminers[0],
+    'External Examiner': sampleExaminers[0],
   },
   {
     'Group Name': 'TeamBeta',
     'Project Title': 'Smart Agriculture Monitoring Platform',
-    'Member Names': 'Dipesh Poudel, Ekta Rai, Firoj Khan',
-    'Roll Numbers': `${roll('BCT', 4)}, ${roll('BEI', 1)}, ${roll('BEI', 2)}`,
-    'Academic Year': '2081',
+    'Members': 'Dipesh Poudel, Ekta Rai, Firoj Khan',
+    'Roll Numbers': `${roll('BCT', 4)}, ${roll('BCT', 5)}, ${roll('BCT', 6)}`,
+    'Batch': '078',
     'Supervisor': sampleSupervisors[1],
-    'Examiner': sampleExaminers[1],
+    'External Examiner': sampleExaminers[1],
   },
 ];
 
 // ====================================================================
 // 2. BACHELOR TEST DATA (30 groups / 90 students)
+//    Each group has members from ONLY ONE program code so that a
+//    coordinator scoped to that program can import them.
 // ====================================================================
 const bachelorTestData = [];
 const firstNames = ['Ram', 'Shyam', 'Hari', 'Sita', 'Gita', 'Rita', 'Krishna', 'Bishnu', 'Arjun', 'Pratik',
@@ -86,24 +88,28 @@ const firstNames = ['Ram', 'Shyam', 'Hari', 'Sita', 'Gita', 'Rita', 'Krishna', '
 const lastNames = ['Acharya', 'Basnet', 'Chhetri', 'Dahal', 'Gurung', 'Khadka', 'Lama', 'Maharjan',
   'Neupane', 'Ojha', 'Pandey', 'Rai', 'Sharma', 'Thapa', 'Poudel', 'Pokhrel', 'Adhikari', 'Bhandari'];
 
+const bachelorPrograms = ['BCT', 'BEI', 'BEL'];
 for (let g = 0; g < 30; g++) {
+  const code = bachelorPrograms[g % bachelorPrograms.length];
   const members = [];
   const rolls = [];
-  const codes = ['BCT', 'BEI'];
   for (let m = 0; m < 3; m++) {
     const fi = (g * 3 + m) % firstNames.length;
     const li = (g * 3 + m) % lastNames.length;
     members.push(`${firstNames[fi]} ${lastNames[li]}`);
-    rolls.push(roll(codes[(g + m) % 2], g * 3 + m + 1));
+    // Continuous numbering per program: each program gets its own sequence
+    const progIdx = Math.floor(g / bachelorPrograms.length);
+    const studentNum = progIdx * 3 + m + 1;
+    rolls.push(roll(code, studentNum));
   }
   bachelorTestData.push({
     'Group Name': `TestGroup_${g + 1}`,
     'Project Title': `Test Bachelor Project ${g + 1} — ${['IoT', 'ML', 'Web', 'Mobile', 'Blockchain', 'NLP', 'CV', 'Robotics', 'Embedded', 'Cloud'][g % 10]} Application`,
-    'Member Names': members.join(', '),
+    'Members': members.join(', '),
     'Roll Numbers': rolls.join(', '),
-    'Academic Year': '2081',
+    'Batch': '078',
     'Supervisor': g < 25 ? sampleSupervisors[g % sampleSupervisors.length] : '',
-    'Examiner': g < 20 ? sampleExaminers[g % sampleExaminers.length] : '',
+    'External Examiner': g < 20 ? sampleExaminers[g % sampleExaminers.length] : '',
   });
 }
 

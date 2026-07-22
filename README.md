@@ -1,271 +1,406 @@
-# Thesis / Project Management System — IOE, Pulchowk Campus
+<div align="center">
 
-A full-stack web application for managing bachelor project groups and master's theses at the **Institute of Engineering, Pulchowk Campus (Tribhuvan University)**. Features role-based access, supervisor & external examiner assignment, evaluation tracking (proposal/mid-term/final), proposal management, file uploads, email notifications, and Excel bulk import.
+<img src="https://img.shields.io/badge/Status-Active-success?style=flat-square" alt="Status"/>
+<img src="https://img.shields.io/badge/React-18.x-61DAFB?style=flat-square&logo=react" alt="React"/>
+<img src="https://img.shields.io/badge/Node.js-18.x-339933?style=flat-square&logo=nodedotjs" alt="Node.js"/>
+<img src="https://img.shields.io/badge/PostgreSQL-16.x-4169E1?style=flat-square&logo=postgresql" alt="PostgreSQL"/>
+<img src="https://img.shields.io/badge/Prisma-5.x-2D3748?style=flat-square&logo=prisma" alt="Prisma"/>
 
-## Tech Stack
+<br/>
 
-| Layer    | Technology              |
-| -------- | ----------------------- |
-| Frontend | React 18 + Vite         |
-| Backend  | Node.js + Express       |
-| Database | PostgreSQL + Prisma ORM |
-| Auth     | JWT (JSON Web Token)    |
+# 🎓 Thesis & Project Management System (TPMS)
 
-## Modules
+### Pulchowk Campus — Institute of Engineering, Tribhuvan University
 
-- **Maintainer** — User management, department & academic year configuration
-- **Coordinator** — Dashboard, bachelor project & master thesis oversight, evaluation component creation, supervisor & external examiner assignment, bulk import
-- **Supervisor** — Dashboard, project/thesis detail view with evaluation & feedback, proposal review
-- **Student** — Dashboard, view assigned projects/theses, submit proposals, view evaluations & recommendations
-- **External Examiner** — Dashboard, evaluate assigned groups/theses, submit marks
+**A comprehensive academic workflow platform for managing bachelor and master thesis/project lifecycles — from group formation and supervisor assignment to final evaluation and PDF generation.**
 
-## Quick Start
+</div>
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [System Architecture](#-system-architecture)
+- [Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Environment Variables](#environment-variables)
+  - [Database Setup](#database-setup)
+  - [Running the Application](#running-the-application)
+- [User Roles](#-user-roles)
+- [Key Workflows](#-key-workflows)
+- [API Overview](#-api-overview)
+- [Project Structure](#-project-structure)
+- [Screenshots](#-screenshots)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## 📖 Overview
+
+TPMS is a full-stack academic management system designed specifically for **Pulchowk Campus, IOE**. It streamlines the entire thesis and project management workflow:
+
+- **Bachelor Students**: Form project groups, submit proposals, upload documents, track evaluation progress
+- **Master Students**: Register theses, submit documents across proposal/mid-term/final stages
+- **Supervisors**: Evaluate students, provide feedback, issue recommendations
+- **External Examiners**: Evaluate mid-term and final thesis/project work
+- **Program Coordinators**: Manage users, assign supervisors/examiners, bulk-import students, forward results
+- **Maintainers**: System-wide administration
+
+The system supports **6 academic programs** across **Bachelor** (BCT, BEI) and **Master** (MSNCS, MSICE, MSDSA, MSCSKE) levels with built-in academic year and batch management.
+
+---
+
+## ✨ Features
+
+### 🔐 Role-Based Access
+- Five distinct roles with granular permissions
+- Program-scoped coordinator access (bachelor = own program, master = cross-program)
+- JWT-based authentication with secure password hashing
+
+### 👥 Student Management
+- Bulk import students from Excel templates with auto-validation
+- Group formation with invitation system
+- Thesis registration for master students
+- Document upload with version tracking
+
+### 👨‍🏫 Supervisor & Examiner Management
+- Auto-assignment from bulk import
+- Cross-program supervisor assignment requests
+- Separate mid-term and final external examiner assignment
+- Designation-aware display (e.g., "Asst. Prof.", "Assoc. Prof. Dr.")
+
+### 📊 Evaluation System
+- Configurable evaluation schemes per project type (Minor/Major/Master)
+- Supervisor evaluation with 5 criteria × 20 marks
+- External (Mid-Term) evaluation with 5 criteria × 20 marks
+- External (Final) evaluation with 5 criteria × 20 marks
+- Coordinator-grade evaluation oversight
+- Live PDF preview with real-time mark/comment updates
+
+### 📄 PDF Generation
+- Automated A4-formatted evaluation sheets
+- University-branded templates (TU, IOE, Pulchowk Campus)
+- Supervisor designation and external examiner details
+- Word-to-number conversion for total marks
+- Scope-specific printing (supervisor/external/all)
+
+### 📬 Notifications & Communication
+- In-app notification system
+- Email notifications for assignments, feedback, and updates
+- Recommendation letter issuance
+- Feedback submission alerts
+
+### 📈 Academic Year Management
+- Batch-aware semester computation (078/079/080/081/082)
+- Automatic MINOR/MAJOR project type detection from batch year
+- Academic year-based grouping and filtering
+
+---
+
+## 🛠 Tech Stack
+
+### Frontend
+
+| Technology | Purpose |
+|-----------|---------|
+| **React 18** | UI framework |
+| **Vite 5** | Build tool & dev server |
+| **React Router v6** | Client-side routing |
+| **Axios** | HTTP client |
+| **CSS Variables** | Theming (IOE academic blue theme) |
+| **Material Symbols** | Icon library |
+| **Inter + DM Sans** | Typography |
+
+### Backend
+
+| Technology | Purpose |
+|-----------|---------|
+| **Node.js + Express** | REST API server |
+| **Prisma 5** | ORM & database migrations |
+| **PostgreSQL** | Primary database |
+| **JWT** | Authentication tokens |
+| **bcryptjs** | Password hashing |
+| **Puppeteer** | Server-side PDF generation |
+| **Multer** | File upload handling |
+| **Nodemailer** | Email notifications |
+| **xlsx** | Excel template parsing |
+
+---
+
+## 🏗 System Architecture
+
+```
+┌─────────────┐     ┌──────────────────────────────────────┐
+│   React      │     │           Express API                │
+│   Frontend   │────▶│                                      │
+│   (Vite)     │     │  /api/auth      → Auth Controller    │
+│              │     │  /api/groups    → Group Controller   │
+│   Port 5173  │     │  /api/theses    → Thesis Controller  │
+│              │     │  /api/evaluations→ Eval Controller   │
+│              │     │  /api/print     → Print Controller   │
+└─────────────┘     │  /api/users     → User Controller    │
+                    │  /api/students  → Student Controller │
+                    │  /api/upload    → Upload Controller  │
+                    │  ...                                  │
+                    │         Port 5000                     │
+                    └──────────┬───────────────────────────┘
+                               │
+                    ┌──────────▼───────────┐
+                    │     PostgreSQL        │
+                    │     Database          │
+                    │  (via Prisma ORM)     │
+                    └──────────────────────┘
+```
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js >= 18
-- PostgreSQL running on `localhost:5432`
-- A database named `thesis_management`
+- **Node.js** ≥ 18.x
+- **PostgreSQL** ≥ 14.x
+- **npm** or **yarn**
+- **Google Chrome / Chromium** (for PDF generation via Puppeteer)
 
-### 1. Clone & Install
+### Installation
 
 ```bash
-# Backend
+# Clone the repository
+git clone <your-repo-url>
+cd se
+
+# Install backend dependencies
 cd backend
 npm install
-cp .env.example .env    # Configure your DATABASE_URL and other vars
 
-# Frontend
+# Install frontend dependencies
 cd ../frontend
 npm install
+
+# Return to root
+cd ..
 ```
 
-### 2. Database Setup
+### Environment Variables
+
+Create `.env` files in both `backend/` and `frontend/`:
+
+**backend/.env**
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/thesis_management?schema=public"
+JWT_SECRET="your-jwt-secret-key"
+JWT_EXPIRES_IN="7d"
+PORT=5000
+
+# Email (optional — for notifications)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# Puppeteer (optional — defaults to auto-detect)
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+```
+
+**frontend/.env**
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
+### Database Setup
 
 ```bash
 cd backend
-npx prisma db push              # Push schema to PostgreSQL
-node prisma/seed.js             # Seed with sample data
+
+# Generate Prisma client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate dev
+
+# Seed the database with sample data
+npm run prisma:seed
 ```
 
-### 3. Run
+The seed script creates:
+- 1 department (ECE — Electronics and Computer Engineering)
+- 6 programs (2 bachelor + 4 master)
+- 5 academic years (078–082)
+- 1 maintainer, 6 coordinators, 8 supervisors, 4 external examiners
+- ~340 students across all batches and programs
+- Sample bachelor groups and master theses with evaluations
+
+### Running the Application
 
 ```bash
-# Terminal 1 — Backend (port 5000)
+# Terminal 1: Start the backend
 cd backend
-npm run dev
+npm run dev        # Development with hot-reload
+# OR
+npm start          # Production
 
-# Terminal 2 — Frontend (port 3000)
+# Terminal 2: Start the frontend
 cd frontend
-npm run dev
+npm run dev        # Development server on port 5173
+# OR
+npm run build      # Production build
 ```
 
-### 4. Login Credentials (from seed)
+Access the application at **http://localhost:5173**
 
-| Role             | Email                              | Password |
-| ---------------- | ---------------------------------- | -------- |
-| MAINTAINER       | subeshgaming@gmail.com             | subesh   |
-| COORDINATOR      | coordinator@pcampus.edu.np         | subesh   |
-| SUPERVISOR       | prabeshbchettri25@gmail.com        | subesh   |
-| EXTERNAL_EXAMINER | external@pcampus.edu.np           | subesh   |
-| Any Student      | `<roll>@pcampus.edu.np`           | subesh   |
+---
 
-Example student login: `078bct001@pcampus.edu.np` / `subesh`
+## 👥 User Roles
 
-## API Overview
+| Role | Permissions | Typical Actions |
+|------|-------------|-----------------|
+| **MAINTAINER** | Full system access | User management, configuration |
+| **COORDINATOR** | Program-level management | Group/thesis oversight, bulk import, evaluation review, result forwarding |
+| **SUPERVISOR** | Evaluate assigned projects | Mark entry, feedback, recommendations |
+| **EXTERNAL_EXAMINER** | Evaluate assigned projects/theses | Mid-term/final evaluation, mark entry |
+| **STUDENT** | Project/thesis submission | Group formation, document upload, view evaluations |
 
-Base URL: `http://localhost:5000/api`
+### Test Accounts
 
-### Auth
-- `POST /auth/login` — Login, returns JWT + user
-- `POST /auth/change-password` — Change user password
+| Role | Email | Password |
+|------|-------|----------|
+| Maintainer | subeshgaming@gmail.com | subesh |
+| Bachelor Student | bachelor@test.com | subesh |
+| Master Student | master@test.com | subesh |
+| BCT Coordinator | bct.coordinator@pcampus.edu.np | subesh |
+| MSNCS Coordinator | msncs.coordinator@pcampus.edu.np | subesh |
+| Supervisor | bishnu.tamang@pcampus.edu.np | subesh |
+| External Examiner | kiran.mainali@ioe.edu.np | subesh |
 
-### Users
-- `GET /users` — List all users
-- `GET /users/role/:role` — Filter by role (supervisor, student, etc.)
-- `POST /users` — Create user
-- `PUT /users/:id` — Update user
-- `DELETE /users/:id` — Delete user
+---
 
-### Groups (Bachelor Projects)
-- `GET /groups` — All groups with members, supervisor, evaluations
-- `GET /groups/:id` — Single group with full relations
-- `POST /groups` — Create group (optional `students` array with firstName/lastName/rollNumber)
-- `POST /groups/upload` — Bulk import via Excel (columns: Group Name, Project Title, Member Names, Roll Numbers)
-- `PUT /groups/:id/supervisor` — Assign/reassign supervisor
-- `PUT /groups/:id/status` — Update group status
+## 🔄 Key Workflows
 
-### Theses (Master)
-- `GET /theses` — All theses
-- `GET /theses/:id` — Single thesis with full relations
-- `POST /theses` — Create thesis
-- `POST /theses/upload` — Bulk import via Excel (columns: Project Title, Member Names, Roll Numbers)
-- `PUT /theses/:id/supervisor` — Assign/reassign supervisor
+### Bachelor Project Flow
+```
+Student creates group ─▶ Coordinator approves ─▶ Supervisor assigned
+    ─▶ Proposal submission ─▶ Mid-term evaluation ─▶ Final evaluation
+    ─▶ Results forwarded to exam department
+```
 
-### Evaluations
-- `GET /evaluations/groups` — Evaluations for bachelor groups
-- `GET /evaluations/theses` — Evaluations for theses
-- `GET /evaluations/:id` — Single evaluation detail
-- `POST /evaluations` — Submit evaluation
-- `PUT /evaluations/:id` — Update evaluation
-- `GET /evaluations/components/group/:groupId` — Evaluation components for a group
-- `GET /evaluations/components/thesis/:thesisId` — Evaluation components for a thesis
-- `POST /evaluations/components` — Create evaluation component
-- `DELETE /evaluations/components/:id` — Delete evaluation component
+### Master Thesis Flow
+```
+Coordinator creates announcement ─▶ Student submits thesis
+    ─▶ Coordinator approves ─▶ Supervisor assigned
+    ─▶ External examiners assigned (mid-term + final)
+    ─▶ Proposal → Mid-term → Final evaluations
+    ─▶ Thesis completion
+```
 
-### Departments
-- `GET /departments` — List departments
-- `POST /departments` — Create department
-- `PUT /departments/:id` — Update department
-- `DELETE /departments/:id` — Delete department
-- `GET /departments/academic-years` — Academic years
-- `POST /departments/academic-years` — Create academic year
-- `PUT /departments/academic-years/:id` — Update academic year
-- `PUT /departments/academic-years/:id/activate` — Activate an academic year
+### Bulk Import Flow
+```
+Upload Excel file ─▶ Preview with anomaly detection
+    ─▶ Auto-create missing users (supervisors, examiners)
+    ─▶ Confirm import ─▶ Groups/theses created with assignments
+```
 
-### Supervisors
-- `GET /supervisors/groups` — Supervisor's assigned groups
-- `GET /supervisors/theses` — Supervisor's assigned theses
+---
 
-### Students
-- `GET /students/groups` — Student's groups
-- `GET /students/theses` — Student's theses
-- `GET /students/:id` — Get student by ID
-- `DELETE /students/groups/:groupId/members/:studentId` — Remove member from group
+## 📡 API Overview
 
-### Notifications
-- `GET /notifications` — List user notifications
-- `PUT /notifications/:id/read` — Mark notification as read
-- `PUT /notifications/read-all` — Mark all as read
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/login` | POST | User authentication |
+| `/api/users` | GET/POST/DELETE | User management |
+| `/api/groups` | GET/POST | Project group operations |
+| `/api/theses` | GET/POST | Thesis management |
+| `/api/evaluations/marks` | POST | Submit/update evaluation marks |
+| `/api/evaluations/thesis/:id` | GET | Get thesis evaluations |
+| `/api/print/thesis/:id` | GET | Generate evaluation PDF |
+| `/api/print/preview/thesis/:id` | GET | HTML preview of evaluation |
+| `/api/upload/proposal` | POST | Document upload |
+| `/api/groups/bulk-import/preview` | POST | Preview bulk import |
+| `/api/groups/bulk-import/confirm` | POST | Confirm bulk import |
+| `/api/forward` | POST | Forward results to exam dept |
 
-### External Examiners
-- `GET /external-examiners` — List external examiners
-- `POST /external-examiners` — Create external examiner
-- `PUT /external-examiners/:id` — Update external examiner
-- `DELETE /external-examiners/:id` — Delete external examiner
+Full API documentation available in the source code route handlers.
 
-### Examiner Assignments
-- `GET /examiner-assignments` — List examiner assignments
-- `POST /examiner-assignments` — Assign examiner to group/thesis
-- `DELETE /examiner-assignments/:id` — Remove assignment
+---
 
-### Proposals
-- `GET /groups/:id/proposals` — List proposals for a group
-- `GET /theses/:id/proposals` — List proposals for a thesis
-- `POST /proposals` — Submit proposal
-- `PUT /proposals/:id/review` — Review proposal (supervisor)
-
-### Recommendations
-- `GET /groups/:id/recommendations` — Recommendations for a group
-- `GET /theses/:id/recommendations` — Recommendations for a thesis
-- `POST /recommendations` — Issue recommendation
-
-### Other
-- `GET /stats` — Dashboard statistics (counts by role, status, department)
-- `GET /health` — Health check endpoint
-- `GET /files/:type/:filename` — Serve uploaded files (groups/theses)
-
-## Environment Variables
-
-| Variable              | Description                    | Default                              |
-| --------------------- | ------------------------------ | ------------------------------------ |
-| `DATABASE_URL`        | PostgreSQL connection string   | `postgresql://postgres:postgres@localhost:5432/thesis_management` |
-| `JWT_SECRET`          | JWT signing secret             |                                      |
-| `JWT_EXPIRES_IN`      | JWT expiration duration        | `7d`                                 |
-| `PORT`                | Backend server port            | `5000`                               |
-| `FRONTEND_URL`        | CORS origin                    | `http://localhost:3000`              |
-| `SMTP_HOST`           | SMTP server                    | `smtp.gmail.com`                     |
-| `SMTP_PORT`           | SMTP port                      | `587`                                |
-| `SMTP_USER`           | SMTP email                     |                                      |
-| `SMTP_PASS`           | SMTP app password              |                                      |
-| `EMAIL_FROM`          | Sender email address           | `University Thesis Management <noreply@university.edu>` |
-| `EXAM_DEPT_API_URL`   | External exam dept API         |                                      |
-
-## Project Structure
+## 📁 Project Structure
 
 ```
+se/
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma           # Database schema (10 models)
-│   │   └── seed.js                 # Sample data seeder
+│   │   ├── schema.prisma       # Database schema
+│   │   ├── seed.js             # Database seeder
+│   │   └── migrations/         # Prisma migrations
 │   ├── src/
-│   │   ├── config/
-│   │   │   └── evaluationScheme.js # Evaluation scheme configuration
-│   │   ├── controllers/            # Route handlers (12 files)
-│   │   ├── middleware/
-│   │   │   └── auth.js             # JWT auth & role middleware
-│   │   ├── routes/                 # Express routes (12 files)
-│   │   ├── services/
-│   │   │   ├── emailService.js     # Nodemailer integration
-│   │   │   └── notificationService.js # In-app notifications
-│   │   └── index.js                # Express entry point
-│   ├── storage/
-│   │   ├── groups/                 # Uploaded group files
-│   │   └── theses/                 # Uploaded thesis files
-│   ├── scripts/
-│   │   └── generate-samples.js     # Regenerate sample xlsx files
-│   ├── sample_bachelor_projects.xlsx
-│   ├── sample_master_theses.xlsx
-│   ├── generate_sample_excel.js
-│   ├── .env.example
-│   └── .gitignore
+│   │   ├── index.js            # Express app entry
+│   │   ├── controllers/        # Route handlers
+│   │   ├── routes/             # Express routes
+│   │   ├── services/           # Business logic (email, PDF, notifications)
+│   │   ├── middleware/         # Auth, error handling
+│   │   ├── config/             # Evaluation schemes, year/semester rules
+│   │   ├── utils/              # Prisma client, helpers
+│   │   └── ...
+│   ├── excel-templates/        # Sample Excel files for bulk import
+│   └── package.json
 │
 ├── frontend/
-│   └── src/
-│       ├── components/             # Shared components (8 files)
-│       │   ├── Sidebar.jsx
-│       │   ├── PageLayout.jsx
-│       │   ├── PrivateRoute.jsx
-│       │   ├── NotificationBell.jsx
-│       │   ├── Pagination.jsx
-│       │   ├── DocumentViewer.jsx
-│       │   ├── ProposalsSection.jsx
-│       │   └── ExaminerAssignmentSection.jsx
-│       ├── contexts/
-│       │   └── ToastContext.jsx    # Toast notification context
-│       ├── pages/
-│       │   ├── Login.jsx
-│       │   ├── Profile.jsx
-│       │   ├── maintainer/        # Dashboard, UserManagement, DepartmentManagement
-│       │   ├── coordinator/       # Dashboard, BachelorProjects, MasterThesis, Evaluations, SupervisorList, ExaminerList
-│       │   ├── supervisor/        # Dashboard, BachelorProjects, MasterThesis, ProjectDetail
-│       │   ├── student/           # Dashboard, Projects, Theses, Assignment, Submissions, Notifications
-│       │   └── external/          # Dashboard, EvaluationsList, EvaluationPage
-│       ├── services/
-│       │   └── api.jsx            # Axios API client
-│       ├── utils/
-│       │   └── download.js        # File download utility
-│       ├── App.jsx                # Router & routes
-│       ├── App.css                # Design system & all styles
-│       └── main.jsx               # Vite entry point
+│   ├── src/
+│   │   ├── components/         # Reusable React components
+│   │   ├── pages/              # Page components by role
+│   │   │   ├── coordinator/    # Coordinator dashboard & management
+│   │   │   ├── supervisor/     # Supervisor evaluation pages
+│   │   │   ├── external/       # External examiner pages
+│   │   │   └── student/        # Student submission pages
+│   │   ├── services/           # API client configuration
+│   │   ├── contexts/           # React contexts (toast, etc.)
+│   │   └── styles/             # CSS variables & global styles
+│   ├── public/                 # Static assets
+│   └── package.json
 │
-└── README.md
+├── ai_chatbot/                 # AI chatbot for proposal review
+├── README.md
+└── .gitignore
 ```
 
-## Excel Import Format
+---
 
-### Bachelor Projects
-| Group Name   | Project Title                    | Member Names               | Roll Numbers                  |
-| ------------ | -------------------------------- | -------------------------- | ----------------------------- |
-| Team Alpha   | AI-Powered Smart Farming ...     | Ram Khadka,Sita Poudel,... | 078BCT021,078BCT022,078BCT023 |
+## 📸 Screenshots
 
-### Master Theses
-| Project Title                                  | Member Names  | Roll Numbers |
-| ---------------------------------------------- | ------------- | ------------ |
-| Deep Learning for Nepali Sign Language ...     | Pooja Magar   | 080BCT001    |
+> Screenshots are available in the project documentation.
+> 
+> *Dashboard* — Role-based overview with statistics cards
+> *Evaluation Review* — Side-by-side marks editor with live PDF preview
+> *Bulk Import* — Excel template upload with anomaly detection preview
+> *PDF Generation* — University-branded A4 evaluation sheets
 
-## Database Models
+---
 
-- **User** — Users across all roles (MAINTAINER, COORDINATOR, SUPERVISOR, STUDENT, EXTERNAL_EXAMINER)
-- **Department** — Academic departments with unique code
-- **AcademicYear** — Year/semester per department, with active flag
-- **ProjectGroup** — Bachelor project groups with status lifecycle (PENDING → ACTIVE → COMPLETED)
-- **GroupMember** — Many-to-many relation between students and groups
-- **Thesis** — Master theses linked to a single student
-- **EvaluationComponent** — Configurable evaluation rubrics per group/thesis
-- **Evaluation** — Marks and comments submitted for components
-- **ExaminerAssignment** — External examiner assignments to groups/theses
-- **ExternalExaminer** — External examiner contact info
-- **Proposal** — Proposal submissions with document uploads and supervisor feedback
-- **Notification** — In-app notifications per user
-- **Recommendation** — Recommendations issued by evaluators
+## 🤝 Contributing
+
+This project is developed for Pulchowk Campus, Institute of Engineering. For internal contributions:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is developed for academic purposes at **Pulchowk Campus, Institute of Engineering, Tribhuvan University**.
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ for the academic community of Pulchowk Campus, IOE</sub>
+  <br/>
+  <sub>Thesis & Project Management System © 2026</sub>
+</div>

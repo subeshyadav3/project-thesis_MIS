@@ -41,8 +41,18 @@ function StudentSubmissions() {
     Promise.all([
       api.get('/students/groups').then(({ data }) => setGroups(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load groups'); setGroups([]); }),
       api.get('/students/theses').then(({ data }) => setTheses(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); }),
-    ]).finally(() => setLoading(false));
+    ]);
   }, []);
+
+  // Auto-select the correct tab once data loads: prefer 'theses' if only theses exist, else 'groups'
+  useEffect(() => {
+    if (groups.length === 0 && theses.length > 0) {
+      setActiveTab('theses');
+    } else {
+      setActiveTab('groups');
+    }
+    setLoading(false);
+  }, [groups.length, theses.length]);
 
   useEffect(() => {
     if (!selectedId) { setProposals([]); setAnnouncement(null); return; }
@@ -124,24 +134,27 @@ function StudentSubmissions() {
         </div>
       )}
 
-      {/* Assignment selector */}
-      {items.length > 1 && (
-        <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>{itemLabel}:</span>
-          <select
-            value={selectedId || ''}
-            onChange={e => setSelectedId(parseInt(e.target.value))}
-            className="input"
-            style={{ maxWidth: 400, padding: '6px 10px', fontSize: 13 }}
-          >
-            {items.map(i => (
-              <option key={i.id} value={i.id}>
-                {activeTab === 'groups' ? i.projectTitle : i.title} ({i.batch || '—'})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Assignment selector — always shown so user can pick which project/thesis to upload to */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
+            {activeTab === 'groups' ? 'school' : 'library_books'}
+          </span>
+          {itemLabel}:
+        </span>
+        <select
+          value={selectedId || ''}
+          onChange={e => setSelectedId(parseInt(e.target.value))}
+          className="input"
+          style={{ maxWidth: 400, padding: '6px 10px', fontSize: 13 }}
+        >
+          {items.map(i => (
+            <option key={i.id} value={i.id}>
+              {activeTab === 'groups' ? i.projectTitle : i.title} ({i.batch || '—'})
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {stages.map(stage => {

@@ -45,10 +45,9 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
     const detailEndpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
     try {
       const detail = await api.get(detailEndpoint);
-      setItem(detail.data);
-      const previewEndpoint = type === 'group'
-        ? `/print/preview/group/${id}`
-        : `/print/preview/thesis/${id}?scope=${pdfScope}`;
+      setItem(detail.data);      const previewEndpoint = type === 'group'
+        ? `/print/preview/group/${id}?_t=${Date.now()}`
+        : `/print/preview/thesis/${id}?scope=${pdfScope}&_t=${Date.now()}`;
       const previewRes = await api.get(previewEndpoint, { responseType: 'text' });
       setPreviewHtml(previewRes.data);
     } catch (e) {
@@ -88,68 +87,79 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
     return groups;
   }, [editableComponents]);
 
-  // Extract per-role feedback from existing evaluations
-  const roleFeedbackInitial = useMemo(() => {
+  // Extract per-type feedback from existing evaluations
+  const feedbackInitial = useMemo(() => {
     const result = {};
-    Object.keys(groupedByRole).forEach(role => {
-      const roleEvals = groupedByRole[role].map(c => evaluationFor(c.id)).filter(Boolean);
-      result[role] = {
-        comments: roleEvals.map(e => e.comments).find(Boolean) || '',
-        suggestions: roleEvals.map(e => e.suggestions).find(Boolean) || '',
-      };
+    editableComponents.forEach(c => {
+      const key = c.evaluationType;
+      const e = evaluationFor(c.id);
+      if (!result[key]) result[key] = { comments: '', suggestions: '' };
+      if (e?.comments) result[key].comments = e.comments;
+      if (e?.suggestions) result[key].suggestions = e.suggestions;
     });
     return result;
-  }, [item, groupedByRole]);
+  }, [item, editableComponents]);
 
   const [marks, setMarks] = useState({});
-  const [roleFeedback, setRoleFeedback] = useState({});
+  const [feedback, setFeedback] = useState({});
 
-  // Initialize marks and per-role feedback when data loads
+  // Initialize marks and per-type feedback when data loads
   useEffect(() => {
     const nextMarks = {};
     editableComponents.forEach(c => { nextMarks[c.id] = evaluationFor(c.id)?.marks ?? ''; });
     setMarks(nextMarks);
-    setRoleFeedback(prev => {
+    setFeedback(prev => {
       const merged = { ...prev };
-      Object.keys(roleFeedbackInitial).forEach(role => {
-        if (!merged[role]) {
-          merged[role] = { comments: '', suggestions: '' };
-        }
-        // Only overwrite with empty if there is actual saved data
-        if (roleFeedbackInitial[role].comments) merged[role].comments = roleFeedbackInitial[role].comments;
-        if (roleFeedbackInitial[role].suggestions) merged[role].suggestions = roleFeedbackInitial[role].suggestions;
+      Object.keys(feedbackInitial).forEach(key => {
+        if (!merged[key]) merged[key] = { comments: '', suggestions: '' };
+        if (feedbackInitial[key].comments) merged[key].comments = feedbackInitial[key].comments;
+        if (feedbackInitial[key].suggestions) merged[key].suggestions = feedbackInitial[key].suggestions;
       });
       return merged;
     });
-  }, [item, editableComponents.length, roleFeedbackInitial]);
+  }, [item, editableComponents.length, feedbackInitial]);
 
   const saveChanges = async () => {
     setSaving(true); setError('');
+    let saveOk = false;
     try {
+      // Track which evaluationTypes have had feedback saved already
+      const feedbackSavedForType = {};
       for (const component of editableComponents) {
         const value = marks[component.id];
         if (value !== '' && (Number.isNaN(Number(value)) || Number(value) < 0 || Number(value) > component.maxMarks)) {
-          throw new Error(`${component.name}: enter marks from 0 to ${component.maxMarks}.`);
+          setError(`${component.name}: enter marks from 0 to ${component.maxMarks}.`);
+          setSaving(false);
+          return;
         }
-        const rf = roleFeedback[component.evaluatorRole] || { comments: '', suggestions: '' };
+        const typeKey = component.evaluationType;
+        // Only save comments/suggestions to the FIRST component per evaluationType
+        const fb = feedback[typeKey] || { comments: '', suggestions: '' };
+        const comments = !feedbackSavedForType[typeKey] ? (fb.comments || null) : null;
+        const suggestions = !feedbackSavedForType[typeKey] ? (fb.suggestions || null) : null;
+        feedbackSavedForType[typeKey] = true;
         await api.post('/evaluations/marks', {
           componentId: component.id,
           marks: value === '' ? null : Number(value),
-          comments: rf.comments || null,
-          suggestions: rf.suggestions || null,
+          comments,
+          suggestions,
           ...(type === 'group' ? { groupId: Number(id) } : { thesisId: Number(id) }),
         });
       }
-      await load();
-      if (onSave) onSave();
-    } catch (e) { setError(e.response?.data?.error || e.message || 'Could not save changes.'); }
-    finally { setSaving(false); }
+      saveOk = true;
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Could not save changes.');
+    }
+    // Always refresh the preview so it reflects latest data (even if some saves failed, partial data may have been saved)
+    try { await load(); } catch (_) { /* preview load is best-effort */ }
+    if (saveOk && onSave) onSave();
+    setSaving(false);
   };
 
-  const updateRoleFeedback = (role, field, value) => {
-    setRoleFeedback(prev => ({
+  const updateFeedback = (key, field, value) => {
+    setFeedback(prev => ({
       ...prev,
-      [role]: { ...(prev[role] || { comments: '', suggestions: '' }), [field]: value },
+      [key]: { ...(prev[key] || { comments: '', suggestions: '' }), [field]: value },
     }));
   };
 
@@ -213,21 +223,22 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
 
             {!editableComponents.length && <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>You can review this form, but do not have an assigned evaluation component.</p>}
 
-            {/* Per-role sections */}
+            {/* Per-type sections */}
             {displayedRoles.map((role, ri) => {
-              const rf = roleFeedback[role] || { comments: '', suggestions: '' };
               const components = groupedByRole[role];
               // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
               const sections = role === 'EXTERNAL_EXAMINER' && pdfScope === 'both'
                 ? [
-                    { key: 'mid', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
-                    { key: 'final', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
+                    { key: 'EXTERNAL_MIDTERM', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
+                    { key: 'EXTERNAL_FINAL', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
                   ].filter(s => components.some(s.filter))
-                : [{ key: 'all', label: role === 'SUPERVISOR' ? 'Supervisor'
+                : [{ key: components[0]?.evaluationType || 'UNKNOWN', label: role === 'SUPERVISOR' ? 'Supervisor'
                     : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)'
                     : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)'
                     : (ROLE_LABEL[role] || role), filter: () => true }];
-              return sections.map((section, si) => (
+              return sections.map((section, si) => {
+                const fb = feedback[section.key] || { comments: '', suggestions: '' };
+                return (
                 <div key={`${role}-${section.key}`} style={{ marginBottom: (ri < displayedRoles.length - 1 || si < sections.length - 1) ? 18 : 0 }}>
                   {/* Section header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -245,18 +256,18 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
                     </div>
                   ))}
 
-                  {/* Per-role comments & suggestions */}
+                  {/* Per-type comments & suggestions */}
                   <label style={{ display: 'block', marginTop: 10, fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
                     Comments {displayedRoles.length > 1 ? `(${section.label})` : ''}
                   </label>
-                  <textarea rows={2} value={rf.comments} onChange={e => updateRoleFeedback(role, 'comments', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
+                  <textarea rows={2} value={fb.comments} onChange={e => updateFeedback(section.key, 'comments', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
 
                   <label style={{ display: 'block', marginTop: 8, fontSize: 11, fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>
                     Suggestions & recommendations {displayedRoles.length > 1 ? `(${section.label})` : ''}
                   </label>
-                  <textarea rows={2} value={rf.suggestions} onChange={e => updateRoleFeedback(role, 'suggestions', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
+                  <textarea rows={2} value={fb.suggestions} onChange={e => updateFeedback(section.key, 'suggestions', e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: 13 }} />
                 </div>
-              ));
+              );});
             })}
 
             {editableComponents.length > 0 && (

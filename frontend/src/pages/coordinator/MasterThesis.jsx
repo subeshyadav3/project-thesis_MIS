@@ -326,7 +326,10 @@ const handleComplete = async (id) => {
 
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {
-      const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.student?.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
@@ -449,7 +452,11 @@ return (
                 <span className="material-symbols-outlined">library_books</span>
               </div>
               <div className="modal-header-text">
-                <h2>{showDetail.student?.firstName} {showDetail.student?.lastName}</h2>
+                <h2>
+                  {showDetail.student?.firstName} {showDetail.student?.lastName}
+                  {showDetail.student?.rollNumber ? ` (${showDetail.student?.rollNumber})` : ''}
+                  {showDetail.batch ? ` · Batch ${showDetail.batch}` : ''}
+                </h2>
                 <p>{showDetail.title}</p>
               </div>
             </div>
@@ -538,6 +545,7 @@ return (
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>Roll</th>
                     <th>Email</th>
                   </tr>
                 </thead>
@@ -551,6 +559,7 @@ return (
                         {showDetail.student?.firstName || ''} {showDetail.student?.lastName || ''}
                       </div>
                     </td>
+                    <td>{showDetail.student?.rollNumber || '—'}</td>
                     <td>{showDetail.student?.email || '—'}</td>
                   </tr>
                 </tbody>
@@ -849,19 +858,18 @@ return (
               Mark Complete
             </button>
             <button className="btn btn-sm btn-danger" onClick={() => {
-              const pending = selectedTheses.filter(id => {
-                const t = theses.find(th => th.id === id);
-                return t && t.status === 'PENDING';
-              });
-              if (pending.length === 0) return toast.warning('No pending theses selected');
+              const selected = selectedTheses;
+              if (selected.length === 0) return toast.warning('No theses selected');
               setConfirmDialog({
                 open: true,
                 title: 'Delete Theses',
-                message: `Are you sure you want to delete ${pending.length} pending theses? This cannot be undone.`,
+                message: `Are you sure you want to delete ${selected.length} theses? This cannot be undone.`,
                 onConfirm: async () => {
                   try {
-                    await Promise.all(pending.map(id => api.delete(`/theses/${id}`)));
-                    toast.success(`Deleted ${pending.length} theses`);
+                    const results = await Promise.allSettled(selected.map(id => api.delete(`/theses/${id}`)));
+                    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+                    const failed = results.filter(r => r.status === 'rejected').length;
+                    toast.success(`Deleted ${succeeded} theses${failed ? `, ${failed} failed` : ''}`);
                     setSelectedTheses([]);
                     setConfirmDialog(prev => ({ ...prev, open: false }));
                     loadData();
@@ -880,7 +888,7 @@ return (
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search theses, students, supervisors..." />
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by title, student, roll, email..." />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedTheses.length} theses</span>

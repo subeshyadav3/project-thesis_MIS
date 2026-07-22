@@ -238,12 +238,35 @@ function ExternalExaminerEvaluationPage() {
               <span>{item?.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : '—'}</span>
               <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Status:</span>
               <span><span className={`badge badge-${item?.status?.toLowerCase() || 'pending'}`}>{item?.status || 'PENDING'}</span></span>
-              {item?.examinerAssignments?.length > 0 && (
+              {type === 'thesis' ? (
+                <>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>External (Mid-Term):</span>
+                  <span>
+                    {item?.externalMidTerm ? (
+                      <span className="badge badge-info" style={{ fontSize: 12 }}>
+                        {item.externalMidTerm.firstName} {item.externalMidTerm.lastName}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
+                    )}
+                  </span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>External (Final):</span>
+                  <span>
+                    {item?.externalFinal ? (
+                      <span className="badge badge-warning" style={{ fontSize: 12 }}>
+                        {item.externalFinal.firstName} {item.externalFinal.lastName}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
+                    )}
+                  </span>
+                </>
+              ) : item?.examinerAssignments?.length > 0 && (
                 <>
                   <span style={{ fontWeight: 600, color: 'var(--color-on-surface-variant)' }}>Internal Examiner:</span>
                   <span>
                     {item.examinerAssignments.map(a => (
-                      <span key={a.id} className="badge badge-info" style={{ fontSize: 12 }}>
+                      <span key={a.id} className="badge badge-info" style={{ fontSize: 12, marginRight: 4 }}>
                         {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
                       </span>
                     ))}
@@ -253,86 +276,74 @@ function ExternalExaminerEvaluationPage() {
             </div>
           </div>
 
-          {/* Stats Summary */}
+          {/* Stats Summary — only show user's own totals */}
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card bento-card">
               <div className="stat-icon"><span className="material-symbols-outlined">score</span></div>
-              <div className="stat-number">{summary ? summary.total : 0}</div>
-              <div className="stat-label">Total Marks / {summary?.maxTotal || (type === 'group' ? 100 : 200)}</div>
+              <div className="stat-number">
+                {currentUserComponents.reduce((s, c) => {
+                  const e = evaluationForComponent(c.id);
+                  return s + (e?.marks ?? 0);
+                }, 0)}
+              </div>
+              <div className="stat-label">Your Total / {currentUserComponents.reduce((s, c) => s + c.maxMarks, 0)}</div>
             </div>
             <div className="stat-card bento-card">
               <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
-              <div className="stat-number">{summary?.completedCount || 0}<span style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>/{summary?.totalCount || components.length}</span></div>
-              <div className="stat-label">Components Evaluated</div>
+              <div className="stat-number">
+                {currentUserComponents.filter(c => {
+                  const e = evaluationForComponent(c.id);
+                  return e?.marks !== null && e?.marks !== undefined;
+                }).length}
+                <span style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>/{currentUserComponents.length}</span>
+              </div>
+              <div className="stat-label">Your Components Evaluated</div>
             </div>
           </div>
 
-          {/* Evaluation Breakdown (read-only) */}
+          {/* Evaluation Breakdown — only user's own components */}
           <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-header"><h3>Evaluation Breakdown</h3></div>
-            {orderedComponents.length === 0 ? (
-              <p style={{ color: 'var(--color-on-surface-variant)' }}>No evaluation components yet.</p>
+            <div className="card-header"><h3>Your Evaluation Breakdown</h3></div>
+            {currentUserComponents.length === 0 ? (
+              <p style={{ color: 'var(--color-on-surface-variant)', padding: 16 }}>No evaluation components assigned to you.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {orderedComponents.map(c => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 4 }}>
+                {currentUserComponents.map(c => {
                   const e = evaluationForComponent(c.id);
                   const hasMarks = e && e.marks !== null && e.marks !== undefined;
-                  const isCompleted = e?.status === 'COMPLETED';
-                  const isMine = c.evaluatorRole === 'EXTERNAL_EXAMINER';
                   return (
                     <div key={c.id} style={{
                       display: 'flex', alignItems: 'center', gap: 12, padding: 12,
                       borderRadius: 8,
-                      background: isCompleted ? 'var(--color-surface-container-low)' : isMine ? 'var(--color-primary-container)' : 'transparent',
-                      border: `1px solid ${isCompleted ? 'var(--color-success)' : isMine ? 'var(--color-primary)' : 'var(--color-outline-variant)'}`,
-                      opacity: isCompleted ? 0.85 : 1,
+                      background: hasMarks ? 'var(--color-surface-container-low)' : 'var(--color-primary-container)',
+                      border: `1px solid ${hasMarks ? 'var(--color-success)' : 'var(--color-primary)'}`,
                     }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: 10,
-                        background: isCompleted ? 'var(--color-success-container)' : hasMarks ? 'var(--color-tertiary-container)' : 'var(--color-surface-container)',
+                        background: hasMarks ? 'var(--color-success-container)' : 'var(--color-primary-container)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: isCompleted ? 'var(--color-on-success-container)' : hasMarks ? 'var(--color-on-tertiary-container)' : 'var(--color-on-surface-variant)',
+                        color: hasMarks ? 'var(--color-on-success-container)' : 'var(--color-on-primary-container)',
                         flexShrink: 0,
                       }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {isCompleted ? 'check_circle' : hasMarks ? 'check_circle' : 'pending'}
+                          {hasMarks ? 'check_circle' : 'pending'}
                         </span>
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>
-                          {c.name}
-                          {isMine && !isCompleted && <span className="badge" style={{ marginLeft: 8, fontSize: 10, background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>Your Evaluation</span>}
-                          {isCompleted && <span className="badge" style={{ marginLeft: 8, fontSize: 10, background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}>Completed</span>}
-                        </div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          Evaluated by {ROLE_LABEL[c.evaluatorRole]} · Max {c.maxMarks} marks
+                          Max {c.maxMarks} marks
                         </div>
-                        {e?.comment && (
-                          <div style={{ fontSize: 12, fontStyle: 'italic', marginTop: 4, color: 'var(--color-on-surface-variant)' }}>
-                            "{e.comment}"
-                          </div>
-                        )}
                       </div>
                       <div style={{ textAlign: 'right', minWidth: 70 }}>
                         <div style={{ fontSize: 20, fontWeight: 700, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
                           {hasMarks ? e.marks : '—'}
                           <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}> / {c.maxMarks}</span>
                         </div>
-                        {e?.submittedBy && (
-                          <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>
-                            by {e.submittedBy.firstName} {e.submittedBy.lastName}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
                 })}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 14, borderRadius: 8, background: 'var(--color-primary-container)', border: '2px solid var(--color-primary)' }}>
-                  <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-on-primary)' }}>Grand Total</span>
-                  <span style={{ fontWeight: 800, fontSize: 24, color: 'var(--color-on-primary)' }}>
-                    {summary?.total ?? 0} <span style={{ fontWeight: 400, fontSize: 14 }}>/ {summary?.maxTotal ?? (type === 'group' ? 100 : 200)}</span>
-                  </span>
-                </div>
               </div>
             )}
           </div>
@@ -344,81 +355,89 @@ function ExternalExaminerEvaluationPage() {
         </>
       )}
 
-      {/* ============ EVALUATION TAB ============ */}
-      {activeTab === 'evaluation' && (
+      {/* ============ EVALUATION TAB ============ */}        {activeTab === 'evaluation' && (
         <>
           {currentUserComponents.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
-              {currentUserComponents.map(comp => {
-                const e = evaluationForComponent(comp.id);
-                return (
-                  <div key={comp.id} className="card">
-                    <div className="card-header">
-                      <div>
-                        <h3 style={{ margin: 0 }}>{comp.name}</h3>
-                        <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                          {ROLE_LABEL[comp.evaluatorRole]} evaluation · Max {comp.maxMarks} marks
-                        </span>
-                      </div>
+            <>
+              {/* Simple table layout like coordinator */}
+              <div className="card" style={{ marginBottom: 24, padding: 0, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--color-surface-container-low)' }}>
+                      <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Component</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Status</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Marks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentUserComponents.map(comp => {
+                      const e = evaluationForComponent(comp.id);
+                      const hasMarks = e?.marks !== null && e?.marks !== undefined;
+                      return (
+                        <tr key={comp.id} style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
+                          <td style={{ padding: '8px 14px' }}>
+                            <div style={{ fontWeight: 500 }}>{comp.name}</div>
+                            <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Max {comp.maxMarks} marks</span>
+                          </td>
+                          <td style={{ padding: '8px 14px', textAlign: 'center' }}>
+                            {hasMarks ? (
+                              <span className="badge badge-completed" style={{ fontSize: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>check_circle</span> Saved
+                              </span>
+                            ) : (
+                              <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>radio_button_unchecked</span> Pending
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '6px 14px', textAlign: 'right' }}>
+                            <ExaminerEvaluationForm
+                              component={comp}
+                              evaluation={e}
+                              onSave={(marks) => handleSaveComponent(comp, marks)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Compact feedback section */}
+              <div className="card" style={{ marginBottom: 24 }}>
+                <div style={{
+                  padding: '12px 20px',
+                  borderBottom: '1px solid var(--color-outline-variant)',
+                }}>
+                  <h3 style={{ margin: 0, fontSize: 14 }}>Feedback</h3>
+                </div>
+                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                      <textarea rows={2} value={feedbackComments} onChange={e => setFeedbackComments(e.target.value)}
+                        placeholder="Comments..."
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
+                      />
                     </div>
-                    <div style={{ padding: '0 16px 16px' }}>
-                      <ExaminerEvaluationForm
-                        component={comp}
-                        evaluation={e}
-                        onSave={(marks) => handleSaveComponent(comp, marks)}
+                    <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                      <textarea rows={2} value={feedbackSuggestions} onChange={e => setFeedbackSuggestions(e.target.value)}
+                        placeholder="Suggestions..."
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
                       />
                     </div>
                   </div>
-                );
-              })}
-
-              {/* Comments + Suggestions feedback section */}
-              <div className="card">
-                <div className="card-header">
-                  <div>
-                    <h3 style={{ margin: 0 }}>Feedback</h3>
-                    <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                      Overall comments and suggestions for this evaluation
-                    </span>
-                  </div>
-                </div>
-                <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontSize: 13, fontWeight: 600 }}>Comments</label>
-                    <textarea
-                      rows={3}
-                      value={feedbackComments}
-                      onChange={e => setFeedbackComments(e.target.value)}
-                      placeholder="Enter your overall comments about this evaluation..."
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
-                    />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label style={{ fontSize: 13, fontWeight: 600 }}>Suggestions & Recommendations</label>
-                    <textarea
-                      rows={3}
-                      value={feedbackSuggestions}
-                      onChange={e => setFeedbackSuggestions(e.target.value)}
-                      placeholder="Enter suggestions and recommendations..."
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline-variant)', fontSize: 13, resize: 'vertical' }}
-                    />
-                  </div>
-                  <div>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={handleSaveFeedback}
-                      disabled={savingFeedback}
-                      style={{ padding: '6px 16px', fontSize: 13 }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button className="btn btn-primary btn-sm" onClick={handleSaveFeedback} disabled={savingFeedback}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                         {savingFeedback ? 'progress_activity' : 'save'}
                       </span>
-                      {savingFeedback ? 'Saving...' : 'Save Feedback'}
+                      {savingFeedback ? 'Saving...' : 'Save'}
                     </button>
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {currentUserComponents.length === 0 && (
@@ -436,7 +455,7 @@ function ExternalExaminerEvaluationPage() {
         type={type}
         id={id}
         onClose={() => setShowPdfPreview(false)}
-        onSave={() => { setShowPdfPreview(false); loadData(); }}
+        onSave={() => { loadData(); }}
         {...(type === 'thesis' && externalType === 'FINAL' ? { initialScope: 'external-final' }
           : type === 'thesis' && externalType === 'MIDTERM' ? { initialScope: 'external' }
           : {})}
@@ -450,6 +469,7 @@ function ExaminerEvaluationForm({ component, evaluation, onSave }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const hasValue = marks !== '' && marks !== null && marks !== undefined;
 
   useEffect(() => {
     setMarks(evaluation?.marks?.toString() ?? '');
@@ -470,28 +490,7 @@ function ExaminerEvaluationForm({ component, evaluation, onSave }) {
     finally { setSaving(false); }
   };
 
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 10,
-          background: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-primary-container)' : 'var(--color-surface-container)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: (marks !== '' && marks !== null && marks !== undefined) ? 'var(--color-on-primary-container)' : 'var(--color-on-surface-variant)',
-          flexShrink: 0,
-        }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-            {(marks !== '' && marks !== null && marks !== undefined) ? 'check_circle' : 'edit'}
-          </span>
-        </div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{component.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-            Max {component.maxMarks} marks
-          </div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+  return (      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
         <input
           type="number"
           value={marks}
@@ -500,15 +499,21 @@ function ExaminerEvaluationForm({ component, evaluation, onSave }) {
           min="0"
           step="0.5"
           placeholder="0"
-          style={{ width: 70, padding: '8px 10px', fontSize: 14, textAlign: 'center', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}
+          style={{
+            width: 60, padding: '4px 8px', fontSize: 13, textAlign: 'center',
+            borderRadius: 6, border: hasValue ? '1px solid var(--color-primary-container)' : '1px solid var(--color-outline)',
+            background: 'transparent', outline: 'none', fontWeight: 600,
+            color: hasValue ? 'var(--color-primary)' : 'var(--color-on-surface)',
+          }}
+          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
         />
-        <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', fontWeight: 500 }}>/ {component.maxMarks}</span>
-        <button className="btn btn-primary btn-sm" onClick={submit} disabled={saving || marks === '' || marks === null || marks === undefined} style={{ padding: '6px 14px', fontSize: 13 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16, marginRight: 4 }}>{saving ? 'progress_activity' : 'save'}</span>
-          {saving ? 'Saving...' : 'Save'}
+        <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
+        <button className="btn btn-primary btn-sm" onClick={submit}
+          disabled={saving || marks === '' || marks === null || marks === undefined}
+          style={{ padding: '4px 10px', minWidth: 48, fontSize: 12 }}>
+          {saving ? '...' : 'Save'}
         </button>
       </div>
-    </div>
   );
 }
 

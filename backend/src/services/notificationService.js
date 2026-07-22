@@ -88,28 +88,52 @@ async function getCoordinatorIds() {
 
 /**
  * Student uploaded a proposal/defense document.
- * Notify: supervisor + coordinators (not the student who uploaded).
+ * Notify: supervisor + relevant coordinator (not the student who uploaded).
  */
 async function notifyProposalUpload({ groupId, thesisId, stage, uploaderId, studentName, itemTitle }) {
   const stageLabel = stage === 'MID_TERM' ? 'Mid-Term' : stage.charAt(0) + stage.slice(1).toLowerCase();
   const recipients = [
     ...(groupId ? await getGroupNotifyIds(groupId, { includeStudents: false }) : await getThesisNotifyIds(thesisId, { includeStudent: false })),
-    ...await getCoordinatorIds(),
   ].filter(id => id !== uploaderId);
+  const coordinatorId = await findCoordinatorForItem(groupId, thesisId);
+  if (coordinatorId && coordinatorId !== uploaderId && !recipients.includes(coordinatorId)) {
+    recipients.push(coordinatorId);
+  }
+  if (recipients.length === 0) return null;
   return notifyMany(recipients, 'PROPOSAL_UPLOAD', `${studentName} uploaded a ${stageLabel} document for "${itemTitle}"`);
 }
 
 /**
  * Someone submitted/updated evaluation marks.
- * Notify: coordinators only (excluding the submitter).
+ * Notify: the relevant coordinator only (excluding the submitter).
  */
 async function notifyMarksSubmitted({ groupId, thesisId, componentName, marks, maxMarks, evaluatorRole, itemTitle, submitterId }) {
-  const recipients = [
-    ...await getCoordinatorIds(),
-  ].filter(id => id !== submitterId);
   const roleLabel = ROLE_LABEL[evaluatorRole] || evaluatorRole;
   const marksStr = marks !== null && marks !== undefined ? `${marks}/${maxMarks}` : `cleared`;
-  return notifyMany(recipients, 'MARKS_SUBMITTED', `${roleLabel} marks for "${itemTitle}" — ${componentName}: ${marksStr}`);
+  try {
+    const coordinatorId = await findCoordinatorForItem(groupId, thesisId);
+    if (coordinatorId && coordinatorId !== submitterId) {
+      return notify(coordinatorId, 'MARKS_SUBMITTED', `${roleLabel} marks for "${itemTitle}" — ${componentName}: ${marksStr}`);
+    }
+  } catch (e) {
+    console.error('notifyMarksSubmitted error:', e.message);
+  }
+  return null;
+}
+
+/** Look up the coordinator for a group or thesis. */
+async function findCoordinatorForItem(groupId, thesisId) {
+  let programId = null;
+  if (groupId) {
+    const group = await prisma.projectGroup.findUnique({ where: { id: groupId }, select: { programId: true } });
+    programId = group?.programId;
+  } else if (thesisId) {
+    const thesis = await prisma.thesis.findUnique({ where: { id: thesisId }, include: { student: { select: { programId: true } } } });
+    programId = thesis?.student?.programId;
+  }
+  if (!programId) return null;
+  const program = await prisma.program.findUnique({ where: { id: programId }, select: { coordinatorId: true } });
+  return program?.coordinatorId || null;
 }
 
 /**

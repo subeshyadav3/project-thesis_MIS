@@ -47,8 +47,10 @@ exports.uploadDocument = async (req, res) => {
     let whereClause = {};
     if (type === 'group') {
       if (req.body.groupId) {
+        const groupId = parseInt(req.body.groupId);
+        if (isNaN(groupId)) return res.status(400).json({ error: 'Invalid group ID' });
         const member = await prisma.groupMember.findFirst({
-          where: { studentId: req.user.id, groupId: parseInt(req.body.groupId) },
+          where: { studentId: req.user.id, groupId },
         });
         if (!member) return res.status(403).json({ error: 'You are not a member of this group' });
         whereClause = { groupId: member.groupId, stage };
@@ -59,8 +61,10 @@ exports.uploadDocument = async (req, res) => {
       }
     } else {
       if (req.body.thesisId) {
+        const thesisId = parseInt(req.body.thesisId);
+        if (isNaN(thesisId)) return res.status(400).json({ error: 'Invalid thesis ID' });
         const thesis = await prisma.thesis.findFirst({
-          where: { id: parseInt(req.body.thesisId), studentId: req.user.id },
+          where: { id: thesisId, studentId: req.user.id },
         });
         if (!thesis) return res.status(403).json({ error: 'This thesis does not belong to you' });
         whereClause = { thesisId: thesis.id, stage };
@@ -114,7 +118,8 @@ exports.uploadDocument = async (req, res) => {
   audit.log({ action: 'UPLOAD', entity: 'Document', details: `Uploaded ${stageLabel} document`, performedById: req.user.id });
     res.json({ message: 'Document uploaded successfully', documentUrl, proposal });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('uploadDocument error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
 
