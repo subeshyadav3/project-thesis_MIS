@@ -111,6 +111,7 @@ exports.createThesis = async (req, res) => {
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         batch: student.batch || null,
         cluster: student.program?.cluster || null,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         status: status || 'ACTIVE',
       },
     });
@@ -218,7 +219,7 @@ exports.bulkImportPreview = async (req, res) => {
       const name = (row['Name'] || row['name'] || '').toString().trim();
       const roll = (row['Roll'] || row['roll'] || row['Roll Numbers'] || '').toString().trim();
       const title = (row['Title'] || row['title'] || row['Project Title'] || '').toString().trim();
-      const batch = (row['Batch'] || row['batch'] || '').toString().trim();
+      let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || '').toString().trim();
       const cluster = (row['Cluster'] || row['cluster'] || '').toString().trim();
       const programValue = (row['Program'] || row['program'] || '').toString().trim();
       const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
@@ -253,6 +254,14 @@ exports.bulkImportPreview = async (req, res) => {
         if (importedProgram && studentMatch.user.programId !== importedProgram.id) {
           warnings.push('Program does not match the matched student');
         }
+        if (!batch && studentMatch.user.rollNumber) {
+          const rollMatch = studentMatch.user.rollNumber.match(/^(\d{2,3})/);
+          if (rollMatch) batch = rollMatch[1];
+        }
+      }
+      if (!batch && roll) {
+        const rollMatch = roll.match(/^(\d{2,3})/);
+        if (rollMatch) batch = rollMatch[1];
       }
 
       // Match supervisor — if not found, mark for auto-create
@@ -371,7 +380,7 @@ exports.bulkImportConfirm = async (req, res) => {
         if (!willCreate) return null;
         try {
           const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-          const hash = await bcrypt.hash('password123', 10);
+           const hash = await bcrypt.hash('subesh', 10);
           const newUser = await prisma.user.upsert({
             where: { email },
             update: {},
@@ -776,10 +785,12 @@ exports.updateThesis = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    const { title, description } = req.body;
+    const { title, description, startDate, endDate } = req.body;
     const data = {};
     if (title !== undefined) data.title = title;
     if (description !== undefined) data.description = description;
+    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     const thesis = await prisma.thesis.update({
       where: { id },
       data,

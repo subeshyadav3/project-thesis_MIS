@@ -7,6 +7,21 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
+function getDeadlineInfo(expirationDate) {
+  if (!expirationDate) return null;
+  const now = new Date();
+  const deadline = new Date(expirationDate);
+  const diffMs = deadline - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+  if (diffMs < 0) return { expired: true, label: 'Deadline passed', urgent: false };
+  if (diffDays > 30) return { expired: false, label: `${deadline.toLocaleDateString()}`, urgent: false };
+  if (diffDays > 7) return { expired: false, label: `${diffDays} days left`, urgent: false };
+  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
+  if (diffHours >= 1) return { expired: false, label: `${diffHours} hours left`, urgent: true };
+  return { expired: false, label: 'Due soon', urgent: true };
+}
+
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
   COORDINATOR: 'Coordinator',
@@ -152,17 +167,35 @@ function StudentProjectDetail() {
                   }
                 </span>
               </div>
+              {isGroup && (assignment.examinerAssignments || []).filter(a => a.externalExaminer).map(a => (
+                <div key={a.id} className="detail-item">
+                  <span className="detail-label">Internal Examiner</span>
+                  <span style={{ fontWeight: 500 }}>{a.externalExaminer.firstName} {a.externalExaminer.lastName}</span>
+                </div>
+              ))}
+              {!isGroup && assignment.externalMidTerm && (
+                <div className="detail-item">
+                  <span className="detail-label">External Mid-Term</span>
+                  <span style={{ fontWeight: 500 }}>{assignment.externalMidTerm.firstName} {assignment.externalMidTerm.lastName}</span>
+                </div>
+              )}
+              {!isGroup && assignment.externalFinal && (
+                <div className="detail-item">
+                  <span className="detail-label">External Final</span>
+                  <span style={{ fontWeight: 500 }}>{assignment.externalFinal.firstName} {assignment.externalFinal.lastName}</span>
+                </div>
+              )}
               <div className="detail-item">
                 <span className="detail-label">Batch</span>
                 <span>{assignment.batch || '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Department</span>
-                <span>{assignment.student?.program?.department?.name || assignment.department?.name || '—'}</span>
+                <span>{isGroup ? (assignment.program?.department?.name || assignment.academicYear?.department?.name || '—') : (assignment.student?.program?.department?.name || '—')}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Program</span>
-                <span>{assignment.program?.name || assignment.programName || '—'}</span>
+                <span>{isGroup ? (assignment.program?.name || '—') : (assignment.student?.program?.name || '—')}</span>
               </div>
             </div>
           </div>
@@ -227,6 +260,10 @@ function StudentProjectDetail() {
                   <span className="detail-label">Email</span>
                   <span style={{ fontSize: 13 }}>{assignment.student?.email || '—'}</span>
                 </div>
+                <div className="detail-item">
+                  <span className="detail-label">Roll Number</span>
+                  <span>{assignment.student?.rollNumber || '—'}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -241,6 +278,20 @@ function StudentProjectDetail() {
               {assignment.status === 'COMPLETED' && <span className="badge badge-completed"><span className="dot" />Completed</span>}
             </div>
             <div style={{ padding: '0 16px 16px' }}>
+              {assignment.announcement?.expirationDate && (() => {
+                const info = getDeadlineInfo(assignment.announcement.expirationDate);
+                if (!info) return null;
+                return (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', marginBottom: 8, borderRadius: 6, fontSize: 11,
+                    background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'var(--color-surface-container)',
+                    color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'}</span>
+                    {info.label}
+                  </div>
+                );
+              })()}
               {stageKeys.map((s, i) => {
                 const status = stageStatus(s);
                 const color = stageColor(s);

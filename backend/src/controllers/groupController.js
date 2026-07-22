@@ -102,6 +102,7 @@ exports.createGroup = async (req, res) => {
         projectTitle,
         projectType: projectType || 'MINOR',
         batch: batch || null,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         programId: resolvedProgramId,
         status: status || 'ACTIVE',
@@ -213,7 +214,7 @@ exports.bulkImportPreview = async (req, res) => {
       const projectTitle = (row['Project Title'] || row['projectTitle'] || '').toString().trim();
       const memberNames = (row['Members'] || row['memberNames'] || '').toString().trim();
       const rollNumbers = (row['Roll Numbers'] || row['rollNumbers'] || '').toString().trim();
-      const batch = (row['Batch'] || row['batch'] || '').toString().trim();
+      let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || row['Academic Year'] || '').toString().trim();
       const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
       const examinerName = (row['External Examiner'] || row['examiner'] || '').toString().trim();
 
@@ -262,6 +263,17 @@ exports.bulkImportPreview = async (req, res) => {
         }
       }
 
+      if (!batch) {
+        const firstMatch = studentMatches.find(m => m);
+        if (firstMatch?.user?.rollNumber) {
+          const rollMatch = firstMatch.user.rollNumber.match(/^(\d{2,3})/);
+          if (rollMatch) batch = rollMatch[1];
+        } else if (rolls.length > 0) {
+          const rollMatch = rolls[0].match(/^(\d{2,3})/);
+          if (rollMatch) batch = rollMatch[1];
+        }
+      }
+
       let supervisorMatch = null;
       let supervisorWillCreate = null;
       if (supervisorName) {
@@ -285,11 +297,8 @@ exports.bulkImportPreview = async (req, res) => {
       }
 
       // Auto-detect project type from student batch/year
-      let projectType = 'MINOR';
-      if (batch) {
-        const { currentYear } = computeCurrentYearSemesterFromBatch(batch, 'BACHELOR');
-        if (currentYear && currentYear >= 4) projectType = 'MAJOR';
-      }
+      const { currentYear } = batch ? computeCurrentYearSemesterFromBatch(batch, 'BACHELOR') : { currentYear: null };
+      let projectType = (currentYear && currentYear >= 4) ? 'MAJOR' : 'MINOR';
 
       const existingGroup = await prisma.projectGroup.findFirst({ where: { name: groupName } });
       if (existingGroup && groupName) {
@@ -338,7 +347,7 @@ exports.bulkImportConfirm = async (req, res) => {
       if (!willCreate) return null;
       try {
         const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-        const hash = await bcrypt.hash('password123', 10);
+        const hash = await bcrypt.hash('subesh', 10);
         const newUser = await prisma.user.upsert({
           where: { email },
           update: {},
@@ -641,10 +650,12 @@ exports.deleteGroup = async (req, res) => {
 exports.updateGroup = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { projectTitle, description } = req.body;
+    const { projectTitle, description, startDate, endDate } = req.body;
     const data = {};
     if (projectTitle !== undefined) data.projectTitle = projectTitle;
     if (description !== undefined) data.description = description;
+    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     const group = await prisma.projectGroup.update({
       where: { id },
       data,

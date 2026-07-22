@@ -5,6 +5,19 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 
+function getDeadlineInfo(expirationDate) {
+  if (!expirationDate) return null;
+  const now = new Date();
+  const deadline = new Date(expirationDate);
+  const diffMs = deadline - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (diffMs < 0) return { expired: true, label: 'Deadline passed' };
+  if (diffDays > 7) return { expired: false, label: `${diffDays} days left` };
+  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
+  if (diffDays === 1) return { expired: false, label: '1 day left', urgent: true };
+  return { expired: false, label: 'Due soon', urgent: true };
+}
+
 function StudentTheses() {
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +98,19 @@ function StudentTheses() {
                   <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`}>
                     <span className="dot" />{t.status}
                   </span>
+                  {t.announcement?.expirationDate && (() => {
+                    const info = getDeadlineInfo(t.announcement.expirationDate);
+                    if (!info) return null;
+                    return t.announcement?.expirationDate ? (
+                      <span className={`badge`} style={{
+                        fontSize: 9, padding: '1px 6px', border: 'none',
+                        background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'var(--color-surface-container)',
+                        color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
+                      }}>
+                        {info.label}
+                      </span>
+                    ) : null;
+                  })()}
                   <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }}>chevron_right</span>
                 </div>
               </div>

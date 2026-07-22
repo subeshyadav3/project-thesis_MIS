@@ -10,6 +10,11 @@ const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: '
 
 function CoordinatorAnnouncements() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const degreeType = user.program?.degreeType || '';
+  const isMasterCoordinator = degreeType === 'MASTER';
+  const TYPE_OPTIONS = isMasterCoordinator
+    ? [{ value: 'GENERAL', label: 'General' }, { value: 'THESIS', label: 'Thesis' }]
+    : [{ value: 'GENERAL', label: 'General' }, { value: 'MINOR', label: 'Minor Project' }, { value: 'MAJOR', label: 'Major Project' }];
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -20,6 +25,7 @@ function CoordinatorAnnouncements() {
     degreeType: user.program?.degreeType || '',
     programIds: user.program?.id ? [user.program.id] : [],
     studentIds: [],
+    batch: '',
     academicYearId: '', allowGroupFormation: false,
     startDate: '', expirationDate: '',
     expiresAt: '',
@@ -27,6 +33,7 @@ function CoordinatorAnnouncements() {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentOpen, setStudentOpen] = useState(false);
+  const [editAnnouncement, setEditAnnouncement] = useState(null);
   const [viewAnnouncement, setViewAnnouncement] = useState(null);
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
@@ -44,6 +51,22 @@ function CoordinatorAnnouncements() {
 
   useEffect(() => { loadData(); }, []);
 
+  // Derive unique batch options from allStudents, normalizing to 4-digit Nepali year
+  const batchOptions = React.useMemo(() => {
+    const batches = new Set();
+    const normalize = (v) => {
+      if (/^\d{3}$/.test(v)) return `2${v}`;        // "080" → "2080"
+      if (/^2\d{3}$/.test(v)) return v;               // "2080" → "2080"
+      return v;
+    };
+    allStudents.forEach(s => {
+      if (s.batch) batches.add(normalize(s.batch));
+      const rollPrefix = s.rollNumber?.slice(0, 3);
+      if (rollPrefix && /^\d{3}$/.test(rollPrefix)) batches.add(normalize(rollPrefix));
+    });
+    return [...batches].sort((a, b) => b.localeCompare(a));
+  }, [allStudents]);
+
   useEffect(() => {
     const f = (e) => { if (studentRef.current && !studentRef.current.contains(e.target)) setStudentOpen(false); };
     if (studentOpen) document.addEventListener('mousedown', f);
@@ -55,26 +78,64 @@ function CoordinatorAnnouncements() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.message.trim() || !form.academicYearId) {
-      toast.warning('Title, message, and academic year are required');
+    if (!form.title.trim() || !form.message.trim() || !form.batch.trim()) {
+      toast.warning('Title, message, and batch are required');
       return;
     }
-    // degreeType and programIds are auto-set from user.program
+    const isEdit = !!editAnnouncement;
+    const payload = {
+      ...form,
+      degreeType: user.program?.degreeType || '',
+      programIds: user.program?.id ? [user.program.id] : [],
+      studentIds: selectedStudents,
+      startDate: form.startDate || undefined,
+      expirationDate: form.expirationDate || undefined,
+    };
     try {
-      await api.post('/announcements', {
-        ...form,
-        degreeType: user.program?.degreeType || '',
-        programIds: user.program?.id ? [user.program.id] : [],
-        studentIds: selectedStudents,
-        startDate: form.startDate || undefined,
-        expirationDate: form.expirationDate || undefined,
-      });
-      toast.success('Announcement created');
+      if (isEdit) {
+        await api.put(`/announcements/${editAnnouncement.id}`, payload);
+        toast.success('Announcement updated — notification re-sent');
+      } else {
+        await api.post('/announcements', payload);
+        toast.success('Announcement created');
+      }
       setShowCreate(false);
-      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], academicYearId: '', allowGroupFormation: false, startDate: '', expirationDate: '', expiresAt: '' });
+      setEditAnnouncement(null);
+      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, startDate: '', expirationDate: '', expiresAt: '' });
       setSelectedStudents([]);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to create'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to save'); }
+  };
+
+  const handleEdit = (a) => {
+    setEditAnnouncement(a);
+    setForm({
+      title: a.title || '',
+      message: a.message || '',
+      type: a.type || 'GENERAL',
+      degreeType: a.degreeType || user.program?.degreeType || '',
+      programIds: a.programIds?.length ? a.programIds : (user.program?.id ? [user.program.id] : []),
+      studentIds: a.studentIds || [],
+      batch: a.batch || '',
+      academicYearId: a.academicYearId ? String(a.academicYearId) : '',
+      allowGroupFormation: a.allowGroupFormation || false,
+      startDate: a.startDate ? a.startDate.split('T')[0] : '',
+      expirationDate: a.expirationDate ? a.expirationDate.split('T')[0] : '',
+      expiresAt: a.expiresAt ? a.expiresAt.slice(0, 16) : '',
+    });
+    setSelectedStudents(a.studentIds || []);
+    setShowCreate(true);
+  };
+
+  const handleDelete = async (a) => {
+    if (!window.confirm(`Delete announcement "${a.title}"? This action cannot be undone.`)) return;
+    try {
+      await api.delete(`/announcements/${a.id}`);
+      toast.success('Announcement deleted');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete');
+    }
   };
 
   const deactivate = async (id) => {
@@ -115,7 +176,7 @@ function CoordinatorAnnouncements() {
   };
 
   const actions = (
-    <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+    <button className="btn btn-primary btn-sm" onClick={() => { setEditAnnouncement(null); setShowCreate(true); }}>
       <span className="material-symbols-outlined">campaign</span> New Announcement
     </button>
   );
@@ -187,7 +248,13 @@ function CoordinatorAnnouncements() {
                             <span className="badge badge-pending">Expired</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button className="btn btn-sm btn-outline" onClick={() => handleDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
                           {hasGF && (
                             <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
                               <span className="material-symbols-outlined">visibility</span> View Submissions
@@ -209,31 +276,34 @@ function CoordinatorAnnouncements() {
         </div>
 
         {showCreate && (
-          <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="modal-overlay" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}>
             <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <div className="modal-header-icon info"><span className="material-symbols-outlined">campaign</span></div>
-                <div className="modal-header-text"><h2>New Announcement</h2><p>Send a notification to students</p></div>
+                <div className="modal-header-text">
+                  <h2>{editAnnouncement ? 'Edit Announcement' : 'New Announcement'}</h2>
+                  <p>{editAnnouncement ? 'Update the announcement — notification will be re-sent' : 'Send a notification to students'}</p>
+                </div>
               </div>
               <form onSubmit={handleSubmit}>
-                <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm({...form, title: e.target.value})} required placeholder="e.g. Minor Project Group Formation" /></div>
+                <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm({...form, title: e.target.value})} required placeholder={isMasterCoordinator ? 'e.g. Thesis Information' : 'e.g. Minor Project Group Formation'} /></div>
                 <div className="form-group"><label>Message *</label><textarea value={form.message} onChange={e => setForm({...form, message: e.target.value})} required rows={3} placeholder="Details about this announcement..." /></div>
                 <div className="form-row" style={{ display: 'flex', gap: 12 }}>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label>Type</label>
                     <select value={form.type} onChange={e => { const t = e.target.value; setForm({...form, type: t, allowGroupFormation: ['MINOR', 'MAJOR', 'THESIS'].includes(t) ? true : form.allowGroupFormation, degreeType: ['MINOR', 'MAJOR'].includes(t) ? 'BACHELOR' : t === 'THESIS' ? 'MASTER' : '' }); }}>
-                      <option value="GENERAL">General</option>
-                      <option value="MINOR">Minor Project</option>
-                      <option value="MAJOR">Major Project</option>
-                      <option value="THESIS">Thesis</option>
+                      {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
-                    <label>Academic Year *</label>
-                    <select value={form.academicYearId} onChange={e => setForm({...form, academicYearId: e.target.value})} required>
-                      <option value="">Select year...</option>
-                      {academicYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+                    <label>Batch *</label>
+                    <select value={form.batch} onChange={e => setForm({...form, batch: e.target.value})} required>
+                      <option value="">Select batch...</option>
+                      {batchOptions.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
+                    <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
+                      Only students in this batch will receive the notification
+                    </p>
                   </div>
                 </div>
 
@@ -272,6 +342,7 @@ function CoordinatorAnnouncements() {
                   </div>
                 </div>
 
+                {!isMasterCoordinator && (
                 <div className="form-group" style={{
                   background: 'var(--color-surface-container-low)',
                   borderRadius: 'var(--border-radius-md)',
@@ -305,8 +376,8 @@ function CoordinatorAnnouncements() {
                     </div>
                   </div>
                   {form.allowGroupFormation && (
-                    <div className="form-row" style={{ display: 'flex', gap: 12 }}>
-                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                    <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                         <label style={{ fontSize: 12 }}>Max Members</label>
                         <div style={{
                           padding: '10px 14px',
@@ -323,27 +394,28 @@ function CoordinatorAnnouncements() {
                           </span>
                         </div>
                       </div>
-                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                         <label style={{ fontSize: 12 }}>Start Date (optional)</label>
                         <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
                         <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
                       </div>
-                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                         <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
                         <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
                         <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
                       </div>
-                      <div className="form-group" style={{ flex: 1, margin: 0 }}>
+                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                         <label style={{ fontSize: 12 }}>Expires At (optional)</label>
                         <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
                       </div>
                     </div>
                   )}
                 </div>
+                )}
 
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}><span className="material-symbols-outlined">close</span> Cancel</button>
-                  <button type="submit" className="btn btn-primary"><span className="material-symbols-outlined">send</span> Send</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}><span className="material-symbols-outlined">close</span> Cancel</button>
+                  <button type="submit" className="btn btn-primary"><span className="material-symbols-outlined">send</span> {editAnnouncement ? 'Update & Re-send' : 'Send'}</button>
                 </div>
               </form>
             </div>

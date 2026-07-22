@@ -373,6 +373,8 @@ function ProjectDetail() {
                       : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                   } />
                 )}
+                {item?.startDate && <InfoRow label="Start Date" value={new Date(item.startDate).toLocaleDateString()} />}
+                <InfoRow label="End Date" value={item?.endDate ? new Date(item.endDate).toLocaleDateString() : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not Added</span>} />
                 {item?.description && <InfoRow label="Description" value={item.description} />}
               </div>
             </div>

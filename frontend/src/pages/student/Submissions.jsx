@@ -6,12 +6,28 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
+function getDeadlineInfo(expirationDate) {
+  if (!expirationDate) return null;
+  const now = new Date();
+  const deadline = new Date(expirationDate);
+  const diffMs = deadline - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+  if (diffMs < 0) return { expired: true, label: 'Deadline passed', urgent: false };
+  if (diffDays > 30) return { expired: false, label: `${deadline.toLocaleDateString()}`, urgent: false };
+  if (diffDays > 7) return { expired: false, label: `${diffDays} days left`, urgent: false };
+  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
+  if (diffHours >= 1) return { expired: false, label: `${diffHours} hours left`, urgent: true };
+  return { expired: false, label: 'Due soon', urgent: true };
+}
+
 function StudentSubmissions() {
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [activeTab, setActiveTab] = useState('groups');
   const [selectedId, setSelectedId] = useState(null);
   const [proposals, setProposals] = useState([]);
+  const [announcement, setAnnouncement] = useState(null);
   const [uploading, setUploading] = useState({});
   const [loading, setLoading] = useState(true);
   const [viewerDoc, setViewerDoc] = useState(null);
@@ -29,12 +45,15 @@ function StudentSubmissions() {
   }, []);
 
   useEffect(() => {
-    if (!selectedId) { setProposals([]); return; }
+    if (!selectedId) { setProposals([]); setAnnouncement(null); return; }
     const isGroup = activeTab === 'groups';
     const endpoint = isGroup ? `/students/groups/${selectedId}` : `/students/theses/${selectedId}`;
     api.get(endpoint)
-      .then(({ data }) => setProposals(data.proposals || []))
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load proposals'); setProposals([]); });
+      .then(({ data }) => {
+        setProposals(data.proposals || []);
+        setAnnouncement(data.announcement || null);
+      })
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load proposals'); setProposals([]); setAnnouncement(null); });
   }, [selectedId, activeTab]);
 
   const items = activeTab === 'groups' ? groups : theses;
@@ -156,6 +175,22 @@ function StudentSubmissions() {
                   <span className="dot" />{existing?.documentUrl ? 'Uploaded' : 'Pending'}
                 </span>
               </div>
+
+              {announcement?.expirationDate && (() => {
+                const info = getDeadlineInfo(announcement.expirationDate);
+                if (!info) return null;
+                return (
+                  <div style={{
+                    padding: '6px 16px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
+                    background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'transparent',
+                    color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
+                    borderBottom: '1px solid var(--color-outline-variant)',
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'}</span>
+                    {info.label}
+                  </div>
+                );
+              })()}
 
               <div style={{ padding: 16 }}>
                 {existing?.documentUrl ? (

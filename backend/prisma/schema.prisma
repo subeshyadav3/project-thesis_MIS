@@ -83,6 +83,7 @@ model Announcement {
   degreeType      DegreeType?
   programIds      Int[]               @default([])
   studentIds      Int[]               @default([])
+  batch           String?
   academicYearId  Int
   academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id])
   departmentId    Int
@@ -252,6 +253,8 @@ model ProjectGroup {
   announcement   Announcement?       @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   formedById     Int?
   formedBy       User?               @relation("GroupFormer", fields: [formedById], references: [id], onDelete: SetNull)
+  startDate      DateTime?
+  endDate        DateTime?
   joinPolicy     String              @default("INVITE_ONLY")
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -299,6 +302,8 @@ model Thesis {
   crossProgramRequestedBy   User?   @relation("CrossProgramRequester", fields: [crossProgramRequestedById], references: [id], onDelete: SetNull)
   cluster        String?
   batch          String?
+  startDate      DateTime?
+  endDate        DateTime?
   announcementId Int?
   announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())

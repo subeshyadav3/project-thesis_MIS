@@ -143,13 +143,10 @@ function SupervisorList() {
       {isMasterCoordinator && (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
           <span className="material-symbols-outlined">upload_file</span>
-          Upload Theses
+          Upload Supervisor Assignments
         </button>
       )}
-      <button className="btn btn-secondary btn-sm" onClick={() => setShowSupervisorUpload(true)}>
-        <span className="material-symbols-outlined">upload_file</span>
-        Bulk Upload
-      </button>
+     
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
         <span className="material-symbols-outlined">add</span>
         Add Supervisor
@@ -166,13 +163,7 @@ function SupervisorList() {
         onSuccess={loadData}
         title="Bulk Upload Theses (Supervisors)"
       />
-      <UsersBulkUploadModal
-        open={showSupervisorUpload}
-        onClose={() => setShowSupervisorUpload(false)}
-        onSuccess={loadData}
-        fixedRole="SUPERVISOR"
-        title="Bulk Import Supervisors"
-      />
+      
       {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>

@@ -127,7 +127,7 @@ exports.getMyGroups = async (req, res) => {
           include: {
             supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
             academicYear: { include: { department: { select: { id: true, name: true } } } },
-            program: true,
+            program: { include: { department: { select: { id: true, name: true } } } },
             members: {
               include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } },
             },
@@ -136,10 +136,11 @@ exports.getMyGroups = async (req, res) => {
             },
             evaluationComponents: true,
             proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
+            announcement: { select: { id: true, title: true, expirationDate: true, startDate: true } },
+            examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
     res.json(members.map(m => ({ ...m.group, _memberRoll: m.rollNumber })));
   } catch (error) {
@@ -152,13 +153,17 @@ exports.getMyTheses = async (req, res) => {
     const theses = await prisma.thesis.findMany({
       where: { studentId: req.user.id },
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, program: { include: { department: { select: { id: true, name: true } } } } } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true } },
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
+        announcement: { select: { id: true, title: true, expirationDate: true, startDate: true } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -175,7 +180,7 @@ exports.getGroupById = async (req, res) => {
       include: {
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         academicYear: { include: { department: { select: { id: true, name: true } } } },
-        program: true,
+        program: { include: { department: { select: { id: true, name: true } } } },
         members: {
           include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } },
         },
@@ -184,6 +189,8 @@ exports.getGroupById = async (req, res) => {
         },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
+        announcement: { select: { id: true, title: true, expirationDate: true, startDate: true } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -200,13 +207,17 @@ exports.getThesisById = async (req, res) => {
     const thesis = await prisma.thesis.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, program: { include: { department: { select: { id: true, name: true } } } } } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true } },
+        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true } },
         evaluations: {
           include: { submittedBy: { select: { firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" } },
+        announcement: { select: { id: true, title: true, expirationDate: true, startDate: true } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true } } } },
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });

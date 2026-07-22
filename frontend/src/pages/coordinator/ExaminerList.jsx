@@ -165,13 +165,10 @@ function ExaminerList() {
       {isMasterCoordinator && (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
           <span className="material-symbols-outlined">upload_file</span>
-          Upload Theses
+          Upload Examiner Assignments
         </button>
       )}
-      <button className="btn btn-secondary btn-sm" onClick={() => setShowExaminerUpload(true)}>
-        <span className="material-symbols-outlined">upload_file</span>
-        Bulk Upload
-      </button>
+      
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
         <span className="material-symbols-outlined">add</span>
         Add Examiner
@@ -187,13 +184,7 @@ function ExaminerList() {
         onSuccess={loadData}
         title="Bulk Upload Theses (External Examiners)"
       />
-      <UsersBulkUploadModal
-        open={showExaminerUpload}
-        onClose={() => setShowExaminerUpload(false)}
-        onSuccess={loadData}
-        fixedRole="EXTERNAL_EXAMINER"
-        title="Bulk Import External Examiners"
-      />
+      
       {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>

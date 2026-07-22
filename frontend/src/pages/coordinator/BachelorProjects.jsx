@@ -26,7 +26,8 @@ function BachelorProjects() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [bulkPreview, setBulkPreview] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
@@ -49,6 +50,9 @@ function BachelorProjects() {
   const [editStatus, setEditStatus] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [bulkEndDate, setBulkEndDate] = useState('');
   const editSupRef = useRef(null);
   const editExamRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -302,6 +306,18 @@ useEffect(() => {
       if (editStatus && editStatus !== showDetail.status) {
         promises.push(api.put(`/groups/${groupId}/status`, { status: editStatus }));
       }
+      if (editStartDate !== undefined) {
+        const current = showDetail.startDate ? new Date(showDetail.startDate).toISOString().split('T')[0] : '';
+        if (editStartDate !== current) {
+          promises.push(api.put(`/groups/${groupId}`, { startDate: editStartDate || null }));
+        }
+      }
+      if (editEndDate !== undefined) {
+        const current = showDetail.endDate ? new Date(showDetail.endDate).toISOString().split('T')[0] : '';
+        if (editEndDate !== current) {
+          promises.push(api.put(`/groups/${groupId}`, { endDate: editEndDate || null }));
+        }
+      }
       await Promise.all(promises);
       toast.success('Changes saved successfully');
       setShowDetail(null);
@@ -320,9 +336,15 @@ useEffect(() => {
     const students = createForm.students.filter(s => s.studentId);
     try {
       const payload = {
-        ...createForm,
-        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
+        name: createForm.name,
+        projectTitle: createForm.projectTitle,
+        projectType: createForm.projectType,
+        status: createForm.status,
+        startDate: createForm.startDate || null,
+        batch: createForm.batch,
+        supervisorId: createForm.supervisorId,
         programId: user.program?.id,
+        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
       };
       const { data: group } = await api.post('/groups', payload);
       if (createForm.examinerId) {
@@ -330,7 +352,7 @@ useEffect(() => {
       }
       toast.success('Group created successfully');
       setShowCreate(false);
-      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -451,6 +473,8 @@ const filteredGroups = useMemo(() => {
       setEditTitle(g.projectTitle || '');
       setEditDescription(g.description || '');
       setEditStatus(g.status || '');
+      setEditStartDate(g.startDate ? new Date(g.startDate).toISOString().split('T')[0] : '');
+      setEditEndDate(g.endDate ? new Date(g.endDate).toISOString().split('T')[0] : '');
     }
   };
 
@@ -631,6 +655,15 @@ const filteredGroups = useMemo(() => {
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
                     </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Start Date</label>
+                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                    <input type="date" className="form-input" value={editEndDate} onChange={e => { setEditEndDate(e.target.value); }} />
+                    {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
@@ -821,6 +854,36 @@ const filteredGroups = useMemo(() => {
             }}>
               <span className="material-symbols-outlined">play_arrow</span>
               Make Active
+            </button>
+            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <button className="btn btn-sm btn-primary" onClick={async () => {
+              if (!bulkEndDate) return toast.warning('Select an end date first');
+              try {
+                const ids = selectedGroups.map(g => g.id);
+                await Promise.all(ids.map(id => api.put(`/groups/${id}`, { endDate: bulkEndDate })));
+                toast.success(`End date set for ${ids.length} groups`);
+                setSelectedGroups([]);
+                setBulkEndDate('');
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+            }}>
+              <span className="material-symbols-outlined">calendar_month</span>
+              Set End Date
+            </button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const active = selectedGroups.filter(g => g.status === 'ACTIVE' || g.status === 'PENDING');
+              if (active.length === 0) return toast.warning('No active/pending groups selected');
+              try {
+                await Promise.all(active.map(g => api.put(`/groups/${g.id}/status`, { status: 'COMPLETED' })));
+                toast.success(`Completed ${active.length} groups`);
+                setSelectedGroups([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk complete failed');
+              }
+            }}>
+              <span className="material-symbols-outlined">check_circle</span>
+              Mark Complete
             </button>
             <button className="btn btn-sm btn-danger" onClick={() => {
               const pending = selectedGroups.filter(g => g.status === 'PENDING');
@@ -1146,6 +1209,14 @@ const filteredGroups = useMemo(() => {
                 <label>Batch</label>
                 <input value={createForm.batch} onChange={e => setCreateForm({...createForm, batch: e.target.value})} placeholder="e.g. 080" />
                 <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Auto-derived from student roll numbers</span>
+              </div>
+              <div className="form-group">
+                <label>Start Date</label>
+                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
 
               <div className="form-group" ref={createSupRef}>

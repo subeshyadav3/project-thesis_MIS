@@ -25,8 +25,12 @@ function MasterThesis() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
   const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [bulkEndDate, setBulkEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -247,7 +251,7 @@ const handleComplete = async (id) => {
         toast.success('Thesis created successfully');
       }
       setShowCreate(false);
-      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
+      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -293,6 +297,18 @@ const handleComplete = async (id) => {
       }
       if (editStatus && editStatus !== showDetail.status) {
         promises.push(api.put(`/theses/${thesisId}/status`, { status: editStatus }));
+      }
+      if (editStartDate !== undefined) {
+        const current = showDetail.startDate ? new Date(showDetail.startDate).toISOString().split('T')[0] : '';
+        if (editStartDate !== current) {
+          promises.push(api.put(`/theses/${thesisId}`, { startDate: editStartDate || null }));
+        }
+      }
+      if (editEndDate !== undefined) {
+        const current = showDetail.endDate ? new Date(showDetail.endDate).toISOString().split('T')[0] : '';
+        if (editEndDate !== current) {
+          promises.push(api.put(`/theses/${thesisId}`, { endDate: editEndDate || null }));
+        }
       }
       const results = await Promise.all(promises);
       const hasCrossProgram = results.some(r => r?.data?.crossProgram);
@@ -354,6 +370,8 @@ const handleComplete = async (id) => {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
       setEditStatus(t.status || '');
+      setEditStartDate(t.startDate ? new Date(t.startDate).toISOString().split('T')[0] : '');
+      setEditEndDate(t.endDate ? new Date(t.endDate).toISOString().split('T')[0] : '');
       setEditSupId(t.supervisorId ? t.supervisorId.toString() : '');
       setEditMidTermExamId(t.externalMidTerm?.id?.toString() || '');
       setEditFinalExamId(t.externalFinal?.id?.toString() || '');
@@ -559,6 +577,15 @@ return (
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
                     </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Start Date</label>
+                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                    <input type="date" className="form-input" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+                    {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
@@ -788,6 +815,38 @@ return (
             }}>
               <span className="material-symbols-outlined">play_arrow</span>
               Make Active
+            </button>
+            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <button className="btn btn-sm btn-primary" onClick={async () => {
+              if (!bulkEndDate) return toast.warning('Select an end date first');
+              try {
+                await Promise.all(selectedTheses.map(id => api.put(`/theses/${id}`, { endDate: bulkEndDate })));
+                toast.success(`End date set for ${selectedTheses.length} theses`);
+                setSelectedTheses([]);
+                setBulkEndDate('');
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+            }}>
+              <span className="material-symbols-outlined">calendar_month</span>
+              Set End Date
+            </button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const active = selectedTheses.filter(id => {
+                const t = theses.find(th => th.id === id);
+                return t && (t.status === 'ACTIVE' || t.status === 'PENDING');
+              });
+              if (active.length === 0) return toast.warning('No active/pending theses selected');
+              try {
+                await Promise.all(active.map(id => api.put(`/theses/${id}/status`, { status: 'COMPLETED' })));
+                toast.success(`Completed ${active.length} theses`);
+                setSelectedTheses([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk complete failed');
+              }
+            }}>
+              <span className="material-symbols-outlined">check_circle</span>
+              Mark Complete
             </button>
             <button className="btn btn-sm btn-danger" onClick={() => {
               const pending = selectedTheses.filter(id => {
@@ -1094,6 +1153,14 @@ return (
                   <option value="PENDING">Pending</option>
                   <option value="ACTIVE">Active</option>
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Start Date</label>
+                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
               <div className="form-group" ref={createSupRef}>
                 <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>

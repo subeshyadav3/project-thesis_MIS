@@ -47,16 +47,10 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
       const detail = await api.get(detailEndpoint);
       setItem(detail.data);
       const previewEndpoint = type === 'group'
-        ? `${api.defaults.baseURL}/print/preview/group/${id}`
-        : `${api.defaults.baseURL}/print/preview/thesis/${id}?scope=${pdfScope}`;
-      const previewRes = await fetch(previewEndpoint, { credentials: 'include' });
-      if (!previewRes.ok) {
-        const errText = await previewRes.text();
-        try { const errJson = JSON.parse(errText); throw new Error(errJson.error || 'Preview fetch failed'); }
-        catch (parseErr) { throw new Error(parseErr.message || 'Preview fetch failed'); }
-      }
-      const previewHtml = await previewRes.text();
-      setPreviewHtml(previewHtml);
+        ? `/print/preview/group/${id}`
+        : `/print/preview/thesis/${id}?scope=${pdfScope}`;
+      const previewRes = await api.get(previewEndpoint, { responseType: 'text' });
+      setPreviewHtml(previewRes.data);
     } catch (e) {
       setError(e.message || 'Failed to load the evaluation preview.');
     } finally { setLoading(false); }
