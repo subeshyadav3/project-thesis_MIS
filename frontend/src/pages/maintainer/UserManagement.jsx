@@ -3,6 +3,7 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { formatYearSemester } from '../../utils/romanNumerals';
 
 const COORDINATOR_ALLOWED_ROLES = ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
@@ -27,6 +28,7 @@ function UserManagement() {
   const [excelResult, setExcelResult] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', confirmLabel: 'Confirm', onConfirm: () => {}, danger: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isCoordinator = user.role === 'COORDINATOR';
   const isMaintainer = user.role === 'MAINTAINER';
@@ -81,15 +83,40 @@ function UserManagement() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
-    try {
-      await api.delete(`/users/${id}`);
-      toast.success('User deleted successfully');
-      loadUsers();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Error deleting user');
-    }
+  const handleDelete = (user) => {
+    const targetUser = users.find(u => u.id === user.id);
+    if (!targetUser) return;
+
+    let warningMessage = `Are you sure you want to delete ${targetUser.firstName} ${targetUser.lastName} (${targetUser.role.toLowerCase()})? This action cannot be undone.`;
+    
+    setConfirmDialog({
+      open: true,
+      title: `Delete ${targetUser.firstName} ${targetUser.lastName}`,
+      message: warningMessage,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/users/${user.id}`);
+          toast.success('User deleted successfully');
+          loadUsers();
+        } catch (err) {
+          const details = err.response?.data?.details;
+          let errorMsg = err.response?.data?.error || 'Error deleting user';
+          if (details) {
+            const links = [];
+            if (details.groups) links.push(`${details.groups} group(s)`);
+            if (details.theses) links.push(`${details.theses} thesis(es)`);
+            if (details.supervisedGroups) links.push(`${details.supervisedGroups} supervised group(s)`);
+            if (details.supervisedTheses) links.push(`${details.supervisedTheses} supervised thesis(es)`);
+            if (details.examinerAssignments) links.push(`${details.examinerAssignments} examiner assignment(s)`);
+            if (links.length) errorMsg += ` — Still has: ${links.join(', ')}. Remove assignments first.`;
+          }
+          toast.error(errorMsg);
+        }
+        setConfirmDialog((prev) => ({ ...prev, open: false }));
+      },
+    });
   };
 
   const openEdit = (u) => {
@@ -163,7 +190,7 @@ function UserManagement() {
           Bulk Import
         </button>
       )}
-      {isMasterCoordinator && (
+      {isCoordinator && (
         <button className="btn btn-secondary btn-sm" onClick={() => { setShowExcelBulk(true); setExcelResult(null); setExcelFile(null); }}>
           <span className="material-symbols-outlined">upload_file</span>
           Bulk Upload
@@ -346,7 +373,7 @@ function UserManagement() {
                         <button className="icon-btn" title="Edit User" onClick={() => openEdit(u)}>
                           <span className="material-symbols-outlined">edit</span>
                         </button>
-                        <button className="icon-btn danger" title="Delete User" onClick={() => handleDelete(u.id)}>
+                        <button className="icon-btn danger" title="Delete User" onClick={() => handleDelete(u)}>
                           <span className="material-symbols-outlined">delete</span>
                         </button>
                       </div>
@@ -624,6 +651,16 @@ function UserManagement() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        danger={confirmDialog.danger}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      />
     </PageLayout>
   );
 }

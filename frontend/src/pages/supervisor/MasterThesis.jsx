@@ -53,8 +53,10 @@ function SupervisorMasterThesis() {
         externalMidTermMatch: p.externalMidTermMatch, externalMidTermWillCreate: p.externalMidTermWillCreate,
         externalFinalMatch: p.externalFinalMatch, externalFinalWillCreate: p.externalFinalWillCreate,
       }));
-      await api.post('/theses/bulk-import/confirm', { rows });
-      toast.success(`${bulkPreview.stats.matched} theses imported`);
+      const res = await api.post('/theses/bulk-import/confirm', { rows });
+      const created = res.data?.created ?? bulkPreview.stats.matched;
+      const skipInfo = res.data?.skipped?.length ? ` (${res.data.skipped.length} skipped: ${res.data.skipped.map(s => s.reason).join('; ')})` : '';
+      toast.success(`${created} theses imported${skipInfo}`);
       setShowUpload(false);
       setBulkPreview(null);
       setSelectedFile(null);
@@ -139,7 +141,7 @@ function SupervisorMasterThesis() {
                 <span className="material-symbols-outlined">library_books</span>
               </div>
               <div className="modal-header-text">
-                <h2>{showDetail.student?.firstName} {showDetail.student?.lastName}</h2>
+                <h2>{showDetail.student?.firstName} {showDetail.student?.lastName}{showDetail.student?.rollNumber ? ` (${showDetail.student.rollNumber})` : ''}</h2>
                 <p>{showDetail.title}</p>
               </div>
             </div>
@@ -167,6 +169,10 @@ function SupervisorMasterThesis() {
                 <div className="detail-item">
                   <span className="detail-label">Email</span>
                   <span style={{ wordBreak: 'break-all' }}>{showDetail.student?.email || '—'}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Roll Number</span>
+                  <span>{showDetail.student?.rollNumber || '—'}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
@@ -213,10 +219,6 @@ function SupervisorMasterThesis() {
             <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search by student name, title..." />
           </div>
           <div className="table-toolbar-right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-              <span className="material-symbols-outlined">upload_file</span>
-              Upload Excel
-            </button>
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedTheses.length} theses</span>
           </div>
         </div>
@@ -239,6 +241,7 @@ function SupervisorMasterThesis() {
               <thead>
                 <tr>
                   <th>Student</th>
+                  <th>Roll</th>
                   <th>Thesis Title</th>
                   <th>Email</th>
                   <th>Status</th>
@@ -257,6 +260,7 @@ function SupervisorMasterThesis() {
                         <span style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</span>
                       </div>
                     </td>
+                    <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.student?.rollNumber || '—'}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13, wordBreak: 'break-all' }}>{t.student?.email || '—'}</td>
                     <td>
@@ -300,74 +304,6 @@ function SupervisorMasterThesis() {
         <EvaluationPdfPreview type="thesis" id={pdfPreviewItem.id} onClose={() => setPdfPreviewItem(null)} onSave={loadData} initialScope="supervisor" />
       )}
 
-      {showUpload && (
-        <div className="modal-overlay" onClick={() => { setShowUpload(false); setBulkPreview(null); }}>
-          <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">upload_file</span>
-              </div>
-              <div className="modal-header-text">
-                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Import Theses'}</h2>
-                <p>{bulkPreview ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched` : 'Upload Excel with Name, Roll, Title, Supervisor, External_mid_term, External_final, Cluster, Batch'}</p>
-              </div>
-            </div>
-            {!bulkPreview ? (
-              <form onSubmit={handleFileUpload}>
-                <div className="form-group">
-                  <label>Excel File (.xlsx)</label>
-                  <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
-                </div>
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
-                    <span className="material-symbols-outlined">close</span>Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
-                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
-                    {bulkLoading ? 'Analyzing...' : 'Preview'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div>
-                <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
-                  <table style={{ width: '100%', fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th>#</th><th>Name</th><th>Roll</th><th>Title</th><th>Student</th><th>Supervisor</th><th>Ext (Mid)</th><th>Ext (Final)</th><th>Cluster</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkPreview.preview.map(p => (
-                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
-                          <td>{p.row}</td>
-                          <td>{p.name}</td>
-                          <td style={{ fontSize: 11 }}>{p.roll}</td>
-                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</td>
-                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : p.externalMidTermWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalMidTermWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : p.externalFinalWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalFinalWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
-                          <td>{p.cluster || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
-                    <span className="material-symbols-outlined">arrow_back</span>Back
-                  </button>
-                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
-                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
-                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} theses`}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }

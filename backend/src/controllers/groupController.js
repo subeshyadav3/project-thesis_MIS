@@ -1,7 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+
 const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
@@ -9,6 +9,15 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildGroupWhereForCoordinator } = require('../utils/coordinatorScope');
+const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
+
+const normalizeBatch = (batch) => {
+  if (!batch) return batch;
+  const digits = batch.toString().replace(/\D/g, '');
+  if (!digits) return batch;
+  if (digits.length >= 3) return digits.slice(-3);
+  return digits.padStart(3, '0');
+};
 
 exports.getGroups = async (req, res) => {
   try {
@@ -101,6 +110,7 @@ exports.createGroup = async (req, res) => {
         projectTitle,
         projectType: projectType || 'MINOR',
         batch: batch || null,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         programId: resolvedProgramId,
         status: status || 'ACTIVE',
@@ -171,15 +181,25 @@ exports.createGroup = async (req, res) => {
 };
 
 function parseName(inputName) {
-  if (!inputName || !inputName.trim()) return { firstName: '', lastName: '' };
-  const cleaned = inputName.trim().replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*/i, '');
+  if (!inputName || !inputName.trim()) return { firstName: '', lastName: '', designation: '' };
+  const titleRegex = /^((Assoc\.\s*Prof\.|Asst\.\s*Prof\.|Prof\.|Dr\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*\.?\s*)/i;
+  let cleaned = inputName.trim();
+  let title = '';
+  let m;
+  while ((m = titleRegex.exec(cleaned)) !== null) {
+    title += m[1];
+    cleaned = cleaned.slice(m[0].length).trim();
+  }
+  const designation = title.trim().replace(/\.\s+/g, '. ').trim();
+  if (!cleaned) return { firstName: title.trim() || inputName.trim(), lastName: '', designation };
   const parts = cleaned.split(/\s+/);
-  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
-  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '', designation };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' '), designation };
 }
 
 function generateEmail(firstName, lastName, role) {
-  const base = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/[^a-z.]/g, '');
+  const ln = lastName || firstName;
+  const base = `${firstName.toLowerCase()}.${ln.toLowerCase()}`.replace(/[^a-z.]/g, '');
   const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
   return `${base}.${suffix}@pcampus.edu.np`;
 }
@@ -196,10 +216,19 @@ exports.bulkImportPreview = async (req, res) => {
     const coordinatorProgram = req.user.role === 'COORDINATOR'
       ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
       : null;
-    const [allStudents, allSupervisors, allExaminers] = await Promise.all([
+    const [allStudents, allSupervisors, allExaminers, existingGroups] = await Promise.all([
       prisma.user.findMany({ where: { role: 'STUDENT', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } }),
       prisma.user.findMany({ where: { role: 'SUPERVISOR', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.user.findMany({ where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
+      prisma.projectGroup.findMany({
+        where: { status: { not: 'COMPLETED' } },
+        select: {
+          id: true,
+          name: true,
+          projectTitle: true,
+          members: { select: { studentId: true } },
+        },
+      }),
     ]);
 
     const preview = [];
@@ -212,7 +241,7 @@ exports.bulkImportPreview = async (req, res) => {
       const projectTitle = (row['Project Title'] || row['projectTitle'] || '').toString().trim();
       const memberNames = (row['Members'] || row['memberNames'] || '').toString().trim();
       const rollNumbers = (row['Roll Numbers'] || row['rollNumbers'] || '').toString().trim();
-      const batch = (row['Batch'] || row['batch'] || '').toString().trim();
+      let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || row['Academic Year'] || '').toString().trim();
       const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
       const examinerName = (row['External Examiner'] || row['examiner'] || '').toString().trim();
 
@@ -231,13 +260,10 @@ exports.bulkImportPreview = async (req, res) => {
           const byRoll = allStudents.find(s => s.rollNumber && s.rollNumber.toLowerCase() === roll.toLowerCase());
           if (byRoll) match = { user: byRoll, score: 1.0, method: 'roll' };
         }
-        if (!match && name) {
-          match = fuzzyMatch(name, allStudents, 0.5);
-        }
         if (match) {
           studentMatches.push(match);
           matchCount++;
-          if (coordinatorProgram && match.user.programId !== coordinatorProgram.id) {
+          if (coordinatorProgram && match.user.programId && match.user.programId !== coordinatorProgram.id) {
             warnings.push(`Student "${name}" belongs to another program`);
           }
         } else {
@@ -261,13 +287,25 @@ exports.bulkImportPreview = async (req, res) => {
         }
       }
 
+      if (!batch) {
+        const firstMatch = studentMatches.find(m => m);
+        if (firstMatch?.user?.rollNumber) {
+          const rollMatch = firstMatch.user.rollNumber.match(/^(\d{2,3})/);
+          if (rollMatch) batch = rollMatch[1];
+        } else if (rolls.length > 0) {
+          const rollMatch = rolls[0].match(/^(\d{2,3})/);
+          if (rollMatch) batch = rollMatch[1];
+        }
+      }
+      batch = normalizeBatch(batch);
+
       let supervisorMatch = null;
       let supervisorWillCreate = null;
       if (supervisorName) {
         supervisorMatch = fuzzyMatch(supervisorName, allSupervisors, 0.5);
         if (!supervisorMatch) {
           const parsed = parseName(supervisorName);
-          supervisorWillCreate = { firstName: parsed.firstName, lastName: parsed.lastName, name: supervisorName };
+          supervisorWillCreate = { firstName: parsed.firstName, lastName: parsed.lastName, name: supervisorName, designation: parsed.designation };
           warnings.push(`Supervisor "${supervisorName}" will be auto-created`);
         }
       }
@@ -278,20 +316,60 @@ exports.bulkImportPreview = async (req, res) => {
         examinerMatch = fuzzyMatch(examinerName, allExaminers, 0.5);
         if (!examinerMatch) {
           const parsed = parseName(examinerName);
-          examinerWillCreate = { firstName: parsed.firstName, lastName: parsed.lastName, name: examinerName };
+          examinerWillCreate = { firstName: parsed.firstName, lastName: parsed.lastName, name: examinerName, designation: parsed.designation };
           warnings.push(`External Examiner "${examinerName}" will be auto-created`);
         }
       }
 
-      const existingGroup = await prisma.projectGroup.findFirst({ where: { name: groupName } });
-      if (existingGroup && groupName) {
-        warnings.push(`Group "${groupName}" already exists`);
+      // Auto-detect project type from student batch/year
+      const { currentYear } = batch ? computeCurrentYearSemesterFromBatch(batch, 'BACHELOR') : { currentYear: null };
+      let projectType = (currentYear && currentYear >= 4) ? 'MAJOR' : 'MINOR';
+
+      // ── Anomaly detection ────────────────────────────────
+      const anomalies = [];
+      const matchedIds = studentMatches.filter(Boolean).map(m => m.user.id);
+
+      // Check intra-upload: does this student appear in an earlier row?
+      for (const sid of matchedIds) {
+        const earlierRow = preview.find(p =>
+          p.studentMatches?.some(sm => sm?.id === sid)
+        );
+        if (earlierRow) {
+          anomalies.push({ type: 'student_in_group', studentId: sid, existingGroupName: earlierRow.groupName, message: `Student (ID: ${sid}) also appears in row ${earlierRow.row} — group "${earlierRow.groupName}"` });
+        }
+      }
+
+      if (groupName) {
+        const nameDup = existingGroups.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+        if (nameDup) {
+          const sameMembers = nameDup.members.every(m => matchedIds.includes(m.studentId)) && matchedIds.every(id => nameDup.members.some(m => m.studentId === id));
+          const sameTitle = nameDup.projectTitle?.toLowerCase() === projectTitle.toLowerCase();
+          if (sameMembers && sameTitle) {
+            anomalies.push({ type: 'exact_duplicate', existingId: nameDup.id, message: `Exact duplicate of existing group "${nameDup.name}"` });
+          } else {
+            anomalies.push({ type: 'group_name_exists', existingId: nameDup.id, existingName: nameDup.name, message: `Group name "${groupName}" already exists (ID: ${nameDup.id})` });
+          }
+        }
+      }
+
+      // Check if any student is already in another active group
+      for (const sid of matchedIds) {
+        const otherGroup = existingGroups.find(g => g.members.some(m => m.studentId === sid) && g.name.toLowerCase() !== (groupName || '').toLowerCase());
+        if (otherGroup) {
+          anomalies.push({ type: 'student_in_group', studentId: sid, existingGroupName: otherGroup.name, message: `Student (ID: ${sid}) is already in group "${otherGroup.name}"` });
+        }
+      }
+
+      const orgWarnings = [...warnings];
+      if (anomalies.length) {
+        warnings.push(...anomalies.map(a => a.message));
       }
 
       preview.push({
         row: i + 1,
         groupName: groupName || '(unnamed)',
         projectTitle,
+        projectType,
         members: names,
         rolls,
         batch,
@@ -302,6 +380,7 @@ exports.bulkImportPreview = async (req, res) => {
         examinerMatch: examinerMatch ? { id: examinerMatch.user.id, name: `${examinerMatch.user.firstName} ${examinerMatch.user.lastName}`, score: examinerMatch.score, status: 'matched' } : null,
         examinerWillCreate,
         warnings,
+        anomalies,
       });
     }
 
@@ -329,7 +408,7 @@ exports.bulkImportConfirm = async (req, res) => {
       if (!willCreate) return null;
       try {
         const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-        const hash = await bcrypt.hash('password123', 10);
+        const hash = await bcrypt.hash('subesh', 10);
         const newUser = await prisma.user.upsert({
           where: { email },
           update: {},
@@ -339,12 +418,14 @@ exports.bulkImportConfirm = async (req, res) => {
             firstName: willCreate.firstName,
             lastName: willCreate.lastName || willCreate.firstName,
             role,
+            designation: willCreate.designation || null,
             departmentId: req.user.departmentId,
             active: true,
           },
         }).catch(() => null);
         if (newUser) {
           audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newUser.id, details: `Auto-created ${role} via bulk import` });
+          emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'subesh');
           return newUser.id;
         }
       } catch (e) {
@@ -355,10 +436,30 @@ exports.bulkImportConfirm = async (req, res) => {
 
     for (const row of rows) {
       const {
-        groupName, projectTitle, members, rolls, batch, programId,
+        _action,
+        _edits,
+        groupName: origGroupName,
+        projectTitle: origProjectTitle,
+        projectType: origProjectType,
+        members, rolls,
+        batch: origBatch,
+        programId: origProgramId,
         studentMatches, supervisorMatch, supervisorWillCreate,
         examinerMatch, examinerWillCreate,
       } = row;
+
+      // Respect skip / delete action
+      if (_action === 'skip') {
+        skipped.push({ row: row.row, reason: 'Skipped by user' });
+        continue;
+      }
+
+      // Apply edits
+      const groupName = _edits?.groupName ?? origGroupName;
+      const projectTitle = _edits?.projectTitle ?? origProjectTitle;
+      const projectType = _edits?.projectType ?? origProjectType;
+      const batch = normalizeBatch(_edits?.batch ?? origBatch);
+      const programId = _edits?.programId ?? origProgramId;
 
       if (!groupName || !projectTitle) {
         skipped.push({ row: row.row, reason: 'No group name or project title' });
@@ -366,10 +467,44 @@ exports.bulkImportConfirm = async (req, res) => {
       }
 
       const matchedStudents = [];
+      const resolvedRolls = [...(rolls || [])];
+      const studentWillCreate = _edits?.students || {};
       for (let j = 0; j < (studentMatches || []).length; j++) {
         const sm = studentMatches[j];
+        const se = studentWillCreate[j];
+        if (se?.roll && resolvedRolls[j] !== se.roll) {
+          resolvedRolls[j] = se.roll;
+        }
         if (sm?.id) {
           matchedStudents.push(sm.id);
+        } else if (se?.firstName && se?.lastName && resolvedRolls[j]) {
+          const email = resolvedRolls[j].toLowerCase() + '@pcampus.edu.np';
+          const hash = await bcrypt.hash('subesh', 10);
+          const batchMatch = resolvedRolls[j].match(/^(\d{2,3})/);
+          const newStudent = await prisma.user.upsert({
+            where: { email },
+            update: {},
+            create: {
+              email,
+              password: hash,
+              firstName: se.firstName,
+              lastName: se.lastName,
+              role: 'STUDENT',
+              rollNumber: resolvedRolls[j],
+              batch: batchMatch ? batchMatch[1] : null,
+              degreeType: 'BACHELOR',
+              programId: programId || undefined,
+              departmentId: req.user.departmentId,
+              active: true,
+            },
+          }).catch(() => null);
+          if (newStudent) {
+            matchedStudents.push(newStudent.id);
+            audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newStudent.id, details: `Auto-created STUDENT via bulk import` });
+            emailService.notifyUserCreated(email, se.firstName, 'STUDENT', email, 'subesh');
+          } else {
+            skipped.push({ row: row.row, reason: `Student at position ${j + 1} could not be created` });
+          }
         } else {
           skipped.push({ row: row.row, reason: `Student at position ${j + 1} could not be matched` });
         }
@@ -381,27 +516,55 @@ exports.bulkImportConfirm = async (req, res) => {
       }
 
       let resolvedSupervisorId = supervisorMatch?.id || null;
+      if (resolvedSupervisorId) {
+        const sup = await prisma.user.findUnique({ where: { id: resolvedSupervisorId }, select: { role: true } });
+        if (sup && sup.role !== 'SUPERVISOR') {
+          skipped.push({ row: row.row, reason: `Matched supervisor "${supervisorMatch?.name}" is not a SUPERVISOR` });
+          continue;
+        }
+      }
       if (!resolvedSupervisorId && supervisorWillCreate) {
         resolvedSupervisorId = await autoCreateUser(supervisorWillCreate, 'SUPERVISOR');
       }
 
       let resolvedExaminerId = examinerMatch?.id || null;
+      if (resolvedExaminerId) {
+        const exam = await prisma.user.findUnique({ where: { id: resolvedExaminerId }, select: { role: true } });
+        if (exam && exam.role !== 'EXTERNAL_EXAMINER') {
+          skipped.push({ row: row.row, reason: `Matched examiner "${examinerMatch?.name}" is not an EXTERNAL_EXAMINER` });
+          continue;
+        }
+      }
       if (!resolvedExaminerId && examinerWillCreate) {
         resolvedExaminerId = await autoCreateUser(examinerWillCreate, 'EXTERNAL_EXAMINER');
       }
 
       const group = await prisma.$transaction(async (tx) => {
-        const dup = await tx.projectGroup.findFirst({ where: { name: groupName } });
+        const dup = await tx.projectGroup.findFirst({
+          where: { name: { equals: groupName.trim(), mode: 'insensitive' } },
+        });
         if (dup) {
           skipped.push({ row: row.row, reason: `Group "${groupName}" already exists` });
           return null;
         }
 
+        // Re-check that no matched student is already in another active group
+        const existingMemberships = await tx.groupMember.findMany({
+          where: { studentId: { in: matchedStudents }, group: { status: { not: 'COMPLETED' } } },
+          include: { group: { select: { name: true } } },
+        });
+        if (existingMemberships.length > 0) {
+          const names = existingMemberships.map(m => `student ${m.studentId} in "${m.group.name}"`).join(', ');
+          skipped.push({ row: row.row, reason: `Student(s) already in another active group: ${names}` });
+          return null;
+        }
+
+        const pt = (projectType === 'MAJOR' || projectType === 'MINOR') ? projectType : 'MINOR';
         const newGroup = await tx.projectGroup.create({
           data: {
             name: groupName,
             projectTitle,
-            projectType: 'MINOR',
+            projectType: pt,
             status: 'ACTIVE',
             batch: batch || null,
             programId: programId || null,
@@ -409,7 +572,7 @@ exports.bulkImportConfirm = async (req, res) => {
           },
         });
 
-        const defaults = getDefaultComponents('MINOR');
+        const defaults = getDefaultComponents(pt);
         for (const comp of defaults) {
           await tx.evaluationComponent.create({
             data: { ...comp, groupId: newGroup.id, createdById: req.user.id },
@@ -418,7 +581,7 @@ exports.bulkImportConfirm = async (req, res) => {
 
         for (let j = 0; j < matchedStudents.length; j++) {
           const studentId = matchedStudents[j];
-          const roll = (rolls && rolls[j]) || `R${studentId}`;
+          const roll = (resolvedRolls && resolvedRolls[j]) || `R${studentId}`;
           await tx.groupMember.create({
             data: { studentId, groupId: newGroup.id, rollNumber: roll },
           });
@@ -450,6 +613,65 @@ exports.bulkImportConfirm = async (req, res) => {
         created.push(newGroup);
         return newGroup;
       });
+
+      // --- Notifications ---
+      if (group) {
+        try {
+          const studentRecords = await prisma.user.findMany({
+            where: { id: { in: matchedStudents } },
+            select: { id: true, email: true, firstName: true, lastName: true },
+          });
+          const studentEmails = studentRecords.map(s => s.email).filter(Boolean);
+          const memberDetails = studentRecords.map((s, idx) =>
+            `${s.firstName} ${s.lastName} (${(rolls && rolls[idx]) || ''})`
+          ).join(', ');
+
+          const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+
+          // In-app
+          notifSvc.notifyMany(matchedStudents, 'GROUP_CREATED',
+            `Your group "${groupName}" for project "${projectTitle}" has been created.`);
+
+          if (resolvedSupervisorId) {
+            notifSvc.notify(resolvedSupervisorId, 'SUPERVISOR_ASSIGNMENT',
+              `${assignerName} assigned you as supervisor for group "${groupName}" — project "${projectTitle}". Members: ${memberDetails}`);
+          }
+
+          if (resolvedExaminerId) {
+            notifSvc.notify(resolvedExaminerId, 'EXAMINER_ASSIGNMENT',
+              `${assignerName} assigned you as Internal Examiner for group "${groupName}" — project "${projectTitle}".`);
+          }
+
+          // Emails
+          if (studentEmails.length) {
+            let supName = null;
+            if (resolvedSupervisorId) {
+              if (supervisorMatch) supName = supervisorMatch.name;
+              else if (supervisorWillCreate) supName = `${supervisorWillCreate.firstName} ${supervisorWillCreate.lastName}`.trim();
+            }
+            emailService.notifyGroupCreated(studentEmails, groupName, projectTitle, supName, memberDetails);
+          }
+
+          if (resolvedSupervisorId) {
+            const sup = await prisma.user.findUnique({ where: { id: resolvedSupervisorId }, select: { email: true, firstName: true, lastName: true } });
+            if (sup) {
+              emailService.notifySupervisorAssigned(
+                sup.email, `${sup.firstName} ${sup.lastName}`, groupName, projectTitle,
+                studentRecords.map((s, idx) => ({ firstName: s.firstName, lastName: s.lastName, rollNumber: (rolls && rolls[idx]) || '' }))
+              );
+            }
+          }
+
+          if (resolvedExaminerId) {
+            const exam = await prisma.user.findUnique({ where: { id: resolvedExaminerId }, select: { email: true, firstName: true, lastName: true } });
+            if (exam) {
+              emailService.notifyExaminerAssigned(exam.email, `${exam.firstName} ${exam.lastName}`, projectTitle, groupName, 'group');
+            }
+          }
+        } catch (e) {
+          console.error('notifications for group:', groupName, e.message);
+        }
+      }
     }
 
     audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Bulk imported ${created.length} groups${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });
@@ -589,13 +811,51 @@ exports.bulkAssignSupervisor = async (req, res) => {
     if (!supervisor || supervisor.role !== 'SUPERVISOR') {
       return res.status(400).json({ success: false, error: 'Invalid supervisor' });
     }
+
+    // Fetch groups with members before update
+    const groups = await prisma.projectGroup.findMany({
+      where: { id: { in: ids } },
+      include: { members: { include: { student: true } } },
+    });
+
     const result = await prisma.projectGroup.updateMany({
       where: { id: { in: ids } },
       data: { supervisorId: supId },
     });
+
+    // Notifications per group
+    const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+    for (const group of groups) {
+      const studentIds = group.members.map(m => m.studentId);
+      const studentEmails = group.members.map(m => m.student.email).filter(Boolean);
+      const memberDetails = group.members.map(m =>
+        `${m.student.firstName} ${m.student.lastName} (${m.rollNumber || ''})`
+      ).join(', ');
+
+      // In-app
+      notifSvc.notifyMany(studentIds, 'SUPERVISOR_ASSIGNMENT',
+        `${assignerName} assigned supervisor "${supervisor.firstName} ${supervisor.lastName}" to group "${group.name}".`);
+      notifSvc.notify(supId, 'SUPERVISOR_ASSIGNMENT',
+        `${assignerName} assigned you as supervisor for group "${group.name}". Members: ${memberDetails}`);
+
+      // Emails
+      emailService.notifySupervisorAssigned(
+        supervisor.email, `${supervisor.firstName} ${supervisor.lastName}`,
+        group.name, group.projectTitle,
+        group.members.map(m => ({ firstName: m.student.firstName, lastName: m.student.lastName, rollNumber: m.rollNumber || '' }))
+      );
+      if (studentEmails.length) {
+        emailService.notifyStudentsSupervisorAssigned(
+          studentEmails, group.name, group.projectTitle,
+          `${supervisor.firstName} ${supervisor.lastName}`
+        );
+      }
+    }
+
     audit.log({ action: 'BULK_ASSIGN_SUPERVISOR', entity: 'ProjectGroup', details: `Assigned supervisor ${supId} to ${ids.length} groups`, performedById: req.user.id });
     res.json({ success: true, data: { updated: result.count } });
   } catch (error) {
+    console.error('bulkAssignSupervisor error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
@@ -605,12 +865,29 @@ exports.deleteGroup = async (req, res) => {
     const id = parseInt(req.params.id);
     const group = await prisma.projectGroup.findUnique({
       where: { id },
-      include: { proposals: true, evaluations: true },
+      include: {
+        proposals: true,
+        evaluations: true,
+        members: { include: { student: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true } } } },
+      },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
     if (group.status !== 'PENDING' && (group.proposals.length > 0 || group.evaluations.length > 0)) {
       return res.status(400).json({ error: 'Cannot delete: group has files uploaded or evaluations completed' });
     }
+
+    // Notify before deletion
+    const studentIds = group.members.map(m => m.studentId);
+    notifSvc.notifyMany(studentIds, 'GROUP_DELETED', `Your group "${group.name}" has been deleted by coordinator.`);
+    if (group.supervisorId) {
+      notifSvc.notify(group.supervisorId, 'GROUP_DELETED', `Group "${group.name}" you supervised has been deleted.`);
+    }
+    for (const ea of group.examinerAssignments) {
+      notifSvc.notify(ea.externalExaminer.id, 'EXAMINER_REMOVED', `Your assignment to group "${group.name}" has been removed.`);
+    }
+
     await prisma.$transaction([
       prisma.groupMember.deleteMany({ where: { groupId: id } }),
       prisma.evaluation.deleteMany({ where: { groupId: id } }),
@@ -624,6 +901,7 @@ exports.deleteGroup = async (req, res) => {
     audit.log({ action: 'DELETE', entity: 'ProjectGroup', entityId: id, details: `Deleted group "${group.name}"`, performedById: req.user.id });
     res.json({ message: 'Group deleted' });
   } catch (error) {
+    console.error('deleteGroup error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -631,10 +909,12 @@ exports.deleteGroup = async (req, res) => {
 exports.updateGroup = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { projectTitle, description } = req.body;
+    const { projectTitle, description, startDate, endDate } = req.body;
     const data = {};
     if (projectTitle !== undefined) data.projectTitle = projectTitle;
     if (description !== undefined) data.description = description;
+    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     const group = await prisma.projectGroup.update({
       where: { id },
       data,

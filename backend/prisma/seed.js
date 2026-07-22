@@ -28,8 +28,8 @@ function masterRoll(batch, code, serial) {
 
 // ── Program definitions ────────────────────────────────────────────────
 const BACHELOR_PROGRAMS = [
-  { code: 'BCT', name: 'Bachelor of Computer Engineering', maxStudents: 96 },
-  { code: 'BEI', name: 'Bachelor of Electronics and Information Engineering', maxStudents: 48 },
+  { code: 'BCT', name: 'Bachelor in Computer Engineering', maxStudents: 96 },
+  { code: 'BEI', name: 'Bachelor in Electronics and Information Engineering', maxStudents: 48 },
 ];
 
 const MASTER_PROGRAMS = [
@@ -169,8 +169,8 @@ async function main() {
   // ============================================================
   const programs = {};
   const progDefs = [
-    { code: 'BCT', name: 'Bachelor of Computer Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
-    { code: 'BEI', name: 'Bachelor of Electronics and Information Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
+    { code: 'BCT', name: 'Bachelor in Computer Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
+    { code: 'BEI', name: 'Bachelor in Electronics and Information Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
     { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', cluster: 'Cluster 1', departmentId: eceDept.id },
     { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', cluster: 'Cluster 2', departmentId: eceDept.id },
     { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', cluster: 'Cluster 3', departmentId: eceDept.id },
@@ -358,6 +358,8 @@ async function main() {
           projectTitle: groupTitles[groupIndex % groupTitles.length],
           projectType: 'MINOR',
           status: 'ACTIVE',
+          startDate: new Date('2025-02-01'),
+          endDate: new Date('2025-07-30'),
           supervisorId: supervisors[groupIndex % supervisors.length].id,
           programId: programs.BCT.id,
           academicYearId: ayMap[batchStr].id,
@@ -385,6 +387,8 @@ async function main() {
             projectTitle: 'IoT-based Smart Monitoring System for Electronics Labs',
             projectType: 'MINOR',
             status: 'ACTIVE',
+            startDate: new Date('2025-02-01'),
+            endDate: new Date('2025-07-30'),
             supervisorId: supervisors[0].id,
             programId: programs.BEI.id,
             academicYearId: ayMap[batchStr].id,
@@ -449,6 +453,8 @@ async function main() {
             projectType: 'MASTER',
             studentId: student.id,
             status: 'ACTIVE',
+            startDate: new Date('2025-02-01'),
+            endDate: new Date('2025-08-30'),
             supervisorId: supervisors[thesisIndex % supervisors.length].id,
             batch: String(bsYear),
             cluster: prog.cluster,
@@ -497,7 +503,7 @@ async function main() {
       data: { componentId: compByType.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 8.0, comment: 'Solid technical implementation.', comments: 'Technical implementation was solid and well-tested.', suggestions: 'Improve the user interface for better usability.', status: 'COMPLETED', submittedById: examiner.id, groupId: g.id },
     });
     await prisma.evaluation.create({
-      data: { componentId: compByType.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 16.0, comment: 'Excellent final presentation.', comments: 'The final defense was comprehensive and well-delivered.', suggestions: 'Publish the findings in a research paper.', status: 'COMPLETED', submittedById: coord.id, groupId: g.id },
+      data: { componentId: compByType.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE',      marks: 4.5, comment: 'Excellent final presentation.', comments: 'The final defense was comprehensive and well-delivered.', suggestions: 'Publish the findings in a research paper.', status: 'COMPLETED', submittedById: coord.id, groupId: g.id },
     });
   }
 

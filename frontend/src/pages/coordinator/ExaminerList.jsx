@@ -9,6 +9,8 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
+import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
+import GroupBulkUploadModal from '../../components/GroupBulkUploadModal';
 
 const PAGE_SIZE = 10;
 
@@ -25,6 +27,8 @@ function ExaminerList() {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showExaminerUpload, setShowExaminerUpload] = useState(false);
+  const [showGroupUpload, setShowGroupUpload] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
@@ -160,12 +164,23 @@ function ExaminerList() {
 
   const actions = (
     <>
-      {isMasterCoordinator && (
+      {isMasterCoordinator ? (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
           <span className="material-symbols-outlined">upload_file</span>
-          Upload Excel
+          Upload Examiner Assignments
+        </button>
+      ) : (
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowGroupUpload(true)}>
+          <span className="material-symbols-outlined">upload_file</span>
+          Upload Examiner Assignments
         </button>
       )}
+      
+      <button className="btn btn-secondary btn-sm" onClick={() => setShowExaminerUpload(true)}>
+        <span className="material-symbols-outlined">upload_file</span>
+        Bulk Add
+      </button>
+
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
         <span className="material-symbols-outlined">add</span>
         Add Examiner
@@ -175,12 +190,27 @@ function ExaminerList() {
 
   return (
     <ErrorBoundary><PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
-      <MasterThesisBulkUploadModal
-        open={showUpload}
-        onClose={() => setShowUpload(false)}
-        onSuccess={loadData}
-        title="Bulk Upload Theses (External Examiners)"
-      />
+       <MasterThesisBulkUploadModal
+         open={showUpload}
+         onClose={() => setShowUpload(false)}
+         onSuccess={loadData}
+         title="Bulk Upload Theses (External Examiners)"
+       />
+
+        <UsersBulkUploadModal
+          open={showExaminerUpload}
+          onClose={() => setShowExaminerUpload(false)}
+          onSuccess={loadData}
+          fixedRole="EXTERNAL_EXAMINER"
+          title="Bulk Upload External Examiners"
+        />
+
+        <GroupBulkUploadModal
+          open={showGroupUpload}
+          onClose={() => setShowGroupUpload(false)}
+          onSuccess={loadData}
+        />
+       
       {/* ── CREATE MODAL ── */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>

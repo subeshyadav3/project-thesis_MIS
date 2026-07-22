@@ -1,13 +1,22 @@
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
+
 const XLSX = require('xlsx');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
+const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator } = require('../utils/coordinatorScope');
+
+const normalizeBatch = (batch) => {
+  if (!batch) return batch;
+  const digits = batch.toString().replace(/\D/g, '');
+  if (!digits) return batch;
+  if (digits.length >= 3) return digits.slice(-3);
+  return digits.padStart(3, '0');
+};
 
 exports.getTheses = async (req, res) => {
   try {
@@ -23,7 +32,7 @@ exports.getTheses = async (req, res) => {
     const theses = await prisma.thesis.findMany({
       where,
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -46,7 +55,7 @@ exports.getThesis = async (req, res) => {
     const thesis = await prisma.thesis.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true, programId: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -110,7 +119,8 @@ exports.createThesis = async (req, res) => {
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         batch: student.batch || null,
-        cluster: student.program?.cluster || null,
+        cluster: req.body.cluster || student.program?.cluster || null,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         status: status || 'ACTIVE',
       },
     });
@@ -174,7 +184,15 @@ exports.createThesis = async (req, res) => {
  */
 function parseName(inputName) {
   if (!inputName || !inputName.trim()) return { firstName: '', lastName: '' };
-  const cleaned = inputName.trim().replace(/^(Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*/i, '');
+  const titleRegex = /^((Assoc\.\s*Prof\.|Asst\.\s*Prof\.|Prof\.|Dr\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*\.?\s*)/i;
+  let cleaned = inputName.trim();
+  let title = '';
+  let m;
+  while ((m = titleRegex.exec(cleaned)) !== null) {
+    title += m[1];
+    cleaned = cleaned.slice(m[0].length).trim();
+  }
+  if (!cleaned) return { firstName: title.trim() || inputName.trim(), lastName: '' };
   const parts = cleaned.split(/\s+/);
   if (parts.length === 1) return { firstName: parts[0], lastName: '' };
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
@@ -184,7 +202,8 @@ function parseName(inputName) {
  * Helper: generate a simple email from a name for auto-created users.
  */
 function generateEmail(firstName, lastName, role) {
-  const base = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/[^a-z.]/g, '');
+  const ln = lastName || firstName;
+  const base = `${firstName.toLowerCase()}.${ln.toLowerCase()}`.replace(/[^a-z.]/g, '');
   const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
   return `${base}.${suffix}@pcampus.edu.np`;
 }
@@ -202,11 +221,15 @@ exports.bulkImportPreview = async (req, res) => {
     const coordinatorProgram = req.user.role === 'COORDINATOR'
       ? await prisma.program.findUnique({ where: { coordinatorId: req.user.id } })
       : null;
-    const [allStudents, allSupervisors, allExternals, programs] = await Promise.all([
+    const [allStudents, allSupervisors, allExternals, programs, existingTheses] = await Promise.all([
       prisma.user.findMany({ where: { role: 'STUDENT', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } }),
       prisma.user.findMany({ where: { role: 'SUPERVISOR', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.user.findMany({ where: { role: 'EXTERNAL_EXAMINER', departmentId: deptId }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.program.findMany({ where: { departmentId: deptId }, select: { id: true, name: true, code: true, degreeType: true, cluster: true } }),
+      prisma.thesis.findMany({
+        where: { status: { in: ['PENDING', 'ACTIVE'] } },
+        select: { id: true, title: true, studentId: true },
+      }),
     ]);
 
     const preview = [];
@@ -218,7 +241,7 @@ exports.bulkImportPreview = async (req, res) => {
       const name = (row['Name'] || row['name'] || '').toString().trim();
       const roll = (row['Roll'] || row['roll'] || row['Roll Numbers'] || '').toString().trim();
       const title = (row['Title'] || row['title'] || row['Project Title'] || '').toString().trim();
-      const batch = (row['Batch'] || row['batch'] || '').toString().trim();
+      let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || '').toString().trim();
       const cluster = (row['Cluster'] || row['cluster'] || '').toString().trim();
       const programValue = (row['Program'] || row['program'] || '').toString().trim();
       const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
@@ -233,25 +256,45 @@ exports.bulkImportPreview = async (req, res) => {
         : null;
       if (programValue && !importedProgram) warnings.push(`Program not found for "${programValue}"`);
 
-      // Match student
+      // Match student by roll only
       let studentMatch = null;
       if (roll) {
         const byRoll = allStudents.find(s => s.rollNumber && s.rollNumber.toLowerCase() === roll.toLowerCase());
         if (byRoll) studentMatch = { user: byRoll, score: 1.0, method: 'roll' };
       }
-      if (!studentMatch && name) {
-        studentMatch = fuzzyMatch(name, allStudents, 0.5);
-      }
       if (!studentMatch) {
-        warnings.push(`Student not found for "${name}" (roll: ${roll})`);
+        warnings.push(`Student not found for roll: ${roll || '(none)'}`);
         unmatchCount++;
       } else {
         matchCount++;
-        if (coordinatorProgram && studentMatch.user.programId !== coordinatorProgram.id) {
+        if (coordinatorProgram && studentMatch.user.programId && studentMatch.user.programId !== coordinatorProgram.id) {
           warnings.push('Student belongs to another program and cannot be imported by this coordinator');
         }
         if (importedProgram && studentMatch.user.programId !== importedProgram.id) {
           warnings.push('Program does not match the matched student');
+        }
+        if (!batch && studentMatch.user.rollNumber) {
+          const rollMatch = studentMatch.user.rollNumber.match(/^(\d{2,3})/);
+          if (rollMatch) batch = rollMatch[1];
+        }
+      }
+      if (!batch && roll) {
+        const rollMatch = roll.match(/^(\d{2,3})/);
+        if (rollMatch) batch = rollMatch[1];
+      }
+      batch = normalizeBatch(batch);
+      // Cross-program detection: roll prefix vs Program column (applies to all rows)
+      if (importedProgram && roll) {
+        const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
+        if (rollProg && !rollProg.startsWith(importedProgram.code)) {
+          warnings.push(`Roll "${roll}" program code (${rollProg}) does not match selected program (${importedProgram.code})`);
+        }
+      }
+      // Student has no program assigned — e.g. auto-created without programId
+      if (coordinatorProgram && studentMatch && !studentMatch.user.programId) {
+        const hasProgWarning = warnings.findIndex(w => w.includes('belongs to another program'));
+        if (hasProgWarning === -1) {
+          warnings.push('Student program not set — will be assigned during import');
         }
       }
 
@@ -266,6 +309,7 @@ exports.bulkImportPreview = async (req, res) => {
             firstName: parsed.firstName,
             lastName: parsed.lastName,
             name: supervisorName,
+            designation: parsed.designation,
           };
           warnings.push(`Supervisor "${supervisorName}" will be auto-created`);
         }
@@ -282,6 +326,7 @@ exports.bulkImportPreview = async (req, res) => {
             firstName: parsed.firstName,
             lastName: parsed.lastName,
             name: externalMidTermName,
+            designation: parsed.designation,
           };
           warnings.push(`External Mid-Term "${externalMidTermName}" will be auto-created`);
         }
@@ -298,9 +343,29 @@ exports.bulkImportPreview = async (req, res) => {
             firstName: parsed.firstName,
             lastName: parsed.lastName,
             name: externalFinalName,
+            designation: parsed.designation,
           };
           warnings.push(`External Final "${externalFinalName}" will be auto-created`);
         }
+      }
+
+      // ── Anomaly detection ────────────────────────────────
+      const anomalies = [];
+      if (studentMatch) {
+        const sid = studentMatch.user.id;
+        const existingDup = existingTheses.find(t => t.studentId === sid && t.title.toLowerCase() === title.toLowerCase());
+        if (existingDup) {
+          anomalies.push({ type: 'exact_duplicate', existingId: existingDup.id, message: `Exact duplicate — student already has thesis "${existingDup.title}"` });
+        } else {
+          const existingThesis = existingTheses.find(t => t.studentId === sid);
+          if (existingThesis) {
+            anomalies.push({ type: 'student_in_thesis', existingId: existingThesis.id, existingTitle: existingThesis.title, message: `Student already has active thesis "${existingThesis.title}"` });
+          }
+        }
+      }
+
+      if (anomalies.length) {
+        warnings.push(...anomalies.map(a => a.message));
       }
 
       preview.push({
@@ -320,6 +385,7 @@ exports.bulkImportPreview = async (req, res) => {
         externalFinalMatch: externalFinalMatch ? { id: externalFinalMatch.user.id, name: `${externalFinalMatch.user.firstName} ${externalFinalMatch.user.lastName}`, score: externalFinalMatch.score, status: 'matched' } : null,
         externalFinalWillCreate,
         warnings,
+        anomalies,
       });
     }
 
@@ -349,15 +415,63 @@ exports.bulkImportConfirm = async (req, res) => {
 
     for (const row of rows) {
       const {
+        _action,
+        _edits,
         studentMatch, supervisorMatch, supervisorWillCreate,
         externalMidTermMatch, externalMidTermWillCreate,
         externalFinalMatch, externalFinalWillCreate,
-        title, batch, cluster,
+        title: origTitle, batch: origBatch, cluster: origCluster,
       } = row;
 
-      if (!studentMatch?.id && !row.studentMatch?.id) {
-        skipped.push({ row: row.row, reason: 'No student matched' });
+      // Respect skip / delete action
+      if (_action === 'skip') {
+        skipped.push({ row: row.row, reason: 'Skipped by user' });
         continue;
+      }
+
+      // Apply edits
+      const title = _edits?.title ?? origTitle;
+      const batch = normalizeBatch(_edits?.batch ?? origBatch);
+      const cluster = _edits?.cluster ?? origCluster;
+
+      if (!studentMatch?.id && !row.studentMatch?.id) {
+        // Try auto-creating the student from _edits.student
+        const willCreate = _edits?.student;
+        const roll = _edits?.roll || row.roll;
+        if (willCreate?.firstName && willCreate?.lastName && roll) {
+          const email = roll.toLowerCase() + '@pcampus.edu.np';
+          const hash = await bcrypt.hash('subesh', 10);
+          // Derive programId from roll prefix
+          const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
+          const prog = rollProg ? await prisma.program.findFirst({ where: { code: rollProg } }) : null;
+          const newStudent = await prisma.user.upsert({
+            where: { email },
+            update: {},
+            create: {
+              email,
+              password: hash,
+              firstName: willCreate.firstName,
+              lastName: willCreate.lastName,
+              role: 'STUDENT',
+              rollNumber: roll,
+              degreeType: 'MASTER',
+              programId: prog?.id || undefined,
+              departmentId: req.user.departmentId,
+              active: true,
+            },
+          }).catch(() => null);
+          if (newStudent) {
+            row.studentMatch = { id: newStudent.id, name: `${willCreate.firstName} ${willCreate.lastName}` };
+            audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newStudent.id, details: `Auto-created MASTER student via thesis bulk import` });
+            emailService.notifyUserCreated(email, willCreate.firstName, 'STUDENT', email, 'subesh');
+          } else {
+            skipped.push({ row: row.row, reason: 'Student could not be auto-created' });
+            continue;
+          }
+        } else {
+          skipped.push({ row: row.row, reason: 'No student matched' });
+          continue;
+        }
       }
       if (!title) {
         skipped.push({ row: row.row, reason: 'No thesis title' });
@@ -371,22 +485,24 @@ exports.bulkImportConfirm = async (req, res) => {
         if (!willCreate) return null;
         try {
           const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-          const hash = await bcrypt.hash('password123', 10);
+           const hash = await bcrypt.hash('subesh', 10);
           const newUser = await prisma.user.upsert({
             where: { email },
             update: {},
-            create: {
-              email,
-              password: hash,
-              firstName: willCreate.firstName,
-              lastName: willCreate.lastName || willCreate.firstName,
-              role,
-              departmentId: req.user.departmentId,
-              active: true,
-            },
+          create: {
+            email,
+            password: hash,
+            firstName: willCreate.firstName,
+            lastName: willCreate.lastName || willCreate.firstName,
+            role,
+            designation: willCreate.designation || null,
+            departmentId: req.user.departmentId,
+            active: true,
+          },
           }).catch(() => null);
           if (newUser) {
             audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newUser.id, details: `Auto-created ${role} via bulk import` });
+            emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'subesh');
             return newUser.id;
           }
         } catch (e) {
@@ -397,18 +513,39 @@ exports.bulkImportConfirm = async (req, res) => {
 
       // Resolve supervisor: auto-create if needed
       let resolvedSupervisorId = supervisorMatch?.id || null;
+      if (resolvedSupervisorId) {
+        const sup = await prisma.user.findUnique({ where: { id: resolvedSupervisorId }, select: { role: true } });
+        if (sup && sup.role !== 'SUPERVISOR') {
+          skipped.push({ row: row.row, reason: `Matched supervisor "${supervisorMatch?.name}" is not a SUPERVISOR` });
+          continue;
+        }
+      }
       if (!resolvedSupervisorId && supervisorWillCreate) {
         resolvedSupervisorId = await autoCreateUser(supervisorWillCreate, 'SUPERVISOR');
       }
 
       // Resolve external mid-term: auto-create if needed
       let resolvedMidTermId = externalMidTermMatch?.id || null;
+      if (resolvedMidTermId) {
+        const exam = await prisma.user.findUnique({ where: { id: resolvedMidTermId }, select: { role: true } });
+        if (exam && exam.role !== 'EXTERNAL_EXAMINER') {
+          skipped.push({ row: row.row, reason: `Matched mid-term examiner "${externalMidTermMatch?.name}" is not an EXTERNAL_EXAMINER` });
+          continue;
+        }
+      }
       if (!resolvedMidTermId && externalMidTermWillCreate) {
         resolvedMidTermId = await autoCreateUser(externalMidTermWillCreate, 'EXTERNAL_EXAMINER');
       }
 
       // Resolve external final: auto-create if needed
       let resolvedFinalId = externalFinalMatch?.id || null;
+      if (resolvedFinalId) {
+        const exam = await prisma.user.findUnique({ where: { id: resolvedFinalId }, select: { role: true } });
+        if (exam && exam.role !== 'EXTERNAL_EXAMINER') {
+          skipped.push({ row: row.row, reason: `Matched final examiner "${externalFinalMatch?.name}" is not an EXTERNAL_EXAMINER` });
+          continue;
+        }
+      }
       if (!resolvedFinalId && externalFinalWillCreate) {
         resolvedFinalId = await autoCreateUser(externalFinalWillCreate, 'EXTERNAL_EXAMINER');
       }
@@ -420,9 +557,24 @@ exports.bulkImportConfirm = async (req, res) => {
           skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
           return null;
         }
-        if (coordinatorProgram && student.programId !== coordinatorProgram.id) {
+        if (coordinatorProgram && student.programId && student.programId !== coordinatorProgram.id) {
           skipped.push({ row: row.row, reason: 'Student belongs to another program' });
           return null;
+        }
+
+        // Fix student without a programId — derive from roll prefix
+        if (!student.programId) {
+          const roll = _edits?.roll || row.roll;
+          if (roll) {
+            const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
+            if (rollProg) {
+              const prog = await tx.program.findFirst({ where: { code: rollProg } });
+              if (prog) {
+                await tx.user.update({ where: { id: student.id }, data: { programId: prog.id } });
+                student.programId = prog.id;
+              }
+            }
+          }
         }
 
         // Check for active thesis within the transaction
@@ -499,6 +651,78 @@ exports.bulkImportConfirm = async (req, res) => {
         created.push(newThesis);
         return newThesis;
       });
+
+      // --- Notifications ---
+      if (thesis) {
+        try {
+          const student = await prisma.user.findUnique({
+            where: { id: effectiveStudentId },
+            select: { id: true, email: true, firstName: true, lastName: true },
+          });
+          const studentEmail = student?.email;
+          const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+
+          // In-app
+          if (student) {
+            notifSvc.notify(student.id, 'THESIS_CREATED',
+              `Your thesis "${title}" has been created.`);
+          }
+
+          if (resolvedSupervisorId) {
+            notifSvc.notify(resolvedSupervisorId, 'SUPERVISOR_ASSIGNMENT',
+              `${assignerName} assigned you as supervisor for thesis "${title}" — student: ${student?.firstName} ${student?.lastName}.`);
+          }
+
+          if (resolvedMidTermId) {
+            notifSvc.notify(resolvedMidTermId, 'EXAMINER_ASSIGNMENT',
+              `${assignerName} assigned you as Mid-Term Examiner for thesis "${title}" — student: ${student?.firstName} ${student?.lastName}.`);
+          }
+
+          if (resolvedFinalId) {
+            notifSvc.notify(resolvedFinalId, 'EXAMINER_ASSIGNMENT',
+              `${assignerName} assigned you as Final Examiner for thesis "${title}" — student: ${student?.firstName} ${student?.lastName}.`);
+          }
+
+          // Emails
+          const studentName = student ? `${student.firstName} ${student.lastName}` : '';
+
+          if (studentEmail) {
+            let supName = null;
+            if (resolvedSupervisorId) {
+              if (supervisorMatch) supName = supervisorMatch.name;
+              else if (supervisorWillCreate) supName = `${supervisorWillCreate.firstName} ${supervisorWillCreate.lastName}`.trim();
+            }
+            emailService.notifyThesisCreated(studentEmail, studentName, title, supName, cluster);
+          }
+
+          if (resolvedSupervisorId) {
+            const sup = await prisma.user.findUnique({ where: { id: resolvedSupervisorId }, select: { email: true, firstName: true, lastName: true } });
+            if (sup) {
+              emailService.notifySupervisorAssigned(
+                sup.email, `${sup.firstName} ${sup.lastName}`,
+                studentName, title,
+                [{ firstName: student?.firstName || '', lastName: student?.lastName || '', rollNumber: '' }]
+              );
+            }
+          }
+
+          if (resolvedMidTermId) {
+            const exam = await prisma.user.findUnique({ where: { id: resolvedMidTermId }, select: { email: true, firstName: true, lastName: true } });
+            if (exam) {
+              emailService.notifyExaminerAssigned(exam.email, `${exam.firstName} ${exam.lastName}`, title, studentName, 'thesis');
+            }
+          }
+
+          if (resolvedFinalId) {
+            const exam = await prisma.user.findUnique({ where: { id: resolvedFinalId }, select: { email: true, firstName: true, lastName: true } });
+            if (exam) {
+              emailService.notifyExaminerAssigned(exam.email, `${exam.firstName} ${exam.lastName}`, title, studentName, 'thesis');
+            }
+          }
+        } catch (e) {
+          console.error('notifications for thesis:', title, e.message);
+        }
+      }
     }
 
     audit.log({ action: 'CREATE', entity: 'Thesis', details: `Bulk imported ${created.length} theses${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });
@@ -625,7 +849,7 @@ exports.deleteThesis = async (req, res) => {
     const id = parseInt(req.params.id);
     const thesis = await prisma.thesis.findUnique({
       where: { id },
-      include: { proposals: true, evaluations: true },
+      include: { student: true, proposals: true, evaluations: true },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
@@ -776,10 +1000,12 @@ exports.updateThesis = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    const { title, description } = req.body;
+    const { title, description, startDate, endDate } = req.body;
     const data = {};
     if (title !== undefined) data.title = title;
     if (description !== undefined) data.description = description;
+    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     const thesis = await prisma.thesis.update({
       where: { id },
       data,

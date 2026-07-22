@@ -124,12 +124,6 @@ function ExternalEvaluationsList() {
         <TableSkeleton rows={5} cols={6} />
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-              <span className="material-symbols-outlined">upload_file</span>
-              Upload Excel
-            </button>
-          </div>
           <div className="tabs" style={{ marginBottom: 24 }}>
             <div className={`tab ${activeTab === 'groups' ? 'active' : ''}`} onClick={() => setActiveTab('groups')}>
               <span className="material-symbols-outlined">school</span> Bachelor Projects ({groups.length})
@@ -273,45 +267,6 @@ function ExternalEvaluationsList() {
         />
       )}
 
-      {showUpload && (
-        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">upload_file</span>
-              </div>
-              <div className="modal-header-text">
-                <h2>Upload Excel</h2>
-                <p>{activeTab === 'groups' ? 'Import groups from an Excel spreadsheet' : 'Import theses from an Excel spreadsheet'}</p>
-              </div>
-            </div>
-            <form onSubmit={handleFileUpload}>
-              {activeTab === 'groups' && (
-                <div className="form-group">
-                  <label>Project Type</label>
-                  <select value={uploadProjectType} onChange={e => setUploadProjectType(e.target.value)}>
-                    <option value="MINOR">Minor Project</option>
-                    <option value="MAJOR">Major Project</option>
-                  </select>
-                </div>
-              )}
-              <div className="form-group">
-                <label>Excel File (.xlsx)</label>
-                <input type="file" accept=".xlsx" onChange={e => setSelectedFile(e.target.files[0])} required />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowUpload(false)}>
-                  <span className="material-symbols-outlined">close</span>Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={uploading || !selectedFile}>
-                  <span className="material-symbols-outlined">{uploading ? 'progress_activity' : 'upload'}</span>
-                  {uploading ? 'Uploading...' : 'Upload'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </PageLayout>
     </ErrorBoundary>
   );

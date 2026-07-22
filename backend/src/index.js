@@ -138,6 +138,22 @@ app.get('/api/stats', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/download-template/:filename', authenticate, (req, res) => {
+  try {
+    const { filename } = req.params;
+    const allowed = ['bachelor_upload_template.xlsx', 'master_upload_template.xlsx', 'student_users_template.xlsx', 'supervisor_users_template.xlsx', 'external_users_template.xlsx'];
+    if (!allowed.includes(filename)) return res.status(400).json({ error: 'Invalid template filename' });
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    const filePath = path.join(__dirname, '..', 'excel-templates', filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Template not found' });
+    res.download(filePath, filename);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Thesis Management API is running' });
 });

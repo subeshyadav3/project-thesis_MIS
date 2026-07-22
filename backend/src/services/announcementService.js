@@ -1,7 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
 
-async function resolveAudience({ type, degreeType, programIds, studentIds, departmentId, academicYearId }) {
+const prisma = require('../utils/prisma');
+
+async function resolveAudience({ type, degreeType, programIds, studentIds, departmentId, academicYearId, batch }) {
   const filter = { role: 'STUDENT', active: true, departmentId };
 
   if (studentIds?.length) {
@@ -11,6 +11,23 @@ async function resolveAudience({ type, degreeType, programIds, studentIds, depar
   if (degreeType) filter.degreeType = degreeType;
   if (programIds?.length) {
     filter.programId = { in: programIds.map(Number) };
+  }
+
+  // Filter by batch if provided — match students whose batch field or rollNumber starts with the batch
+  if (batch?.trim()) {
+    const batchStr = batch.trim();
+    // Derive 3-digit short form (e.g., "2080" → "080") and 4-digit full form
+    const shortBatch = batchStr.length === 4 && batchStr.startsWith('2') ? batchStr.slice(1) : null;
+    filter.OR = [
+      { batch: batchStr },
+      { rollNumber: { startsWith: batchStr } },
+    ];
+    if (shortBatch) {
+      filter.OR.push(
+        { batch: shortBatch },
+        { rollNumber: { startsWith: shortBatch } },
+      );
+    }
   }
 
   return prisma.user.findMany({ where: filter, select: { id: true } });
@@ -34,6 +51,15 @@ async function listEligibleAnnouncementsForStudent(user) {
     if (a.type === 'MINOR' && user.degreeType !== 'BACHELOR') return false;
     if (a.type === 'MAJOR' && user.degreeType !== 'BACHELOR') return false;
     if (a.type === 'THESIS' && user.degreeType !== 'MASTER') return false;
+    // Batch filter — only show announcements for the student's batch
+    if (a.batch) {
+      const userBatch = user.batch || user.rollNumber?.slice(0, 3);
+      if (userBatch) {
+        // Normalize both sides to 4-digit before comparing (handles "080"/"2080" matching)
+        const n = (v) => /^\d{3}$/.test(v) ? `2${v}` : v;
+        if (n(a.batch) !== n(userBatch)) return false;
+      }
+    }
     return true;
   });
 }

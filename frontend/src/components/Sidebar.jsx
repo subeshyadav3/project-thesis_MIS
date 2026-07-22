@@ -59,10 +59,7 @@ function Sidebar({ user, isOpen, onClose }) {
             { path: '/student/theses', label: 'Theses', icon: 'library_books' },
           ]
     ),
-    ...(sType !== 'master'
-      ? [{ path: '/student/groups', label: 'Groups', icon: 'group_add' }]
-      : []
-    ),
+    { path: '/student/groups', label: sType === 'master' ? 'Thesis Formation' : 'Groups', icon: 'group_add' },
     { path: '/student/submissions', label: 'Project Submission', icon: 'upload_file' },
     { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
   ];

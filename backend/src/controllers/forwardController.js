@@ -1,7 +1,7 @@
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 
 exports.forwardToExamDept = async (req, res) => {
   try {

@@ -6,12 +6,28 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import api from '../../services/api';
 
+function getDeadlineInfo(expirationDate) {
+  if (!expirationDate) return null;
+  const now = new Date();
+  const deadline = new Date(expirationDate);
+  const diffMs = deadline - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+  if (diffMs < 0) return { expired: true, label: 'Deadline passed', urgent: false };
+  if (diffDays > 30) return { expired: false, label: `${deadline.toLocaleDateString()}`, urgent: false };
+  if (diffDays > 7) return { expired: false, label: `${diffDays} days left`, urgent: false };
+  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
+  if (diffHours >= 1) return { expired: false, label: `${diffHours} hours left`, urgent: true };
+  return { expired: false, label: 'Due soon', urgent: true };
+}
+
 function StudentSubmissions() {
   const [groups, setGroups] = useState([]);
   const [theses, setTheses] = useState([]);
   const [activeTab, setActiveTab] = useState('groups');
   const [selectedId, setSelectedId] = useState(null);
   const [proposals, setProposals] = useState([]);
+  const [announcement, setAnnouncement] = useState(null);
   const [uploading, setUploading] = useState({});
   const [loading, setLoading] = useState(true);
   const [viewerDoc, setViewerDoc] = useState(null);
@@ -25,16 +41,29 @@ function StudentSubmissions() {
     Promise.all([
       api.get('/students/groups').then(({ data }) => setGroups(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load groups'); setGroups([]); }),
       api.get('/students/theses').then(({ data }) => setTheses(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); }),
-    ]).finally(() => setLoading(false));
+    ]);
   }, []);
 
+  // Auto-select the correct tab once data loads: prefer 'theses' if only theses exist, else 'groups'
   useEffect(() => {
-    if (!selectedId) { setProposals([]); return; }
+    if (groups.length === 0 && theses.length > 0) {
+      setActiveTab('theses');
+    } else {
+      setActiveTab('groups');
+    }
+    setLoading(false);
+  }, [groups.length, theses.length]);
+
+  useEffect(() => {
+    if (!selectedId) { setProposals([]); setAnnouncement(null); return; }
     const isGroup = activeTab === 'groups';
     const endpoint = isGroup ? `/students/groups/${selectedId}` : `/students/theses/${selectedId}`;
     api.get(endpoint)
-      .then(({ data }) => setProposals(data.proposals || []))
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load proposals'); setProposals([]); });
+      .then(({ data }) => {
+        setProposals(data.proposals || []);
+        setAnnouncement(data.announcement || null);
+      })
+      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load proposals'); setProposals([]); setAnnouncement(null); });
   }, [selectedId, activeTab]);
 
   const items = activeTab === 'groups' ? groups : theses;
@@ -105,24 +134,27 @@ function StudentSubmissions() {
         </div>
       )}
 
-      {/* Assignment selector */}
-      {items.length > 1 && (
-        <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>{itemLabel}:</span>
-          <select
-            value={selectedId || ''}
-            onChange={e => setSelectedId(parseInt(e.target.value))}
-            className="input"
-            style={{ maxWidth: 400, padding: '6px 10px', fontSize: 13 }}
-          >
-            {items.map(i => (
-              <option key={i.id} value={i.id}>
-                {activeTab === 'groups' ? i.projectTitle : i.title} ({i.batch || '—'})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Assignment selector — always shown so user can pick which project/thesis to upload to */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
+            {activeTab === 'groups' ? 'school' : 'library_books'}
+          </span>
+          {itemLabel}:
+        </span>
+        <select
+          value={selectedId || ''}
+          onChange={e => setSelectedId(parseInt(e.target.value))}
+          className="input"
+          style={{ maxWidth: 400, padding: '6px 10px', fontSize: 13 }}
+        >
+          {items.map(i => (
+            <option key={i.id} value={i.id}>
+              {activeTab === 'groups' ? i.projectTitle : i.title} ({i.batch || '—'})
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {stages.map(stage => {
@@ -156,6 +188,22 @@ function StudentSubmissions() {
                   <span className="dot" />{existing?.documentUrl ? 'Uploaded' : 'Pending'}
                 </span>
               </div>
+
+              {announcement?.expirationDate && (() => {
+                const info = getDeadlineInfo(announcement.expirationDate);
+                if (!info) return null;
+                return (
+                  <div style={{
+                    padding: '6px 16px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
+                    background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'transparent',
+                    color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
+                    borderBottom: '1px solid var(--color-outline-variant)',
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'}</span>
+                    {info.label}
+                  </div>
+                );
+              })()}
 
               <div style={{ padding: 16 }}>
                 {existing?.documentUrl ? (

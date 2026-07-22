@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 const puppeteer = require('puppeteer-core');
 
 function esc(s) {
@@ -82,7 +82,7 @@ function buildBlankLines(count) {
   return out;
 }
 
-function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions) {
+function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions, supervisorDesignation) {
   const totalMarks = supCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -148,14 +148,14 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
     <div style="font-size:12px;margin-top:16px;">
       <strong>Examiner:</strong><br/>
       <strong>Name:</strong> ${esc(supervisor)}<br/>
-      <strong>Post:</strong> Supervisor<br/>
+      <strong>Post:</strong> ${esc(supervisorDesignation || 'Supervisor')}<br/>
       <strong>Organization:</strong> IOE<br/>
       <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
       <strong>Signature:</strong><br/>
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
 
@@ -217,8 +217,8 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
 
     <div style="font-size:12px;margin-top:16px;">
       <strong>Examiner:</strong><br/>
-      <strong>Name:</strong><br/>
-      <strong>Designation:</strong><br/>
+      <strong>Name:</strong> ${esc(extName || '')}<br/>
+      <strong>Designation:</strong> ${esc(extDesignation || '')}<br/>
       <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
       <strong>Signature:</strong><br/>
     </div>`;
@@ -230,7 +230,7 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
  * @param {'supervisor'|'external'|'both'} [scope='both'] - which evaluator pages to include
  */
 function buildMasterFormat(data, scope = 'both') {
-  const { title, name, supervisor, evaluations, student } = data;
+  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal } = data;
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
   const midEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_MIDTERM');
@@ -272,22 +272,27 @@ function buildMasterFormat(data, scope = 'both') {
   const includeExtFinal = scope === 'external-final' || scope === 'both';
 
   let pages = '';
+  const midExtName = externalMidTerm ? `${externalMidTerm.firstName} ${externalMidTerm.lastName}`.trim() : '';
+  const midExtDesignation = externalMidTerm?.designation || '';
+  const finalExtName = externalFinal ? `${externalFinal.firstName} ${externalFinal.lastName}`.trim() : '';
+  const finalExtDesignation = externalFinal?.designation || '';
+
   if (includeSup) {
     pages += `
     <div style="page-break-after:always;">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions)}
+      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation)}
     </div>`;
   }
   if (includeExt) {
     pages += `
     <div${includeSup ? ' style="page-break-after:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm')}
+      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation)}
     </div>`;
   }
   if (includeExtFinal) {
     pages += `
     <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final')}
+      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation)}
     </div>`;
   }
 
@@ -474,7 +479,9 @@ exports.printThesisEvaluation = async (req, res) => {
       where: { id },
       include: {
         student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, designation: true } },
+        externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
+        externalFinal: { select: { firstName: true, lastName: true, designation: true } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -487,6 +494,7 @@ exports.printThesisEvaluation = async (req, res) => {
       const e = evaluations.find(ev => ev.componentId === c.id);
       return {
         name: c.name,
+        evaluationType: c.evaluationType,
         evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
           : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
           : 'Coordinator',
@@ -504,8 +512,11 @@ exports.printThesisEvaluation = async (req, res) => {
       title: thesis.title,
       name: `${thesis.student.firstName} ${thesis.student.lastName}`,
       supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+      supervisorDesignation: thesis.supervisor?.designation || '',
       evaluations: evalData,
       student: thesis.student || null,
+      externalMidTerm: thesis.externalMidTerm || null,
+      externalFinal: thesis.externalFinal || null,
     }, scope);
 
     const pdf = await generatePdf(html);
@@ -587,7 +598,9 @@ exports.previewThesisEvaluation = async (req, res) => {
       where: { id },
       include: {
         student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, designation: true } },
+        externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
+        externalFinal: { select: { firstName: true, lastName: true, designation: true } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -600,6 +613,7 @@ exports.previewThesisEvaluation = async (req, res) => {
       const e = evaluations.find(ev => ev.componentId === c.id);
       return {
         name: c.name,
+        evaluationType: c.evaluationType,
         evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
           : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
           : 'Coordinator',
@@ -617,8 +631,11 @@ exports.previewThesisEvaluation = async (req, res) => {
       title: thesis.title,
       name: `${thesis.student.firstName} ${thesis.student.lastName}`,
       supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+      supervisorDesignation: thesis.supervisor?.designation || '',
       evaluations: evalData,
       student: thesis.student || null,
+      externalMidTerm: thesis.externalMidTerm || null,
+      externalFinal: thesis.externalFinal || null,
     }, scope);
 
     res.setHeader('Content-Type', 'text/html');

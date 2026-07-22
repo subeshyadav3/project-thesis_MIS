@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
+const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
@@ -25,7 +26,11 @@ function extractBatchFromRoll(rollNumber) {
   return match ? match[1] : null;
 }
 
-
+function extractProgramCodeFromRoll(roll) {
+  if (!roll) return null;
+  const code = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
+  return code || null;
+}
 
 function enrichWithComputedYearSemester(user) {
   if (user.role !== 'STUDENT' || !user.batch) return user;
@@ -67,16 +72,57 @@ exports.getUsers = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber } = req.body;
-    if (!email || !password || !firstName || !lastName || !role) {
-      return res.status(400).json({ error: 'email, password, firstName, lastName, and role are required' });
+    let email = (req.body.email || '').toString().trim().toLowerCase();
+    const { password, firstName, lastName, role, degreeType, departmentId, programId, designation, rollNumber } = req.body;
+    if (!password || !firstName || !lastName || !role) {
+      return res.status(400).json({ error: 'password, firstName, lastName, and role are required' });
     }
     if (!VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
     }
-    if (degreeType && !VALID_DEGREE_TYPES.includes(degreeType)) {
+
+    // Student roll & email enforcement
+    let resolvedRoll = (rollNumber || '').toString().trim();
+    let resolvedEmail = email;
+    let resolvedProgramId = programId ? parseInt(programId) : undefined;
+    let resolvedDegreeType = degreeType;
+
+    if (role === 'STUDENT') {
+      if (!resolvedRoll) {
+        return res.status(400).json({ error: 'rollNumber is required for students' });
+      }
+      // Auto-generate email from roll (ignore provided email for students)
+      resolvedEmail = resolvedRoll.toLowerCase() + '@pcampus.edu.np';
+      // Check roll uniqueness
+      const existingByRoll = await prisma.user.findFirst({ where: { rollNumber: resolvedRoll } });
+      if (existingByRoll) {
+        return res.status(400).json({ error: `Roll number "${resolvedRoll}" is already assigned to another student` });
+      }
+      // Derive program from roll prefix if not provided
+      if (!resolvedProgramId) {
+        const progCode = extractProgramCodeFromRoll(resolvedRoll);
+        if (progCode) {
+          const prog = await prisma.program.findFirst({ where: { code: { equals: progCode, mode: 'insensitive' } } });
+          if (prog) {
+            resolvedProgramId = prog.id;
+            if (!resolvedDegreeType) resolvedDegreeType = prog.degreeType;
+          }
+        }
+      }
+      // Fallback degree type
+      if (!resolvedDegreeType) resolvedDegreeType = 'BACHELOR';
+    }
+
+    if (resolvedDegreeType && !VALID_DEGREE_TYPES.includes(resolvedDegreeType)) {
       return res.status(400).json({ error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
     }
+
+    // Check email uniqueness
+    const existingByEmail = await prisma.user.findUnique({ where: { email: resolvedEmail } });
+    if (existingByEmail) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
+
     // Coordinator can only create users in their own department
     const targetDeptId = departmentId ? parseInt(departmentId) : req.user.departmentId;
     if (req.user.role === 'COORDINATOR' && targetDeptId !== req.user.departmentId) {
@@ -88,19 +134,23 @@ exports.createUser = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const batch = extractBatchFromRoll(rollNumber);
+    const batch = extractBatchFromRoll(resolvedRoll);
     const user = await prisma.user.create({
       data: {
-        email, password: hash, firstName, lastName, role, degreeType,
-        departmentId: targetDeptId, programId: programId ? parseInt(programId) : undefined,
-        designation, rollNumber, batch,
+        email: resolvedEmail, password: hash, firstName, lastName, role,
+        degreeType: resolvedDegreeType,
+        departmentId: targetDeptId, programId: resolvedProgramId,
+        designation, rollNumber: resolvedRoll, batch,
       },
       select: USER_SELECT,
     });
-  audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Created ${role} ${email}`, performedById: req.user.id });
+  audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Created ${role} ${resolvedEmail}`, performedById: req.user.id });
   try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
   res.status(201).json(user);
   } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'A user with this email or roll number already exists' });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -141,6 +191,18 @@ exports.updateUser = async (req, res) => {
     if (req.body.designation !== undefined) data.designation = req.body.designation;
     if (req.body.currentYear !== undefined) data.enrollmentYear = req.body.enrollmentYear ? parseInt(req.body.enrollmentYear) : null;
     if (req.body.currentSemester !== undefined) data.enrollmentSemester = req.body.enrollmentSemester ? parseInt(req.body.enrollmentSemester) : null;
+    if (req.body.rollNumber !== undefined) {
+      const newRoll = req.body.rollNumber.toString().trim();
+      if (newRoll) {
+        const dup = await prisma.user.findFirst({ where: { rollNumber: newRoll, id: { not: userId } } });
+        if (dup) return res.status(400).json({ error: `Roll number "${newRoll}" is already assigned to another student` });
+        data.rollNumber = newRoll;
+        data.batch = extractBatchFromRoll(newRoll);
+      } else {
+        data.rollNumber = null;
+        data.batch = null;
+      }
+    }
     const user = await prisma.user.update({
       where: { id: userId },
       data,
@@ -167,11 +229,57 @@ exports.deleteUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(existing.role)) {
       return res.status(403).json({ error: 'Cannot delete this user role' });
     }
+
+    // Check if user has active links
+    let groupCount = 0, thesisCount = 0, supervisedGroupCount = 0, supervisedThesisCount = 0, examAssignCount = 0;
+    
+    if (existing.role === 'STUDENT') {
+      [groupCount, thesisCount] = await Promise.all([
+        prisma.groupMember.count({ where: { studentId: userId } }),
+        prisma.thesis.count({ where: { studentId: userId } }),
+      ]);
+    } else if (existing.role === 'SUPERVISOR') {
+      [supervisedGroupCount, supervisedThesisCount] = await Promise.all([
+        prisma.projectGroup.count({ where: { supervisorId: userId } }),
+        prisma.thesis.count({ where: { supervisorId: userId } }),
+      ]);
+    } else if (existing.role === 'EXTERNAL_EXAMINER') {
+      examAssignCount = await prisma.examinerAssignment.count({ where: { externalExaminerId: userId } });
+    }
+
+    if (groupCount > 0 || thesisCount > 0 || supervisedGroupCount > 0 || supervisedThesisCount > 0 || examAssignCount > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete user with active assignments',
+        details: {
+          groups: groupCount,
+          theses: thesisCount,
+          supervisedGroups: supervisedGroupCount,
+          supervisedTheses: supervisedThesisCount,
+          examinerAssignments: examAssignCount,
+        },
+      });
+    }
+
     audit.log({ action: 'DELETE', entity: 'User', entityId: userId, details: `Deleted ${existing.role} ${existing.email}`, performedById: req.user.id });
-    await prisma.user.delete({ where: { id: userId } });
+    await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { userId: userId } }),
+      prisma.auditLog.deleteMany({ where: { performedById: userId } }),
+      prisma.evaluation.deleteMany({ where: { submittedById: userId } }),
+      prisma.evaluationComponent.deleteMany({ where: { createdById: userId } }),
+      prisma.recommendation.deleteMany({ where: { issuedById: userId } }),
+      prisma.assignmentRequest.deleteMany({ where: { fromCoordinatorId: userId } }),
+      prisma.assignmentRequest.deleteMany({ where: { toCoordinatorId: userId } }),
+      prisma.assignmentRequest.deleteMany({ where: { supervisorId: userId } }),
+      prisma.groupInvitation.deleteMany({ where: { inviterId: userId } }),
+      prisma.groupInvitation.deleteMany({ where: { inviteeId: userId } }),
+      prisma.announcement.deleteMany({ where: { createdById: userId } }),
+      prisma.examinerAssignment.deleteMany({ where: { assignedById: userId } }),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
     res.json({ message: 'User deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('deleteUser error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
 
@@ -280,7 +388,8 @@ exports.bulkCreateUsers = async (req, res) => {
     const errors = [];
 
     for (const u of users) {
-      const { email, password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
+      const { password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
+      const email = (u.email || '').toString().trim().toLowerCase();
       if (!email || !password || !firstName || !lastName || !role) {
         errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
         continue;
@@ -318,6 +427,7 @@ exports.bulkCreateUsers = async (req, res) => {
         created.push(user);
         audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Bulk created ${role} ${email}`, performedById: req.user.id });
         try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+        try { emailService.notifyUserCreated(email, firstName, role, email, password); } catch (e) { console.error(e.message); }
       } catch (err) {
         errors.push({ email, error: err.message });
       }
@@ -325,7 +435,8 @@ exports.bulkCreateUsers = async (req, res) => {
 
     res.status(201).json({
       message: `Successfully created ${created.length} user(s)`,
-      created: created.length,
+      created,
+      createdCount: created.length,
       failed: errors.length,
       errors,
     });
@@ -372,13 +483,20 @@ exports.bulkImportUsersExcel = async (req, res) => {
       return allPrograms.find(p => p.code.toLowerCase() === q || p.name.toLowerCase() === q) || null;
     };
 
+    // Pre-fetch all existing roll numbers for uniqueness check
+    const existingRolls = new Set();
+    if (role === 'STUDENT') {
+      const existing = await prisma.user.findMany({ where: { rollNumber: { not: null } }, select: { rollNumber: true } });
+      existing.forEach(u => existingRolls.add(u.rollNumber.toLowerCase()));
+    }
+
     const created = [];
     const errors = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2; // header is row 1
-      const email = (row.email || row.Email || '').toString().trim();
+      const email = (row.email || row.Email || '').toString().trim().toLowerCase();
       const password = (row.password || row.Password || '').toString().trim();
       const firstName = (row.firstName || row.FirstName || row['First Name'] || '').toString().trim();
       const lastName = (row.lastName || row.LastName || row['Last Name'] || '').toString().trim();
@@ -389,18 +507,37 @@ exports.bulkImportUsersExcel = async (req, res) => {
       let programId = row.programId ? parseInt(row.programId) : null;
 
       if (!email || !password || !firstName || !lastName) {
-        errors.push({ row: rowNum, email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName)' });
-        continue;
+        if (role !== 'STUDENT' || !firstName || !lastName) {
+          errors.push({ row: rowNum, email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName)' });
+          continue;
+        }
       }
 
       if (role === 'STUDENT') {
         if (!rollNumber) {
-          errors.push({ row: rowNum, email, error: 'rollNumber is required for students' });
+          errors.push({ row: rowNum, email: email || 'unknown', error: 'rollNumber is required for students' });
           continue;
         }
+        // Auto-generate email from roll (ignore provided email for students)
+        email = rollNumber.toLowerCase() + '@pcampus.edu.np';
+        // Roll uniqueness
+        if (existingRolls.has(rollNumber.toLowerCase())) {
+          errors.push({ row: rowNum, email, error: `Roll number "${rollNumber}" already exists` });
+          continue;
+        }
+        existingRolls.add(rollNumber.toLowerCase());
+
         if (!programId && programRaw) {
           const prog = findProgram(programRaw);
           if (prog) programId = prog.id;
+        }
+        // Derive program from roll prefix if still not resolved
+        if (!programId) {
+          const progCode = extractProgramCodeFromRoll(rollNumber);
+          if (progCode) {
+            const prog = findProgram(progCode);
+            if (prog) programId = prog.id;
+          }
         }
         if (!programId && coordinatorProgram) {
           programId = coordinatorProgram.id;
@@ -457,6 +594,7 @@ exports.bulkImportUsersExcel = async (req, res) => {
         created.push(user);
         audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Excel bulk created ${role} ${email}`, performedById: req.user.id });
         try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+        try { emailService.notifyUserCreated(email, firstName, role, email, password); } catch (e) { console.error(e.message); }
       } catch (err) {
         errors.push({ row: rowNum, email, error: err.message });
       }

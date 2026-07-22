@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');

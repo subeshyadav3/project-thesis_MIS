@@ -25,7 +25,12 @@ function MasterThesis() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+  const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [bulkEndDate, setBulkEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -45,6 +50,7 @@ function MasterThesis() {
   const [editFinalExamOpen, setEditFinalExamOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editStatus, setEditStatus] = useState('');
   const editSupRef = useRef(null);
   const editMidTermExamRef = useRef(null);
   const editFinalExamRef = useRef(null);
@@ -80,7 +86,36 @@ function MasterThesis() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-useEffect(() => {
+  const downloadEvalPdf = async (thesis) => {
+    try {
+      const { data } = await api.get(`/print/thesis/${thesis.id}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `thesis_evaluation_${thesis.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('Failed to download PDF');
+    }
+  };
+
+  const updateThesisStatus = async (thesisId, newStatus) => {
+    setUpdatingStatus(thesisId);
+    try {
+      await api.put(`/theses/${thesisId}/status`, { status: newStatus });
+      setTheses(prev => prev.map(t => t.id === thesisId ? { ...t, status: newStatus } : t));
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Status update failed');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  useEffect(() => {
     const handleClickOutside = (e) => {
       if (createSupRef.current && !createSupRef.current.contains(e.target)) {
         setCreateSupOpen(false);
@@ -216,7 +251,7 @@ const handleComplete = async (id) => {
         toast.success('Thesis created successfully');
       }
       setShowCreate(false);
-      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE' });
+      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -260,6 +295,21 @@ const handleComplete = async (id) => {
           promises.push(api.put(`/theses/${thesisId}/external-final`, { externalExaminerId: editFinalExamId ? parseInt(editFinalExamId) : null }));
         }
       }
+      if (editStatus && editStatus !== showDetail.status) {
+        promises.push(api.put(`/theses/${thesisId}/status`, { status: editStatus }));
+      }
+      if (editStartDate !== undefined) {
+        const current = showDetail.startDate ? new Date(showDetail.startDate).toISOString().split('T')[0] : '';
+        if (editStartDate !== current) {
+          promises.push(api.put(`/theses/${thesisId}`, { startDate: editStartDate || null }));
+        }
+      }
+      if (editEndDate !== undefined) {
+        const current = showDetail.endDate ? new Date(showDetail.endDate).toISOString().split('T')[0] : '';
+        if (editEndDate !== current) {
+          promises.push(api.put(`/theses/${thesisId}`, { endDate: editEndDate || null }));
+        }
+      }
       const results = await Promise.all(promises);
       const hasCrossProgram = results.some(r => r?.data?.crossProgram);
       if (hasCrossProgram) {
@@ -276,7 +326,10 @@ const handleComplete = async (id) => {
 
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {
-      const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.student?.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
@@ -319,6 +372,9 @@ const handleComplete = async (id) => {
     if (mode === 'edit') {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
+      setEditStatus(t.status || '');
+      setEditStartDate(t.startDate ? new Date(t.startDate).toISOString().split('T')[0] : '');
+      setEditEndDate(t.endDate ? new Date(t.endDate).toISOString().split('T')[0] : '');
       setEditSupId(t.supervisorId ? t.supervisorId.toString() : '');
       setEditMidTermExamId(t.externalMidTerm?.id?.toString() || '');
       setEditFinalExamId(t.externalFinal?.id?.toString() || '');
@@ -396,7 +452,11 @@ return (
                 <span className="material-symbols-outlined">library_books</span>
               </div>
               <div className="modal-header-text">
-                <h2>{showDetail.student?.firstName} {showDetail.student?.lastName}</h2>
+                <h2>
+                  {showDetail.student?.firstName} {showDetail.student?.lastName}
+                  {showDetail.student?.rollNumber ? ` (${showDetail.student?.rollNumber})` : ''}
+                  {showDetail.batch ? ` · Batch ${showDetail.batch}` : ''}
+                </h2>
                 <p>{showDetail.title}</p>
               </div>
             </div>
@@ -485,6 +545,7 @@ return (
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>Roll</th>
                     <th>Email</th>
                   </tr>
                 </thead>
@@ -498,6 +559,7 @@ return (
                         {showDetail.student?.firstName || ''} {showDetail.student?.lastName || ''}
                       </div>
                     </td>
+                    <td>{showDetail.student?.rollNumber || '—'}</td>
                     <td>{showDetail.student?.email || '—'}</td>
                   </tr>
                 </tbody>
@@ -515,6 +577,24 @@ return (
                   <div className="form-group" style={{ flex: 1, minWidth: 300 }}>
                     <label>Description</label>
                     <textarea className="form-input" rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Thesis description..." />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Status</label>
+                    <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                      <option value="PENDING">Pending</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="OVERDUE">Overdue</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Start Date</label>
+                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                    <input type="date" className="form-input" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+                    {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
@@ -745,20 +825,51 @@ return (
               <span className="material-symbols-outlined">play_arrow</span>
               Make Active
             </button>
-            <button className="btn btn-sm btn-danger" onClick={() => {
-              const pending = selectedTheses.filter(id => {
+            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <button className="btn btn-sm btn-primary" onClick={async () => {
+              if (!bulkEndDate) return toast.warning('Select an end date first');
+              try {
+                await Promise.all(selectedTheses.map(id => api.put(`/theses/${id}`, { endDate: bulkEndDate })));
+                toast.success(`End date set for ${selectedTheses.length} theses`);
+                setSelectedTheses([]);
+                setBulkEndDate('');
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+            }}>
+              <span className="material-symbols-outlined">calendar_month</span>
+              Set End Date
+            </button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const active = selectedTheses.filter(id => {
                 const t = theses.find(th => th.id === id);
-                return t && t.status === 'PENDING';
+                return t && (t.status === 'ACTIVE' || t.status === 'PENDING');
               });
-              if (pending.length === 0) return toast.warning('No pending theses selected');
+              if (active.length === 0) return toast.warning('No active/pending theses selected');
+              try {
+                await Promise.all(active.map(id => api.put(`/theses/${id}/status`, { status: 'COMPLETED' })));
+                toast.success(`Completed ${active.length} theses`);
+                setSelectedTheses([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk complete failed');
+              }
+            }}>
+              <span className="material-symbols-outlined">check_circle</span>
+              Mark Complete
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={() => {
+              const selected = selectedTheses;
+              if (selected.length === 0) return toast.warning('No theses selected');
               setConfirmDialog({
                 open: true,
                 title: 'Delete Theses',
-                message: `Are you sure you want to delete ${pending.length} pending theses? This cannot be undone.`,
+                message: `Are you sure you want to delete ${selected.length} theses? This cannot be undone.`,
                 onConfirm: async () => {
                   try {
-                    await Promise.all(pending.map(id => api.delete(`/theses/${id}`)));
-                    toast.success(`Deleted ${pending.length} theses`);
+                    const results = await Promise.allSettled(selected.map(id => api.delete(`/theses/${id}`)));
+                    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+                    const failed = results.filter(r => r.status === 'rejected').length;
+                    toast.success(`Deleted ${succeeded} theses${failed ? `, ${failed} failed` : ''}`);
                     setSelectedTheses([]);
                     setConfirmDialog(prev => ({ ...prev, open: false }));
                     loadData();
@@ -777,7 +888,7 @@ return (
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search theses, students, supervisors..." />
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by title, student, roll, email..." />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedTheses.length} theses</span>
@@ -858,10 +969,17 @@ return (
                     </td>
                     <td style={{ padding: '6px 10px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                        <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px', whiteSpace: 'nowrap' }}>
-                          <span className="dot" />
-                          {t.status || 'PENDING'}
-                        </span>
+                        <select value={t.status || 'PENDING'}
+                          onChange={e => updateThesisStatus(t.id, e.target.value)}
+                          disabled={updatingStatus === t.id}
+                          onClick={e => e.stopPropagation()}
+                          style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: t.status === 'COMPLETED' ? 'var(--color-success)' : t.status === 'OVERDUE' ? 'var(--color-error)' : t.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                        >
+                          <option value="PENDING">PENDING</option>
+                          <option value="ACTIVE">ACTIVE</option>
+                          <option value="OVERDUE">OVERDUE</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                        </select>
                         {t.crossProgramRequestedBy && (
                           <>
                             <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
@@ -922,6 +1040,10 @@ return (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(t)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
                                 PDF Preview
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => downloadEvalPdf(t)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                                Export PDF
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
@@ -1039,6 +1161,14 @@ return (
                   <option value="PENDING">Pending</option>
                   <option value="ACTIVE">Active</option>
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Start Date</label>
+                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
               <div className="form-group" ref={createSupRef}>
                 <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>

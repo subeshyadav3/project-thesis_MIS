@@ -9,6 +9,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
 
 const PAGE_SIZE = 10;
 
@@ -26,8 +27,11 @@ function BachelorProjects() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [bulkPreview, setBulkPreview] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [showReview, setShowReview] = useState(false);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
+  const [updatingStatus, setUpdatingStatus] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -48,6 +52,21 @@ function BachelorProjects() {
   const [editStatus, setEditStatus] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [bulkEndDate, setBulkEndDate] = useState('');
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [rowActions, setRowActions] = useState({});
+  const [rowEdits, setRowEdits] = useState({});
+
+  const skipCount = useMemo(() => {
+    return Object.values(rowActions).filter(v => v === 'skip').length;
+  }, [rowActions]);
+
+  const duplicateCount = useMemo(() => {
+    if (!bulkPreview?.preview) return 0;
+    return bulkPreview.preview.filter(p => p.anomalies?.some(a => a.type === 'exact_duplicate')).length;
+  }, [bulkPreview]);
   const editSupRef = useRef(null);
   const editExamRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -138,17 +157,53 @@ useEffect(() => {
     return () => document.removeEventListener('click', handleClick);
   }, [actionMenuRow]);
 
+  const updateGroupStatus = async (groupId, newStatus) => {
+    setUpdatingStatus(groupId);
+    try {
+      await api.put(`/groups/${groupId}/status`, { status: newStatus });
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: newStatus } : g));
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Status update failed');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const downloadEvalPdf = async (group) => {
+    try {
+      const { data } = await api.get(`/print/group/${group.id}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `evaluation_${group.name || group.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('Failed to download PDF');
+    }
+  };
+
   const resetUploadModal = () => {
     setSelectedFile(null);
     setBulkPreview(null);
     setBulkLoading(false);
+    setShowReview(false);
     setShowUpload(false);
+    setExpandedRow(null);
+    setRowActions({});
+    setRowEdits({});
   };
 
   const handleBulkPreview = async (e) => {
     e.preventDefault();
     if (!selectedFile) { toast.warning('Select a file'); return; }
     setBulkLoading(true);
+    setRowActions({});
+    setRowEdits({});
+    setExpandedRow(null);
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -161,26 +216,58 @@ useEffect(() => {
     }
   };
 
-  const handleBulkConfirm = async () => {
-    if (!bulkPreview?.preview) return;
-    setBulkLoading(true);
-    try {
-      const rows = bulkPreview.preview.map(p => ({
+  const hasPendingUsers = useMemo(() => {
+    if (!bulkPreview?.preview) return false;
+    return bulkPreview.preview.some(p => p.supervisorWillCreate || p.examinerWillCreate);
+  }, [bulkPreview]);
+
+  const handleReviewComplete = (updatedRows) => {
+    if (bulkPreview?.preview) {
+      setBulkPreview({ ...bulkPreview, preview: updatedRows });
+    }
+    setShowReview(false);
+  };
+
+  const handleBulkConfirm = async (rowsOverride) => {
+    const rows = rowsOverride || (bulkPreview?.preview || []).map(p => {
+      const action = rowActions[p.row];
+      let edits = rowEdits[p.row] ? { ...rowEdits[p.row] } : {};
+      // Auto-populate student edits from member names for unmatched students
+      p.studentMatches.forEach((sm, j) => {
+        if (sm) return;
+        const current = edits.students?.[j];
+        if (current?.firstName && current?.lastName) return;
+        if (!p.members[j]) return;
+        const parts = p.members[j].split(' ');
+        edits.students = { ...(edits.students || {}), [j]: { ...(current || {}), firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' } };
+      });
+      return {
+        _action: action,
+        _edits: edits,
         row: p.row,
-        groupName: p.groupName,
-        projectTitle: p.projectTitle,
+        groupName: edits?.groupName ?? p.groupName,
+        projectTitle: edits?.projectTitle ?? p.projectTitle,
+        projectType: edits?.projectType ?? p.projectType,
         members: p.members,
         rolls: p.rolls,
-        batch: p.batch,
+        batch: edits?.batch ?? p.batch,
         programId: p.programId,
         studentMatches: p.studentMatches,
         supervisorMatch: p.supervisorMatch,
         supervisorWillCreate: p.supervisorWillCreate,
         examinerMatch: p.examinerMatch,
         examinerWillCreate: p.examinerWillCreate,
-      }));
-      await api.post('/groups/bulk-import/confirm', { rows });
-      toast.success(`${bulkPreview.stats.matched} groups imported`);
+      };
+    });
+    if (rows.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await api.post('/groups/bulk-import/confirm', { rows });
+      const created = res.data?.created ?? bulkPreview.stats.matched;
+      const skipCount = res.data?.skipped?.length ?? 0;
+      let msg = `${created} imported`;
+      if (skipCount) msg += `, ${skipCount} skipped`;
+      toast.success(msg);
       resetUploadModal();
       loadData();
     } catch (err) {
@@ -271,6 +358,18 @@ useEffect(() => {
       if (editStatus && editStatus !== showDetail.status) {
         promises.push(api.put(`/groups/${groupId}/status`, { status: editStatus }));
       }
+      if (editStartDate !== undefined) {
+        const current = showDetail.startDate ? new Date(showDetail.startDate).toISOString().split('T')[0] : '';
+        if (editStartDate !== current) {
+          promises.push(api.put(`/groups/${groupId}`, { startDate: editStartDate || null }));
+        }
+      }
+      if (editEndDate !== undefined) {
+        const current = showDetail.endDate ? new Date(showDetail.endDate).toISOString().split('T')[0] : '';
+        if (editEndDate !== current) {
+          promises.push(api.put(`/groups/${groupId}`, { endDate: editEndDate || null }));
+        }
+      }
       await Promise.all(promises);
       toast.success('Changes saved successfully');
       setShowDetail(null);
@@ -289,9 +388,15 @@ useEffect(() => {
     const students = createForm.students.filter(s => s.studentId);
     try {
       const payload = {
-        ...createForm,
-        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
+        name: createForm.name,
+        projectTitle: createForm.projectTitle,
+        projectType: createForm.projectType,
+        status: createForm.status,
+        startDate: createForm.startDate || null,
+        batch: createForm.batch,
+        supervisorId: createForm.supervisorId,
         programId: user.program?.id,
+        students: students.map(s => ({ studentId: s.studentId, rollNumber: s.rollNumber })),
       };
       const { data: group } = await api.post('/groups', payload);
       if (createForm.examinerId) {
@@ -299,7 +404,7 @@ useEffect(() => {
       }
       toast.success('Group created successfully');
       setShowCreate(false);
-      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -349,9 +454,15 @@ const getMatchedStudent = (roll) => {
 const filteredGroups = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return groups;
-    return groups.filter(g =>
-      g.name.toLowerCase().includes(q) || (g.projectTitle || '').toLowerCase().includes(q)
-    );
+    return groups.filter(g => {
+      if (g.name.toLowerCase().includes(q) || (g.projectTitle || '').toLowerCase().includes(q)) return true;
+      return (g.members || []).some(m =>
+        (m.student?.firstName || '').toLowerCase().includes(q) ||
+        (m.student?.lastName || '').toLowerCase().includes(q) ||
+        (m.rollNumber || '').toLowerCase().includes(q) ||
+        (m.student?.email || '').toLowerCase().includes(q)
+      );
+    });
   }, [groups, searchQuery]);
 
   const filteredByAdvanced = useMemo(() => {
@@ -360,7 +471,7 @@ const filteredGroups = useMemo(() => {
         g.name + ' ' +
         g.projectTitle + ' ' +
         (g.supervisor ? `${g.supervisor.designation ? g.supervisor.designation + ' ' : ''}${g.supervisor.firstName} ${g.supervisor.lastName}` : '') + ' ' +
-        (g.members || []).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).join(' ')
+        (g.members || []).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''} ${m.rollNumber || ''} ${m.student?.email || ''}`).join(' ')
       ).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
@@ -420,6 +531,8 @@ const filteredGroups = useMemo(() => {
       setEditTitle(g.projectTitle || '');
       setEditDescription(g.description || '');
       setEditStatus(g.status || '');
+      setEditStartDate(g.startDate ? new Date(g.startDate).toISOString().split('T')[0] : '');
+      setEditEndDate(g.endDate ? new Date(g.endDate).toISOString().split('T')[0] : '');
     }
   };
 
@@ -592,15 +705,24 @@ const filteredGroups = useMemo(() => {
                     <label>Description</label>
                     <textarea className="form-input" rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)} placeholder="Project description..." />
                   </div>
-                  {showDetail.status === 'PENDING' && (
-                    <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
-                      <label>Status</label>
-                      <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-                        <option value="PENDING">Pending</option>
-                        <option value="ACTIVE">Active</option>
-                      </select>
-                    </div>
-                  )}
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Status</label>
+                    <select className="form-input" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                      <option value="PENDING">Pending</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="OVERDUE">Overdue</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Start Date</label>
+                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                    <input type="date" className="form-input" value={editEndDate} onChange={e => { setEditEndDate(e.target.value); }} />
+                    {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
+                  </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
                     <label>Supervisor</label>
                     <div className="sup-dropdown-trigger">
@@ -791,6 +913,36 @@ const filteredGroups = useMemo(() => {
               <span className="material-symbols-outlined">play_arrow</span>
               Make Active
             </button>
+            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <button className="btn btn-sm btn-primary" onClick={async () => {
+              if (!bulkEndDate) return toast.warning('Select an end date first');
+              try {
+                const ids = selectedGroups.map(g => g.id);
+                await Promise.all(ids.map(id => api.put(`/groups/${id}`, { endDate: bulkEndDate })));
+                toast.success(`End date set for ${ids.length} groups`);
+                setSelectedGroups([]);
+                setBulkEndDate('');
+                loadData();
+              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+            }}>
+              <span className="material-symbols-outlined">calendar_month</span>
+              Set End Date
+            </button>
+            <button className="btn btn-sm btn-success" onClick={async () => {
+              const active = selectedGroups.filter(g => g.status === 'ACTIVE' || g.status === 'PENDING');
+              if (active.length === 0) return toast.warning('No active/pending groups selected');
+              try {
+                await Promise.all(active.map(g => api.put(`/groups/${g.id}/status`, { status: 'COMPLETED' })));
+                toast.success(`Completed ${active.length} groups`);
+                setSelectedGroups([]);
+                loadData();
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Bulk complete failed');
+              }
+            }}>
+              <span className="material-symbols-outlined">check_circle</span>
+              Mark Complete
+            </button>
             <button className="btn btn-sm btn-danger" onClick={() => {
               const pending = selectedGroups.filter(g => g.status === 'PENDING');
               if (pending.length === 0) return toast.warning('No pending groups selected');
@@ -821,7 +973,7 @@ const filteredGroups = useMemo(() => {
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
-            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by group name or project title..." style={{ maxWidth: 320 }} />
+            <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by name, roll, email, or title..." style={{ maxWidth: 320 }} />
           </div>
           <div className="table-toolbar-right">
             <span className="font-label text-xs font-semibold text-on-surface-variant">{sortedGroups.length} groups</span>
@@ -894,11 +1046,17 @@ const filteredGroups = useMemo(() => {
                         {safeMembers(g).length}
                       </span>
                     </td>
-                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }}>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
-                        <span className="dot" />
-                        {g.status || 'PENDING'}
-                      </span>
+                    <td style={{ width: '1%', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
+                      <select value={g.status || 'PENDING'}
+                        onChange={e => updateGroupStatus(g.id, e.target.value)}
+                        disabled={updatingStatus === g.id}
+                        style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: g.status === 'COMPLETED' ? 'var(--color-success)' : g.status === 'OVERDUE' ? 'var(--color-error)' : g.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                      >
+                        <option value="PENDING">PENDING</option>
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="OVERDUE">OVERDUE</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                      </select>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
                       {g.batch || '—'}
@@ -927,6 +1085,10 @@ const filteredGroups = useMemo(() => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(g)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
                                 PDF Preview
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => downloadEvalPdf(g)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                                Export PDF
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: g.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteGroup(g.id); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (g.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (g.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
@@ -961,16 +1123,28 @@ const filteredGroups = useMemo(() => {
                 <span className="material-symbols-outlined">upload_file</span>
               </div>
               <div className="modal-header-text">
-                <h2>{bulkPreview ? 'Preview Import' : 'Bulk Upload Groups'}</h2>
+                <h2>{showReview ? 'Review Users to Create' : (bulkPreview ? 'Preview Import' : 'Bulk Upload Groups')}</h2>
                 <p>
-                  {bulkPreview
-                    ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched`
-                    : 'Upload Excel with Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner'}
+                  {showReview
+                    ? 'Edit user details before creating them'
+                    : bulkPreview
+                      ? `Found ${bulkPreview.stats.total} rows — ${bulkPreview.stats.matched} matched, ${bulkPreview.stats.unmatched} unmatched`
+                      : 'Required columns: Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner'}
                 </p>
               </div>
             </div>
 
-            {!bulkPreview ? (
+            {showReview ? (
+              <BulkPendingUsersModal
+                open
+                previewRows={bulkPreview.preview}
+                type="groups"
+                departmentId={user.departmentId}
+                onComplete={handleReviewComplete}
+                onBack={() => setShowReview(false)}
+                onClose={resetUploadModal}
+              />
+            ) : !bulkPreview ? (
               <form onSubmit={handleBulkPreview}>
                 <div className="form-group">
                   <label>Excel File (.xlsx)</label>
@@ -983,9 +1157,6 @@ const filteredGroups = useMemo(() => {
                     <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
                     {' '}Download blank template
                   </a>
-                  <span style={{ display: 'block', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
-                    Columns: Group Name, Project Title, Members, Roll Numbers, Batch, Supervisor, External Examiner
-                  </span>
                 </div>
                 <div className="modal-actions">
                   <button type="button" className="btn btn-outline" onClick={resetUploadModal}>
@@ -999,10 +1170,19 @@ const filteredGroups = useMemo(() => {
               </form>
             ) : (
               <div>
+                {/* Summary bar */}
+                <div style={{ display: 'flex', gap: 12, padding: '8px 0', fontSize: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--color-outline-variant)', marginBottom: 8 }}>
+                  <span>Total: <strong>{bulkPreview.preview.length}</strong></span>
+                  {duplicateCount > 0 && <span style={{ color: 'var(--color-error)' }}>Duplicates: <strong>{duplicateCount}</strong></span>}
+                  {skipCount > 0 && <span style={{ color: 'var(--color-warning)' }}>Skipped: <strong>{skipCount}</strong></span>}
+                  <span style={{ color: 'var(--color-success)' }}>Will import: <strong>{bulkPreview.preview.length - duplicateCount - skipCount}</strong></span>
+                </div>
+
                 <div style={{ maxHeight: 400, overflow: 'auto', marginBottom: 16 }}>
                   <table style={{ width: '100%', fontSize: 12 }}>
                     <thead>
                       <tr>
+                        <th style={{ width: 30 }}></th>
                         <th>#</th>
                         <th>Group</th>
                         <th>Title</th>
@@ -1010,30 +1190,229 @@ const filteredGroups = useMemo(() => {
                         <th>Students</th>
                         <th>Supervisor</th>
                         <th>Examiner</th>
+                        <th>Type</th>
                         <th>Batch</th>
+                        <th style={{ width: 60 }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {bulkPreview.preview.map(p => (
-                        <tr key={p.row} style={{ background: p.warnings.length ? 'var(--color-error-container)' : 'transparent' }}>
-                          <td>{p.row}</td>
-                          <td style={{ fontWeight: 600 }}>{p.groupName}</td>
-                          <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.projectTitle}</td>
-                          <td>{p.members.join(', ') || '—'}</td>
-                          <td>
-                            {p.studentMatches.filter(Boolean).length > 0
-                              ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatches.filter(Boolean).length} matched</span>
-                              : <span style={{ color: 'var(--color-error)' }}>?</span>
-                            }
-                            {p.studentMatches.filter(m => !m).length > 0 && (
-                              <span style={{ color: 'var(--color-error)', marginLeft: 4 }}>({p.studentMatches.filter(m => !m).length} missing)</span>
+                      {bulkPreview.preview.map(p => {
+                        const isSkipped = rowActions[p.row] === 'skip';
+                        const isExpanded = expandedRow === p.row;
+                        const edits = rowEdits[p.row] || {};
+                        const hasAnomaly = p.anomalies && p.anomalies.length > 0;
+                        const studentEdits = edits.students || {};
+
+                        const anomalyBadge = (a) => {
+                          const labels = {
+                            exact_duplicate: 'Duplicate',
+                            group_name_exists: 'Name taken',
+                            student_in_group: 'Student conflict',
+                          };
+                          const isError = a.type === 'exact_duplicate';
+                          const style = {
+                            background: isError ? 'var(--color-error)' : 'var(--color-warning)',
+                            color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
+                          };
+                          return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
+                        };
+
+                        const toggleExpand = () => setExpandedRow(isExpanded ? null : p.row);
+
+                        const setEdit = (field, value) => {
+                          setRowEdits(prev => ({
+                            ...prev,
+                            [p.row]: { ...(prev[p.row] || {}), [field]: value },
+                          }));
+                        };
+
+                        const setStudentEdit = (idx, field, value) => {
+                          setRowEdits(prev => {
+                            const row = prev[p.row] || {};
+                            const students = { ...(row.students || {}) };
+                            students[idx] = { ...(students[idx] || {}), [field]: value };
+                            return { ...prev, [p.row]: { ...row, students } };
+                          });
+                        };
+
+                        const toggleSkip = () => {
+                          setRowActions(prev => {
+                            const next = { ...prev };
+                            if (next[p.row] === 'skip') delete next[p.row];
+                            else next[p.row] = 'skip';
+                            return next;
+                          });
+                        };
+
+                        return (
+                          <React.Fragment key={p.row}>
+                            <tr style={{
+                              background: isSkipped ? 'var(--color-surface-variant)' : hasAnomaly ? 'var(--color-error-container)' : p.warnings.length ? 'var(--color-warning-container)' : 'transparent',
+                              opacity: isSkipped ? 0.5 : 1,
+                              cursor: 'pointer',
+                            }} onClick={toggleExpand}>
+                              <td>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>
+                                  {isExpanded ? 'expand_less' : 'expand_more'}
+                                </span>
+                              </td>
+                              <td>{p.row}</td>
+                              <td style={{ fontWeight: 600 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                  {hasAnomaly && p.anomalies.map(anomalyBadge)}
+                                  <span style={{ textDecoration: isSkipped ? 'line-through' : 'none' }}>
+                                    {edits.groupName || p.groupName}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edits.projectTitle || p.projectTitle}</td>
+                              <td>{p.members.join(', ') || '—'}</td>
+                              <td>
+                                {p.studentMatches.filter(Boolean).length > 0
+                                  ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatches.filter(Boolean).length} matched</span>
+                                  : <span style={{ color: 'var(--color-error)' }}>?</span>
+                                }
+                                {p.studentMatches.filter(m => !m).length > 0 && (
+                                  <span style={{ color: 'var(--color-error)', marginLeft: 4 }}>({p.studentMatches.filter(m => !m).length} missing)</span>
+                                )}
+                              </td>
+                              <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
+                              <td>{p.examinerMatch ? <span style={{ color: 'var(--color-success)' }}>{p.examinerMatch.name}</span> : p.examinerWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.examinerWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
+                              <td>
+                                <select value={(edits.projectType || p.projectType) || 'MINOR'}
+                                  onChange={e => { e.stopPropagation(); setEdit('projectType', e.target.value); }}
+                                  style={{ fontSize: 11, padding: '2px 4px' }}
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <option value="MINOR">Minor</option>
+                                  <option value="MAJOR">Major</option>
+                                </select>
+                              </td>
+                              <td>{edits.batch || p.batch || '—'}</td>
+                              <td onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                  <span
+                                    className="material-symbols-outlined"
+                                    style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }}
+                                    onClick={toggleSkip}
+                                    title={isSkipped ? 'Unskip' : 'Skip'}
+                                  >
+                                    {isSkipped ? 'undo' : 'delete'}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={11} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
+                                  {hasAnomaly && (
+                                    <div style={{ marginBottom: 8 }}>
+                                      {p.anomalies.map((a, ai) => (
+                                        <div key={ai} style={{ fontSize: 11, color: a.type === 'exact_duplicate' ? 'var(--color-error)' : 'var(--color-warning)', marginBottom: 2 }}>
+                                          ⚠ {a.message}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                                    <div>
+                                      <label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Group Name</label>
+                                      <input
+                                        type="text"
+                                        value={edits.groupName ?? p.groupName}
+                                        onChange={e => setEdit('groupName', e.target.value)}
+                                        style={{ fontSize: 12, padding: '4px 8px' }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Project Title</label>
+                                      <input
+                                        type="text"
+                                        value={edits.projectTitle ?? p.projectTitle}
+                                        onChange={e => setEdit('projectTitle', e.target.value)}
+                                        style={{ fontSize: 12, padding: '4px 8px', width: 200 }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Batch</label>
+                                      <input
+                                        type="text"
+                                        value={edits.batch ?? p.batch ?? ''}
+                                        onChange={e => setEdit('batch', e.target.value)}
+                                        style={{ fontSize: 12, padding: '4px 8px', width: 60 }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Project Type</label>
+                                      <select
+                                        value={edits.projectType || p.projectType || 'MINOR'}
+                                        onChange={e => setEdit('projectType', e.target.value)}
+                                        style={{ fontSize: 12, padding: '4px 8px' }}
+                                      >
+                                        <option value="MINOR">Minor</option>
+                                        <option value="MAJOR">Major</option>
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  {/* Per-student editor */}
+                                  <div style={{ marginTop: 12, borderTop: '1px solid var(--color-outline-variant)', paddingTop: 8 }}>
+                                    <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Members</label>
+                                    {p.members.map((name, j) => {
+                                      const origRoll = (p.rolls && p.rolls[j]) || '';
+                                      const se = studentEdits[j] || {};
+                                      const matched = p.studentMatches && p.studentMatches[j];
+                                      return (
+                                        <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                                          <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', width: 24 }}>#{j + 1}</span>
+                                          <input
+                                            type="text"
+                                            value={se.roll ?? origRoll}
+                                            onChange={e => setStudentEdit(j, 'roll', e.target.value)}
+                                            style={{ fontSize: 12, padding: '3px 6px', width: 110 }}
+                                            placeholder="Roll"
+                                          />
+                                          {matched ? (
+                                            <span style={{ fontSize: 11, color: 'var(--color-success)' }}>
+                                              {matched.name} ({origRoll}) ✅
+                                            </span>
+                                          ) : (
+                                            <span style={{ fontSize: 11, color: 'var(--color-error)' }}>
+                                              ❌ Not found —
+                                                <input
+                                                  type="text"
+                                                  value={se.firstName ?? (name.split(' ')[0] || '')}
+                                                  onChange={e => setStudentEdit(j, 'firstName', e.target.value)}
+                                                  style={{ fontSize: 12, padding: '3px 6px', width: 100, marginLeft: 4 }}
+                                                  placeholder="First"
+                                                />
+                                                <input
+                                                  type="text"
+                                                  value={se.lastName ?? (name.split(' ').slice(1).join(' ') || '')}
+                                                onChange={e => setStudentEdit(j, 'lastName', e.target.value)}
+                                                style={{ fontSize: 12, padding: '3px 6px', width: 100, marginLeft: 4 }}
+                                                placeholder="Last"
+                                              />
+                                              <span style={{ marginLeft: 4, color: 'var(--color-warning)', fontSize: 10 }}>(will auto-create)</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div style={{ marginTop: 8 }}>
+                                    <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                                      <input type="checkbox" checked={isSkipped} onChange={toggleSkip} />
+                                      Skip this row
+                                    </label>
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                          </td>
-                          <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
-                          <td>{p.examinerMatch ? <span style={{ color: 'var(--color-success)' }}>{p.examinerMatch.name}</span> : p.examinerWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.examinerWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
-                          <td>{p.batch || '—'}</td>
-                        </tr>
-                      ))}
+                          </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1041,9 +1420,14 @@ const filteredGroups = useMemo(() => {
                   <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
                     <span className="material-symbols-outlined">arrow_back</span>Back
                   </button>
-                  <button className="btn btn-primary" onClick={handleBulkConfirm} disabled={bulkLoading || bulkPreview.stats.matched === 0}>
+                  {hasPendingUsers && (
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowReview(true)}>
+                      <span className="material-symbols-outlined">person_add</span>Next — Create Users
+                    </button>
+                  )}
+                  <button className="btn btn-primary" onClick={() => handleBulkConfirm()} disabled={bulkLoading || bulkPreview.preview.length === 0}>
                     <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
-                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.stats.matched} groups`}
+                    {bulkLoading ? 'Importing...' : `Import ${bulkPreview.preview.length - duplicateCount - skipCount} groups`}
                   </button>
                 </div>
               </div>
@@ -1091,6 +1475,14 @@ const filteredGroups = useMemo(() => {
                 <label>Batch</label>
                 <input value={createForm.batch} onChange={e => setCreateForm({...createForm, batch: e.target.value})} placeholder="e.g. 080" />
                 <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Auto-derived from student roll numbers</span>
+              </div>
+              <div className="form-group">
+                <label>Start Date</label>
+                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
 
               <div className="form-group" ref={createSupRef}>

@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
@@ -53,6 +53,16 @@ ctrl.create = async (req, res) => {
     }
 
     if (isThesisAnnouncement) {
+      // Auto-detect batch from student's roll number
+      const studentBatch = req.user.batch || (() => {
+        const rollMatch = req.user.rollNumber?.match(/^(\d{2,3})/);
+        if (rollMatch) {
+          const digits = rollMatch[1];
+          return digits.length === 3 ? `2${digits}` : digits;
+        }
+        return null;
+      })();
+
       // Master thesis: single student, no group members/invitations
       const thesis = await prisma.thesis.create({
         data: {
@@ -61,6 +71,7 @@ ctrl.create = async (req, res) => {
           status: 'PENDING',
           studentId: req.user.id,
           announcementId: ann.id,
+          batch: studentBatch,
         },
       });
 

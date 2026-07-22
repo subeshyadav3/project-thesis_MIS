@@ -10,5 +10,7 @@ router.get('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.list);
 router.get('/:id', authorize('COORDINATOR', 'MAINTAINER', 'STUDENT'), ctrl.get);
 router.post('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.create);
 router.put('/:id/deactivate', authorize('COORDINATOR', 'MAINTAINER'), ctrl.deactivate);
+router.put('/:id', authorize('COORDINATOR', 'MAINTAINER'), ctrl.update);
+router.delete('/:id', authorize('COORDINATOR', 'MAINTAINER'), ctrl.delete);
 
 module.exports = router;
