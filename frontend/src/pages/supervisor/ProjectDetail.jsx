@@ -38,7 +38,6 @@ function ProjectDetail() {
   const [uploading, setUploading] = useState(false);
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
-  const [recommendationContent, setRecommendationContent] = useState('');
   const [issuingRecommendation, setIssuingRecommendation] = useState(false);
   const [showAllBreakdown, setShowAllBreakdown] = useState(false);
 
@@ -190,15 +189,13 @@ function ProjectDetail() {
   };
 
   const handleIssueRecommendation = async () => {
-    const content = recommendationContent.trim();
-    if (!content) return toast.warning('Write the recommendation first');
     setIssuingRecommendation(true);
     try {
-      const payload = { content };
+      const payload = {};
       if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
       await api.post('/supervisors/recommendation', payload);
-      toast.success('Recommendation issued');
-      setRecommendationContent(''); loadData();
+      toast.success('Recommendation issued — auto-generated from template');
+      loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed');
     } finally { setIssuingRecommendation(false); }
@@ -669,7 +666,7 @@ function ProjectDetail() {
 
         {/* ═══════════════ RECOMMENDATIONS TAB ═══════════════ */}
         {activeTab === 'recommendations' && (
-          <div style={{ display: 'grid', gridTemplateColumns: isSupervisor ? '1.5fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: (isSupervisor || isCoordinator) ? '1.5fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
             {/* Recommendation list */}
             <div className="card">
               <div className="card-header">
@@ -704,12 +701,32 @@ function ProjectDetail() {
                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.6, color: 'var(--color-on-surface)' }}>{r.content}</p>
+                        <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.6, color: 'var(--color-on-surface)' }}>
+                          {r.content.length > 200 ? r.content.slice(0, 200) + '...' : r.content}
+                        </p>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
                           Issued {new Date(r.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                           {' at '}
                           {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
+                          onClick={() => window.open(`/api/supervisors/recommendation/${r.id}/pdf`, '_blank')}
+                          title="View Recommendation PDF">
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                        </button>
+                        <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const a = document.createElement('a');
+                            a.href = `/api/supervisors/recommendation/${r.id}/pdf?download=true`;
+                            a.download = `recommendation_${r.id}.pdf`;
+                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                          }}
+                          title="Download PDF">
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                        </button>
                       </div>
                     </div>
                   ))
@@ -717,24 +734,26 @@ function ProjectDetail() {
               </div>
             </div>
 
-            {/* Issue recommendation form (supervisor only) */}
-            {isSupervisor && (
+            {/* Issue recommendation form (supervisor & coordinator) */}
+            {(isSupervisor || isCoordinator) && (
               <div className="card">
                 <div className="card-header">
                   <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>edit_note</span>Issue Recommendation</h3>
                 </div>
                 <div style={{ padding: '0 20px 20px' }}>
-                  <div className="form-group">
-                    <label style={{ fontSize: 12 }}>Letter of Recommendation</label>
-                    <textarea className="form-input" rows={8}
-                      placeholder="Write the recommendation letter for this student/group..."
-                      value={recommendationContent} onChange={e => setRecommendationContent(e.target.value)}
-                      style={{ minHeight: 180, resize: 'vertical', fontSize: 13 }}
-                    />
+                  <div style={{
+                    padding: 16, marginBottom: 16,
+                    borderRadius: 8, background: 'var(--color-surface-container-low)',
+                    border: '1px solid var(--color-outline-variant)',
+                    fontSize: 13, lineHeight: 1.6, color: 'var(--color-on-surface-variant)',
+                  }}>
+                    A professionally formatted Letter of Recommendation will be auto-generated from a
+                    standard university template. The letter will include the student/group name, project/thesis
+                    title, and other relevant details. You can preview and download the PDF after issuance.
                   </div>
                   <button className="btn btn-primary btn-block" onClick={handleIssueRecommendation}
-                    disabled={!recommendationContent.trim() || issuingRecommendation}>
-                    <span className="material-symbols-outlined">send</span>
+                    disabled={issuingRecommendation}>
+                    <span className="material-symbols-outlined">verified</span>
                     {issuingRecommendation ? 'Issuing...' : 'Issue Recommendation'}
                   </button>
                 </div>

@@ -21,8 +21,8 @@ function ExternalExaminerEvaluationPage() {
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const [feedbackComments, setFeedbackComments] = useState('');
-  const [feedbackSuggestions, setFeedbackSuggestions] = useState('');
+  // Separate feedback for each evaluation type (mid-term vs final)
+  const [feedbackState, setFeedbackState] = useState({});
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const toast = useToast();
@@ -39,12 +39,16 @@ function ExternalExaminerEvaluationPage() {
       .then(({ data }) => {
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
-        // Load existing feedback
+        // Load existing feedback per evaluation type
+        const fb = {};
         const evals = data.evaluations || [];
-        const existingComments = evals.map(e => e.comments).filter(Boolean).join('\n');
-        const existingSuggestions = evals.map(e => e.suggestions).filter(Boolean).join('\n');
-        if (existingComments) setFeedbackComments(existingComments);
-        if (existingSuggestions) setFeedbackSuggestions(existingSuggestions);
+        evals.forEach(e => {
+          const typeKey = e.evaluationType || 'EXTERNAL_EXAMINER';
+          if (!fb[typeKey]) fb[typeKey] = { comments: '', suggestions: '' };
+          if (e.comments) fb[typeKey].comments = e.comments;
+          if (e.suggestions) fb[typeKey].suggestions = e.suggestions;
+        });
+        setFeedbackState(fb);
       })
       .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
       .finally(() => setLoading(false));
@@ -83,19 +87,22 @@ function ExternalExaminerEvaluationPage() {
     }
   };
 
-  const handleSaveFeedback = async () => {
-    if (!feedbackComments.trim() && !feedbackSuggestions.trim()) {
+  const handleSaveFeedback = async (typeKey) => {
+    const fb = feedbackState[typeKey] || { comments: '', suggestions: '' };
+    if (!fb.comments.trim() && !fb.suggestions.trim()) {
       toast.warning('Please enter comments or suggestions');
       return;
     }
     setSavingFeedback(true);
     try {
-      for (const comp of currentUserComponents) {
+      // Save feedback to all components of this evaluation type
+      const comps = currentUserComponents.filter(c => c.evaluationType === typeKey || (typeKey === 'EXTERNAL_EXAMINER' && !c.evaluationType));
+      for (const comp of comps) {
         const payload = {
           componentId: comp.id,
           marks: evaluationForComponent(comp.id)?.marks ?? null,
-          comments: feedbackComments || null,
-          suggestions: feedbackSuggestions || null,
+          comments: fb.comments || null,
+          suggestions: fb.suggestions || null,
         };
         if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
         await api.post('/evaluations/marks', payload);
@@ -396,39 +403,107 @@ function ExternalExaminerEvaluationPage() {
                 </table>
               </div>
 
-              {/* Compact feedback section */}
-              <div className="card" style={{ marginBottom: 24 }}>
-                <div style={{
-                  padding: '12px 20px',
-                  borderBottom: '1px solid var(--color-outline-variant)',
-                }}>
-                  <h3 style={{ margin: 0, fontSize: 14 }}>Feedback</h3>
-                </div>
-                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                      <textarea rows={2} value={feedbackComments} onChange={e => setFeedbackComments(e.target.value)}
-                        placeholder="Comments..."
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
-                      />
+              {/* Per-type feedback sections */}
+              {(type === 'thesis' && (externalType === 'BOTH' || externalType === 'MIDTERM' || externalType === 'FINAL')) ? (
+                (externalType === 'BOTH'
+                  ? ['EXTERNAL_MIDTERM', 'EXTERNAL_FINAL']
+                  : externalType === 'MIDTERM'
+                    ? ['EXTERNAL_MIDTERM']
+                    : ['EXTERNAL_FINAL']
+                ).map(typeKey => {
+                  const fb = feedbackState[typeKey] || { comments: '', suggestions: '' };
+                  const sectionLabel = typeKey === 'EXTERNAL_MIDTERM' ? 'External (Mid-Term)' : 'External (Final)';
+                  return (
+                    <div key={typeKey} className="card" style={{ marginBottom: 24 }}>
+                      <div style={{
+                        padding: '12px 20px',
+                        borderBottom: '1px solid var(--color-outline-variant)',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <span style={{
+                          display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                          background: typeKey === 'EXTERNAL_MIDTERM' ? 'var(--color-info)' : 'var(--color-warning)',
+                        }} />
+                        <h3 style={{ margin: 0, fontSize: 14 }}>{sectionLabel} Feedback</h3>
+                      </div>
+                      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                          <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                            <textarea rows={2} value={fb.comments}
+                              onChange={e => setFeedbackState(prev => ({
+                                ...prev,
+                                [typeKey]: { ...(prev[typeKey] || { comments: '', suggestions: '' }), comments: e.target.value },
+                              }))}
+                              placeholder={`Comments (${sectionLabel})...`}
+                              style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
+                            />
+                          </div>
+                          <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                            <textarea rows={2} value={fb.suggestions}
+                              onChange={e => setFeedbackState(prev => ({
+                                ...prev,
+                                [typeKey]: { ...(prev[typeKey] || { comments: '', suggestions: '' }), suggestions: e.target.value },
+                              }))}
+                              placeholder={`Suggestions (${sectionLabel})...`}
+                              style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button className="btn btn-primary btn-sm" onClick={() => handleSaveFeedback(typeKey)} disabled={savingFeedback}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                              {savingFeedback ? 'progress_activity' : 'save'}
+                            </span>
+                            {savingFeedback ? 'Saving...' : `Save ${sectionLabel} Feedback`}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                      <textarea rows={2} value={feedbackSuggestions} onChange={e => setFeedbackSuggestions(e.target.value)}
-                        placeholder="Suggestions..."
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
-                      />
+                  );
+                })
+              ) : (
+                /* Bachelor groups / single-type external — single feedback section */
+                <div className="card" style={{ marginBottom: 24 }}>
+                  <div style={{
+                    padding: '12px 20px',
+                    borderBottom: '1px solid var(--color-outline-variant)',
+                  }}>
+                    <h3 style={{ margin: 0, fontSize: 14 }}>Feedback</h3>
+                  </div>
+                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                        <textarea rows={2} value={(feedbackState['EXTERNAL_EXAMINER'] || { comments: '' }).comments}
+                          onChange={e => setFeedbackState(prev => ({
+                            ...prev,
+                            EXTERNAL_EXAMINER: { ...(prev['EXTERNAL_EXAMINER'] || { comments: '', suggestions: '' }), comments: e.target.value },
+                          }))}
+                          placeholder="Comments..."
+                          style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                        <textarea rows={2} value={(feedbackState['EXTERNAL_EXAMINER'] || { suggestions: '' }).suggestions}
+                          onChange={e => setFeedbackState(prev => ({
+                            ...prev,
+                            EXTERNAL_EXAMINER: { ...(prev['EXTERNAL_EXAMINER'] || { comments: '', suggestions: '' }), suggestions: e.target.value },
+                          }))}
+                          placeholder="Suggestions..."
+                          style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-outline)', fontSize: 13, resize: 'vertical' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => handleSaveFeedback('EXTERNAL_EXAMINER')} disabled={savingFeedback}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                          {savingFeedback ? 'progress_activity' : 'save'}
+                        </span>
+                        {savingFeedback ? 'Saving...' : 'Save'}
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="btn btn-primary btn-sm" onClick={handleSaveFeedback} disabled={savingFeedback}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                        {savingFeedback ? 'progress_activity' : 'save'}
-                      </span>
-                      {savingFeedback ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 
@@ -450,6 +525,7 @@ function ExternalExaminerEvaluationPage() {
         onSave={() => { loadData(); }}
         {...(type === 'thesis' && externalType === 'FINAL' ? { initialScope: 'external-final' }
           : type === 'thesis' && externalType === 'MIDTERM' ? { initialScope: 'external' }
+          : type === 'thesis' && externalType === 'BOTH' ? { initialScope: 'both', hideScopeSelector: true }
           : {})}
       />
     )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { downloadFile } from '../utils/download';
 import DocumentViewer from './DocumentViewer';
 import AiAssistantModal from './AiAssistantModal';
@@ -17,16 +17,26 @@ const STAGE_ICON = {
   FINAL: 'flag',
 };
 
+const ROLE_COLORS = {
+  SUPERVISOR: { bg: '#e8f5e9', color: '#2e7d32', label: 'Supervisor' },
+  COORDINATOR: { bg: '#e3f2fd', color: '#1565c0', label: 'Coordinator' },
+  EXTERNAL_EXAMINER: { bg: '#fff3e0', color: '#e65100', label: 'External' },
+};
+
 function ProposalsSection({ proposals = [], title = 'Submitted Documents', user }) {
   const [viewerDoc, setViewerDoc] = useState(null);
   const [aiProposal, setAiProposal] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
+  const [editInputs, setEditInputs] = useState({});
+  const [editingId, setEditingId] = useState(null);
   const [savingComments, setSavingComments] = useState({});
+  const [commentsMap, setCommentsMap] = useState({});
+  const [loadingComments, setLoadingComments] = useState({});
+  const [deletingComment, setDeletingComment] = useState(null);
   const toast = useToast();
 
   const canComment = user && ['SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'].includes(user.role);
   const openAI = canComment;
-  const userRole = user?.role;
 
   const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const byStage = stages.reduce((acc, stage) => {
@@ -36,18 +46,76 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
 
   const hasAny = Object.values(byStage).some(arr => arr.length > 0);
 
-  const handleSaveComment = async (proposalId) => {
-    const comment = commentInputs[proposalId]?.trim();
-    if (!comment) return;
+  // Load comments for latest proposal of each stage
+  const loadComments = useCallback(async (proposalId) => {
+    if (!proposalId) return;
+    setLoadingComments(prev => ({ ...prev, [proposalId]: true }));
+    try {
+      const { data } = await api.get(`/proposals/${proposalId}/comments`);
+      setCommentsMap(prev => ({ ...prev, [proposalId]: data }));
+    } catch (err) {
+      // silently fail
+    } finally {
+      setLoadingComments(prev => ({ ...prev, [proposalId]: false }));
+    }
+  }, []);
+
+  // Auto-load comments for all latest proposals
+  useEffect(() => {
+    stages.forEach(stage => {
+      const docs = byStage[stage];
+      const latest = docs?.[0];
+      if (latest && !commentsMap[latest.id] && !loadingComments[latest.id]) {
+        loadComments(latest.id);
+      }
+    });
+  }, [proposals.length]);
+
+  const handleAddComment = async (proposalId) => {
+    const content = commentInputs[proposalId]?.trim();
+    if (!content) return;
     setSavingComments(prev => ({ ...prev, [proposalId]: true }));
     try {
-      await api.put(`/proposals/${proposalId}/comment`, { comment });
-      toast.success('Feedback saved');
+      await api.post(`/proposals/${proposalId}/comments`, { content });
+      toast.success('Feedback added');
       setCommentInputs(prev => ({ ...prev, [proposalId]: '' }));
+      loadComments(proposalId);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save feedback');
+      toast.error(err.response?.data?.error || 'Failed to add feedback');
     } finally {
       setSavingComments(prev => ({ ...prev, [proposalId]: false }));
+    }
+  };
+
+  const handleUpdateComment = async (proposalId, commentId) => {
+    const content = editInputs[commentId]?.trim();
+    if (!content) return;
+    setSavingComments(prev => ({ ...prev, [commentId]: true }));
+    try {
+      await api.put(`/proposals/${proposalId}/comments/${commentId}`, { content });
+      toast.success('Feedback updated');
+      setEditingId(null);
+      setEditInputs(prev => ({ ...prev, [commentId]: '' }));
+      loadComments(proposalId);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update feedback');
+    } finally {
+      setSavingComments(prev => ({ ...prev, [commentId]: false }));
+    }
+  };
+
+  const handleDeleteComment = async (proposalId, commentId) => {
+    if (deletingComment === commentId) return;
+    if (!window.confirm('Delete this feedback? This cannot be undone.')) return;
+    setDeletingComment(commentId);
+    try {
+      await api.delete(`/proposals/${proposalId}/comments/${commentId}`);
+      toast.success('Feedback deleted');
+      loadComments(proposalId);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete feedback');
+    } finally {
+      setDeletingComment(null);
     }
   };
 
@@ -107,6 +175,8 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                   const ext = doc.documentUrl?.match(/\.(\w+)$/)?.[1] || 'pdf';
                   const fileName = `${stageLabel}_v${docs.length - idx}.${ext}`;
                   const isLatest = idx === 0;
+                  const comments = commentsMap[doc.id] || [];
+
                   return (
                     <div key={doc.id} style={{
                       borderBottom: idx < docs.length - 1 ? '1px solid var(--color-surface-container-low)' : 'none',
@@ -179,38 +249,104 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                         </div>
                       </div>
 
-                      {/* Existing feedback */}
-                      {doc.supervisorComment && (
-                        <div style={{ padding: '8px 12px 8px 58px', background: 'var(--color-tertiary-container)' }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-on-tertiary-container)', marginBottom: 2 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 2 }}>chat</span>
-                            Feedback
+                      {/* Multiple comments section */}
+                      <div style={{ padding: '8px 12px 8px 58px' }}>
+                        {/* Existing comments list */}
+                        {loadingComments[doc.id] ? (
+                          <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', padding: '8px 0' }}>Loading feedback...</div>
+                        ) : comments.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                            {comments.map(comment => {
+                              const roleStyle = ROLE_COLORS[comment.author?.role] || ROLE_COLORS.SUPERVISOR;
+                              const isOwn = user?.id === comment.authorId;
+                              const canEdit = isOwn || ['COORDINATOR', 'MAINTAINER'].includes(user?.role);
+                              const isEditing = editingId === comment.id;
+                              return (
+                                <div key={comment.id} style={{
+                                  padding: '10px 12px', borderRadius: 8,
+                                  background: 'var(--color-surface-container-low)',
+                                  border: '1px solid var(--color-outline-variant)',
+                                  position: 'relative',
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <span style={{
+                                      fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                                      background: roleStyle.bg, color: roleStyle.color,
+                                      fontWeight: 600,
+                                    }}>
+                                      {comment.author?.firstName} {comment.author?.lastName} · {roleStyle.label}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>
+                                      {new Date(comment.createdAt).toLocaleDateString()} {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    <div style={{ flex: 1 }} />
+                                    {canEdit && (
+                                      <>
+                                        {isEditing ? (
+                                          <span style={{ fontSize: 11, color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600 }}
+                                            onClick={() => { setEditingId(null); setEditInputs(prev => ({ ...prev, [comment.id]: '' })); }}>
+                                            Cancel
+                                          </span>
+                                        ) : (
+                                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', cursor: 'pointer' }}
+                                            onClick={() => { setEditingId(comment.id); setEditInputs(prev => ({ ...prev, [comment.id]: comment.content })); }}
+                                            title="Edit">
+                                            edit
+                                          </span>
+                                        )}
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-error)', cursor: 'pointer', opacity: deletingComment === comment.id ? 0.5 : 1 }}
+                                          onClick={() => handleDeleteComment(doc.id, comment.id)}
+                                          title="Delete">
+                                          delete
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {isEditing ? (
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                                      <textarea
+                                        value={editInputs[comment.id] ?? comment.content}
+                                        onChange={e => setEditInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                                        style={{ flex: 1, minHeight: 36, fontSize: 12, padding: '6px 8px', resize: 'vertical' }}
+                                      />
+                                      <button
+                                        className="btn btn-sm btn-primary"
+                                        onClick={() => handleUpdateComment(doc.id, comment.id)}
+                                        disabled={!editInputs[comment.id]?.trim() || savingComments[comment.id]}
+                                        style={{ whiteSpace: 'nowrap', padding: '6px 10px' }}
+                                      >
+                                        {savingComments[comment.id] ? '...' : 'Save'}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{comment.content}</p>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-on-tertiary-container)' }}>{doc.supervisorComment}</p>
-                        </div>
-                      )}
+                        ) : null}
 
-                      {/* Comment input for supervisors/coordinators/examiners */}
-                      {canComment && isLatest && (
-                        <div style={{ padding: '8px 12px 12px 58px', background: 'var(--color-surface-container-low)' }}>
+                        {/* New comment input — only on latest version */}
+                        {canComment && isLatest && (
                           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                             <textarea
                               value={commentInputs[doc.id] ?? ''}
                               onChange={e => setCommentInputs(prev => ({ ...prev, [doc.id]: e.target.value }))}
-                              placeholder={doc.supervisorComment ? 'Update your feedback...' : 'Add feedback on this document...'}
+                              placeholder="Add feedback on this document..."
                               style={{ flex: 1, minHeight: 40, fontSize: 12, padding: '6px 8px', resize: 'vertical' }}
                             />
                             <button
                               className="btn btn-sm btn-primary"
-                              onClick={() => handleSaveComment(doc.id)}
+                              onClick={() => handleAddComment(doc.id)}
                               disabled={!commentInputs[doc.id]?.trim() || savingComments[doc.id]}
                               style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}
                             >
                               {savingComments[doc.id] ? 'Saving...' : 'Send'}
                             </button>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}

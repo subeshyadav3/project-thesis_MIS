@@ -5,7 +5,7 @@ import api from '../services/api';
 const ROLE_LABEL = { SUPERVISOR: 'Supervisor', EXTERNAL_EXAMINER: 'External Examiner' };
 
 /** Editable review surface shared by coordinators, supervisors and externals. */
-export default function EvaluationPdfPreview({ type, id, onClose, onSave, initialScope }) {
+export default function EvaluationPdfPreview({ type, id, onClose, onSave, initialScope, hideScopeSelector }) {
   const [item, setItem] = useState(null);
   const [previewHtml, setPreviewHtml] = useState('');
   const [loading, setLoading] = useState(true);
@@ -15,8 +15,12 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   const [error, setError] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isScopeLocked = !!initialScope;
-  // Auto-detect: if initialScope is 'external' but current user is the thesis's final external examiner, default to external-final
+  // Auto-detect the correct scope for external examiners
   const computedInitial = useMemo(() => {
+    if (user.role === 'EXTERNAL_EXAMINER' && initialScope === 'both') {
+      // External with both mid and final roles: use external-both scope
+      return 'external-both';
+    }
     if (initialScope === 'external') {
       if (user.role === 'EXTERNAL_EXAMINER' && item) {
         if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
@@ -34,10 +38,10 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
 
   // Keep scope in sync when computedInitial changes (data loads)
   useEffect(() => {
-    if (computedInitial && isScopeLocked) {
+    if (computedInitial && (isScopeLocked || hideScopeSelector)) {
       setPdfScope(computedInitial);
     }
-  }, [computedInitial, isScopeLocked]);
+  }, [computedInitial, isScopeLocked, hideScopeSelector]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +70,8 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             ? c.evaluatorRole === 'SUPERVISOR'
             : pdfScope === 'external'
               ? c.evaluationType === 'EXTERNAL_MIDTERM'
+              : pdfScope === 'external-both'
+                ? (c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL')
               : c.evaluationType === 'EXTERNAL_FINAL'
         )
       : components;
@@ -187,17 +193,23 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>{type === 'group' ? item?.projectTitle || 'Project' : item?.title || 'Thesis'}</h3>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{type === 'group' ? item?.name : `${item?.student?.firstName || ''} ${item?.student?.lastName || ''}`}</p>
 
-            {/* Scope selector: only for master thesis, hidden when locked */}
-            {type === 'thesis' && !isScopeLocked && (
+            {/* Scope selector: only for master thesis, hidden when locked or hidden by parent */}
+            {type === 'thesis' && !isScopeLocked && !hideScopeSelector && (
               <div style={{ marginBottom: 14, padding: 10, background: 'var(--color-surface-container-low)', borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Print scope</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {[
-                    { value: 'supervisor', label: 'Supervisor' },
-                    { value: 'external', label: 'External (Mid-Term)' },
-                    { value: 'external-final', label: 'External (Final)' },
-                    { value: 'both', label: 'All Pages' },
-                  ].map(opt => (
+                  {(user.role === 'EXTERNAL_EXAMINER'
+                    ? [
+                        { value: 'external', label: 'External (Mid-Term)' },
+                        { value: 'external-final', label: 'External (Final)' },
+                      ]
+                    : [
+                        { value: 'supervisor', label: 'Supervisor' },
+                        { value: 'external', label: 'External (Mid-Term)' },
+                        { value: 'external-final', label: 'External (Final)' },
+                        { value: 'both', label: 'All Pages' },
+                      ]
+                  ).map(opt => (
                     <button key={opt.value}
                       onClick={() => setPdfScope(opt.value)}
                       style={{
@@ -227,7 +239,8 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {displayedRoles.map((role, ri) => {
               const components = groupedByRole[role];
               // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
-              const sections = role === 'EXTERNAL_EXAMINER' && pdfScope === 'both'
+              const shouldShowBothExt = role === 'EXTERNAL_EXAMINER' && (pdfScope === 'both' || pdfScope === 'external-both');
+              const sections = shouldShowBothExt
                 ? [
                     { key: 'EXTERNAL_MIDTERM', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
                     { key: 'EXTERNAL_FINAL', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },

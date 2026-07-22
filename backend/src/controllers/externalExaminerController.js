@@ -17,7 +17,7 @@ exports.getAssignedGroups = async (req, res) => {
               include: { submittedBy: { select: { firstName: true, lastName: true } } },
             },
             evaluationComponents: true,
-            proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+            proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
           },
         },
       },
@@ -37,7 +37,7 @@ exports.getAssignedTheses = async (req, res) => {
         include: { submittedBy: { select: { firstName: true, lastName: true } } },
       },
       evaluationComponents: true,
-      proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+      proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
     };
 
     // Include theses where this user is mid-term and/or final external (or has a legacy assignment row)

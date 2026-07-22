@@ -170,6 +170,8 @@ model User {
   componentsCreated        EvaluationComponent[] @relation("ComponentCreator")
   notifications            Notification[]
   proposals                Proposal[]
+  proposalComments         Proposal[]    @relation("ProposalCommenter")
+  proposalCommentsAuthored  ProposalComment[] @relation("ProposalCommentAuthor")
   recommendations          Recommendation[]
   examinerAssignments      ExaminerAssignment[]  @relation("ExternalExaminer")
   examinerAssignmentsAssigned ExaminerAssignment[] @relation("AssignedBy")
@@ -396,10 +398,26 @@ model Proposal {
   thesis            Thesis?       @relation(fields: [thesisId], references: [id], onDelete: Cascade)
   submittedById     Int
   submittedBy       User          @relation(fields: [submittedById], references: [id])
+  commentedById     Int?
+  commentedBy       User?         @relation("ProposalCommenter", fields: [commentedById], references: [id])
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
+  comments          ProposalComment[]
   embedding         DocumentEmbedding?
+}
+
+model ProposalComment {
+  id         Int           @id @default(autoincrement())
+  content    String
+  proposalId Int
+  proposal   Proposal      @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  authorId   Int
+  author     User          @relation("ProposalCommentAuthor", fields: [authorId], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([proposalId])
 }
 
 enum DocumentType {

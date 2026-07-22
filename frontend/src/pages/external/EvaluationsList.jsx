@@ -261,7 +261,7 @@ function ExternalEvaluationsList() {
             initialScope: pdfPreviewItem.externalRole === 'FINAL'
               ? 'external-final'
               : pdfPreviewItem.externalRole === 'BOTH'
-                ? undefined
+                ? 'both'
                 : 'external',
           } : {})}
         />

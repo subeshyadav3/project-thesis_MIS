@@ -268,8 +268,8 @@ function buildMasterFormat(data, scope = 'both') {
   const rollNo = student?.rollNumber || '—';
 
   const includeSup = scope === 'supervisor' || scope === 'both';
-  const includeExt = scope === 'external' || scope === 'external-midterm' || scope === 'both';
-  const includeExtFinal = scope === 'external-final' || scope === 'both';
+  const includeExt = scope === 'external' || scope === 'external-midterm' || scope === 'both' || scope === 'external-both';
+  const includeExtFinal = scope === 'external-final' || scope === 'both' || scope === 'external-both';
 
   let pages = '';
   const midExtName = externalMidTerm ? `${externalMidTerm.firstName} ${externalMidTerm.lastName}`.trim() : '';

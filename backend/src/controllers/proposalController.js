@@ -16,10 +16,14 @@ exports.updateComment = async (req, res) => {
 
     const updated = await prisma.proposal.update({
       where: { id: parseInt(id) },
-      data: { supervisorComment: comment.trim() },
+      data: {
+        supervisorComment: comment.trim(),
+        commentedById: req.user.id,
+      },
     });
 
-    audit.log({ action: 'COMMENT', entity: 'Proposal', entityId: proposal.id, details: `Supervisor comment added to proposal ${proposal.id}`, performedById: req.user.id });
+    const roleLabel = req.user.role === 'SUPERVISOR' ? 'Supervisor' : req.user.role === 'COORDINATOR' ? 'Coordinator' : 'External';
+    audit.log({ action: 'COMMENT', entity: 'Proposal', entityId: proposal.id, details: `${roleLabel} comment added to proposal ${proposal.id}`, performedById: req.user.id });
 
     res.json({ success: true, data: updated });
   } catch (error) {
