@@ -5,6 +5,7 @@ import DocumentViewer from '../../components/DocumentViewer';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
+import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
 
 function getDeadlineInfo(expirationDate) {
@@ -373,22 +374,17 @@ function StudentProjectDetail() {
                     </button>
                   </div>
                 </div>
+
+                {/* Show feedback/comments alongside the document */}
+                <ProposalCommentsViewer
+                  proposalId={tabProposal.id}
+                  legacyComment={tabProposal.supervisorComment}
+                  legacyAuthor={tabProposal.commentedBy}
+                />
               </div>
             )}
 
-            {currentFeedback.length === 0 ? (
-              <div className="empty-state" style={{ padding: 32 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-outline)' }}>chat_bubble_outline</span>
-                </div>
-                <p>No feedback yet for this stage.</p>
-                <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', margin: '4px 0 0' }}>
-                  {submittedStages.includes(feedbackTab)
-                    ? 'Your document has been submitted. Please wait for your supervisor to review.'
-                    : 'Upload your document in the Submissions page to receive feedback.'}
-                </p>
-              </div>
-            ) : (
+            {currentFeedback.length > 0 && (
               <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {currentFeedback.map(e => (
                   <div key={e.id} style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)' }}>
@@ -403,6 +399,19 @@ function StudentProjectDetail() {
                 ))}
               </div>
             )}
+            {currentFeedback.length === 0 && !tabProposal && (
+              <div className="empty-state" style={{ padding: 32 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-outline)' }}>chat_bubble_outline</span>
+                </div>
+                <p>No feedback yet for this stage.</p>
+                <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', margin: '4px 0 0' }}>
+                  {submittedStages.includes(feedbackTab)
+                    ? 'Your document has been submitted. Please wait for your supervisor to review.'
+                    : 'Upload your document in the Submissions page to receive feedback.'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -412,7 +421,7 @@ function StudentProjectDetail() {
       {assignment?.recommendations?.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           <div className="card-header">
-            <h3>Recommendations from Supervisor</h3>
+            <h3>Recommendations</h3>
             <span className="badge" style={{ background: 'var(--color-tertiary-container)', color: 'var(--color-on-tertiary-container)' }}>
               {assignment.recommendations.length}
             </span>
@@ -433,28 +442,40 @@ function StudentProjectDetail() {
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.5 }}>{r.content}</p>
-                  <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 6 }}>
-                    Issued {new Date(r.createdAt).toLocaleDateString()} at {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {r.issuedBy && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span>
+                        {r.issuedBy.firstName} {r.issuedBy.lastName}
+                        <span style={{
+                          padding: '1px 5px', borderRadius: 3, fontSize: 9, fontWeight: 600,
+                          background: r.issuedBy.role === 'COORDINATOR' ? '#e3f2fd' : r.issuedBy.role === 'SUPERVISOR' ? '#e8f5e9' : '#f3e5f5',
+                          color: r.issuedBy.role === 'COORDINATOR' ? '#1565c0' : r.issuedBy.role === 'SUPERVISOR' ? '#2e7d32' : '#7b1fa2',
+                        }}>{r.issuedBy.role}</span>
+                      </span>
+                    )}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_today</span>
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
                   <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
-                    onClick={() => window.open(`/api/supervisors/recommendation/${r.id}/pdf`, '_blank')}
+                    onClick={() => setViewerDoc({ url: `/api/supervisors/recommendation/${r.id}/pdf`, name: `Recommendation_${r.id}.pdf` })}
                     title="View Recommendation PDF">
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
-                  </button>
-                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const a = document.createElement('a');
-                      a.href = `/api/supervisors/recommendation/${r.id}/pdf`;
-                      a.download = `recommendation_${r.id}.pdf`;
-                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    }}
-                    title="Download PDF">
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
-                  </button>
+                  </button>                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const a = document.createElement('a');
+                        a.href = `/api/supervisors/recommendation/${r.id}/pdf?download=true`;
+                        a.download = `recommendation_${r.id}.pdf`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      }}
+                      title="Download PDF">
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                    </button>
                 </div>
               </div>
             ))}

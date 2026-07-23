@@ -36,7 +36,7 @@ exports.getGroups = async (req, res) => {
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         evaluations: true,
         evaluationComponents: true,
-        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
@@ -58,7 +58,7 @@ exports.getGroup = async (req, res) => {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
-        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+        proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },

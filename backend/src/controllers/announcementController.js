@@ -252,8 +252,9 @@ exports.list = async (req, res) => {
       where.departmentId = req.user.departmentId;
       // Resolve coordinator's degree type from their own field or their program
       let coordDegreeType = req.user.degreeType;
-      if (!coordDegreeType && req.user.programId) {
-        const prog = await prisma.program.findUnique({ where: { id: req.user.programId }, select: { degreeType: true } });
+      if (!coordDegreeType) {
+        // Coordinators are linked via Program.coordinatorId, not User.programId
+        const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id }, select: { degreeType: true } });
         coordDegreeType = prog?.degreeType;
       }
       if (coordDegreeType) {

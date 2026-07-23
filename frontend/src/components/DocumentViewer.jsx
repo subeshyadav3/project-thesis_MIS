@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 function DocumentViewer({ fileUrl, fileName, onClose }) {
   const [previewError, setPreviewError] = useState(false);
   const fullUrl = fileUrl.startsWith('http') ? fileUrl : fileUrl;
-  const ext = fileUrl.match(/\.(\w+)$/)?.[1]?.toLowerCase() || '';
+  const ext = fileUrl.match(/\.(\w+)$/)?.[1]?.toLowerCase() || fileName?.match(/\.(\w+)$/)?.[1]?.toLowerCase() || '';
   const isPreviewable = ['pdf'].includes(ext);
 
   const handleDownload = (e) => {

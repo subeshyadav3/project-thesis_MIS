@@ -4,6 +4,7 @@ import DocumentViewer from '../../components/DocumentViewer';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
+import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
 
 function getDeadlineInfo(expirationDate) {
@@ -253,15 +254,8 @@ function StudentSubmissions() {
                       </div>
                     </div>
 
-                    {existing.supervisorComment && (
-                      <div style={{ marginTop: 10, padding: 12, borderRadius: 8, background: 'var(--color-tertiary-container)', border: '1px solid var(--color-outline-variant)' }}>
-                        <p style={{ fontSize: 12, fontWeight: 600, margin: '0 0 6px', color: 'var(--color-on-tertiary-container)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4 }}>chat</span>
-                          Supervisor Feedback
-                        </p>
-                        <p style={{ margin: 0, fontSize: 14, color: 'var(--color-on-tertiary-container)' }}>{existing.supervisorComment}</p>
-                      </div>
-                    )}
+                    {/* Show comments (new system) or legacy feedback if no new comments exist */}
+                    <ProposalCommentsViewer proposalId={existing.id} legacyComment={existing.supervisorComment} legacyAuthor={existing.commentedBy} />
                   </div>
                 ) : (
                   <div className="empty-state" style={{ padding: '16px 0' }}>
