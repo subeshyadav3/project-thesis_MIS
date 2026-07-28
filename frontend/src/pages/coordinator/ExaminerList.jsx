@@ -22,6 +22,7 @@ function ExaminerList() {
   const [theses, setTheses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -45,7 +46,6 @@ function ExaminerList() {
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
     ];
-    // Only fetch theses for Master coordinators
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
       promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
@@ -55,6 +55,7 @@ function ExaminerList() {
   }, [isMasterCoordinator]);
 
   const loadData = () => {
+    setCurrentPage(1);
     const controller = new AbortController();
     const signal = controller.signal;
     setLoading(true);
@@ -75,6 +76,7 @@ function ExaminerList() {
       toast.error('First name and last name are required');
       return;
     }
+    setSubmitting(true);
     try {
       await api.post('/users', { ...createForm, role: 'EXTERNAL_EXAMINER' });
       toast.success('Internal Examiner created successfully');
@@ -82,13 +84,14 @@ function ExaminerList() {
       setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    setSubmitting(false);
   };
 
   const handleDelete = async (id) => {
     setConfirmDialog({
       open: true,
       title: 'Remove Internal Examiner',
-      message: 'Remove this examiner? Their assignments will also be cleared.',
+      message: 'Examiners with active assignments cannot be deleted. Reassign or remove their assignments first before deleting.',
       danger: true,
       onConfirm: async () => {
         try {
@@ -105,13 +108,14 @@ function ExaminerList() {
     e.preventDefault();
     const needsDeactivate = editForm.active !== showEdit.active && !editForm.active;
     if (needsDeactivate) {
-      const nonCompletedGroups = (showEdit.assignedGroups || []).filter(g => g.status !== 'COMPLETED').length;
-      const nonCompletedTheses = (showEdit.assignedTheses || []).filter(t => t.status !== 'COMPLETED').length;
+      const nonCompletedGroups = (showEdit.assignedGroups || []).filter(g => ['PENDING', 'ACTIVE'].includes(g.status)).length;
+      const nonCompletedTheses = (showEdit.assignedTheses || []).filter(t => ['PENDING', 'ACTIVE'].includes(t.status)).length;
       if (nonCompletedGroups + nonCompletedTheses > 0) {
         toast.error('Cannot mark as inactive: this examiner still has active non-completed projects/theses. All assigned work must be completed first.');
         return;
       }
     }
+    setSubmitting(true);
     try {
       const payload = { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, designation: editForm.designation };
       if (editForm.password) payload.password = editForm.password;
@@ -122,7 +126,11 @@ function ExaminerList() {
       toast.success('Examiner updated successfully');
       setShowEdit(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Update failed'); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Update failed');
+      loadData();
+    }
+    setSubmitting(false);
   };
 
   const openEdit = (ex) => {
@@ -156,6 +164,7 @@ function ExaminerList() {
   const totalPages = Math.ceil(filteredExaminers.length / PAGE_SIZE);
   const paginated = filteredExaminers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(1); }, [totalPages, currentPage]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
   const totalAssigned = groups.reduce((s, g) => s + (g.examinerAssignments?.length || 0), 0)
     + (isMasterCoordinator ? theses.reduce((s, t) => s + (t.examinerAssignments?.length || 0), 0) : 0);
@@ -190,12 +199,12 @@ function ExaminerList() {
 
   return (
     <ErrorBoundary><PageLayout title="Internal Examiners" subtitle="Manage internal examiners and their assignments" user={user} actions={actions}>
-       <MasterThesisBulkUploadModal
-         open={showUpload}
-         onClose={() => setShowUpload(false)}
-         onSuccess={loadData}
-         title="Bulk Upload Theses (External Examiners)"
-       />
+        <MasterThesisBulkUploadModal
+          open={showUpload}
+          onClose={() => setShowUpload(false)}
+          onSuccess={loadData}
+          title="Bulk Upload Theses (External Examiners)"
+        />
 
         <UsersBulkUploadModal
           open={showExaminerUpload}
@@ -239,7 +248,7 @@ function ExaminerList() {
               </div>
               <div className="form-group">
                 <label>Password</label>
-                <input value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} required placeholder="Default: subesh" />
+                <input value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} required placeholder="Auto-generated (change if needed)" />
               </div>
               <div className="form-group">
                 <label>Designation</label>
@@ -258,9 +267,9 @@ function ExaminerList() {
                   <span className="material-symbols-outlined">close</span>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
                   <span className="material-symbols-outlined">add</span>
-                  Create
+                  {submitting ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </form>
@@ -405,9 +414,9 @@ function ExaminerList() {
                   <span className="material-symbols-outlined">close</span>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
                   <span className="material-symbols-outlined">save</span>
-                  Save Changes
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -418,23 +427,39 @@ function ExaminerList() {
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">person</span></div>
-          <div className="stat-number">{examiners.length}</div>
+          {loading ? (
+            <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
+          ) : (
+            <div className="stat-number">{examiners.length}</div>
+          )}
           <div className="stat-label">Total Examiners</div>
         </div>
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">assignment_ind</span></div>
-          <div className="stat-number">{totalAssigned}</div>
+          {loading ? (
+            <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
+          ) : (
+            <div className="stat-number">{totalAssigned}</div>
+          )}
           <div className="stat-label">Total Assignments</div>
         </div>
         <div className="stat-card bento-card">
           <div className="stat-icon"><span className="material-symbols-outlined">school</span></div>
-          <div className="stat-number">{unassignedGroups}</div>
+          {loading ? (
+            <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
+          ) : (
+            <div className="stat-number">{unassignedGroups}</div>
+          )}
           <div className="stat-label">Projects Unassigned</div>
         </div>
         {isMasterCoordinator && (
           <div className="stat-card bento-card">
             <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
-            <div className="stat-number">{unassignedTheses}</div>
+            {loading ? (
+              <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
+            ) : (
+              <div className="stat-number">{unassignedTheses}</div>
+            )}
             <div className="stat-label">Theses Unassigned</div>
           </div>
         )}
