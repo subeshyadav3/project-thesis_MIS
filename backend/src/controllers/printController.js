@@ -20,6 +20,8 @@ function numberToWords(n) {
 const os = require('os');
 const fsSync = require('fs');
 
+let browserInstancePromise = null;
+
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,
   process.env.CHROME_PATH,
@@ -41,27 +43,59 @@ function findChrome() {
   return null;
 }
 
-async function generatePdf(html) {
+async function getBrowser() {
+  if (browserInstancePromise) {
+    try {
+      const browser = await browserInstancePromise;
+      if (browser.isConnected()) return browser;
+    } catch (_) {
+      browserInstancePromise = null;
+    }
+  }
   const executablePath = findChrome();
   if (!executablePath) {
     throw new Error(
       'Chrome/Chromium executable not found. Set PUPPETEER_EXECUTABLE_PATH or CHROME_PATH environment variable.'
     );
   }
-  const browser = await puppeteer.launch({
+  browserInstancePromise = puppeteer.launch({
     executablePath,
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  }).catch(err => {
+    browserInstancePromise = null;
+    throw err;
   });
+  return browserInstancePromise;
+}
+
+async function generatePdf(html) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' } });
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+    });
     return Buffer.from(pdf);
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
+
+async function shutdownBrowser() {
+  if (!browserInstancePromise) return;
+  try {
+    const browser = await browserInstancePromise;
+    if (browser.isConnected()) await browser.close();
+  } catch (_) { /* ignore */ }
+  browserInstancePromise = null;
+}
+
+process.on('SIGTERM', () => { shutdownBrowser(); });
+process.on('SIGINT', () => { shutdownBrowser(); });
 
 function buildPageHeader() {
   return `

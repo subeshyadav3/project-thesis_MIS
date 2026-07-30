@@ -536,11 +536,18 @@ function ExternalExaminerEvaluationPage() {
 function ExaminerEvaluationForm({ component, evaluation, onSave }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
   const toast = useToast();
   const hasValue = marks !== '' && marks !== null && marks !== undefined;
 
+  const marksNum = marks === '' ? null : parseFloat(marks);
+  const isOverMax = marksNum !== null && marksNum > component.maxMarks;
+  const isNegative = marksNum !== null && marksNum < 0;
+  const showError = isOverMax || isNegative;
+
   useEffect(() => {
     setMarks(evaluation?.marks?.toString() ?? '');
+    setSaveStatus(null);
   }, [evaluation?.id, evaluation?.marks]);
 
   const submit = async () => {
@@ -548,40 +555,54 @@ function ExaminerEvaluationForm({ component, evaluation, onSave }) {
       toast.warning('Please enter marks');
       return;
     }
-    const m = parseFloat(marks);
-    if (Number.isNaN(m) || m < 0 || m > component.maxMarks) {
+    if (showError) {
       toast.warning(`Marks must be between 0 and ${component.maxMarks}`);
       return;
     }
     setSaving(true);
-    try { await onSave(marks); }
-    finally { setSaving(false); }
+    setSaveStatus('saving');
+    try {
+      await onSave(marks);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch {
+      setSaveStatus('error');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  return (      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
-        <input
-          type="number"
-          value={marks}
-          onChange={e => setMarks(e.target.value)}
-          max={component.maxMarks}
-          min="0"
-          step="0.5"
-          placeholder="0"
-          style={{
-            width: 60, padding: '4px 8px', fontSize: 13, textAlign: 'center',
-            borderRadius: 6, border: hasValue ? '1px solid var(--color-primary-container)' : '1px solid var(--color-outline)',
-            background: 'transparent', outline: 'none', fontWeight: 600,
-            color: hasValue ? 'var(--color-primary)' : 'var(--color-on-surface)',
-          }}
-          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-        />
-        <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
-        <button className="btn btn-primary btn-sm" onClick={submit}
-          disabled={saving || marks === '' || marks === null || marks === undefined}
-          style={{ padding: '4px 10px', minWidth: 48, fontSize: 12 }}>
-          {saving ? '...' : 'Save'}
-        </button>
-      </div>
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+      <input
+        type="number"
+        value={marks}
+        onChange={e => setMarks(e.target.value)}
+        max={component.maxMarks}
+        min="0"
+        step="0.5"
+        placeholder="0"
+        style={{
+          width: 60, padding: '4px 8px', fontSize: 13, textAlign: 'center',
+          borderRadius: 6, border: showError ? '1px solid var(--color-error)' : hasValue ? '1px solid var(--color-primary-container)' : '1px solid var(--color-outline)',
+          background: 'transparent', outline: 'none', fontWeight: 600,
+          color: showError ? 'var(--color-error)' : hasValue ? 'var(--color-primary)' : 'var(--color-on-surface)',
+        }}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+      />
+      <span style={{ fontSize: 11, color: showError ? 'var(--color-error)' : 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
+      <button className="btn btn-primary btn-sm" onClick={submit}
+        disabled={saving || marks === '' || marks === null || marks === undefined || showError}
+        style={{ padding: '4px 10px', minWidth: 48, fontSize: 12 }}>
+        {saving ? '...' : 'Save'}
+      </button>
+      {saveStatus === 'saved' && (
+        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-success)' }}>check</span>
+      )}
+      {saveStatus === 'error' && (
+        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }}>error</span>
+      )}
+    </div>
   );
 }
 
