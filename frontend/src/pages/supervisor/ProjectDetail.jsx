@@ -6,6 +6,7 @@ import ExaminerAssignmentSection from '../../components/ExaminerAssignmentSectio
 import SupervisorAssignmentSection from '../../components/SupervisorAssignmentSection';
 import ExternalExaminerSection from '../../components/ExternalExaminerSection';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
+import WorkflowStepper from '../../components/WorkflowStepper';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -281,6 +282,8 @@ function ProjectDetail() {
         {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
         {activeTab === 'overview' && (
           <>
+            <WorkflowStepper status={item.status} degreeType={isThesis ? 'MASTER' : 'BACHELOR'} />
+
             {/* Summary cards */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
