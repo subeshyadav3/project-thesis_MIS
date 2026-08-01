@@ -17,6 +17,7 @@ function DepartmentManagement() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const toast = useToast();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
@@ -47,6 +48,7 @@ function DepartmentManagement() {
       toast.error('Department name and code are required');
       return;
     }
+    setSaving(true);
     try {
       await api.post('/departments', deptForm);
       toast.success('Department created successfully');
@@ -55,6 +57,8 @@ function DepartmentManagement() {
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error creating department');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -64,6 +68,7 @@ function DepartmentManagement() {
       toast.error('All academic year fields are required');
       return;
     }
+    setSaving(true);
     try {
       await api.post('/departments/academic-years', yearForm);
       toast.success('Academic year created successfully');
@@ -72,6 +77,8 @@ function DepartmentManagement() {
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error creating academic year');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -162,6 +169,9 @@ function DepartmentManagement() {
         <div className="card-header">
           <h3>Academic Years</h3>
         </div>
+        {loading ? (
+          <TableSkeleton rows={5} cols={4} />
+        ) : (
         <table>
           <thead>
             <tr>
@@ -195,6 +205,7 @@ function DepartmentManagement() {
             )}
           </tbody>
         </table>
+        )}
       </div>
 
       {showDeptModal && (
@@ -223,9 +234,9 @@ function DepartmentManagement() {
                   <span className="material-symbols-outlined">close</span>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">add</span>
-                  Create
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'add'}</span>
+                  {saving ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </form>
@@ -266,9 +277,9 @@ function DepartmentManagement() {
                   <span className="material-symbols-outlined">close</span>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">add</span>
-                  Create
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'add'}</span>
+                  {saving ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </form>

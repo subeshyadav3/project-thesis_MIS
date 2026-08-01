@@ -7,21 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
-
-function getDeadlineInfo(expirationDate) {
-  if (!expirationDate) return null;
-  const now = new Date();
-  const deadline = new Date(expirationDate);
-  const diffMs = deadline - now;
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-  if (diffMs < 0) return { expired: true, label: 'Deadline passed', urgent: false };
-  if (diffDays > 30) return { expired: false, label: `${deadline.toLocaleDateString()}`, urgent: false };
-  if (diffDays > 7) return { expired: false, label: `${diffDays} days left`, urgent: false };
-  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
-  if (diffHours >= 1) return { expired: false, label: `${diffHours} hours left`, urgent: true };
-  return { expired: false, label: 'Due soon', urgent: true };
-}
+import { getDeadlineInfo } from '../../utils/deadline';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -462,8 +448,8 @@ function StudentProjectDetail() {
                         {r.issuedBy.firstName} {r.issuedBy.lastName}
                         <span style={{
                           padding: '1px 5px', borderRadius: 3, fontSize: 9, fontWeight: 600,
-                          background: r.issuedBy.role === 'COORDINATOR' ? '#e3f2fd' : r.issuedBy.role === 'SUPERVISOR' ? '#e8f5e9' : '#f3e5f5',
-                          color: r.issuedBy.role === 'COORDINATOR' ? '#1565c0' : r.issuedBy.role === 'SUPERVISOR' ? '#2e7d32' : '#7b1fa2',
+                          background: r.issuedBy.role === 'COORDINATOR' ? 'var(--color-primary-container)' : r.issuedBy.role === 'SUPERVISOR' ? 'var(--color-success-container)' : r.issuedBy.role === 'EXTERNAL_EXAMINER' ? 'var(--color-warning-container)' : 'var(--color-surface-container-high)',
+                          color: r.issuedBy.role === 'COORDINATOR' ? 'var(--color-on-primary-container)' : r.issuedBy.role === 'SUPERVISOR' ? 'var(--color-on-success-container)' : r.issuedBy.role === 'EXTERNAL_EXAMINER' ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                         }}>{r.issuedBy.role}</span>
                       </span>
                     )}

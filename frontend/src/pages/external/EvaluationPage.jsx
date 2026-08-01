@@ -148,7 +148,7 @@ function ExternalExaminerEvaluationPage() {
   if (loading) {
     return (
       <PageLayout title="Internal Examiner Evaluation" user={user}>
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span></div>
+        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading evaluation...</p></div>
       </PageLayout>
     );
   }

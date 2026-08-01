@@ -43,6 +43,7 @@ function Evaluations() {
   const [showForward, setShowForward] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [printingAll, setPrintingAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -162,9 +163,9 @@ function Evaluations() {
 
   const actions = (
     <>
-      <button className="btn btn-outline btn-sm" onClick={() => handlePrintAll()}>
-        <span className="material-symbols-outlined">print</span>
-        Print All
+      <button className="btn btn-outline btn-sm" onClick={() => handlePrintAll()} disabled={printingAll}>
+        <span className="material-symbols-outlined">{printingAll ? 'progress_activity' : 'print'}</span>
+        {printingAll ? 'Printing...' : 'Print All'}
       </button>
       <button className="btn btn-success btn-sm" onClick={() => setShowForward(true)}>
         <span className="material-symbols-outlined">forward</span>
@@ -180,6 +181,9 @@ function Evaluations() {
       toast.warning('No evaluated items to print');
       return;
     }
+    setPrintingAll(true);
+    toast.info(`Preparing ${evaluated.length} evaluation PDF${evaluated.length !== 1 ? 's' : ''}...`);
+    const lastIdx = evaluated.length - 1;
     evaluated.forEach((item, idx) => {
       const endpoint = viewMode === 'bachelor'
         ? `/api/print/group/${item.id}`
@@ -191,6 +195,9 @@ function Evaluations() {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        if (idx === lastIdx) {
+          setTimeout(() => setPrintingAll(false), 1500);
+        }
       }, idx * 800);
     });
   };

@@ -106,17 +106,42 @@ async function notifyProposalUpload({ groupId, thesisId, stage, uploaderId, stud
 /**
  * Someone submitted/updated evaluation marks.
  * Notify: the relevant coordinator only (excluding the submitter).
+ * Rapid updates to the same item (e.g. saving a whole evaluation sheet)
+ * are batched into a single notification.
  */
+const pendingMarksBatches = new Map();
+
 async function notifyMarksSubmitted({ groupId, thesisId, componentName, marks, maxMarks, evaluatorRole, itemTitle, submitterId }) {
   const roleLabel = ROLE_LABEL[evaluatorRole] || evaluatorRole;
   const marksStr = marks !== null && marks !== undefined ? `${marks}/${maxMarks}` : `cleared`;
-  try {
+  const itemKey = groupId ? `g:${groupId}` : `t:${thesisId}`;
+  const batchKey = `${submitterId}:${itemKey}`;
+
+  const flush = async (entry) => {
+    pendingMarksBatches.delete(batchKey);
     const coordinatorId = await findCoordinatorForItem(groupId, thesisId);
-    if (coordinatorId && coordinatorId !== submitterId) {
-      return notify(coordinatorId, 'MARKS_SUBMITTED', `${roleLabel} marks for "${itemTitle}" — ${componentName}: ${marksStr}`);
-    }
-  } catch (e) {
-    console.error('notifyMarksSubmitted error:', e.message);
+    if (!coordinatorId || coordinatorId === submitterId) return;
+    const detail = entry.count === 1
+      ? entry.firstDetail
+      : `${entry.count} components`;
+    await notify(coordinatorId, 'MARKS_SUBMITTED', `${roleLabel} updated marks for "${itemTitle}" — ${detail}`);
+  };
+
+  const existing = pendingMarksBatches.get(batchKey);
+  if (existing) {
+    existing.count += 1;
+    if (existing.names.length < 8) existing.names.push(`${componentName}: ${marksStr}`);
+    clearTimeout(existing.timer);
+    existing.timer = setTimeout(() => flush(existing), 800);
+  } else {
+    const entry = {
+      count: 1,
+      firstDetail: `${componentName}: ${marksStr}`,
+      names: [`${componentName}: ${marksStr}`],
+      timer: null,
+    };
+    entry.timer = setTimeout(() => flush(entry), 800);
+    pendingMarksBatches.set(batchKey, entry);
   }
   return null;
 }

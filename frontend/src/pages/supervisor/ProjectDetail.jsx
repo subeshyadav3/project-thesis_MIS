@@ -202,6 +202,16 @@ function ProjectDetail() {
     } finally { setIssuingRecommendation(false); }
   };
 
+  const handleDeleteRecommendation = async (recId) => {
+    try {
+      await api.delete(`/supervisors/recommendation/${recId}`);
+      toast.success('Recommendation deleted');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete');
+    }
+  };
+
   const tabs = [
     { key: 'overview', icon: 'overview', label: 'Overview' },
     { key: 'evaluation', icon: 'grading', label: 'Evaluation' },
@@ -742,6 +752,16 @@ function ProjectDetail() {
                           title="Download PDF">
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                         </button>
+                        {(isSupervisor || isCoordinator) && (
+                          <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-error)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDialog({ open: true, title: 'Delete recommendation', message: 'Delete this recommendation letter? This cannot be undone.', confirmLabel: 'Delete', danger: true, onConfirm: () => handleDeleteRecommendation(r.id) });
+                            }}
+                            title="Delete Recommendation">
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))

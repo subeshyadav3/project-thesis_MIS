@@ -90,13 +90,11 @@ function StudentDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {groups.slice(0, 3).map(g => (
                   <Link key={g.id} to={`/student/project/${g.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <div style={{
+                    <div className="row-hover" style={{
                       padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
                       borderBottom: '1px solid var(--color-outline-variant)',
-                      transition: 'background 0.15s', cursor: 'pointer',
+                      cursor: 'pointer',
                     }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <div style={{
                         width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
@@ -131,13 +129,11 @@ function StudentDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {theses.slice(0, 3).map(t => (
                   <Link key={t.id} to={`/student/thesis/${t.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <div style={{
+                    <div className="row-hover" style={{
                       padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
                       borderBottom: '1px solid var(--color-outline-variant)',
-                      transition: 'background 0.15s', cursor: 'pointer',
+                      cursor: 'pointer',
                     }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <div style={{
                         width: 8, height: 8, borderRadius: '50%', flexShrink: 0,

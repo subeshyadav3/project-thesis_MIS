@@ -1072,25 +1072,25 @@ const filteredGroups = useMemo(() => {
                           </button>
                           {actionMenuRow === g.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (g.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (g.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
+                              <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                                   Edit
                                 </div>
                               {g.status === 'ACTIVE' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
                                   Complete
                                 </div>
                               )}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(g)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div className="menu-item" onClick={() => setPdfPreviewItem(g)}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
                                 PDF Preview
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => downloadEvalPdf(g)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div className="menu-item" onClick={() => downloadEvalPdf(g)}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                                 Export PDF
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: g.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteGroup(g.id); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (g.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (g.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
+                              <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: g.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteGroup(g.id); }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                                 Delete
                               </div>

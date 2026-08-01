@@ -7,6 +7,9 @@ function StudentNotifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -60,15 +63,18 @@ function StudentNotifications() {
   };
 
   const handleReject = async (requestId) => {
-    const reason = prompt('Please provide a reason for rejection:');
-    if (reason === null) return;
+    setRejectSubmitting(true);
     try {
-      await api.put(`/assignment-requests/${requestId}/reject`, { rejectReason: reason || 'No reason provided' });
+      await api.put(`/assignment-requests/${requestId}/reject`, { rejectReason: rejectReason.trim() || 'No reason provided' });
       toast.success('Request rejected.');
       setPendingRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'REJECTED' } : r));
       loadNotifications();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to reject request');
+    } finally {
+      setRejectSubmitting(false);
+      setRejectingId(null);
+      setRejectReason('');
     }
   };
 
@@ -121,7 +127,7 @@ function StudentNotifications() {
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>
                       Approve
                     </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleReject(req.id)}>
+                    <button className="btn btn-sm btn-danger" onClick={() => { setRejectingId(req.id); setRejectReason(''); }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
                       Reject
                     </button>
@@ -130,6 +136,36 @@ function StudentNotifications() {
               })()}
             </div>
           ))}
+        </div>
+      )}
+
+      {rejectingId && (
+        <div className="modal-overlay" onClick={() => setRejectingId(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <div className="modal-header">
+              <div className="modal-header-icon danger"><span className="material-symbols-outlined">block</span></div>
+              <div className="modal-header-text">
+                <h2>Reject request</h2>
+                <p>Provide a reason before rejecting this cross-program assignment request.</p>
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Reason (optional)</label>
+              <textarea
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="e.g. Supervisor already at full load"
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setRejectingId(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={() => handleReject(rejectingId)} disabled={rejectSubmitting}>
+                <span className="material-symbols-outlined">{rejectSubmitting ? 'progress_activity' : 'close'}</span>
+                {rejectSubmitting ? 'Rejecting...' : 'Reject'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </PageLayout>

@@ -85,6 +85,10 @@ function CommandPalette({ isOpen, onClose, user }) {
     return () => clearTimeout(timer);
   }, [query, user?.role]);
 
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [searchResults, query]);
+
   if (!isOpen) return null;
 
   const defaultNavigation = [
@@ -102,6 +106,21 @@ function CommandPalette({ isOpen, onClose, user }) {
     onClose();
   };
 
+  const handleKeyDown = (e) => {
+    const count = Math.max(items.length, 1);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1) % count);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 + count) % count);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = items[selectedIndex];
+      if (item) handleSelect(item);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
       <div
@@ -116,6 +135,7 @@ function CommandPalette({ isOpen, onClose, user }) {
             placeholder="Search projects, theses, or type a command... (Esc to close)"
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onKeyDown={handleKeyDown}
             autoFocus
             style={{
               width: '100%', border: 'none', background: 'transparent', outline: 'none',
@@ -141,14 +161,9 @@ function CommandPalette({ isOpen, onClose, user }) {
           {!loading && items.map((item, idx) => (
             <div
               key={item.id || item.path}
+              className={`command-item${selectedIndex === idx ? ' active' : ''}`}
               onClick={() => handleSelect(item)}
               onMouseEnter={() => setSelectedIndex(idx)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer',
-                background: selectedIndex === idx ? 'var(--color-primary-container)' : 'transparent',
-                color: selectedIndex === idx ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
-                transition: 'background 0.15s',
-              }}
             >
               <div style={{
                 width: 32, height: 32, borderRadius: 8, background: 'var(--color-surface-container)',

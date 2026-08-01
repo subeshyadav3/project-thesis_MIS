@@ -94,6 +94,20 @@ function NotificationBell() {
     return d.toLocaleDateString();
   };
 
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const notificationsPath = user.role === 'EXTERNAL_EXAMINER'
+    ? '/external/notifications'
+    : user.role === 'SUPERVISOR'
+      ? '/supervisor/notifications'
+      : user.role === 'STUDENT'
+        ? '/student/notifications'
+        : '/coordinator/notifications';
+
+  const goToAll = () => {
+    setOpen(false);
+    navigate(notificationsPath);
+  };
+
   return (
     <div className="notification-bell" ref={dropdownRef}>
       <button
@@ -150,6 +164,11 @@ function NotificationBell() {
               ))
             )}
           </div>
+          {notifications.length > 0 && (
+            <div className="notification-dropdown-footer" onClick={goToAll}>
+              View all notifications
+            </div>
+          )}
         </div>
       )}
     </div>

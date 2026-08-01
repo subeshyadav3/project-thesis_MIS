@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
@@ -37,6 +38,7 @@ function CoordinatorAnnouncements() {
   const [viewAnnouncement, setViewAnnouncement] = useState(null);
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const studentRef = useRef(null);
   const toast = useToast();
 
@@ -127,14 +129,16 @@ function CoordinatorAnnouncements() {
     setShowCreate(true);
   };
 
-  const handleDelete = async (a) => {
-    if (!window.confirm(`Delete announcement "${a.title}"? This action cannot be undone.`)) return;
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
     try {
-      await api.delete(`/announcements/${a.id}`);
+      await api.delete(`/announcements/${confirmDelete.id}`);
       toast.success('Announcement deleted');
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to delete');
+    } finally {
+      setConfirmDelete(null);
     }
   };
 
@@ -252,7 +256,7 @@ function CoordinatorAnnouncements() {
                           <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
                             <span className="material-symbols-outlined">edit</span>
                           </button>
-                          <button className="btn btn-sm btn-outline" onClick={() => handleDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
+                          <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
                             <span className="material-symbols-outlined">delete</span>
                           </button>
                           {hasGF && (
@@ -486,6 +490,15 @@ function CoordinatorAnnouncements() {
           </div>
         )}
 
+        <ConfirmDialog
+          open={!!confirmDelete}
+          title="Delete announcement"
+          message={`Delete announcement "${confirmDelete?.title}"? This action cannot be undone.`}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(null)}
+          confirmLabel="Delete"
+          danger
+        />
       </PageLayout>
     </ErrorBoundary>
   );

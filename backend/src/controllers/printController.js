@@ -346,6 +346,9 @@ function buildBachelorFormat(data) {
   const projectLabel = isMajor ? 'Major Project' : 'Minor Project';
   const credit = isMajor ? '6' : '3';
 
+  const totalNum = parseFloat(total);
+  const hasMarks = evaluations.some(e => e.marks !== null && e.marks !== undefined && e.marks !== '');
+
   let sn = 0;
   const bodyRows = evaluations.map((e) => {
     const marks = e.marks !== null && e.marks !== undefined ? e.marks : '';
@@ -359,6 +362,35 @@ function buildBachelorFormat(data) {
       <td style="padding:4px;border:1px solid #000;">${esc(e.comment || '')}</td>
     </tr>`;
   }).join('');
+
+  const comments = evaluations.map(e => e.comment).filter(Boolean).join('; ');
+  const feedbackComments = evaluations.map(e => e.comments).filter(Boolean).join('; ');
+  const suggestionText = evaluations.map(e => e.suggestions).filter(Boolean).join('; ');
+  const commentText = [comments, feedbackComments].filter(Boolean).join('; ');
+
+  // Distinct examiners (by submittedBy) for the signature block
+  const seen = new Set();
+  const examiners = evaluations.filter(e => e.submittedBy && !seen.has(e.submittedBy) && seen.add(e.submittedBy));
+
+  const examinerBlocks = examiners.length
+    ? examiners.map(e => `
+      <div style="font-size:12px;margin-top:${e === examiners[0] ? 16 : 12}px;">
+        <strong>Examiner:</strong><br/>
+        <strong>Name:</strong> ${esc(e.submittedBy)}<br/>
+        <strong>Post:</strong> ${esc(e.evaluatorRole)}<br/>
+        <strong>Organization:</strong> IOE<br/>
+        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
+        <strong>Signature:</strong><br/>
+      </div>`).join('')
+    : `
+      <div style="font-size:12px;margin-top:16px;">
+        <strong>Examiner:</strong><br/>
+        <strong>Name:</strong><br/>
+        <strong>Post:</strong><br/>
+        <strong>Organization:</strong> IOE<br/>
+        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
+        <strong>Signature:</strong><br/>
+      </div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evaluation - ${esc(title)}</title>
   <style>
@@ -398,6 +430,21 @@ function buildBachelorFormat(data) {
         </tr>
       </tbody>
     </table>
+    ${buildNote()}
+
+    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
+      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</td></tr>
+    </table>
+
+    <div style="margin-top:8px;font-size:12px;">
+      <strong>Comments:</strong>
+      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
+    </div>
+    <div style="font-size:12px;">
+      <strong>Suggestions &amp; recommendations:</strong>
+      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
+    </div>
+    ${examinerBlocks}
   </body></html>`;
 }
 

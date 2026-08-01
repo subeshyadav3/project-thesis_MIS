@@ -53,6 +53,9 @@ function Profile() {
 
   return (
     <ErrorBoundary><PageLayout title="Profile" user={user}>
+      {loading && !userData ? (
+        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading profile...</p></div>
+      ) : (
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         {/* Left: Main Profile Card */}
         <div className="card" style={{ flex: 2, minWidth: 280, marginBottom: 0 }}>
@@ -215,6 +218,7 @@ function Profile() {
 
         </div>
       </div>
+      )}
     </PageLayout></ErrorBoundary>
   );
 }

@@ -27,6 +27,7 @@ function MasterThesis() {
   const [detailMode, setDetailMode] = useState('view');
   const todayStr = new Date().toISOString().split('T')[0];
   const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+  const [creating, setCreating] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [editStartDate, setEditStartDate] = useState('');
   const [editEndDate, setEditEndDate] = useState('');
@@ -208,6 +209,29 @@ const handleComplete = async (id) => {
     });
   };
 
+  const confirmRejectCrossProgram = (id) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Reject cross-program thesis',
+      message: 'Reject this cross-program thesis? It will be removed.',
+      onConfirm: () => {
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+        handleRejectCrossProgram(id);
+      },
+      danger: true,
+    });
+  };
+
+  const handleRejectCrossProgram = async (id) => {
+    try {
+      await api.put(`/theses/${id}/reject-cross-program`);
+      toast.success('Cross-program thesis rejected');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Reject failed');
+    }
+  };
+
   const handleDeleteThesis = async (id) => {
     try {
       await api.delete(`/theses/${id}`);
@@ -243,6 +267,7 @@ const handleComplete = async (id) => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setCreating(true);
     try {
       const res = await api.post('/theses', createForm);
       if (res.data?.crossProgram) {
@@ -254,6 +279,7 @@ const handleComplete = async (id) => {
       setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    finally { setCreating(false); }
   };
 
   const handleEditSave = async (thesisId) => {
@@ -1003,7 +1029,7 @@ return (
                                 <button
                                   className="icon-btn-sm danger"
                                   title="Reject cross-program thesis"
-                                  onClick={async (e) => { e.stopPropagation(); if (window.confirm('Reject this cross-program thesis? It will be removed.')) { try { await api.put(`/theses/${t.id}/reject-cross-program`); toast.success('Cross-program thesis rejected'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Reject failed'); } } }}
+                                  onClick={(e) => { e.stopPropagation(); confirmRejectCrossProgram(t.id); }}
                                 >
                                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
                                 </button>
@@ -1027,25 +1053,25 @@ return (
                           </button>
                           {actionMenuRow === t.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
+                              <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                                   Edit
                                 </div>
                               {t.status === 'ACTIVE' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
                                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
                                   Complete
                                 </div>
                               )}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => setPdfPreviewItem(t)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div className="menu-item" onClick={() => setPdfPreviewItem(t)}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
                                 PDF Preview
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13 }} onClick={() => downloadEvalPdf(t)} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <div className="menu-item" onClick={() => downloadEvalPdf(t)}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                                 Export PDF
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-container-low)'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; if (t.status === 'COMPLETED') e.currentTarget.style.opacity = '0.55'; }}>
+                              <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                                 Delete
                               </div>
@@ -1275,9 +1301,9 @@ return (
                   <span className="material-symbols-outlined">close</span>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">add</span>
-                  Create
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  <span className="material-symbols-outlined">{creating ? 'progress_activity' : 'add'}</span>
+                  {creating ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </form>

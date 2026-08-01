@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function DocumentViewer({ fileUrl, fileName, onClose }) {
   const [previewError, setPreviewError] = useState(false);
-  const fullUrl = fileUrl.startsWith('http') ? fileUrl : fileUrl;
+  const fullUrl = fileUrl;
   const ext = fileUrl.match(/\.(\w+)$/)?.[1]?.toLowerCase() || fileName?.match(/\.(\w+)$/)?.[1]?.toLowerCase() || '';
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const isPreviewable = ['pdf'].includes(ext);
 
   const handleDownload = (e) => {

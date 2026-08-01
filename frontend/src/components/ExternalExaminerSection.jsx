@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../contexts/ToastContext';
+import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
 function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, disabled = false }) {
@@ -8,6 +9,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
   const [selectedExaminerId, setSelectedExaminerId] = useState('');
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -39,7 +41,6 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
 
   const handleRemove = async () => {
     if (!currentExaminer) return;
-    if (!window.confirm(`Remove ${currentExaminer.firstName} ${currentExaminer.lastName} as ${label}?`)) return;
     setRemoving(true);
     try {
       await api.put(`/theses/${id}/${endpointKey}`, { externalExaminerId: null });
@@ -50,6 +51,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
       toast.error(err.response?.data?.error || 'Failed to remove examiner');
     } finally {
       setRemoving(false);
+      setConfirmRemove(false);
     }
   };
 
@@ -141,7 +143,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
               {currentExaminer.active ? 'Active' : 'Inactive'}
             </div>
             {!disabled && (
-              <button className="btn btn-sm btn-outline" onClick={handleRemove} disabled={removing} style={{ color: 'var(--color-error)' }}>
+              <button className="btn btn-sm btn-outline" onClick={() => setConfirmRemove(true)} disabled={removing} style={{ color: 'var(--color-error)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{removing ? 'progress_activity' : 'close'}</span>
                 Remove
               </button>
@@ -156,6 +158,16 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title={`Remove external (${label}) examiner`}
+        message={`Remove ${currentExaminer?.firstName} ${currentExaminer?.lastName} as ${label}?`}
+        onConfirm={handleRemove}
+        onCancel={() => setConfirmRemove(false)}
+        confirmLabel="Remove"
+        danger
+      />
     </div>
   );
 }
