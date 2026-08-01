@@ -96,8 +96,20 @@ exports.submitComponentMarks = async (req, res) => {
     const evaluation = await (isUpdate
       ? prisma.evaluation.update({ where: { id: existing.id }, data })
       : prisma.evaluation.create({ data }));
-    const auditAction = isUpdate ? 'UPDATE_MARKS' : 'SUBMIT_MARKS';
-    audit.log({ action: auditAction, entity: 'Evaluation', entityId: evaluation.id, details: 'Marks updated', performedById: req.user.id });
+
+    // Batched, readable audit entry naming the item instead of one row per component
+    try {
+      const itemTitle = groupId
+        ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true } }))?.projectTitle
+        : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { title: true } }))?.title;
+      audit.logMarks({
+        groupId: groupId ? parseInt(groupId) : undefined,
+        thesisId: thesisId ? parseInt(thesisId) : undefined,
+        title: itemTitle || 'project',
+        performedById: req.user.id,
+        isUpdate,
+      });
+    } catch (e) { console.error('audit marks error:', e.message); }
 
     // Build the new summary so the caller doesn't have to refetch
     const components = await prisma.evaluationComponent.findMany({
@@ -318,7 +330,10 @@ exports.completeEvaluation = async (req, res) => {
       where: { id: evaluation.id },
       data: { status: 'COMPLETED' },
     });
-    audit.log({ action: 'COMPLETE_EVALUATION', entity: 'Evaluation', entityId: evaluation.id, details: `Completed ${evaluation.component.name} evaluation`, performedById: req.user.id });
+    const itemTitle = groupId
+      ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true } }))?.projectTitle
+      : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { title: true } }))?.title;
+    audit.log({ action: 'COMPLETE_EVALUATION', entity: 'Project', entityId: groupId || thesisId, details: `Completed "${evaluation.component.name}" evaluation for "${itemTitle || 'project'}"`, performedById: req.user.id });
 
     res.json({ message: 'Evaluation completed successfully' });
   } catch (error) {

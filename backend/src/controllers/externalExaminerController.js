@@ -128,7 +128,20 @@ exports.submitEvaluation = async (req, res) => {
   } else {
     evaluation = await prisma.evaluation.create({ data });
   }
-  audit.log({ action: 'SUBMIT_MARKS', entity: 'Evaluation', entityId: evaluation.id, details: 'Marks updated', performedById: req.user.id });
+
+  // Batched, readable audit entry naming the item instead of one row per component
+  try {
+    const itemTitle = groupId
+      ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectTitle: true } }))?.projectTitle
+      : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { title: true } }))?.title;
+    audit.logMarks({
+      groupId: groupId ? parseInt(groupId) : undefined,
+      thesisId: thesisId ? parseInt(thesisId) : undefined,
+      title: itemTitle || 'project',
+      performedById: req.user.id,
+      isUpdate: !!existing,
+    });
+  } catch (e) { console.error('audit marks error:', e.message); }
 
   const components = await prisma.evaluationComponent.findMany({
       where: groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) },

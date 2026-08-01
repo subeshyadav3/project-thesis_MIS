@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../contexts/ToastContext';
+import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
 function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefresh, disabled = false }) {
@@ -8,6 +9,7 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
   const [selectedExaminerId, setSelectedExaminerId] = useState('');
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -43,7 +45,6 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
 
   const handleRemove = async () => {
     if (!firstAssignment) return;
-    if (!window.confirm(`Remove ${examinerUser.firstName} ${examinerUser.lastName} as internal examiner?`)) return;
     setRemoving(true);
     try {
       await api.delete(`/examiner-assignments/${firstAssignment.id}`);
@@ -54,6 +55,7 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
       toast.error(err.response?.data?.error || 'Failed to remove examiner');
     } finally {
       setRemoving(false);
+      setConfirmRemove(false);
     }
   };
 
@@ -138,7 +140,7 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
               {examinerUser?.active ? 'Active' : 'Inactive'}
             </div>
             {!disabled && (
-              <button className="btn btn-sm btn-outline" onClick={handleRemove} disabled={removing} style={{ color: 'var(--color-error)' }}>
+              <button className="btn btn-sm btn-outline" onClick={() => setConfirmRemove(true)} disabled={removing} style={{ color: 'var(--color-error)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{removing ? 'progress_activity' : 'close'}</span>
                 Remove
               </button>
@@ -153,6 +155,16 @@ function ExaminerAssignmentSection({ type, id, currentAssignments = [], onRefres
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove internal examiner"
+        message={`Remove ${examinerUser?.firstName} ${examinerUser?.lastName} as internal examiner?`}
+        onConfirm={handleRemove}
+        onCancel={() => setConfirmRemove(false)}
+        confirmLabel="Remove"
+        danger
+      />
     </div>
   );
 }

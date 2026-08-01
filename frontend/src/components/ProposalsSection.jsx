@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { downloadFile } from '../utils/download';
 import DocumentViewer from './DocumentViewer';
 import AiAssistantModal from './AiAssistantModal';
+import ConfirmDialog from './ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 
@@ -18,9 +19,9 @@ const STAGE_ICON = {
 };
 
 const ROLE_COLORS = {
-  SUPERVISOR: { bg: '#e8f5e9', color: '#2e7d32', label: 'Supervisor' },
-  COORDINATOR: { bg: '#e3f2fd', color: '#1565c0', label: 'Coordinator' },
-  EXTERNAL_EXAMINER: { bg: '#fff3e0', color: '#e65100', label: 'External' },
+  SUPERVISOR: { bg: 'var(--color-success-container)', color: 'var(--color-on-success-container)', label: 'Supervisor' },
+  COORDINATOR: { bg: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)', label: 'Coordinator' },
+  EXTERNAL_EXAMINER: { bg: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)', label: 'External' },
 };
 
 function ProposalsSection({ proposals = [], title = 'Submitted Documents', user }) {
@@ -33,6 +34,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
   const [commentsMap, setCommentsMap] = useState({});
   const [loadingComments, setLoadingComments] = useState({});
   const [deletingComment, setDeletingComment] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const toast = useToast();
 
   const canComment = user && ['SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'].includes(user.role);
@@ -104,18 +106,19 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
     }
   };
 
-  const handleDeleteComment = async (proposalId, commentId) => {
-    if (deletingComment === commentId) return;
-    if (!window.confirm('Delete this feedback? This cannot be undone.')) return;
-    setDeletingComment(commentId);
+  const handleDeleteComment = async () => {
+    if (!confirmDelete) return;
+    if (deletingComment === confirmDelete.commentId) return;
+    setDeletingComment(confirmDelete.commentId);
     try {
-      await api.delete(`/proposals/${proposalId}/comments/${commentId}`);
+      await api.delete(`/proposals/${confirmDelete.proposalId}/comments/${confirmDelete.commentId}`);
       toast.success('Feedback deleted');
-      loadComments(proposalId);
+      loadComments(confirmDelete.proposalId);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to delete feedback');
     } finally {
       setDeletingComment(null);
+      setConfirmDelete(null);
     }
   };
 
@@ -234,12 +237,8 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                           </a>
                           {openAI && (
                             <button
-                              className="btn btn-sm"
-                              style={{
-                                padding: '4px 8px', fontSize: 12,
-                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                color: '#fff', border: 'none',
-                              }}
+                              className="btn btn-sm btn-tertiary"
+                              style={{ padding: '4px 8px', fontSize: 12 }}
                               onClick={() => setAiProposal({ id: doc.id, documentUrl: doc.documentUrl })}
                               title="AI Assistant"
                             >
@@ -295,7 +294,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                                           </span>
                                         )}
                                         <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-error)', cursor: 'pointer', opacity: deletingComment === comment.id ? 0.5 : 1 }}
-                                          onClick={() => handleDeleteComment(doc.id, comment.id)}
+                                          onClick={() => setConfirmDelete({ proposalId: doc.id, commentId: comment.id })}
                                           title="Delete">
                                           delete
                                         </span>
@@ -362,6 +361,16 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
       {aiProposal && (
         <AiAssistantModal proposal={aiProposal} onClose={() => setAiProposal(null)} />
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete feedback"
+        message="Delete this feedback? This cannot be undone."
+        onConfirm={handleDeleteComment}
+        onCancel={() => setConfirmDelete(null)}
+        confirmLabel="Delete"
+        danger
+      />
     </div>
   );
 }

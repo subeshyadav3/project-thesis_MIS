@@ -34,6 +34,22 @@ function CoordinatorDashboard() {
 
   const statCards = isMaster ? masterCards : bachelorCards;
 
+  if (!stats) {
+    return (
+      <PageLayout title="Dashboard" subtitle={`${degreeLabel} Program Overview`} user={user}>
+        <div className="stats-grid">
+          {(isMaster ? masterCards : bachelorCards).map((_, i) => (
+            <div key={i} className="stat-card bento-card">
+              <div className="skeleton" style={{ width: 44, height: 44, borderRadius: 'var(--border-radius-md)', marginBottom: 16 }} />
+              <div className="skeleton" style={{ width: 64, height: 32, marginBottom: 8 }} />
+              <div className="skeleton" style={{ width: 90, height: 14 }} />
+            </div>
+          ))}
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout title="Dashboard" subtitle={`${degreeLabel} Program Overview`} user={user}>
       <div className="stats-grid">

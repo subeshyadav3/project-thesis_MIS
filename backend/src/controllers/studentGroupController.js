@@ -23,6 +23,17 @@ const GROUP_INCLUDES = {
   announcement: { select: { id: true, title: true, type: true, groupSizeMin: true, groupSizeMax: true } },
 };
 
+// Auto-detect batch from the student's roll number (e.g. 075BCT001 → "075", 21A → "21")
+function detectBatch(user) {
+  if (user?.batch) return user.batch;
+  const rollMatch = user?.rollNumber?.match(/^(\d{2,3})/);
+  if (rollMatch) {
+    const digits = rollMatch[1];
+    return digits.length === 3 ? `2${digits}` : digits;
+  }
+  return null;
+}
+
 ctrl.create = async (req, res) => {
   try {
     if (req.user.role !== 'STUDENT') return res.status(403).json({ error: 'Only students can create groups' });
@@ -53,15 +64,8 @@ ctrl.create = async (req, res) => {
     }
 
     if (isThesisAnnouncement) {
-      // Auto-detect batch from student's roll number
-      const studentBatch = req.user.batch || (() => {
-        const rollMatch = req.user.rollNumber?.match(/^(\d{2,3})/);
-        if (rollMatch) {
-          const digits = rollMatch[1];
-          return digits.length === 3 ? `2${digits}` : digits;
-        }
-        return null;
-      })();
+      // Auto-detect batch from the announcement (or the student's roll number)
+      const studentBatch = ann.batch || detectBatch(req.user);
 
       // Master thesis: single student, no group members/invitations
       const thesis = await prisma.thesis.create({
@@ -103,6 +107,7 @@ ctrl.create = async (req, res) => {
         projectTitle: projectTitle?.trim() || ann.title,
         projectType,
         status: 'PENDING',
+        batch: ann.batch || detectBatch(req.user),
         programId: resolvedProgramId,
         academicYearId: ann.academicYearId,
         announcementId: ann.id,

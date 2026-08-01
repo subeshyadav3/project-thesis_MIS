@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import NotificationBell from './NotificationBell';
+import CommandPalette from './CommandPalette';
 
 function PageLayout({ children, title, subtitle, actions, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const currentUser = user || JSON.parse(localStorage.getItem('user') || '{}');
 
   return (
     <div className="app-layout">
       {/* Sidebar gets the toggle state and the closing handler */}
       <Sidebar user={currentUser} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} user={currentUser} />
       
       <div className="main-content">
         <header className="top-bar">
@@ -23,7 +26,19 @@ function PageLayout({ children, title, subtitle, actions, user }) {
               <span className="material-symbols-outlined">menu</span>
             </button>
             
-            {/* Optional text or element inside topbar left can go here if needed */}
+            {/* Quick Command Palette trigger */}
+            <button
+              onClick={() => setCommandPaletteOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+                background: 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)',
+                borderRadius: 'var(--border-radius-md)', color: 'var(--color-on-surface-variant)',
+                fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>search</span>
+              <span>Search or type <kbd style={{ fontSize: 10, background: 'var(--color-surface-container)', padding: '1px 5px', borderRadius: 3 }}>Ctrl K</kbd></span>
+            </button>
           </div>
           <div className="top-bar-actions">
             <NotificationBell />

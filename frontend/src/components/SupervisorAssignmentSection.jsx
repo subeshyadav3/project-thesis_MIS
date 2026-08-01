@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../contexts/ToastContext';
+import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
 function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, disabled = false }) {
@@ -8,6 +9,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
   const [selectedSupId, setSelectedSupId] = useState('');
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -38,7 +40,6 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
 
   const handleRemove = async () => {
     if (!currentSupervisor) return;
-    if (!window.confirm(`Remove ${currentSupervisor.firstName} ${currentSupervisor.lastName} as supervisor?`)) return;
     setRemoving(true);
     try {
       const endpoint = type === 'group' ? `/groups/${id}/supervisor` : `/theses/${id}/supervisor`;
@@ -50,6 +51,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
       toast.error(err.response?.data?.error || 'Failed to remove supervisor');
     } finally {
       setRemoving(false);
+      setConfirmRemove(false);
     }
   };
 
@@ -141,7 +143,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
               {currentSupervisor.active ? 'Active' : 'Inactive'}
             </div>
             {!disabled && (
-              <button className="btn btn-sm btn-outline" onClick={handleRemove} disabled={removing} style={{ color: 'var(--color-error)' }}>
+              <button className="btn btn-sm btn-outline" onClick={() => setConfirmRemove(true)} disabled={removing} style={{ color: 'var(--color-error)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{removing ? 'progress_activity' : 'close'}</span>
                 Remove
               </button>
@@ -156,6 +158,16 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove supervisor"
+        message={`Remove ${currentSupervisor?.firstName} ${currentSupervisor?.lastName} as supervisor?`}
+        onConfirm={handleRemove}
+        onCancel={() => setConfirmRemove(false)}
+        confirmLabel="Remove"
+        danger
+      />
     </div>
   );
 }

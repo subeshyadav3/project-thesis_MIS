@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
@@ -165,6 +166,7 @@ function StudentGroups() {
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [availableStudents, setAvailableStudents] = useState([]);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState(null);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -260,13 +262,14 @@ function StudentGroups() {
   };
 
   const handleDeleteGroup = async (groupId) => {
-    if (!window.confirm('Delete this group? This action cannot be undone.')) return;
     try {
       await api.delete(`/student-groups/${groupId}`);
       toast.success('Group deleted');
       loadAll();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to delete group');
+    } finally {
+      setConfirmDeleteGroupId(null);
     }
   };
 
@@ -357,7 +360,7 @@ function StudentGroups() {
                           <td style={{ textAlign: 'right' }}>
                             <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
                               {g.status === 'PENDING' && g.members?.[0]?.student?.id === user.id && (
-                                <button className="icon-btn danger" title="Delete Group" onClick={() => handleDeleteGroup(g.id)}>
+                                <button className="icon-btn danger" title="Delete Group" onClick={() => setConfirmDeleteGroupId(g.id)}>
                                   <span className="material-symbols-outlined">delete</span>
                                 </button>
                               )}
@@ -422,6 +425,16 @@ function StudentGroups() {
             )}
           </div>
         )}
+
+        <ConfirmDialog
+          open={!!confirmDeleteGroupId}
+          title="Delete group"
+          message="Delete this group? This action cannot be undone."
+          onConfirm={() => handleDeleteGroup(confirmDeleteGroupId)}
+          onCancel={() => setConfirmDeleteGroupId(null)}
+          confirmLabel="Delete"
+          danger
+        />
       </PageLayout>
     </ErrorBoundary>
   );

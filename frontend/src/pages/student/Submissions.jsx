@@ -6,21 +6,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
-
-function getDeadlineInfo(expirationDate) {
-  if (!expirationDate) return null;
-  const now = new Date();
-  const deadline = new Date(expirationDate);
-  const diffMs = deadline - now;
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-  if (diffMs < 0) return { expired: true, label: 'Deadline passed', urgent: false };
-  if (diffDays > 30) return { expired: false, label: `${deadline.toLocaleDateString()}`, urgent: false };
-  if (diffDays > 7) return { expired: false, label: `${diffDays} days left`, urgent: false };
-  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
-  if (diffHours >= 1) return { expired: false, label: `${diffHours} hours left`, urgent: true };
-  return { expired: false, label: 'Due soon', urgent: true };
-}
+import { getDeadlineInfo } from '../../utils/deadline';
 
 function StudentSubmissions() {
   const [groups, setGroups] = useState([]);
@@ -209,15 +195,13 @@ function StudentSubmissions() {
               <div style={{ padding: 16 }}>
                 {existing?.documentUrl ? (
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{
+                    <div className="row-hover" style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: 12, borderRadius: 8, background: 'var(--color-surface-container-low)',
                       border: '1px solid var(--color-outline-variant)',
-                      cursor: 'pointer', transition: 'background 0.15s',
+                      cursor: 'pointer',
                     }}
                       onClick={() => setViewerDoc({ url: existing.documentUrl, name: `${stageLabel}_Document.${existing.documentUrl.match(/\.(\w+)$/)?.[1] || 'pdf'}` })}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-container)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'var(--color-surface-container-low)'}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

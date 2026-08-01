@@ -20,6 +20,8 @@ function numberToWords(n) {
 const os = require('os');
 const fsSync = require('fs');
 
+let browserInstancePromise = null;
+
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,
   process.env.CHROME_PATH,
@@ -41,27 +43,59 @@ function findChrome() {
   return null;
 }
 
-async function generatePdf(html) {
+async function getBrowser() {
+  if (browserInstancePromise) {
+    try {
+      const browser = await browserInstancePromise;
+      if (browser.isConnected()) return browser;
+    } catch (_) {
+      browserInstancePromise = null;
+    }
+  }
   const executablePath = findChrome();
   if (!executablePath) {
     throw new Error(
       'Chrome/Chromium executable not found. Set PUPPETEER_EXECUTABLE_PATH or CHROME_PATH environment variable.'
     );
   }
-  const browser = await puppeteer.launch({
+  browserInstancePromise = puppeteer.launch({
     executablePath,
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  }).catch(err => {
+    browserInstancePromise = null;
+    throw err;
   });
+  return browserInstancePromise;
+}
+
+async function generatePdf(html) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' } });
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+    });
     return Buffer.from(pdf);
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
+
+async function shutdownBrowser() {
+  if (!browserInstancePromise) return;
+  try {
+    const browser = await browserInstancePromise;
+    if (browser.isConnected()) await browser.close();
+  } catch (_) { /* ignore */ }
+  browserInstancePromise = null;
+}
+
+process.on('SIGTERM', () => { shutdownBrowser(); });
+process.on('SIGINT', () => { shutdownBrowser(); });
 
 function buildPageHeader() {
   return `
@@ -312,6 +346,9 @@ function buildBachelorFormat(data) {
   const projectLabel = isMajor ? 'Major Project' : 'Minor Project';
   const credit = isMajor ? '6' : '3';
 
+  const totalNum = parseFloat(total);
+  const hasMarks = evaluations.some(e => e.marks !== null && e.marks !== undefined && e.marks !== '');
+
   let sn = 0;
   const bodyRows = evaluations.map((e) => {
     const marks = e.marks !== null && e.marks !== undefined ? e.marks : '';
@@ -325,6 +362,35 @@ function buildBachelorFormat(data) {
       <td style="padding:4px;border:1px solid #000;">${esc(e.comment || '')}</td>
     </tr>`;
   }).join('');
+
+  const comments = evaluations.map(e => e.comment).filter(Boolean).join('; ');
+  const feedbackComments = evaluations.map(e => e.comments).filter(Boolean).join('; ');
+  const suggestionText = evaluations.map(e => e.suggestions).filter(Boolean).join('; ');
+  const commentText = [comments, feedbackComments].filter(Boolean).join('; ');
+
+  // Distinct examiners (by submittedBy) for the signature block
+  const seen = new Set();
+  const examiners = evaluations.filter(e => e.submittedBy && !seen.has(e.submittedBy) && seen.add(e.submittedBy));
+
+  const examinerBlocks = examiners.length
+    ? examiners.map(e => `
+      <div style="font-size:12px;margin-top:${e === examiners[0] ? 16 : 12}px;">
+        <strong>Examiner:</strong><br/>
+        <strong>Name:</strong> ${esc(e.submittedBy)}<br/>
+        <strong>Post:</strong> ${esc(e.evaluatorRole)}<br/>
+        <strong>Organization:</strong> IOE<br/>
+        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
+        <strong>Signature:</strong><br/>
+      </div>`).join('')
+    : `
+      <div style="font-size:12px;margin-top:16px;">
+        <strong>Examiner:</strong><br/>
+        <strong>Name:</strong><br/>
+        <strong>Post:</strong><br/>
+        <strong>Organization:</strong> IOE<br/>
+        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
+        <strong>Signature:</strong><br/>
+      </div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evaluation - ${esc(title)}</title>
   <style>
@@ -364,6 +430,21 @@ function buildBachelorFormat(data) {
         </tr>
       </tbody>
     </table>
+    ${buildNote()}
+
+    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
+      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</td></tr>
+    </table>
+
+    <div style="margin-top:8px;font-size:12px;">
+      <strong>Comments:</strong>
+      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
+    </div>
+    <div style="font-size:12px;">
+      <strong>Suggestions &amp; recommendations:</strong>
+      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
+    </div>
+    ${examinerBlocks}
   </body></html>`;
 }
 

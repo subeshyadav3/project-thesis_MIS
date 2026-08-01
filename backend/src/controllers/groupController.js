@@ -403,13 +403,14 @@ exports.bulkImportConfirm = async (req, res) => {
 
     const created = [];
     const skipped = [];
+    const autoCreatedSideEffects = [];
 
-    const autoCreateUser = async (willCreate, role) => {
+    const autoCreateUser = async (tx, willCreate, role) => {
       if (!willCreate) return null;
       try {
         const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
         const hash = await bcrypt.hash('subesh', 10);
-        const newUser = await prisma.user.upsert({
+        const newUser = await tx.user.upsert({
           where: { email },
           update: {},
           create: {
@@ -424,8 +425,7 @@ exports.bulkImportConfirm = async (req, res) => {
           },
         }).catch(() => null);
         if (newUser) {
-          audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newUser.id, details: `Auto-created ${role} via bulk import` });
-          emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'subesh');
+          autoCreatedSideEffects.push({ userId: newUser.id, role, willCreate });
           return newUser.id;
         }
       } catch (e) {
@@ -469,6 +469,7 @@ exports.bulkImportConfirm = async (req, res) => {
       const matchedStudents = [];
       const resolvedRolls = [...(rolls || [])];
       const studentWillCreate = _edits?.students || {};
+      const studentCreateSpecs = []; // deferred DB writes — executed inside the transaction
       for (let j = 0; j < (studentMatches || []).length; j++) {
         const sm = studentMatches[j];
         const se = studentWillCreate[j];
@@ -478,39 +479,14 @@ exports.bulkImportConfirm = async (req, res) => {
         if (sm?.id) {
           matchedStudents.push(sm.id);
         } else if (se?.firstName && se?.lastName && resolvedRolls[j]) {
-          const email = resolvedRolls[j].toLowerCase() + '@pcampus.edu.np';
-          const hash = await bcrypt.hash('subesh', 10);
-          const batchMatch = resolvedRolls[j].match(/^(\d{2,3})/);
-          const newStudent = await prisma.user.upsert({
-            where: { email },
-            update: {},
-            create: {
-              email,
-              password: hash,
-              firstName: se.firstName,
-              lastName: se.lastName,
-              role: 'STUDENT',
-              rollNumber: resolvedRolls[j],
-              batch: batchMatch ? batchMatch[1] : null,
-              degreeType: 'BACHELOR',
-              programId: programId || undefined,
-              departmentId: req.user.departmentId,
-              active: true,
-            },
-          }).catch(() => null);
-          if (newStudent) {
-            matchedStudents.push(newStudent.id);
-            audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newStudent.id, details: `Auto-created STUDENT via bulk import` });
-            emailService.notifyUserCreated(email, se.firstName, 'STUDENT', email, 'subesh');
-          } else {
-            skipped.push({ row: row.row, reason: `Student at position ${j + 1} could not be created` });
-          }
+          studentCreateSpecs.push({ index: j, se, roll: resolvedRolls[j], programId });
         } else {
           skipped.push({ row: row.row, reason: `Student at position ${j + 1} could not be matched` });
         }
       }
 
-      if (matchedStudents.length === 0) {
+      // Quick validation: don’t bother entering the transaction if we have zero students
+      if (matchedStudents.length === 0 && studentCreateSpecs.length === 0) {
         skipped.push({ row: row.row, reason: 'No students could be matched' });
         continue;
       }
@@ -523,9 +499,6 @@ exports.bulkImportConfirm = async (req, res) => {
           continue;
         }
       }
-      if (!resolvedSupervisorId && supervisorWillCreate) {
-        resolvedSupervisorId = await autoCreateUser(supervisorWillCreate, 'SUPERVISOR');
-      }
 
       let resolvedExaminerId = examinerMatch?.id || null;
       if (resolvedExaminerId) {
@@ -535,11 +508,48 @@ exports.bulkImportConfirm = async (req, res) => {
           continue;
         }
       }
-      if (!resolvedExaminerId && examinerWillCreate) {
-        resolvedExaminerId = await autoCreateUser(examinerWillCreate, 'EXTERNAL_EXAMINER');
-      }
 
-      const group = await prisma.$transaction(async (tx) => {
+      // Run all writes for this row inside one transaction so that any
+      // mid-stream failure (validation, conflict, DB error) rolls back
+      // every auto-created user, group, member and component atomically.
+      const rowResult = await prisma.$transaction(async (tx) => {
+        if (!resolvedSupervisorId && supervisorWillCreate) {
+          resolvedSupervisorId = await autoCreateUser(tx, supervisorWillCreate, 'SUPERVISOR');
+        }
+        if (!resolvedExaminerId && examinerWillCreate) {
+          resolvedExaminerId = await autoCreateUser(tx, examinerWillCreate, 'EXTERNAL_EXAMINER');
+        }
+
+        // Create pending student records inside the transaction
+        for (const spec of studentCreateSpecs) {
+          const email = spec.roll.toLowerCase() + '@pcampus.edu.np';
+          const hash = await bcrypt.hash('subesh', 10);
+          const batchMatch = spec.roll.match(/^(\d{2,3})/);
+          const newStudent = await tx.user.upsert({
+            where: { email },
+            update: {},
+            create: {
+              email,
+              password: hash,
+              firstName: spec.se.firstName,
+              lastName: spec.se.lastName,
+              role: 'STUDENT',
+              rollNumber: spec.roll,
+              batch: batchMatch ? batchMatch[1] : null,
+              degreeType: 'BACHELOR',
+              programId: spec.programId || undefined,
+              departmentId: req.user.departmentId,
+              active: true,
+            },
+          }).catch(() => null);
+          if (newStudent) {
+            matchedStudents.push(newStudent.id);
+            autoCreatedSideEffects.push({ userId: newStudent.id, role: 'STUDENT', willCreate: spec.se });
+          } else {
+            skipped.push({ row: row.row, reason: `Student at position ${spec.index + 1} could not be created` });
+          }
+        }
+
         const dup = await tx.projectGroup.findFirst({
           where: { name: { equals: groupName.trim(), mode: 'insensitive' } },
         });
@@ -610,9 +620,11 @@ exports.bulkImportConfirm = async (req, res) => {
           }
         } catch (e) { /* ignore */ }
 
-        created.push(newGroup);
         return newGroup;
-      });
+      }, { timeout: 60000, maxWait: 10000 });
+
+      const group = rowResult;
+      if (group) created.push(group);
 
       // --- Notifications ---
       if (group) {
@@ -672,6 +684,24 @@ exports.bulkImportConfirm = async (req, res) => {
           console.error('notifications for group:', groupName, e.message);
         }
       }
+    }
+
+    // Audit log + email notifications for auto-created users
+    for (const sideEffect of autoCreatedSideEffects) {
+      audit.log({
+        action: 'AUTO_CREATE',
+        entity: 'User',
+        entityId: sideEffect.userId,
+        details: `Auto-created ${sideEffect.role} via bulk import`,
+        performedById: req.user.id,
+      });
+      const se = sideEffect.willCreate;
+      const email = generateEmail(
+        se.firstName,
+        se.lastName,
+        sideEffect.role === 'STUDENT' ? 'STUDENT' : sideEffect.role,
+      );
+      emailService.notifyUserCreated(email, se.firstName, sideEffect.role, email, 'subesh');
     }
 
     audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Bulk imported ${created.length} groups${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });

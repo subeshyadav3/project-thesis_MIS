@@ -112,9 +112,7 @@ exports.issueRecommendation = async (req, res) => {
       resolvedContent = [
         `I am pleased to recommend ${studentName}, who has successfully completed the ${itemLabel.toLowerCase()} titled "${itemTitle}" under my supervision at the Department of Electronics and Computer Engineering, Institute of Engineering, Pulchowk Campus.`,
         '',
-        `During the course of this ${itemLabel.toLowerCase()}, ${studentName} demonstrated outstanding dedication, analytical skills, and technical proficiency. The work carried out reflects a deep understanding of the subject matter and the ability to apply theoretical knowledge to practical problem-solving.`,
-        '',
-        `${studentName} exhibited strong research capabilities, effective communication skills, and a professional attitude throughout the supervision period. The final deliverables meet the highest standards of academic rigor and originality.`,
+        `During the course of the ${itemLabel.toLowerCase()}, ${studentName} demonstrated strong dedication, technical proficiency, and a professional attitude. The final deliverables reflect a high standard of academic rigor and originality.`,
         '',
         'I recommend this student without reservation and am confident that they will excel in their future academic and professional endeavors.',
       ].join('\n');
@@ -229,6 +227,48 @@ exports.downloadRecommendation = async (req, res) => {
       res.setHeader('Content-Disposition', `inline; filename=recommendation_${id}.pdf`);
     }
     res.send(pdf);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.deleteRecommendation = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const rec = await prisma.recommendation.findUnique({
+      where: { id },
+      select: { id: true, issuedById: true, groupId: true, thesisId: true },
+    });
+    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+
+    // Only the issuer, or a coordinator/maintainer can delete
+    if (req.user.role === 'SUPERVISOR' && rec.issuedById !== req.user.id) {
+      return res.status(403).json({ error: 'You can only delete your own recommendations' });
+    }
+    if (req.user.role === 'STUDENT') {
+      return res.status(403).json({ error: 'Students cannot delete recommendations' });
+    }
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
+      const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      if (prog) {
+        let itemProgramId = null;
+        if (rec.groupId) {
+          const g = await prisma.projectGroup.findUnique({ where: { id: rec.groupId }, select: { programId: true } });
+          itemProgramId = g?.programId;
+        } else if (rec.thesisId) {
+          const t = await prisma.thesis.findUnique({ where: { id: rec.thesisId }, include: { student: { select: { programId: true } } } });
+          itemProgramId = t?.student?.programId;
+        }
+        if (itemProgramId && itemProgramId !== prog.id) {
+          return res.status(403).json({ error: 'This recommendation belongs to another program' });
+        }
+      }
+    }
+
+    await prisma.recommendation.delete({ where: { id } });
+    const issuerLabel = req.user.role === 'SUPERVISOR' ? 'Supervisor' : 'Coordinator';
+    audit.log({ action: 'DELETE_RECOMMENDATION', entity: 'Recommendation', entityId: id, details: `${issuerLabel} deleted recommendation letter`, performedById: req.user.id });
+    res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

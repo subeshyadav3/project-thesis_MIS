@@ -7,21 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { downloadFile } from '../../utils/download';
 import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
-
-function getDeadlineInfo(expirationDate) {
-  if (!expirationDate) return null;
-  const now = new Date();
-  const deadline = new Date(expirationDate);
-  const diffMs = deadline - now;
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-  if (diffMs < 0) return { expired: true, label: 'Deadline passed', urgent: false };
-  if (diffDays > 30) return { expired: false, label: `${deadline.toLocaleDateString()}`, urgent: false };
-  if (diffDays > 7) return { expired: false, label: `${diffDays} days left`, urgent: false };
-  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
-  if (diffHours >= 1) return { expired: false, label: `${diffHours} hours left`, urgent: true };
-  return { expired: false, label: 'Due soon', urgent: true };
-}
+import { getDeadlineInfo } from '../../utils/deadline';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -84,8 +70,31 @@ function StudentProjectDetail() {
   const stageKeys = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const submittedStages = proposals.filter(p => p.documentUrl).map(p => p.stage);
 
+  // Ordered component breakdown (used for marks-based progress)
+  const orderedTypes = isGroup
+    ? ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER']
+    : ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'EXTERNAL_MIDTERM', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_FINAL'];
+  const components = (evaluationsData?.components || []).slice().sort((a, b) =>
+    orderedTypes.indexOf(a.evaluationType) - orderedTypes.indexOf(b.evaluationType)
+  );
+  const evalByComponent = new Map((evaluationsData?.evaluations || []).map(e => [e.componentId, e]));
+
+  // Evaluation types required for each lifecycle stage to be considered complete
+  const stageEvalTypes = {
+    PROPOSAL: ['PROPOSAL_DEFENSE'],
+    MID_TERM: isGroup ? ['MIDTERM_DEFENSE'] : ['MIDTERM_DEFENSE', 'EXTERNAL_MIDTERM'],
+    FINAL: isGroup ? ['FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER'] : ['FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_FINAL'],
+  };
+
   const stageStatus = (stage) => {
     const hasSubmitted = submittedStages.includes(stage);
+    const types = stageEvalTypes[stage] || [];
+    const stageComponents = components.filter(c => types.includes(c.evaluationType));
+    const allMarked = stageComponents.length > 0 && stageComponents.every(c => {
+      const e = evalByComponent.get(c.id);
+      return e && e.marks !== null && e.marks !== undefined;
+    });
+    if (allMarked) return 'done';
     const hasFeedback = evaluations.some(e => e.stage === stage && e.comment);
     if (hasSubmitted && hasFeedback) return 'done';
     if (hasSubmitted) return 'submitted';
@@ -104,16 +113,6 @@ function StudentProjectDetail() {
   const tabProposal = proposals.find(p => p.stage === feedbackTab && p.documentUrl);
   const tabExt = tabProposal?.documentUrl?.match(/\.(\w+)$/)?.[1] || 'pdf';
   const tabLabel = feedbackTab === 'MID_TERM' ? 'Mid-Term' : feedbackTab.charAt(0) + feedbackTab.slice(1).toLowerCase();
-
-  // Ordered 5-component breakdown
-  const orderedTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
-  const components = (evaluationsData?.components || []).slice().sort((a, b) =>
-    orderedTypes.indexOf(a.evaluationType) - orderedTypes.indexOf(b.evaluationType)
-  );
-  const evalByComponent = new Map((evaluationsData?.evaluations || []).map(e => [e.componentId, e]));
-  const breakdown = components.map(c => ({ component: c, evaluation: evalByComponent.get(c.id) }));
-  const completedComponents = breakdown.filter(b => b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined).length;
-  const isComplete = completedComponents === breakdown.length && breakdown.length > 0;
 
   return (
     <ErrorBoundary><PageLayout
@@ -449,8 +448,8 @@ function StudentProjectDetail() {
                         {r.issuedBy.firstName} {r.issuedBy.lastName}
                         <span style={{
                           padding: '1px 5px', borderRadius: 3, fontSize: 9, fontWeight: 600,
-                          background: r.issuedBy.role === 'COORDINATOR' ? '#e3f2fd' : r.issuedBy.role === 'SUPERVISOR' ? '#e8f5e9' : '#f3e5f5',
-                          color: r.issuedBy.role === 'COORDINATOR' ? '#1565c0' : r.issuedBy.role === 'SUPERVISOR' ? '#2e7d32' : '#7b1fa2',
+                          background: r.issuedBy.role === 'COORDINATOR' ? 'var(--color-primary-container)' : r.issuedBy.role === 'SUPERVISOR' ? 'var(--color-success-container)' : r.issuedBy.role === 'EXTERNAL_EXAMINER' ? 'var(--color-warning-container)' : 'var(--color-surface-container-high)',
+                          color: r.issuedBy.role === 'COORDINATOR' ? 'var(--color-on-primary-container)' : r.issuedBy.role === 'SUPERVISOR' ? 'var(--color-on-success-container)' : r.issuedBy.role === 'EXTERNAL_EXAMINER' ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                         }}>{r.issuedBy.role}</span>
                       </span>
                     )}

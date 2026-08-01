@@ -6,6 +6,7 @@ import ExaminerAssignmentSection from '../../components/ExaminerAssignmentSectio
 import SupervisorAssignmentSection from '../../components/SupervisorAssignmentSection';
 import ExternalExaminerSection from '../../components/ExternalExaminerSection';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
+import WorkflowStepper from '../../components/WorkflowStepper';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -201,6 +202,16 @@ function ProjectDetail() {
     } finally { setIssuingRecommendation(false); }
   };
 
+  const handleDeleteRecommendation = async (recId) => {
+    try {
+      await api.delete(`/supervisors/recommendation/${recId}`);
+      toast.success('Recommendation deleted');
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete');
+    }
+  };
+
   const tabs = [
     { key: 'overview', icon: 'overview', label: 'Overview' },
     { key: 'evaluation', icon: 'grading', label: 'Evaluation' },
@@ -209,6 +220,18 @@ function ProjectDetail() {
 
   if (loading && !item) {
     return <PageLayout title="" user={user}><SkeletonPage type={type} /></PageLayout>;
+  }
+
+  if (!item) {
+    return (
+      <PageLayout title="" user={user}>
+        <div className="empty-state" style={{ padding: 48, textAlign: 'center' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>error</span>
+          <h3>Project not found</h3>
+          <button className="btn" onClick={() => navigate(backPath)}>Go back</button>
+        </div>
+      </PageLayout>
+    );
   }
 
   return (
@@ -281,6 +304,8 @@ function ProjectDetail() {
         {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
         {activeTab === 'overview' && (
           <>
+            <WorkflowStepper status={item?.status} degreeType={type === 'thesis' ? 'MASTER' : 'BACHELOR'} components={components} evaluations={evaluations} />
+
             {/* Summary cards */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
@@ -727,6 +752,16 @@ function ProjectDetail() {
                           title="Download PDF">
                           <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                         </button>
+                        {(isSupervisor || isCoordinator) && (
+                          <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-error)' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDialog({ open: true, title: 'Delete recommendation', message: 'Delete this recommendation letter? This cannot be undone.', confirmLabel: 'Delete', danger: true, onConfirm: () => handleDeleteRecommendation(r.id) });
+                            }}
+                            title="Delete Recommendation">
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -813,19 +848,35 @@ function InfoRow({ label, value }) {
 function DefenseCard({ component, evaluation, onSave }) {
   const [marks, setMarks] = useState(evaluation?.marks?.toString() ?? '');
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
 
   useEffect(() => {
     setMarks(evaluation?.marks?.toString() ?? '');
+    setSaveStatus(null);
   }, [evaluation?.id, evaluation?.marks]);
+
+  const marksNum = marks === '' ? null : parseFloat(marks);
+  const isOverMax = marksNum !== null && marksNum > component.maxMarks;
+  const isNegative = marksNum !== null && marksNum < 0;
 
   const submit = async () => {
     if (marks === '' || marks === null || marks === undefined) return;
+    if (isOverMax || isNegative) return;
     setSaving(true);
-    try { await onSave(marks); }
-    finally { setSaving(false); }
+    setSaveStatus('saving');
+    try {
+      await onSave(marks);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch {
+      setSaveStatus('error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const hasValue = marks !== '' && marks !== null && marks !== undefined;
+  const showError = isOverMax || isNegative;
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -841,18 +892,24 @@ function DefenseCard({ component, evaluation, onSave }) {
           max={component.maxMarks} min="0" step="0.5" placeholder="0"
           style={{
             width: 56, padding: '4px 6px', fontSize: 13, textAlign: 'center',
-            border: hasValue ? '1px solid var(--color-primary-container)' : '1px solid var(--color-outline)',
+            border: showError ? '1px solid var(--color-error)' : hasValue ? '1px solid var(--color-primary-container)' : '1px solid var(--color-outline)',
             borderRadius: 6, background: 'transparent', outline: 'none',
-            fontWeight: 600, color: hasValue ? 'var(--color-primary)' : 'var(--color-on-surface)',
+            fontWeight: 600, color: showError ? 'var(--color-error)' : hasValue ? 'var(--color-primary)' : 'var(--color-on-surface)',
           }}
           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
         />
-        <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
+        <span style={{ fontSize: 11, color: showError ? 'var(--color-error)' : 'var(--color-on-surface-variant)' }}>/ {component.maxMarks}</span>
         <button className="btn btn-primary btn-sm" onClick={submit}
-          disabled={saving || marks === '' || marks === null || marks === undefined}
+          disabled={saving || marks === '' || marks === null || marks === undefined || showError}
           style={{ padding: '4px 10px', minWidth: 52, fontSize: 12 }}>
           {saving ? '...' : 'Save'}
         </button>
+        {saveStatus === 'saved' && (
+          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-success)' }}>check</span>
+        )}
+        {saveStatus === 'error' && (
+          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }}>error</span>
+        )}
       </div>
     </div>
   );

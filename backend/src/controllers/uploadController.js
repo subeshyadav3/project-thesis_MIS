@@ -4,6 +4,30 @@ const fs = require('fs');
 const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 
+// Magic number signatures for common document types
+const MAGIC_SIGNATURES = {
+  pdf:  [{ offset: 0, bytes: [0x25, 0x50, 0x44, 0x46] }], // %PDF
+  docx: [{ offset: 0, bytes: [0x50, 0x4B, 0x03, 0x04] }], // PK\x03\x04 (ZIP)
+  xlsx: [{ offset: 0, bytes: [0x50, 0x4B, 0x03, 0x04] }], // PK\x03\x04 (ZIP)
+  doc:  [{ offset: 0, bytes: [0xD0, 0xCF, 0x11, 0xE0] }], // CFB
+  png:  [{ offset: 0, bytes: [0x89, 0x50, 0x4E, 0x47] }], // PNG
+  jpg:  [{ offset: 0, bytes: [0xFF, 0xD8, 0xFF] }],       // JPEG
+};
+
+function detectMimeFromBuffer(buffer) {
+  for (const [type, signatures] of Object.entries(MAGIC_SIGNATURES)) {
+    for (const sig of signatures) {
+      const matches = sig.bytes.every((byte, i) =>
+        buffer[sig.offset + i] === byte
+      );
+      if (matches) return type;
+    }
+  }
+  return null;
+}
+
+const ALLOWED_MIME_TYPES = ['pdf', 'docx', 'doc', 'png', 'jpg'];
+
 /**
  * Trigger the new ai_chatbot pipeline in the background. Best-effort —
  * synchronously returns the response while the AI runs async, with errors
@@ -37,6 +61,10 @@ function triggerAIChatbot({ proposalId, documentUrl, documentType, authToken }) 
 exports.uploadProposal = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+    const detectedType = detectMimeFromBuffer(req.file.buffer);
+    if (!detectedType || !ALLOWED_MIME_TYPES.includes(detectedType)) {
+      return res.status(400).json({ success: false, error: `Invalid file type detected (${detectedType || 'unknown'}). Allowed: ${ALLOWED_MIME_TYPES.join(', ')}` });
+    }
     const { groupId, thesisId, stage } = req.body;
     if (!stage) return res.status(400).json({ success: false, error: 'Stage is required' });
     if (!groupId && !thesisId) return res.status(400).json({ success: false, error: 'groupId or thesisId is required' });

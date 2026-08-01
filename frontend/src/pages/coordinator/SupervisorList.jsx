@@ -5,7 +5,6 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
@@ -35,7 +34,6 @@ function SupervisorList() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isBachelorCoordinator = user.program?.degreeType === 'BACHELOR';
   const isMasterCoordinator = user.program?.degreeType === 'MASTER';
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -509,15 +507,6 @@ function SupervisorList() {
           </>
         )}
       </div>
-      <ConfirmDialog 
-        open={confirmDialog.open}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        confirmLabel="Confirm"
-        danger={confirmDialog.danger}
-        onConfirm={() => { confirmDialog.onConfirm?.(); setConfirmDialog({ ...confirmDialog, open: false }); }}
-        onCancel={() => setConfirmDialog({ ...confirmDialog, open: false })}
-      />
     </PageLayout>
     </ErrorBoundary>
   );

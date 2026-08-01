@@ -4,19 +4,7 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
-
-function getDeadlineInfo(expirationDate) {
-  if (!expirationDate) return null;
-  const now = new Date();
-  const deadline = new Date(expirationDate);
-  const diffMs = deadline - now;
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  if (diffMs < 0) return { expired: true, label: 'Deadline passed' };
-  if (diffDays > 7) return { expired: false, label: `${diffDays} days left` };
-  if (diffDays > 1) return { expired: false, label: `${diffDays} days left`, urgent: true };
-  if (diffDays === 1) return { expired: false, label: '1 day left', urgent: true };
-  return { expired: false, label: 'Due soon', urgent: true };
-}
+import { getDeadlineInfo } from '../../utils/deadline';
 
 function StudentProjects() {
   const [groups, setGroups] = useState([]);
@@ -64,11 +52,9 @@ function StudentProjects() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {groups.map(g => (
           <Link key={g.id} to={`/student/project/${g.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div className="card" style={{
-              cursor: 'pointer', transition: 'all 0.15s', marginBottom: 0,
+            <div className="card hoverable-card" style={{
+              marginBottom: 0,
             }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-outline-variant)'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               <div className="card-header" style={{ border: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
