@@ -84,8 +84,31 @@ function StudentProjectDetail() {
   const stageKeys = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const submittedStages = proposals.filter(p => p.documentUrl).map(p => p.stage);
 
+  // Ordered component breakdown (used for marks-based progress)
+  const orderedTypes = isGroup
+    ? ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER']
+    : ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'EXTERNAL_MIDTERM', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_FINAL'];
+  const components = (evaluationsData?.components || []).slice().sort((a, b) =>
+    orderedTypes.indexOf(a.evaluationType) - orderedTypes.indexOf(b.evaluationType)
+  );
+  const evalByComponent = new Map((evaluationsData?.evaluations || []).map(e => [e.componentId, e]));
+
+  // Evaluation types required for each lifecycle stage to be considered complete
+  const stageEvalTypes = {
+    PROPOSAL: ['PROPOSAL_DEFENSE'],
+    MID_TERM: isGroup ? ['MIDTERM_DEFENSE'] : ['MIDTERM_DEFENSE', 'EXTERNAL_MIDTERM'],
+    FINAL: isGroup ? ['FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER'] : ['FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_FINAL'],
+  };
+
   const stageStatus = (stage) => {
     const hasSubmitted = submittedStages.includes(stage);
+    const types = stageEvalTypes[stage] || [];
+    const stageComponents = components.filter(c => types.includes(c.evaluationType));
+    const allMarked = stageComponents.length > 0 && stageComponents.every(c => {
+      const e = evalByComponent.get(c.id);
+      return e && e.marks !== null && e.marks !== undefined;
+    });
+    if (allMarked) return 'done';
     const hasFeedback = evaluations.some(e => e.stage === stage && e.comment);
     if (hasSubmitted && hasFeedback) return 'done';
     if (hasSubmitted) return 'submitted';
@@ -104,16 +127,6 @@ function StudentProjectDetail() {
   const tabProposal = proposals.find(p => p.stage === feedbackTab && p.documentUrl);
   const tabExt = tabProposal?.documentUrl?.match(/\.(\w+)$/)?.[1] || 'pdf';
   const tabLabel = feedbackTab === 'MID_TERM' ? 'Mid-Term' : feedbackTab.charAt(0) + feedbackTab.slice(1).toLowerCase();
-
-  // Ordered 5-component breakdown
-  const orderedTypes = ['PROPOSAL_DEFENSE', 'MIDTERM_DEFENSE', 'FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
-  const components = (evaluationsData?.components || []).slice().sort((a, b) =>
-    orderedTypes.indexOf(a.evaluationType) - orderedTypes.indexOf(b.evaluationType)
-  );
-  const evalByComponent = new Map((evaluationsData?.evaluations || []).map(e => [e.componentId, e]));
-  const breakdown = components.map(c => ({ component: c, evaluation: evalByComponent.get(c.id) }));
-  const completedComponents = breakdown.filter(b => b.evaluation && b.evaluation.marks !== null && b.evaluation.marks !== undefined).length;
-  const isComplete = completedComponents === breakdown.length && breakdown.length > 0;
 
   return (
     <ErrorBoundary><PageLayout

@@ -212,6 +212,18 @@ function ProjectDetail() {
     return <PageLayout title="" user={user}><SkeletonPage type={type} /></PageLayout>;
   }
 
+  if (!item) {
+    return (
+      <PageLayout title="" user={user}>
+        <div className="empty-state" style={{ padding: 48, textAlign: 'center' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>error</span>
+          <h3>Project not found</h3>
+          <button className="btn" onClick={() => navigate(backPath)}>Go back</button>
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <PageLayout title="" user={user}>
@@ -282,7 +294,7 @@ function ProjectDetail() {
         {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
         {activeTab === 'overview' && (
           <>
-            <WorkflowStepper status={item.status} degreeType={isThesis ? 'MASTER' : 'BACHELOR'} />
+            <WorkflowStepper status={item?.status} degreeType={type === 'thesis' ? 'MASTER' : 'BACHELOR'} components={components} evaluations={evaluations} />
 
             {/* Summary cards */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
