@@ -157,7 +157,7 @@ function StudentSubmissions() {
                   <div style={{
                     width: 36, height: 36, borderRadius: 8,
                     background: existing?.documentUrl ? 'var(--color-primary)' : 'var(--color-surface-container)',
-                    color: existing?.documentUrl ? '#fff' : 'var(--color-on-surface)',
+                    color: existing?.documentUrl ? 'var(--color-on-primary)' : 'var(--color-on-surface)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 20 }}>

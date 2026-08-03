@@ -239,7 +239,7 @@ function ProjectDetail() {
       <PageLayout title="" user={user}>
         {/* ─── HERO HEADER ─── */}
         <div style={{
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f172a 100%)',
+          background: 'linear-gradient(135deg, #3730a3 0%, #0f172a 100%)',
           borderRadius: 16, padding: '28px 32px', marginBottom: 24,
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap',
         }}>
@@ -273,7 +273,7 @@ function ProjectDetail() {
             <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 4px', lineHeight: 1.3 }}>
               {title || 'Loading...'}
             </h1>
-            <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>
+            <p style={{ color: '#cbd5e1', fontSize: 14, margin: 0 }}>
               {name}
               {item?.batch ? ` · Batch ${item.batch}` : ''}
             </p>
@@ -478,7 +478,7 @@ function ProjectDetail() {
                         <div style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           padding: '16px 20px', margin: '8px 12px', borderRadius: 10,
-                          background: 'linear-gradient(135deg, var(--color-primary-grand) 0%, var(--color-primary) 100%)',
+                          background: 'linear-gradient(135deg, #3730a3 0%, #4338ca 100%)',
                         }}>
                           <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Grand Total</span>
                           <span style={{ fontWeight: 800, fontSize: 22, color: '#fff' }}>
@@ -966,7 +966,7 @@ function CoordinatorEvaluationView({ type, orderedComponents, componentByType, e
           })}
         </tbody>
       </table>
-      <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-primary)', color: '#fff' }}>
+      <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
         <span style={{ fontWeight: 600, fontSize: 13, opacity: 0.9 }}>Grand Total</span>
         <span style={{ fontWeight: 700, fontSize: 16 }}>
           {progress.earned} <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.7 }}>/{progress.total}</span>

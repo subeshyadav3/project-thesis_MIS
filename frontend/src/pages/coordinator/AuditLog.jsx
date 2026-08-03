@@ -40,29 +40,54 @@ export default function AuditLog() {
   }, [page, entityFilter, actionFilter]);
 
   const actionColors = {
-    CREATE: 'var(--color-success)',
-    UPDATE: 'var(--color-primary)',
-    DELETE: 'var(--color-error)',
-    DEACTIVATE: 'var(--color-error)',
-    ACTIVATE: 'var(--color-success)',
-    UPLOAD: 'var(--color-tertiary)',
-    LOGIN: 'var(--color-primary)',
-    LOGIN_FAILED: 'var(--color-error)',
-    LOGOUT: 'var(--color-secondary)',
-    CHANGE_PASSWORD: 'var(--color-warning)',
-    RESET_PASSWORD: 'var(--color-warning)',
-    SUBMIT_MARKS: 'var(--color-success)',
-    UPDATE_MARKS: 'var(--color-primary)',
-    SUBMIT_FEEDBACK: 'var(--color-tertiary)',
-    VIEW: 'var(--color-secondary)',
-    FORWARD: 'var(--color-success)',
-    ASSIGN_SUPERVISOR: 'var(--color-primary)',
-    BULK_ASSIGN_SUPERVISOR: 'var(--color-secondary)',
-    ASSIGN_EXAMINER: 'var(--color-primary)',
-    REMOVE: 'var(--color-error)',
-    UPDATE_STATUS: 'var(--color-warning)',
-    ISSUE_RECOMMENDATION: 'var(--color-tertiary)',
-    COMPLETE_EVALUATION: 'var(--color-success)',
+    CREATE: 'var(--color-success-container)',
+    UPDATE: 'var(--color-primary-container)',
+    DELETE: 'var(--color-error-container)',
+    DEACTIVATE: 'var(--color-error-container)',
+    ACTIVATE: 'var(--color-success-container)',
+    UPLOAD: 'var(--color-tertiary-container)',
+    LOGIN: 'var(--color-primary-container)',
+    LOGIN_FAILED: 'var(--color-error-container)',
+    LOGOUT: 'var(--color-secondary-container)',
+    CHANGE_PASSWORD: 'var(--color-warning-container)',
+    RESET_PASSWORD: 'var(--color-warning-container)',
+    SUBMIT_MARKS: 'var(--color-success-container)',
+    UPDATE_MARKS: 'var(--color-primary-container)',
+    SUBMIT_FEEDBACK: 'var(--color-tertiary-container)',
+    VIEW: 'var(--color-secondary-container)',
+    FORWARD: 'var(--color-success-container)',
+    ASSIGN_SUPERVISOR: 'var(--color-primary-container)',
+    BULK_ASSIGN_SUPERVISOR: 'var(--color-secondary-container)',
+    ASSIGN_EXAMINER: 'var(--color-primary-container)',
+    REMOVE: 'var(--color-error-container)',
+    UPDATE_STATUS: 'var(--color-warning-container)',
+    ISSUE_RECOMMENDATION: 'var(--color-tertiary-container)',
+    COMPLETE_EVALUATION: 'var(--color-success-container)',
+  };
+  const actionOnColors = {
+    CREATE: 'var(--color-on-success-container)',
+    UPDATE: 'var(--color-on-primary-container)',
+    DELETE: 'var(--color-on-error-container)',
+    DEACTIVATE: 'var(--color-on-error-container)',
+    ACTIVATE: 'var(--color-on-success-container)',
+    UPLOAD: 'var(--color-on-tertiary-container)',
+    LOGIN: 'var(--color-on-primary-container)',
+    LOGIN_FAILED: 'var(--color-on-error-container)',
+    LOGOUT: 'var(--color-on-secondary-container)',
+    CHANGE_PASSWORD: 'var(--color-on-warning-container)',
+    RESET_PASSWORD: 'var(--color-on-warning-container)',
+    SUBMIT_MARKS: 'var(--color-on-success-container)',
+    UPDATE_MARKS: 'var(--color-on-primary-container)',
+    SUBMIT_FEEDBACK: 'var(--color-on-tertiary-container)',
+    VIEW: 'var(--color-on-secondary-container)',
+    FORWARD: 'var(--color-on-success-container)',
+    ASSIGN_SUPERVISOR: 'var(--color-on-primary-container)',
+    BULK_ASSIGN_SUPERVISOR: 'var(--color-on-secondary-container)',
+    ASSIGN_EXAMINER: 'var(--color-on-primary-container)',
+    REMOVE: 'var(--color-on-error-container)',
+    UPDATE_STATUS: 'var(--color-on-warning-container)',
+    ISSUE_RECOMMENDATION: 'var(--color-on-tertiary-container)',
+    COMPLETE_EVALUATION: 'var(--color-on-success-container)',
   };
 
   return (
@@ -96,7 +121,7 @@ export default function AuditLog() {
                 <tbody>
                   {logs.map(log => (
                     <tr key={log.id}>
-                      <td><span className="badge" style={{ background: actionColors[log.action] || 'var(--color-surface-container)', color: '#fff' }}>{log.action}</span></td>
+                      <td><span className="badge" style={{ background: actionColors[log.action] || 'var(--color-surface-container)', color: actionOnColors[log.action] || 'var(--color-on-surface)' }}>{log.action}</span></td>
                       <td>{log.entity}{log.entityId ? ` #${log.entityId}` : ''}</td>
                       <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || '-'}</td>
                       <td>{log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : 'System'}</td>

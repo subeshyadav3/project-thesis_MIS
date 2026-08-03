@@ -435,7 +435,7 @@ function StudentProjectDetail() {
               }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                  background: 'var(--color-primary)', color: '#fff',
+                  background: 'var(--color-primary)', color: 'var(--color-on-primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>

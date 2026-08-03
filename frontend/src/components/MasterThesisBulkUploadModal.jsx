@@ -127,8 +127,9 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
     };
     const isError = a.type === 'exact_duplicate';
     const style = {
-      background: isError ? 'var(--color-error)' : 'var(--color-warning)',
-      color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
+      background: isError ? 'var(--color-error-container)' : 'var(--color-warning-container)',
+      color: isError ? 'var(--color-on-error-container)' : 'var(--color-on-warning-container)',
+      padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
     };
     return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
   };
@@ -137,7 +138,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
     if (!p.warnings) return null;
     const cp = p.warnings.find(w => w.toLowerCase().includes('does not match selected program'));
     if (!cp) return null;
-    return <span style={{ background: 'var(--color-error)', color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap' }} title={cp}>Cross-program</span>;
+    return <span style={{ background: 'var(--color-error-container)', color: 'var(--color-on-error-container)', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap' }} title={cp}>Cross-program</span>;
   };
 
   const setStudentEdit = (field, value) => {

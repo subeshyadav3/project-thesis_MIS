@@ -197,7 +197,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                     const anomalyBadge = (a) => {
                       const labels = { exact_duplicate: 'Duplicate', group_name_exists: 'Name taken', student_in_group: 'Student conflict' };
                       const isError = a.type === 'exact_duplicate';
-                      const style = { background: isError ? 'var(--color-error)' : 'var(--color-warning)', color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default' };
+                      const style = { background: isError ? 'var(--color-error-container)' : 'var(--color-warning-container)', color: isError ? 'var(--color-on-error-container)' : 'var(--color-on-warning-container)', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default' };
                       return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
                     };
 

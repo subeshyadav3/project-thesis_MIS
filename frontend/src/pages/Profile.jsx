@@ -63,7 +63,7 @@ function Profile() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 0 16px', borderBottom: '1px solid var(--color-outline-variant)', marginBottom: 20 }}>
             <div style={{
               width: 72, height: 72, borderRadius: '50%',
-              background: 'var(--color-primary)', color: '#fff',
+              background: 'var(--color-primary)', color: 'var(--color-on-primary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 28, fontWeight: 700
             }}>
