@@ -1,7 +1,7 @@
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
   :root {
-    /* ─── Warm Minimalist Color Theme ────────────────────────── */
+    /* ─── Original color theme (default; modern palette applied via body.theme-modern) ── */
     --color-primary: #1e293b;
     --color-primary-hover: #0f172a;
     --color-primary-container: #dbeafe;
@@ -46,6 +46,8 @@
 
     --color-warning: #ea580c;
     --color-warning-container: #fff7ed;
+    --color-on-warning: #ffffff;
+    --color-on-warning-container: #c2410c;
     --color-on-warning: #ffffff;
     --color-on-warning-container: #c2410c;
 
@@ -3918,3 +3920,274 @@ a:focus-visible {
 .ai-similarity-meta { font-size: 11px; color: var(--color-on-surface-variant); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; }
 .ai-similarity-meta span { display: inline-flex; align-items: center; gap: 4px; }
 .ai-similarity-empty { font-size: 13px; color: var(--color-on-surface-variant); padding: 16px 0; text-align: center; }
+
+/* ==========================================================================
+   THEME POLISH LAYER — Modern light theme (toggleable)
+   Applied only while <body class="theme-modern"> is present. With no class
+   the app falls back to the original/previous theme. Toggle from the top bar;
+   the choice is persisted in localStorage.
+   ========================================================================== */
+
+body.theme-modern {
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-container: #e0e7ff;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #3730a3;
+  --color-primary-grand: #4338ca;
+  --color-secondary: #f59e0b;
+  --color-secondary-hover: #d97706;
+  --color-secondary-container: #fef3c7;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #92400e;
+  --color-tertiary: #0d9488;
+  --color-tertiary-hover: #0f766e;
+  --color-tertiary-container: #ccfbf1;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #134e4a;
+  --color-surface: #f6f8fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eef1f6;
+  --color-surface-container: #e3e8f0;
+  --color-surface-container-high: #cbd4e1;
+  --color-surface-container-highest: #93a1b3;
+  --color-background: #eef2f7;
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #55657a;
+  --color-outline: #c2ccd8;
+  --color-outline-variant: #dfe5ec;
+  --color-warning: #f97316;
+  --color-warning-container: #fff3e0;
+  --font-display: "DM Sans", sans-serif;
+  --font-headline: "DM Sans", sans-serif;
+}
+
+body.theme-modern { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+/* ── App shell: soft ambient gradient backdrop ───────────────── */
+body.theme-modern .app-layout {
+  background:
+    radial-gradient(1100px 560px at 88% -8%, rgba(79, 70, 229, 0.07), transparent 60%),
+    radial-gradient(900px 480px at -6% 108%, rgba(13, 148, 136, 0.06), transparent 55%),
+    var(--color-background);
+}
+body.theme-modern .main-content { background: transparent; }
+
+/* ── Sidebar: clean light panel with refined active states ───── */
+body.theme-modern .sidebar {
+  background: var(--color-surface-container-lowest);
+  box-shadow: 6px 0 24px -18px rgba(15, 23, 42, 0.25);
+}
+body.theme-modern .sidebar-header { padding: 20px 20px 18px; }
+body.theme-modern .sidebar-header .logo-text h2 {
+  background: linear-gradient(120deg, var(--color-primary), var(--color-tertiary));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+body.theme-modern .sidebar-nav { padding: 14px 12px; }
+body.theme-modern .sidebar-nav li a, body.theme-modern .sidebar-nav li button {
+  margin: 3px 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-weight: 500;
+  color: var(--color-on-surface-variant);
+}
+body.theme-modern .sidebar-nav li a .material-symbols-outlined,
+body.theme-modern .sidebar-nav li button .material-symbols-outlined {
+  color: var(--color-on-surface-variant);
+  transition: color 0.15s;
+}
+body.theme-modern .sidebar-nav li a:hover, body.theme-modern .sidebar-nav li button:hover {
+  background: var(--color-surface-container-low);
+  color: var(--color-primary);
+}
+body.theme-modern .sidebar-nav li a:hover .material-symbols-outlined,
+body.theme-modern .sidebar-nav li button:hover .material-symbols-outlined { color: var(--color-primary); }
+body.theme-modern .sidebar-nav li a.active, body.theme-modern .sidebar-nav li button.active {
+  background: linear-gradient(90deg, var(--color-primary-container), rgba(224, 231, 255, 0.55));
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.16);
+}
+body.theme-modern .sidebar-nav li a.active .material-symbols-outlined,
+body.theme-modern .sidebar-nav li button.active .material-symbols-outlined { color: var(--color-primary); }
+body.theme-modern .sidebar-profile-avatar {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-tertiary));
+}
+
+/* ── Top bar: subtle glass ───────────────────────────────────── */
+body.theme-modern .top-bar {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-outline-variant);
+  box-shadow: 0 1px 10px -8px rgba(15, 23, 42, 0.14);
+}
+
+/* ── Page header: icon chip ──────────────────────────────────── */
+body.theme-modern .page-header h1 .material-symbols-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--color-primary-container);
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+/* ── Cards ───────────────────────────────────────────────────── */
+body.theme-modern .card, body.theme-modern .table-container {
+  border-radius: 14px;
+  border-color: var(--color-outline-variant);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 26px -22px rgba(79, 70, 229, 0.4);
+}
+
+/* ── Stat cards: richer accents + hover lift ─────────────────── */
+body.theme-modern .stat-card {
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 22px -20px rgba(79, 70, 229, 0.5);
+}
+body.theme-modern .stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(var(--color-primary), var(--color-tertiary));
+}
+body.theme-modern .stat-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(79, 70, 229, 0.3);
+  box-shadow: 0 14px 30px -14px rgba(79, 70, 229, 0.45);
+}
+body.theme-modern .stat-card .stat-icon {
+  background: var(--color-primary-container);
+  color: var(--color-primary);
+  border-radius: 10px;
+}
+body.theme-modern .stat-card:nth-child(even) .stat-icon { background: var(--color-tertiary-container); color: var(--color-tertiary); }
+body.theme-modern .stat-card:nth-child(3n)   .stat-icon { background: var(--color-secondary-container); color: var(--color-secondary); }
+
+/* ── Tables ──────────────────────────────────────────────────── */
+body.theme-modern table thead th { position: sticky; top: 0; z-index: 1; }
+body.theme-modern tbody tr:hover { background: rgba(79, 70, 229, 0.045); }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+body.theme-modern .btn-primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-grand));
+  box-shadow: 0 6px 16px -8px rgba(79, 70, 229, 0.6);
+  color: #fff;
+}
+body.theme-modern .btn-primary:hover {
+  background: linear-gradient(135deg, var(--color-primary-hover), var(--color-primary));
+  transform: translateY(-1px);
+}
+body.theme-modern .btn-secondary { box-shadow: 0 6px 16px -10px rgba(245, 158, 11, 0.6); }
+body.theme-modern .btn-primary:active, body.theme-modern .btn-secondary:active, body.theme-modern .btn-danger:active { transform: translateY(0); }
+
+/* ── Badges: refined pills ───────────────────────────────────── */
+body.theme-modern .badge, body.theme-modern .badge-info, body.theme-modern .badge-success, body.theme-modern .badge-warning, body.theme-modern .badge-danger, body.theme-modern .badge-inactive {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+body.theme-modern .badge-info    { background: var(--color-primary-container); color: var(--color-primary); border-color: var(--color-primary-container); }
+body.theme-modern .badge-info .dot { background: var(--color-primary); }
+body.theme-modern .badge-warning { background: var(--color-tertiary-container); color: var(--color-tertiary); }
+body.theme-modern .badge-warning .dot { background: var(--color-tertiary); }
+body.theme-modern .badge-success { background: var(--color-success-container); color: var(--color-success); }
+body.theme-modern .badge-success .dot { background: var(--color-success); }
+
+/* ── Modals ──────────────────────────────────────────────────── */
+body.theme-modern .modal { border-radius: 18px; box-shadow: 0 30px 60px -20px rgba(15, 23, 42, 0.3); }
+body.theme-modern .modal-overlay { background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(5px); }
+
+/* ── Tabs & inputs: consistent indigo focus ──────────────────── */
+body.theme-modern .tab.active { box-shadow: inset 0 -2px 0 var(--color-primary); }
+body.theme-modern input:focus, body.theme-modern select:focus, body.theme-modern textarea:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.13) !important;
+}
+body.theme-modern .search-input-wrapper input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.13);
+}
+
+/* ── Login page: light split-screen showcase ─────────────────── */
+body.theme-modern .login-page {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(79, 70, 229, 0.12), transparent 60%),
+    radial-gradient(720px 520px at -10% 110%, rgba(13, 148, 136, 0.1), transparent 55%),
+    linear-gradient(180deg, #f4f6fb, #e9eef6);
+}
+body.theme-modern .login-page::before {
+  content: '';
+  position: absolute;
+  width: 460px; height: 460px; border-radius: 50%;
+  right: -140px; top: -140px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.16), transparent 70%);
+}
+body.theme-modern .login-wrapper { position: relative; z-index: 1; }
+body.theme-modern .login-brand { display: none; }
+@media (min-width: 1024px) {
+  body.theme-modern .login-brand { display: flex; }
+}
+body.theme-modern .login-brand-badge {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.18);
+  color: var(--color-primary);
+}
+body.theme-modern .login-brand h1 { font-size: 40px; font-weight: 800; line-height: 1.12; letter-spacing: -0.02em; }
+body.theme-modern .login-feature-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--color-outline-variant);
+  backdrop-filter: blur(4px);
+}
+body.theme-modern .login-feature-card:hover { border-color: rgba(79, 70, 229, 0.35); }
+body.theme-modern .login-feature-card .feature-icon { background: var(--color-primary-container); color: var(--color-primary); }
+body.theme-modern .login-card {
+  border-radius: 20px;
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 30px 60px -24px rgba(49, 46, 129, 0.35);
+  backdrop-filter: blur(6px);
+}
+body.theme-modern .login-submit {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-grand));
+  box-shadow: 0 8px 20px -10px rgba(79, 70, 229, 0.55);
+  border-radius: 10px;
+}
+body.theme-modern .login-submit:hover {
+  background: linear-gradient(135deg, var(--color-primary-hover), var(--color-primary));
+}
+
+/* ── Toast: rounder, softer ──────────────────────────────────── */
+body.theme-modern .toast {
+  border-radius: 12px !important;
+  box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.35) !important;
+}
+
+/* ── Theme toggle button (works in both themes) ──────────────── */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--color-outline);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.theme-toggle-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+.theme-toggle-btn .material-symbols-outlined { font-size: 20px; }

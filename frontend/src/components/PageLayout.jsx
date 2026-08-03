@@ -6,7 +6,17 @@ import CommandPalette from './CommandPalette';
 function PageLayout({ children, title, subtitle, actions, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [themeModern, setThemeModern] = useState(() => ((localStorage.getItem('tpms-theme') || 'modern') !== 'legacy'));
   const currentUser = user || JSON.parse(localStorage.getItem('user') || '{}');
+
+  const toggleTheme = () => {
+    const next = !themeModern;
+    setThemeModern(next);
+    try {
+      localStorage.setItem('tpms-theme', next ? 'modern' : 'legacy');
+      document.body.classList.toggle('theme-modern', next);
+    } catch (_) { /* ignore */ }
+  };
 
   return (
     <div className="app-layout">
@@ -41,6 +51,14 @@ function PageLayout({ children, title, subtitle, actions, user }) {
             </button>
           </div>
           <div className="top-bar-actions">
+            <button
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              title={themeModern ? 'Switch to previous theme' : 'Switch to modern theme'}
+              aria-label="Toggle theme"
+            >
+              <span className="material-symbols-outlined">{themeModern ? 'contrast' : 'light_mode'}</span>
+            </button>
             <NotificationBell />
             {actions}
           </div>
