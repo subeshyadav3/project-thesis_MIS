@@ -552,7 +552,7 @@ function ProjectDetail() {
             )}
 
             {/* Proposals */}
-            <ProposalsSection proposals={item?.proposals || []} user={user} />
+            <ProposalsSection proposals={item?.proposals || []} user={user} onRefresh={() => loadData()} />
           </>
         )}
 

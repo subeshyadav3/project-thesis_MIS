@@ -24,7 +24,7 @@ const ROLE_COLORS = {
   EXTERNAL_EXAMINER: { bg: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)', label: 'External' },
 };
 
-function ProposalsSection({ proposals = [], title = 'Submitted Documents', user }) {
+function ProposalsSection({ proposals = [], title = 'Submitted Documents', user, onRefresh }) {
   const [viewerDoc, setViewerDoc] = useState(null);
   const [aiProposal, setAiProposal] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
@@ -35,10 +35,14 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
   const [loadingComments, setLoadingComments] = useState({});
   const [deletingComment, setDeletingComment] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deletingDoc, setDeletingDoc] = useState(null);
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState(null);
   const toast = useToast();
 
   const canComment = user && ['SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'].includes(user.role);
   const openAI = canComment;
+  const MANAGER_ROLES = ['COORDINATOR', 'MAINTAINER', 'SUPERVISOR'];
+  const canDeleteDoc = (doc) => doc && (String(doc.submittedById) === String(user?.id) || MANAGER_ROLES.includes(user?.role));
 
   const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const byStage = stages.reduce((acc, stage) => {
@@ -119,6 +123,23 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
     } finally {
       setDeletingComment(null);
       setConfirmDelete(null);
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!confirmDeleteDoc) return;
+    if (deletingDoc === confirmDeleteDoc.id) return;
+    setDeletingDoc(confirmDeleteDoc.id);
+    try {
+      await api.delete(`/upload/proposal/${confirmDeleteDoc.id}`);
+      toast.success('Document removed');
+      if (viewerDoc?.url === confirmDeleteDoc.url) setViewerDoc(null);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete document');
+    } finally {
+      setDeletingDoc(null);
+      setConfirmDeleteDoc(null);
     }
   };
 
@@ -245,6 +266,17 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>psychology</span>
                             </button>
                           )}
+                          {canDeleteDoc(doc) && (
+                            <button
+                              className="btn btn-sm"
+                              style={{ padding: '4px 8px', fontSize: 12, color: 'var(--color-error)', borderColor: 'var(--color-error)', background: 'transparent', opacity: deletingDoc === doc.id ? 0.5 : 1 }}
+                              onClick={() => setConfirmDeleteDoc({ id: doc.id, name: fileName, stageLabel, url: doc.documentUrl })}
+                              disabled={deletingDoc === doc.id}
+                              title="Remove document"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -369,6 +401,16 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
         onConfirm={handleDeleteComment}
         onCancel={() => setConfirmDelete(null)}
         confirmLabel="Delete"
+        danger
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteDoc}
+        title="Remove document"
+        message={confirmDeleteDoc ? `Remove "${confirmDeleteDoc.name}"? The uploaded file and its AI summary will be permanently deleted.` : ''}
+        onConfirm={handleDeleteDocument}
+        onCancel={() => setConfirmDeleteDoc(null)}
+        confirmLabel="Remove"
         danger
       />
     </div>

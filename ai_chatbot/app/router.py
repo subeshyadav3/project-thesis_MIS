@@ -155,21 +155,22 @@ async def analysis_endpoint(proposal_id: int):
 #
 # The Express backend's aiController.summarize / evaluate / ask / embed post
 # directly to these paths. They accept pre-extracted ``document_text`` from the
-# Node side and use the configured Groq LLM (the Node code forwards the legacy
-# ``nvidia_api_key`` field as well, so it is accepted but ignored — if you want
-# runtime override, set the GROQ_API_KEY env var instead).
+# Node side. Provider selection is driven by ``LLM_PROVIDER`` in ai_chatbot/.env
+# ("groq" is the default; "nvidia" is the fallback). The Express bridge still
+# forwards the legacy ``nvidia_api_key`` field — it is used only when NVIDIA is
+# the primary provider.
 
 
 def _resolve_llm_factory(nvidia_api_key: Optional[str] = None) -> LLMFactory:
-    """Return an LLM factory.
+    """Return an LLM factory for the configured primary provider.
 
     Honors the legacy ``nvidia_api_key`` field the Express bridge still sends —
-    if present it is treated as a Groq key fallback so the old /summarize
-    orchestration keeps working without env-var changes.
+    when NVIDIA is the primary provider it is used as the key; otherwise the
+    env-configured keys drive everything (Groq primary, NVIDIA fallback).
     """
-    if nvidia_api_key:
+    if settings.llm_provider == "nvidia" and nvidia_api_key:
         try:
-            return LLMFactory(api_key=nvidia_api_key)
+            return LLMFactory(provider="nvidia", api_key=nvidia_api_key)
         except LLMAuthError:
             pass
     return get_llm_factory()

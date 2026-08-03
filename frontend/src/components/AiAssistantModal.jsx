@@ -155,7 +155,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
     }
     setStreamingText('');
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || '/api';
+    const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
