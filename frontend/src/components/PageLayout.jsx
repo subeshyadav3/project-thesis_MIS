@@ -6,15 +6,15 @@ import CommandPalette from './CommandPalette';
 function PageLayout({ children, title, subtitle, actions, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [themeModern, setThemeModern] = useState(() => ((localStorage.getItem('tpms-theme') || 'modern') !== 'legacy'));
+  const [dark, setDark] = useState(() => localStorage.getItem('tpms-theme') === 'dark');
   const currentUser = user || JSON.parse(localStorage.getItem('user') || '{}');
 
   const toggleTheme = () => {
-    const next = !themeModern;
-    setThemeModern(next);
+    const next = !dark;
+    setDark(next);
     try {
-      localStorage.setItem('tpms-theme', next ? 'modern' : 'legacy');
-      document.body.classList.toggle('theme-modern', next);
+      localStorage.setItem('tpms-theme', next ? 'dark' : 'light');
+      document.body.classList.toggle('dark', next);
     } catch (_) { /* ignore */ }
   };
 
@@ -54,10 +54,10 @@ function PageLayout({ children, title, subtitle, actions, user }) {
             <button
               className="theme-toggle-btn"
               onClick={toggleTheme}
-              title={themeModern ? 'Switch to previous theme' : 'Switch to modern theme'}
-              aria-label="Toggle theme"
+              title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+              aria-label="Toggle dark mode"
             >
-              <span className="material-symbols-outlined">{themeModern ? 'contrast' : 'light_mode'}</span>
+              <span className="material-symbols-outlined">{dark ? 'light_mode' : 'dark_mode'}</span>
             </button>
             <NotificationBell />
             {actions}
