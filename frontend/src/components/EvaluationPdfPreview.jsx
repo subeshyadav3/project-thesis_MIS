@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
-const ROLE_LABEL = { SUPERVISOR: 'Supervisor', EXTERNAL_EXAMINER: 'External Examiner' };
+const ROLE_LABEL = { SUPERVISOR: 'Supervisor', EXTERNAL_EXAMINER: 'External Examiner', COORDINATOR: 'Coordinator' };
 
 /** Editable review surface shared by coordinators, supervisors and externals. */
 export default function EvaluationPdfPreview({ type, id, onClose, onSave, initialScope, hideScopeSelector }) {
@@ -243,14 +243,21 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
               const components = groupedByRole[role];
               // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
               const shouldShowBothExt = role === 'EXTERNAL_EXAMINER' && (pdfScope === 'both' || pdfScope === 'external-both');
-              const sections = shouldShowBothExt
+              // Split external sections only when actual mid-term/final components exist (master thesis).
+              // Otherwise (e.g. bachelor "Internal Examiner") fall back to a single generic section.
+              const extSections = shouldShowBothExt
                 ? [
                     { key: 'EXTERNAL_MIDTERM', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
                     { key: 'EXTERNAL_FINAL', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
                   ].filter(s => components.some(s.filter))
+                : [];
+              const sections = extSections.length
+                ? extSections
                 : [{ key: components[0]?.evaluationType || 'UNKNOWN', label: role === 'SUPERVISOR' ? 'Supervisor'
-                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)'
-                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)'
+                    : role === 'EXTERNAL_EXAMINER'
+                      ? (components[0]?.evaluationType === 'EXTERNAL_MIDTERM' ? 'External (Mid-Term)'
+                          : components[0]?.evaluationType === 'EXTERNAL_FINAL' ? 'External (Final)'
+                          : (ROLE_LABEL[role] || 'External Examiner'))
                     : (ROLE_LABEL[role] || role), filter: () => true }];
               return sections.map((section, si) => {
                 const fb = feedback[section.key] || { comments: '', suggestions: '' };

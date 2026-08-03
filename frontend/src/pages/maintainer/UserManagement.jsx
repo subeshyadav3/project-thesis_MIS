@@ -212,7 +212,7 @@ function UserManagement() {
   };
 
   return (
-    <PageLayout title={isCoordinator ? 'Manage Users' : 'Users'} user={user} actions={actions}>
+    <PageLayout user={user} actions={actions}>
       <div className="page-header">
         <h1>
           <span className="material-symbols-outlined">groups</span>
