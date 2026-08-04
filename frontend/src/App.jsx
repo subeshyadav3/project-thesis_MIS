@@ -45,11 +45,13 @@ const routeFallback = (
     }}
   >
     <span
-      className="material-symbols-outlined"
-      style={{ display: 'inline-block', animation: 'spin 0.9s linear infinite' }}
-    >
-      progress_activity
-    </span>
+      style={{
+        width: 18, height: 18, borderRadius: '50%', display: 'inline-block',
+        border: '2px solid var(--color-outline)',
+        borderTopColor: 'var(--color-primary)',
+        animation: 'spin 0.9s linear infinite',
+      }}
+    />
     Loading…
   </div>
 );
