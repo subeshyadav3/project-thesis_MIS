@@ -1,44 +1,66 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
-import Login from './pages/Login';
-import ResetPassword from './pages/ResetPassword';
-import Profile from './pages/Profile';
-import MaintainerDashboard from './pages/maintainer/Dashboard';
-import UserManagement from './pages/maintainer/UserManagement';
-import DepartmentManagement from './pages/maintainer/DepartmentManagement';
-import CoordinatorDashboard from './pages/coordinator/Dashboard';
-import BachelorProjects from './pages/coordinator/BachelorProjects';
-import MasterThesis from './pages/coordinator/MasterThesis';
-import Evaluations from './pages/coordinator/Evaluations';
-import SupervisorList from './pages/coordinator/SupervisorList';
-import ExaminerList from './pages/coordinator/ExaminerList';
-import AuditLog from './pages/coordinator/AuditLog';
-import CoordinatorAnnouncements from './pages/coordinator/Announcements';
-import SupervisorDashboard from './pages/supervisor/Dashboard';
-import SupervisorBachelorProjects from './pages/supervisor/BachelorProjects';
-import SupervisorMasterThesis from './pages/supervisor/MasterThesis';
-import ProjectDetail from './pages/supervisor/ProjectDetail';
-import StudentDashboard from './pages/student/Dashboard';
-import StudentProjects from './pages/student/Projects';
-import StudentTheses from './pages/student/Theses';
-import StudentGroups from './pages/student/Groups';
-import StudentProjectDetail from './pages/student/Assignment';
-import StudentSubmissions from './pages/student/Submissions';
-import StudentNotifications from './pages/student/Notifications';
-import ExternalDashboard from './pages/external/Dashboard';
-import ExternalEvaluationsList from './pages/external/EvaluationsList';
-import ExternalEvaluationPage from './pages/external/EvaluationPage';
 import PrivateRoute from './components/PrivateRoute';
 import DegreeGuard from './components/DegreeGuard';
-import NotFound from './pages/NotFound';
 import './App.css';
+
+// Route-level code splitting: each page loads only when its route is visited.
+const Login = lazy(() => import('./pages/Login'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Profile = lazy(() => import('./pages/Profile'));
+const MaintainerDashboard = lazy(() => import('./pages/maintainer/Dashboard'));
+const UserManagement = lazy(() => import('./pages/maintainer/UserManagement'));
+const DepartmentManagement = lazy(() => import('./pages/maintainer/DepartmentManagement'));
+const CoordinatorDashboard = lazy(() => import('./pages/coordinator/Dashboard'));
+const BachelorProjects = lazy(() => import('./pages/coordinator/BachelorProjects'));
+const MasterThesis = lazy(() => import('./pages/coordinator/MasterThesis'));
+const Evaluations = lazy(() => import('./pages/coordinator/Evaluations'));
+const SupervisorList = lazy(() => import('./pages/coordinator/SupervisorList'));
+const ExaminerList = lazy(() => import('./pages/coordinator/ExaminerList'));
+const AuditLog = lazy(() => import('./pages/coordinator/AuditLog'));
+const CoordinatorAnnouncements = lazy(() => import('./pages/coordinator/Announcements'));
+const SupervisorDashboard = lazy(() => import('./pages/supervisor/Dashboard'));
+const SupervisorBachelorProjects = lazy(() => import('./pages/supervisor/BachelorProjects'));
+const SupervisorMasterThesis = lazy(() => import('./pages/supervisor/MasterThesis'));
+const ProjectDetail = lazy(() => import('./pages/supervisor/ProjectDetail'));
+const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
+const StudentProjects = lazy(() => import('./pages/student/Projects'));
+const StudentTheses = lazy(() => import('./pages/student/Theses'));
+const StudentGroups = lazy(() => import('./pages/student/Groups'));
+const StudentProjectDetail = lazy(() => import('./pages/student/Assignment'));
+const StudentSubmissions = lazy(() => import('./pages/student/Submissions'));
+const StudentNotifications = lazy(() => import('./pages/student/Notifications'));
+const ExternalDashboard = lazy(() => import('./pages/external/Dashboard'));
+const ExternalEvaluationsList = lazy(() => import('./pages/external/EvaluationsList'));
+const ExternalEvaluationPage = lazy(() => import('./pages/external/EvaluationPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+const routeFallback = (
+  <div
+    style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', color: 'var(--color-on-surface-variant)',
+      fontFamily: 'var(--font-body)', fontSize: 14, gap: 10,
+    }}
+  >
+    <span
+      className="material-symbols-outlined"
+      style={{ display: 'inline-block', animation: 'spin 0.9s linear infinite' }}
+    >
+      progress_activity
+    </span>
+    Loading…
+  </div>
+);
+
 
 function App() {
   return (
     <Router>
       <ToastProvider>
-        <Routes>
+        <Suspense fallback={routeFallback}>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/maintainer/users" element={<PrivateRoute role="MAINTAINER"><UserManagement /></PrivateRoute>} />
@@ -75,7 +97,9 @@ function App() {
           <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/" element={<Login />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </ToastProvider>
     </Router>
   );
