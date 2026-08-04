@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Icon } from './ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -97,7 +98,7 @@ function Sidebar({ user, isOpen, onClose }) {
           </div>
           {/* Close button visible only inside mobile viewports */}
           <button className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
-            <span className="material-symbols-outlined">close</span>
+            <Icon name="close" className="material-symbols-outlined" />
           </button>
         </div>
 
@@ -106,7 +107,7 @@ function Sidebar({ user, isOpen, onClose }) {
             <li key={link.path}>
               {/* Added onClose trigger to menu links so drawer rolls away upon selecting pages */}
               <Link to={link.path} className={isActive(link.path)} onClick={onClose}>
-                <span className="material-symbols-outlined">{link.icon}</span>
+                <Icon name={link.icon} className="material-symbols-outlined" />
                 <span>{link.label}</span>
               </Link>
             </li>
@@ -122,10 +123,10 @@ function Sidebar({ user, isOpen, onClose }) {
               <div className="sidebar-profile-name">{user?.firstName} {user?.lastName}</div>
               <div className="sidebar-profile-email">{user?.email || ''}</div>
             </div>
-            <span className="material-symbols-outlined sidebar-profile-arrow">chevron_right</span>
+            <Icon name="chevron_right" className="material-symbols-outlined sidebar-profile-arrow" />
           </div>
           <button className="sidebar-logout-btn" onClick={() => setShowLogoutConfirm(true)}>
-            <span className="material-symbols-outlined">logout</span>
+            <Icon name="logout" className="material-symbols-outlined" />
             <span>Logout</span>
           </button>
         </div>
@@ -135,7 +136,7 @@ function Sidebar({ user, isOpen, onClose }) {
             <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
               <div className="modal-header">
                 <div className="modal-header-icon danger">
-                  <span className="material-symbols-outlined">logout</span>
+                  <Icon name="logout" className="material-symbols-outlined" />
                 </div>
                 <div className="modal-header-text">
                   <h2>Confirm Logout</h2>
@@ -144,11 +145,11 @@ function Sidebar({ user, isOpen, onClose }) {
               </div>
               <div className="modal-actions">
                 <button className="btn btn-outline" onClick={() => setShowLogoutConfirm(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button className="btn btn-danger" onClick={handleLogout}>
-                  <span className="material-symbols-outlined">logout</span>
+                  <Icon name="logout" className="material-symbols-outlined" />
                   Logout
                 </button>
               </div>

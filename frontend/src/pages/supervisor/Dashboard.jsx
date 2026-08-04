@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -30,17 +31,17 @@ function SupervisorDashboard() {
     <PageLayout title="Supervisor Dashboard" subtitle="Overview of your assignments" user={user}>
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">assignment_ind</span></div>
+          <div className="stat-icon"><Icon name="assignment_ind" className="material-symbols-outlined" /></div>
           <div className="stat-number">{totalAssigned}</div>
           <div className="stat-label">Total Assigned</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
+          <div className="stat-icon"><Icon name="pending_actions" className="material-symbols-outlined" /></div>
           <div className="stat-number">{pendingCount}</div>
           <div className="stat-label">Pending Evaluations</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{completedCount}</div>
           <div className="stat-label">Completed</div>
         </div>

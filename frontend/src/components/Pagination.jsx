@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './ui';
 
 function Pagination({ currentPage, totalPages, onPageChange, pageSize, onPageSizeChange, pageSizeOptions, totalItems }) {
   if (totalPages <= 1) return null;
@@ -43,7 +44,7 @@ function Pagination({ currentPage, totalPages, onPageChange, pageSize, onPageSiz
           onClick={() => onPageChange(1)}
           title="First page"
         >
-          <span className="material-symbols-outlined">first_page</span>
+          <Icon name="first_page" className="material-symbols-outlined" />
         </button>
         <button
           className="btn btn-xs btn-outline"
@@ -51,7 +52,7 @@ function Pagination({ currentPage, totalPages, onPageChange, pageSize, onPageSiz
           onClick={() => onPageChange(currentPage - 1)}
           title="Previous"
         >
-          <span className="material-symbols-outlined">chevron_left</span>
+          <Icon name="chevron_left" className="material-symbols-outlined" />
         </button>
         {pages.map((p, i) =>
           p === '...' ? (
@@ -72,7 +73,7 @@ function Pagination({ currentPage, totalPages, onPageChange, pageSize, onPageSiz
           onClick={() => onPageChange(currentPage + 1)}
           title="Next"
         >
-          <span className="material-symbols-outlined">chevron_right</span>
+          <Icon name="chevron_right" className="material-symbols-outlined" />
         </button>
         <button
           className="btn btn-xs btn-outline"
@@ -80,7 +81,7 @@ function Pagination({ currentPage, totalPages, onPageChange, pageSize, onPageSiz
           onClick={() => onPageChange(totalPages)}
           title="Last page"
         >
-          <span className="material-symbols-outlined">last_page</span>
+          <Icon name="last_page" className="material-symbols-outlined" />
         </button>
       </div>
     </div>

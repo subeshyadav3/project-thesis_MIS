@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from './ui';
 
 function DocumentViewer({ fileUrl, fileName, onClose }) {
   const [previewError, setPreviewError] = useState(false);
@@ -39,9 +40,7 @@ function DocumentViewer({ fileUrl, fileName, onClose }) {
               background: 'var(--color-primary-container)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }}>
-                {isPreviewable ? 'picture_as_pdf' : 'description'}
-              </span>
+              <Icon name={isPreviewable ? 'picture_as_pdf' : 'description'} className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -54,13 +53,13 @@ function DocumentViewer({ fileUrl, fileName, onClose }) {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-secondary" onClick={handleDownload} title="Download" style={{ padding: '6px 10px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
+              <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 18 }} />
             </button>
             <button className="btn btn-secondary" onClick={handleOpenNewTab} title="Open in new tab" style={{ padding: '6px 10px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
+              <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 18 }} />
             </button>
             <button className="btn btn-secondary" onClick={onClose} title="Close" style={{ padding: '6px 10px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+              <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 18 }} />
             </button>
           </div>
         </div>
@@ -83,9 +82,7 @@ function DocumentViewer({ fileUrl, fileName, onClose }) {
                 background: 'var(--color-surface-container)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }}>
-                  {ext === 'zip' ? 'folder_zip' : 'description'}
-                </span>
+                <Icon name={ext === 'zip' ? 'folder_zip' : 'description'} className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }} />
               </div>
               <h3 style={{ margin: 0, fontSize: 16 }}>Cannot preview this file</h3>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--color-on-surface-variant)', maxWidth: 320 }}>
@@ -93,11 +90,11 @@ function DocumentViewer({ fileUrl, fileName, onClose }) {
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button className="btn btn-primary" onClick={handleDownload} style={{ gap: 6 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
+                  <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                   Download File
                 </button>
                 <button className="btn btn-outline" onClick={handleOpenNewTab} style={{ gap: 6 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
+                  <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                   Open in Browser
                 </button>
               </div>

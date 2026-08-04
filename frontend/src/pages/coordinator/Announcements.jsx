@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -181,7 +182,7 @@ function CoordinatorAnnouncements() {
 
   const actions = (
     <button className="btn btn-primary btn-sm" onClick={() => { setEditAnnouncement(null); setShowCreate(true); }}>
-      <span className="material-symbols-outlined">campaign</span> New Announcement
+      <Icon name="campaign" className="material-symbols-outlined" /> New Announcement
     </button>
   );
 
@@ -190,17 +191,17 @@ function CoordinatorAnnouncements() {
       <PageLayout title="Announcements" subtitle="Send notifications and open group formation" user={user} actions={actions}>
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           <div className="stat-card bento-card">
-            <div className="stat-icon"><span className="material-symbols-outlined">campaign</span></div>
+            <div className="stat-icon"><Icon name="campaign" className="material-symbols-outlined" /></div>
             <div className="stat-number">{announcements.length}</div>
             <div className="stat-label">Total</div>
           </div>
           <div className="stat-card bento-card">
-            <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+            <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
             <div className="stat-number">{activeAnnouncements.length}</div>
             <div className="stat-label">Active</div>
           </div>
           <div className="stat-card bento-card">
-            <div className="stat-icon"><span className="material-symbols-outlined">groups</span></div>
+            <div className="stat-icon"><Icon name="groups" className="material-symbols-outlined" /></div>
             <div className="stat-number">{announcements.filter(a => a.allowGroupFormation).length}</div>
             <div className="stat-label">Group Formation</div>
           </div>
@@ -208,9 +209,9 @@ function CoordinatorAnnouncements() {
 
         <div className="card">
           {loading ? (
-            <div className="loading-state"><span className="material-symbols-outlined spin">progress_activity</span><p>Loading...</p></div>
+            <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading...</p></div>
           ) : announcements.length === 0 ? (
-            <div className="empty-state"><span className="material-symbols-outlined" style={{ fontSize: 48 }}>campaign</span><h3>No announcements</h3><p>Create your first announcement to notify students.</p></div>
+            <div className="empty-state"><Icon name="campaign" className="material-symbols-outlined" style={{ fontSize: 48 }} /><h3>No announcements</h3><p>Create your first announcement to notify students.</p></div>
           ) : (
             <div className="table-container">
               <table className="table">
@@ -254,19 +255,19 @@ function CoordinatorAnnouncements() {
                         </td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
-                            <span className="material-symbols-outlined">edit</span>
+                            <Icon name="edit" className="material-symbols-outlined" />
                           </button>
                           <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
-                            <span className="material-symbols-outlined">delete</span>
+                            <Icon name="delete" className="material-symbols-outlined" />
                           </button>
                           {hasGF && (
                             <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
-                              <span className="material-symbols-outlined">visibility</span> View Submissions
+                              <Icon name="visibility" className="material-symbols-outlined" /> View Submissions
                             </button>
                           )}
                           {active && (
                             <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)}>
-                              <span className="material-symbols-outlined">cancel</span> Deactivate
+                              <Icon name="cancel" className="material-symbols-outlined" /> Deactivate
                             </button>
                           )}
                         </td>
@@ -283,7 +284,7 @@ function CoordinatorAnnouncements() {
           <div className="modal-overlay" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}>
             <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <div className="modal-header-icon info"><span className="material-symbols-outlined">campaign</span></div>
+                <div className="modal-header-icon info"><Icon name="campaign" className="material-symbols-outlined" /></div>
                 <div className="modal-header-text">
                   <h2>{editAnnouncement ? 'Edit Announcement' : 'New Announcement'}</h2>
                   <p>{editAnnouncement ? 'Update the announcement — notification will be re-sent' : 'Send a notification to students'}</p>
@@ -315,7 +316,7 @@ function CoordinatorAnnouncements() {
                   <label>Specific Students (optional)</label>
                   <div className="sup-dropdown-trigger">
                     <div className="sup-search-wrapper" onClick={() => setStudentOpen(true)}>
-                      <span className="material-symbols-outlined">search</span>
+                      <Icon name="search" className="material-symbols-outlined" />
                       <input type="text" placeholder="Search students..." value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentOpen(true); }} onFocus={() => setStudentOpen(true)} />
                     </div>
                     {studentOpen && (
@@ -329,7 +330,7 @@ function CoordinatorAnnouncements() {
                                   <div className="sup-dropdown-item-name">{s.firstName} {s.lastName}</div>
                                   <div className="sup-dropdown-item-email">{s.rollNumber || s.email} · {s.program?.code || '—'}</div>
                                 </div>
-                                {sel && <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>}
+                                {sel && <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />}
                               </div>
                             );
                           })}
@@ -418,8 +419,8 @@ function CoordinatorAnnouncements() {
                 )}
 
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}><span className="material-symbols-outlined">close</span> Cancel</button>
-                  <button type="submit" className="btn btn-primary"><span className="material-symbols-outlined">send</span> {editAnnouncement ? 'Update & Re-send' : 'Send'}</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}><Icon name="close" className="material-symbols-outlined" /> Cancel</button>
+                  <button type="submit" className="btn btn-primary"><Icon name="send" className="material-symbols-outlined" /> {editAnnouncement ? 'Update & Re-send' : 'Send'}</button>
                 </div>
               </form>
             </div>
@@ -430,12 +431,12 @@ function CoordinatorAnnouncements() {
           <div className="modal-overlay" onClick={() => setViewAnnouncement(null)}>
             <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <div className="modal-header-icon info"><span className="material-symbols-outlined">groups</span></div>
+                <div className="modal-header-icon info"><Icon name="groups" className="material-symbols-outlined" /></div>
                 <div className="modal-header-text"><h2>Submissions: {viewAnnouncement.title}</h2><p>{TYPE_LABELS[viewAnnouncement.type] || viewAnnouncement.type}</p></div>
               </div>
               <div className="modal-body">
                 {subLoading ? (
-                  <div className="loading-state"><span className="material-symbols-outlined spin">progress_activity</span><p>Loading submissions...</p></div>
+                  <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading submissions...</p></div>
                 ) : (
                   <div className="table-container">
                     <table className="table">
@@ -454,7 +455,7 @@ function CoordinatorAnnouncements() {
                                 <td><span className="badge badge-pending">{t.status}</span></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <button className="btn btn-sm btn-primary" onClick={() => handleApprove(t, 'thesis')}>
-                                    <span className="material-symbols-outlined">check_circle</span> Approve
+                                    <Icon name="check_circle" className="material-symbols-outlined" /> Approve
                                   </button>
                                 </td>
                               </tr>
@@ -471,7 +472,7 @@ function CoordinatorAnnouncements() {
                                 <td><span className="badge badge-pending">{g.status}</span></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <button className="btn btn-sm btn-primary" onClick={() => handleApprove(g, 'group')}>
-                                    <span className="material-symbols-outlined">check_circle</span> Approve
+                                    <Icon name="check_circle" className="material-symbols-outlined" /> Approve
                                   </button>
                                 </td>
                               </tr>
@@ -484,7 +485,7 @@ function CoordinatorAnnouncements() {
                 )}
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setViewAnnouncement(null)}><span className="material-symbols-outlined">close</span> Close</button>
+                <button type="button" className="btn btn-outline" onClick={() => setViewAnnouncement(null)}><Icon name="close" className="material-symbols-outlined" /> Close</button>
               </div>
             </div>
           </div>

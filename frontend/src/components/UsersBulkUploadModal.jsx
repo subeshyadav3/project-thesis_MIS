@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 
@@ -74,7 +75,7 @@ export default function UsersBulkUploadModal({
       <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-header-icon info">
-            <span className="material-symbols-outlined">upload_file</span>
+            <Icon name="upload_file" className="material-symbols-outlined" />
           </div>
           <div className="modal-header-text">
             <h2>{heading}</h2>
@@ -110,7 +111,7 @@ export default function UsersBulkUploadModal({
           <label>Excel file (.xlsx)</label>
           <input type="file" accept=".xlsx,.xls" onChange={e => setFile(e.target.files[0])} />
           <a href={active.href} download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, display: 'inline-block' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+            <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
             {' '}Download blank template
           </a>
           <span style={{ display: 'block', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
@@ -133,11 +134,11 @@ export default function UsersBulkUploadModal({
 
         <div className="modal-actions">
           <button type="button" className="btn btn-outline" onClick={resetAndClose}>
-            <span className="material-symbols-outlined">close</span>
+            <Icon name="close" className="material-symbols-outlined" />
             Cancel
           </button>
           <button type="button" className="btn btn-primary" disabled={uploading || !file} onClick={handleUpload}>
-            <span className="material-symbols-outlined">{uploading ? 'progress_activity' : 'upload'}</span>
+            <Icon name={uploading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" />
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
         </div>

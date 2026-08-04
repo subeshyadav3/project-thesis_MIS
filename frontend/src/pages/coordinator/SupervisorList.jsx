@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -142,23 +143,23 @@ function SupervisorList() {
     <>
       {isMasterCoordinator ? (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-          <span className="material-symbols-outlined">upload_file</span>
+          <Icon name="upload_file" className="material-symbols-outlined" />
           Upload Supervisor Assignments
         </button>
       ) : (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowGroupUpload(true)}>
-          <span className="material-symbols-outlined">upload_file</span>
+          <Icon name="upload_file" className="material-symbols-outlined" />
           Upload Supervisor Assignments
         </button>
       )}
       
       <button className="btn btn-secondary btn-sm" onClick={() => setShowSupervisorUpload(true)}>
-        <span className="material-symbols-outlined">upload_file</span>
+        <Icon name="upload_file" className="material-symbols-outlined" />
         Bulk Add
       </button>
 
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-        <span className="material-symbols-outlined">add</span>
+        <Icon name="add" className="material-symbols-outlined" />
         Add Supervisor
       </button>
     </>
@@ -194,7 +195,7 @@ function SupervisorList() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">badge</span>
+                <Icon name="badge" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Add Supervisor</h2>
@@ -232,11 +233,11 @@ function SupervisorList() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">add</span>
+                  <Icon name="add" className="material-symbols-outlined" />
                   Create
                 </button>
               </div>
@@ -251,7 +252,7 @@ function SupervisorList() {
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">badge</span>
+                <Icon name="badge" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>{showDetail.firstName} {showDetail.lastName}</h2>
@@ -326,7 +327,7 @@ function SupervisorList() {
             )}
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowDetail(null)}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
                 Close
               </button>
             </div>
@@ -340,7 +341,7 @@ function SupervisorList() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon warning">
-                <span className="material-symbols-outlined">edit</span>
+                <Icon name="edit" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Edit Supervisor</h2>
@@ -383,18 +384,18 @@ function SupervisorList() {
                     {editForm.active ? 'Active' : 'Inactive'}
                   </span>
                   <button type="button" className="btn btn-sm" style={{ background: editForm.active ? 'var(--color-error-container)' : 'var(--color-success-container)', color: editForm.active ? 'var(--color-on-error-container)' : 'var(--color-on-success-container)' }} onClick={() => setEditForm({ ...editForm, active: !editForm.active })}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{editForm.active ? 'cancel' : 'check_circle'}</span>
+                    <Icon name={editForm.active ? 'cancel' : 'check_circle'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
                     {editForm.active ? 'Mark as Inactive' : 'Mark as Active'}
                   </button>
                 </div>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowEdit(null)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">save</span>
+                  <Icon name="save" className="material-symbols-outlined" />
                   Save Changes
                 </button>
               </div>
@@ -405,24 +406,24 @@ function SupervisorList() {
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">supervisor_account</span></div>
+          <div className="stat-icon"><Icon name="supervisor_account" className="material-symbols-outlined" /></div>
           <div className="stat-number">{supervisors.length}</div>
           <div className="stat-label">Total Supervisors</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">school</span></div>
+          <div className="stat-icon"><Icon name="school" className="material-symbols-outlined" /></div>
           <div className="stat-number">{totalGroups}</div>
           <div className="stat-label">Bachelor Projects</div>
         </div>
         {isMasterCoordinator && (
           <div className="stat-card bento-card">
-            <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
+            <div className="stat-icon"><Icon name="library_books" className="material-symbols-outlined" /></div>
             <div className="stat-number">{totalTheses}</div>
             <div className="stat-label">Master Theses</div>
           </div>
         )}
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">person_add</span></div>
+          <div className="stat-icon"><Icon name="person_add" className="material-symbols-outlined" /></div>
           <div className="stat-number">{unassignedGroups + unassignedTheses}</div>
           <div className="stat-label">Unassigned</div>
         </div>
@@ -442,7 +443,7 @@ function SupervisorList() {
           <TableSkeleton rows={5} cols={5} />
         ) : filteredSupervisors.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">supervisor_account</span>
+            <Icon name="supervisor_account" className="material-symbols-outlined" />
             <h3>No supervisors found</h3>
             <p>{searchQuery ? 'Try adjusting your search.' : 'No supervisors have been registered yet.'}</p>
           </div>
@@ -473,9 +474,7 @@ function SupervisorList() {
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.designation || '—'}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
                     <td>
-                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
-                        {s.active ? 'check_circle' : 'cancel'}
-                      </span>
+                      <Icon name={s.active ? 'check_circle' : 'cancel'} className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }} />
                     </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
                     {isMasterCoordinator && <td><span className="stat-chip">{s.thesisCount}</span></td>}
@@ -483,11 +482,11 @@ function SupervisorList() {
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
-                          <span className="material-symbols-outlined">visibility</span>
+                          <Icon name="visibility" className="material-symbols-outlined" />
                           View
                         </button>
                         <button className="btn btn-sm btn-outline" onClick={() => openEdit(s)}>
-                          <span className="material-symbols-outlined">edit</span>
+                          <Icon name="edit" className="material-symbols-outlined" />
                           Edit
                         </button>
                       </div>

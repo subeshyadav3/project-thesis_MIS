@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './ui';
 
 const BACHELOR_STEPS = [
   { id: 'PENDING', label: 'Group Formation', description: 'Group created & supervisor pending' },
@@ -102,7 +103,7 @@ function WorkflowStepper({ status, degreeType = 'BACHELOR', components = [], eva
                   transition: 'all 0.3s ease',
                 }}>
                   {isCompleted ? (
-                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>check</span>
+                    <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 20 }} />
                   ) : (
                     idx + 1
                   )}

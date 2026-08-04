@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Icon } from '../components/ui';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
@@ -63,7 +64,7 @@ function ResetPassword() {
       <div className="login-wrapper">
         <div className="login-brand">
           <div className="login-brand-badge">
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>verified</span>
+            <Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 16 }} />
             SECURE INSTITUTIONAL PORTAL
           </div>
 
@@ -73,14 +74,14 @@ function ResetPassword() {
           <div className="login-features">
             <div className="login-feature-card">
               <div className="feature-icon">
-                <span className="material-symbols-outlined">groups</span>
+                <Icon name="groups" className="material-symbols-outlined" />
               </div>
               <h3>Project Management</h3>
               <p>Streamlined group creation, supervisor assignments, and tracking for bachelor projects.</p>
             </div>
             <div className="login-feature-card">
               <div className="feature-icon">
-                <span className="material-symbols-outlined">shield</span>
+                <Icon name="shield" className="material-symbols-outlined" />
               </div>
               <h3>Role-Based Access</h3>
               <p>Secure role-based authorization with full audit trails for all administrative actions.</p>
@@ -93,7 +94,7 @@ function ResetPassword() {
 
           {error && (
             <div className="login-error">
-              <span className="material-symbols-outlined">error</span>
+              <Icon name="error" className="material-symbols-outlined" />
               {error}
             </div>
           )}
@@ -105,7 +106,7 @@ function ResetPassword() {
                 <div className="login-field">
                   <label>EMAIL</label>
                   <div className="input-wrapper">
-                    <span className="material-symbols-outlined">badge</span>
+                    <Icon name="badge" className="material-symbols-outlined" />
                     <input
                       type="email"
                       placeholder="e.g. name@ioe.edu"
@@ -120,13 +121,13 @@ function ResetPassword() {
                 <button type="submit" className="login-submit" disabled={loading}>
                   {loading ? (
                     <>
-                      <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                      <Icon name="progress_activity" className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }} />
                       Sending...
                     </>
                   ) : (
                     <>
                       Send Reset Link
-                      <span className="material-symbols-outlined">send</span>
+                      <Icon name="send" className="material-symbols-outlined" />
                     </>
                   )}
                 </button>
@@ -139,7 +140,7 @@ function ResetPassword() {
                 <div className="login-field">
                   <label>NEW PASSWORD</label>
                   <div className="input-wrapper">
-                    <span className="material-symbols-outlined">lock</span>
+                    <Icon name="lock" className="material-symbols-outlined" />
                     <input
                       type="password"
                       placeholder="Min. 6 characters"
@@ -154,7 +155,7 @@ function ResetPassword() {
                 <div className="login-field">
                   <label>CONFIRM PASSWORD</label>
                   <div className="input-wrapper">
-                    <span className="material-symbols-outlined">lock</span>
+                    <Icon name="lock" className="material-symbols-outlined" />
                     <input
                       type="password"
                       placeholder="Re-enter new password"
@@ -169,13 +170,13 @@ function ResetPassword() {
                 <button type="submit" className="login-submit" disabled={loading}>
                   {loading ? (
                     <>
-                      <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                      <Icon name="progress_activity" className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }} />
                       Resetting...
                     </>
                   ) : (
                     <>
                       Reset Password
-                      <span className="material-symbols-outlined">key</span>
+                      <Icon name="key" className="material-symbols-outlined" />
                     </>
                   )}
                 </button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -40,7 +41,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 360, padding: '16px', background: 'var(--color-surface-container-low)', borderRadius: 'var(--border-radius-md)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12, borderBottom: '1px solid var(--color-outline-variant)' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 20, color: isThesis ? 'var(--color-warning)' : 'var(--color-primary)' }}>{isThesis ? 'description' : 'group_add'}</span>
+        <Icon name={isThesis ? 'description' : 'group_add'} className="material-symbols-outlined" style={{ fontSize: 20, color: isThesis ? 'var(--color-warning)' : 'var(--color-primary)' }} />
         <span style={{ fontWeight: 600, fontSize: 14 }}>{isThesis ? 'Submit Thesis' : 'Create New Group'}</span>
         <span className={`badge badge-${isThesis ? 'warning' : 'info'}`} style={{ marginLeft: 'auto' }}>
           {TYPE_LABELS[announcement.type]}
@@ -83,7 +84,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
                   <span key={id} className="badge badge-active" style={{ gap: 4, display: 'inline-flex', alignItems: 'center' }}>
                     {s.firstName} {s.lastName}
                     <span onClick={() => removeMember(id)} style={{ cursor: 'pointer', marginLeft: 4 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                      <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                     </span>
                   </span>
                 ) : null;
@@ -93,7 +94,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
 
           <div className="sup-dropdown-trigger" ref={memberRef}>
             <div className="sup-search-wrapper" onClick={() => setMemberOpen(true)}>
-              <span className="material-symbols-outlined">search</span>
+              <Icon name="search" className="material-symbols-outlined" />
               <input
                 type="text"
                 placeholder="Search students by name or roll number..."
@@ -103,7 +104,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
                 style={{ flex: 1 }}
               />
               {memberOpen && (
-                <span className="material-symbols-outlined sup-dropdown-arrow">arrow_drop_up</span>
+                <Icon name="arrow_drop_up" className="material-symbols-outlined sup-dropdown-arrow" />
               )}
             </div>
             {memberOpen && (
@@ -130,7 +131,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
           </div>
 
           <button className="btn btn-sm btn-outline" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }} onClick={loadAvailableStudents} disabled={inviteLoading}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{inviteLoading ? 'sync' : 'refresh'}</span>
+            <Icon name={inviteLoading ? 'sync' : 'refresh'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
             {inviteLoading ? 'Loading...' : 'Reload Program Students'}
           </button>
         </div>
@@ -138,14 +139,14 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
 
       {isThesis && (
         <div style={{ padding: '12px 0', color: 'var(--color-on-surface-variant)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>info</span>
+          <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 18 }} />
           Master theses are individual submissions — no group members needed.
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--color-outline-variant)', paddingTop: 16 }}>
         <button className={`btn ${isThesis ? 'btn-warning' : 'btn-primary'}`} onClick={onCreate} disabled={!isThesis && selectedMembers.length > announcement.groupSizeMax - 1}>
-          <span className="material-symbols-outlined">{isThesis ? 'description' : 'add'}</span> {isThesis ? 'Submit Thesis' : 'Create Group'}
+          <Icon name={isThesis ? 'description' : 'add'} className="material-symbols-outlined" /> {isThesis ? 'Submit Thesis' : 'Create Group'}
         </button>
         <button className="btn btn-outline" onClick={onCancel}>Cancel</button>
       </div>
@@ -280,7 +281,7 @@ function StudentGroups() {
     <ErrorBoundary>
       <PageLayout title="Group Formation" subtitle="Create or join project groups" user={user}>
         {loading ? (
-          <div className="loading-state"><span className="material-symbols-outlined spin">progress_activity</span><p>Loading...</p></div>
+          <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading...</p></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -334,7 +335,7 @@ function StudentGroups() {
                         onCancel={() => { setSelectedAnn(null); setCreateForm({ name: '', projectTitle: '' }); setSelectedMembers([]); }}
                       />
                     ) : (                        <button className={`btn btn-sm ${a.type === 'THESIS' ? 'btn-warning' : 'btn-primary'}`} onClick={() => { setSelectedAnn(a); setCreateForm({ name: a.type === 'THESIS' ? '' : `Group of ${user.firstName}`, projectTitle: a.title }); }}>
-                          <span className="material-symbols-outlined">{a.type === 'THESIS' ? 'description' : 'group_add'}</span> {a.type === 'THESIS' ? 'Submit Thesis' : 'Create Group'}
+                          <Icon name={a.type === 'THESIS' ? 'description' : 'group_add'} className="material-symbols-outlined" /> {a.type === 'THESIS' ? 'Submit Thesis' : 'Create Group'}
                         </button>
                     )}
                   </div>
@@ -361,7 +362,7 @@ function StudentGroups() {
                             <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
                               {g.status === 'PENDING' && g.members?.[0]?.student?.id === user.id && (
                                 <button className="icon-btn danger" title="Delete Group" onClick={() => setConfirmDeleteGroupId(g.id)}>
-                                  <span className="material-symbols-outlined">delete</span>
+                                  <Icon name="delete" className="material-symbols-outlined" />
                                 </button>
                               )}
                             </div>
@@ -392,7 +393,7 @@ function StudentGroups() {
                           <td><span className="badge badge-active">{g.slotsRemaining} left</span></td>
                           <td style={{ textAlign: 'right' }}>
                             <button className="btn btn-sm btn-primary" onClick={() => handleJoin(g.id)}>
-                              <span className="material-symbols-outlined">group_add</span> Join
+                              <Icon name="group_add" className="material-symbols-outlined" /> Join
                             </button>
                           </td>
                         </tr>
@@ -418,7 +419,7 @@ function StudentGroups() {
 
             {eligible.length === 0 && myGroups.length === 0 && invitations.length === 0 && (
               <div className="empty-state" style={{ padding: 60 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>groups</span>
+                <Icon name="groups" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
                 <h3>No Group Opportunities</h3>
                 <p>The coordinator has not opened group formation yet. Check back later.</p>
               </div>

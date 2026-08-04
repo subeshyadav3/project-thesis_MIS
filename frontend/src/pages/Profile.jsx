@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/PageLayout';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -54,7 +55,7 @@ function Profile() {
   return (
     <ErrorBoundary><PageLayout title="Profile" user={user}>
       {loading && !userData ? (
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading profile...</p></div>
+        <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /><p>Loading profile...</p></div>
       ) : (
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         {/* Left: Main Profile Card */}
@@ -144,7 +145,7 @@ function Profile() {
 
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-outline-variant)' }}>
             <button className="btn btn-outline" onClick={() => navigate(-1)}>
-              <span className="material-symbols-outlined">arrow_back</span>
+              <Icon name="arrow_back" className="material-symbols-outlined" />
               Back
             </button>
           </div>
@@ -163,7 +164,7 @@ function Profile() {
                   Update your account password. You'll need your current password.
                 </p>
                 <button className="btn btn-primary btn-block" onClick={() => setShowResetForm(true)}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>lock_reset</span>
+                  <Icon name="lock_reset" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                   Change Password
                 </button>
               </div>
@@ -200,14 +201,14 @@ function Profile() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 8, background: 'var(--color-surface-container-low)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-success)' }}>check_circle</span>
+                <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-success)' }} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>Active</div>
                   <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Account is active</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 8, background: 'var(--color-surface-container-low)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-primary)' }}>verified</span>
+                <Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-primary)' }} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>Verified</div>
                   <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Email verified</div>

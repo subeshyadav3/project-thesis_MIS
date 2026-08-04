@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import api from '../../services/api';
 
@@ -21,7 +22,7 @@ function MaintainerDashboard() {
     <PageLayout title="Dashboard" user={user}>
       <div className="page-header">
         <h1>
-          <span className="material-symbols-outlined">dashboard</span>
+          <Icon name="dashboard" className="material-symbols-outlined" />
           System Overview
         </h1>
         <p>Statistics and analytics for the Thesis/Project Management System of IOE</p>
@@ -30,7 +31,7 @@ function MaintainerDashboard() {
       <div className="stats-grid">
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">groups</span>
+            <Icon name="groups" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.totalGroups || 0}</div>
           <div className="stat-label">Project Groups</div>
@@ -38,7 +39,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">library_books</span>
+            <Icon name="library_books" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.totalTheses || 0}</div>
           <div className="stat-label">Master's Theses</div>
@@ -46,7 +47,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">person</span>
+            <Icon name="person" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.totalSupervisors || 0}</div>
           <div className="stat-label">Supervisors</div>
@@ -54,7 +55,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">admin_panel_settings</span>
+            <Icon name="admin_panel_settings" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.totalCoordinators || 0}</div>
           <div className="stat-label">Coordinators</div>
@@ -62,7 +63,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">school</span>
+            <Icon name="school" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.totalStudents || 0}</div>
           <div className="stat-label">Students</div>
@@ -70,7 +71,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">pending_actions</span>
+            <Icon name="pending_actions" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.pendingGroups || 0}</div>
           <div className="stat-label">Pending Groups</div>
@@ -78,7 +79,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">check_circle</span>
+            <Icon name="check_circle" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.activeGroups || 0}</div>
           <div className="stat-label">Active Groups</div>
@@ -86,7 +87,7 @@ function MaintainerDashboard() {
 
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">done_all</span>
+            <Icon name="done_all" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{stats?.completedGroups || 0}</div>
           <div className="stat-label">Completed Groups</div>
@@ -101,7 +102,7 @@ function MaintainerDashboard() {
           {breakdowns.map((item, i) => (
             <div key={i} className="stat-card bento-card">
               <div className="stat-icon" style={{ background: `${item.color}15`, color: item.color }}>
-                <span className="material-symbols-outlined">{item.icon}</span>
+                <Icon name={item.icon} className="material-symbols-outlined" />
               </div>
               <div className="stat-number">{item.value}</div>
               <div className="stat-label">{item.label}</div>

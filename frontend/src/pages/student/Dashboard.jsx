@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -51,22 +52,22 @@ function StudentDashboard() {
     <ErrorBoundary><PageLayout title="Student Dashboard" subtitle={`${all.length} assignment${all.length !== 1 ? 's' : ''} total`} user={user}>
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">assignment</span></div>
+          <div className="stat-icon"><Icon name="assignment" className="material-symbols-outlined" /></div>
           <div className="stat-number">{all.length}</div>
           <div className="stat-label">Total Assignments</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{completed}</div>
           <div className="stat-label">Completed</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
+          <div className="stat-icon"><Icon name="pending_actions" className="material-symbols-outlined" /></div>
           <div className="stat-number">{active}</div>
           <div className="stat-label">Working / Pending</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">notifications</span></div>
+          <div className="stat-icon"><Icon name="notifications" className="material-symbols-outlined" /></div>
           <div className="stat-number">{unread}</div>
           <div className="stat-label">Unread Notifications</div>
         </div>
@@ -75,7 +76,7 @@ function StudentDashboard() {
       {/* Projects list */}
       {loading ? (
         <div className="loading-state" style={{ padding: 20 }}>
-          <span className="material-symbols-outlined">progress_activity</span>
+          <Icon name="progress_activity" className="material-symbols-outlined" />
         </div>
       ) : (
         <>
@@ -169,7 +170,7 @@ function StudentDashboard() {
             </div>
             {notifications.length === 0 ? (
               <div className="empty-state" style={{ padding: 24 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>notifications_off</span>
+                <Icon name="notifications_off" className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }} />
                 <p>No notifications yet</p>
               </div>
             ) : (
@@ -180,9 +181,7 @@ function StudentDashboard() {
                     background: n.read ? 'transparent' : 'var(--color-primary-container)',
                     opacity: n.read ? 0.6 : 1,
                   }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }}>
-                      {n.read ? 'check_circle' : 'notifications'}
-                    </span>
+                    <Icon name={n.read ? 'check_circle' : 'notifications'} className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }} />
                     <div style={{ flex: 1, fontSize: 13 }}>{n.message}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
                       {new Date(n.createdAt).toLocaleDateString()}

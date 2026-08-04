@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import { Link, useParams } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import DocumentViewer from '../../components/DocumentViewer';
@@ -47,7 +48,7 @@ function StudentProjectDetail() {
   if (loading) {
     return (
       <ErrorBoundary><PageLayout title={nameLabel} user={user}>
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
+        <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /><p>Loading...</p></div>
       </PageLayout></ErrorBoundary>
     );
   }
@@ -56,7 +57,7 @@ function StudentProjectDetail() {
     return (
       <ErrorBoundary><PageLayout title={nameLabel} user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>error_outline</span>
+          <Icon name="error_outline" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
           <h3>{nameLabel} not found</h3>
         </div>
       </PageLayout></ErrorBoundary>
@@ -120,7 +121,7 @@ function StudentProjectDetail() {
       subtitle={
         <Link to={isGroup ? '/student/projects' : '/student/theses'}
           style={{ color: 'var(--color-primary)', textDecoration: 'none', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
+          <Icon name="arrow_back" className="material-symbols-outlined" style={{ fontSize: 16 }} />
           Back to {isGroup ? 'Projects' : 'Theses'}
         </Link>
       }
@@ -133,9 +134,7 @@ function StudentProjectDetail() {
           <div className="card-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }}>
-                  {isGroup ? 'group' : 'person'}
-                </span>
+                <Icon name={isGroup ? 'group' : 'person'} className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }} />
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: 15 }}>{nameLabel} Details</h3>
@@ -206,7 +205,7 @@ function StudentProjectDetail() {
             <div className="card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-secondary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-secondary-container)' }}>people</span>
+                  <Icon name="people" className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-secondary-container)' }} />
                 </div>
                 <h3 style={{ margin: 0, fontSize: 15 }}>Group Members</h3>
               </div>
@@ -245,7 +244,7 @@ function StudentProjectDetail() {
             <div className="card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-secondary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-secondary-container)' }}>person</span>
+                  <Icon name="person" className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-secondary-container)' }} />
                 </div>
                 <h3 style={{ margin: 0, fontSize: 15 }}>Student</h3>
               </div>
@@ -287,7 +286,7 @@ function StudentProjectDetail() {
                     background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'var(--color-surface-container)',
                     color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                   }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'}</span>
+                    <Icon name={info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
                     {info.label}
                   </div>
                 );
@@ -305,9 +304,7 @@ function StudentProjectDetail() {
                     )}
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingTop: 6, cursor: 'pointer', width: '100%' }}
                       onClick={() => setFeedbackTab(s)}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 20, color, flexShrink: 0, fontVariationSettings: status === 'done' ? "'FILL' 1" : "'FILL' 0" }}>
-                        {icons[status]}
-                      </span>
+                      <Icon name={icons[status]} className="material-symbols-outlined" style={{ fontSize: 20, color, flexShrink: 0, fontVariationSettings: status === 'done' ? "'FILL' 1" : "'FILL' 0" }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: isActive ? 700 : 500, color: color === 'var(--color-outline-variant)' ? 'var(--color-on-surface-variant)' : 'var(--color-on-surface)' }}>
                           {label}
@@ -328,9 +325,7 @@ function StudentProjectDetail() {
           <div className="tabs" style={{ marginBottom: 16 }}>
             {stageKeys.map(st => (
               <div key={st} className={`tab ${feedbackTab === st ? 'active' : ''}`} onClick={() => setFeedbackTab(st)}>
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: submittedStages.includes(st) ? "'FILL' 1" : "'FILL' 0", color: submittedStages.includes(st) ? 'var(--color-primary)' : undefined }}>
-                  {st === 'PROPOSAL' ? 'description' : st === 'MID_TERM' ? 'schedule' : 'flag'}
-                </span>
+                <Icon name={st === 'PROPOSAL' ? 'description' : st === 'MID_TERM' ? 'schedule' : 'flag'} className="material-symbols-outlined" style={{ fontVariationSettings: submittedStages.includes(st) ? "'FILL' 1" : "'FILL' 0", color: submittedStages.includes(st) ? 'var(--color-primary)' : undefined }} />
                 {st === 'MID_TERM' ? 'Mid-Term' : st.charAt(0) + st.slice(1).toLowerCase()}
               </div>
             ))}
@@ -340,7 +335,7 @@ function StudentProjectDetail() {
             <div className="card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-tertiary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-tertiary-container)' }}>reviews</span>
+                  <Icon name="reviews" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-tertiary-container)' }} />
                 </div>
                 <h3 style={{ margin: 0, fontSize: 14 }}>{tabLabel} Feedback</h3>
               </div>
@@ -354,7 +349,7 @@ function StudentProjectDetail() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', marginBottom: 12, borderRadius: 8, background: 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)', cursor: 'pointer' }}
                   onClick={() => setViewerDoc({ url: tabProposal.documentUrl, name: `${tabLabel}_Document.${tabExt}` })}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }}>{tabExt === 'pdf' ? 'picture_as_pdf' : 'description'}</span>
+                    <Icon name={tabExt === 'pdf' ? 'picture_as_pdf' : 'description'} className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--color-on-primary-container)' }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tabLabel}_Document.{tabExt}</div>
@@ -365,11 +360,11 @@ function StudentProjectDetail() {
                   <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
                     <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
                       onClick={() => setViewerDoc({ url: tabProposal.documentUrl, name: `${tabLabel}_Document.${tabExt}` })} title="Preview">
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
+                      <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                     </button>
                     <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
                       onClick={(e) => { e.stopPropagation(); downloadFile(tabProposal.documentUrl, `${tabLabel}_Document`); }} title="Download">
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                      <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                     </button>
                   </div>
                 </div>
@@ -389,7 +384,7 @@ function StudentProjectDetail() {
                   <div key={e.id} style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)' }}>
                     <p style={{ margin: '0 0 8px', fontSize: 14, lineHeight: 1.6 }}>{e.comment}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span>
+                      <Icon name="person" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                       {e.submittedBy?.firstName} {e.submittedBy?.lastName}
                       <span style={{ marginLeft: 4 }}>·</span>
                       <span>{new Date(e.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
@@ -401,7 +396,7 @@ function StudentProjectDetail() {
             {currentFeedback.length === 0 && !tabProposal && (
               <div className="empty-state" style={{ padding: 32 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-outline)' }}>chat_bubble_outline</span>
+                  <Icon name="chat_bubble_outline" className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--color-outline)' }} />
                 </div>
                 <p>No feedback yet for this stage.</p>
                 <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', margin: '4px 0 0' }}>
@@ -438,13 +433,13 @@ function StudentProjectDetail() {
                   background: 'var(--color-primary)', color: 'var(--color-on-primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
+                  <Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     {r.issuedBy && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span>
+                        <Icon name="person" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                         {r.issuedBy.firstName} {r.issuedBy.lastName}
                         <span style={{
                           padding: '1px 5px', borderRadius: 3, fontSize: 9, fontWeight: 600,
@@ -454,7 +449,7 @@ function StudentProjectDetail() {
                       </span>
                     )}
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_today</span>
+                      <Icon name="calendar_today" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                       {new Date(r.createdAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -463,7 +458,7 @@ function StudentProjectDetail() {
                   <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
                     onClick={() => setViewerDoc({ url: `/api/supervisors/recommendation/${r.id}/pdf`, name: `Recommendation_${r.id}.pdf` })}
                     title="View Recommendation PDF">
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                    <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                   </button>                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -473,7 +468,7 @@ function StudentProjectDetail() {
                         document.body.appendChild(a); a.click(); document.body.removeChild(a);
                       }}
                       title="Download PDF">
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                      <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                     </button>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Icon } from './ui';
 import Sidebar from './Sidebar';
 import NotificationBell from './NotificationBell';
 import CommandPalette from './CommandPalette';
@@ -33,7 +34,7 @@ function PageLayout({ children, title, subtitle, actions, user }) {
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
             >
-              <span className="material-symbols-outlined">menu</span>
+              <Icon name="menu" className="material-symbols-outlined" />
             </button>
             
             {/* Quick Command Palette trigger */}
@@ -46,7 +47,7 @@ function PageLayout({ children, title, subtitle, actions, user }) {
                 fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)',
               }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>search</span>
+              <Icon name="search" className="material-symbols-outlined" style={{ fontSize: 18 }} />
               <span>Search or type <kbd style={{ fontSize: 10, background: 'var(--color-surface-container)', padding: '1px 5px', borderRadius: 3 }}>Ctrl K</kbd></span>
             </button>
           </div>
@@ -57,7 +58,7 @@ function PageLayout({ children, title, subtitle, actions, user }) {
               title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
               aria-label="Toggle dark mode"
             >
-              <span className="material-symbols-outlined">{dark ? 'light_mode' : 'dark_mode'}</span>
+              <Icon name={dark ? 'light_mode' : 'dark_mode'} className="material-symbols-outlined" />
             </button>
             <NotificationBell />
             {actions}
@@ -68,9 +69,7 @@ function PageLayout({ children, title, subtitle, actions, user }) {
           {(title || subtitle) && (
             <div className="page-header">
               <h1>
-                <span className="material-symbols-outlined">
-                  {title === 'Dashboard' ? 'dashboard' : 'folder'}
-                </span>
+                <Icon name={title === 'Dashboard' ? 'dashboard' : 'folder'} className="material-symbols-outlined" />
                 {title}
               </h1>
               {subtitle && <p>{subtitle}</p>}

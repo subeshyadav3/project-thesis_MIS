@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import api from '../../services/api';
 import PageLayout from '../../components/PageLayout';
 import SearchInput from '../../components/SearchInput';
@@ -107,7 +108,7 @@ export default function AuditLog() {
           {loading ? (
             <TableSkeleton rows={8} cols={4} />
           ) : logs.length === 0 ? (
-            <div className="empty-state"><span className="material-symbols-outlined" style={{ fontSize: 48 }}>history</span><p>No audit logs found</p></div>
+            <div className="empty-state"><Icon name="history" className="material-symbols-outlined" style={{ fontSize: 48 }} /><p>No audit logs found</p></div>
           ) : (
             <div className="table-container">
               <table className="table">

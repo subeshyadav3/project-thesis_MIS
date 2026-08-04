@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Icon } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -417,11 +418,11 @@ const handleComplete = async (id) => {
   const actions = (
     <>
       <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-        <span className="material-symbols-outlined">upload_file</span>
+        <Icon name="upload_file" className="material-symbols-outlined" />
         Upload Excel
       </button>
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-        <span className="material-symbols-outlined">add</span>
+        <Icon name="add" className="material-symbols-outlined" />
         Add Thesis
       </button>
       <button className="btn btn-outline btn-sm" onClick={async () => {
@@ -435,7 +436,7 @@ const handleComplete = async (id) => {
           toast.error('Export failed');
         }
       }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Export
+        <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Export
       </button>
     </>
   );
@@ -475,7 +476,7 @@ return (
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">library_books</span>
+                <Icon name="library_books" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>
@@ -626,7 +627,7 @@ return (
                     <label>Supervisor</label>
                     <div className="sup-dropdown-trigger">
                       <div className="sup-search-wrapper" onClick={() => setEditSupOpen(true)}>
-                        <span className="material-symbols-outlined">search</span>
+                        <Icon name="search" className="material-symbols-outlined" />
                         <input
                           type="text"
                           placeholder={editSupId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === editSupId)) : 'No supervisor'}
@@ -636,10 +637,10 @@ return (
                         />
                         {editSupId && (
                           <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditSupId(''); setEditSupSearch(''); }}>
-                            <span className="material-symbols-outlined">close</span>
+                            <Icon name="close" className="material-symbols-outlined" />
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <Icon name={editSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                       </div>
                       {editSupOpen && (
                         <div className="sup-dropdown">
@@ -674,7 +675,7 @@ return (
                     <label>External Examiner (Mid-Term)</label>
                     <div className="sup-dropdown-trigger">
                       <div className="sup-search-wrapper" onClick={() => setEditMidTermExamOpen(true)}>
-                        <span className="material-symbols-outlined">search</span>
+                        <Icon name="search" className="material-symbols-outlined" />
                         <input
                           type="text"
                           placeholder={editMidTermExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editMidTermExamId)) : 'No mid-term examiner'}
@@ -684,10 +685,10 @@ return (
                         />
                         {editMidTermExamId && (
                           <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditMidTermExamId(''); setEditMidTermExamSearch(''); }}>
-                            <span className="material-symbols-outlined">close</span>
+                            <Icon name="close" className="material-symbols-outlined" />
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <Icon name={editMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                       </div>
                       {editMidTermExamOpen && (
                         <div className="sup-dropdown">
@@ -722,7 +723,7 @@ return (
                     <label>External Examiner (Final)</label>
                     <div className="sup-dropdown-trigger">
                       <div className="sup-search-wrapper" onClick={() => setEditFinalExamOpen(true)}>
-                        <span className="material-symbols-outlined">search</span>
+                        <Icon name="search" className="material-symbols-outlined" />
                         <input
                           type="text"
                           placeholder={editFinalExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editFinalExamId)) : 'No final examiner'}
@@ -732,10 +733,10 @@ return (
                         />
                         {editFinalExamId && (
                           <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditFinalExamId(''); setEditFinalExamSearch(''); }}>
-                            <span className="material-symbols-outlined">close</span>
+                            <Icon name="close" className="material-symbols-outlined" />
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editFinalExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <Icon name={editFinalExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                       </div>
                       {editFinalExamOpen && (
                         <div className="sup-dropdown">
@@ -772,24 +773,24 @@ return (
 
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
                 Close
               </button>
               {detailMode === 'edit' && (
                 <button className="btn btn-primary" onClick={() => handleEditSave(showDetail.id)}>
-                  <span className="material-symbols-outlined">save</span>
+                  <Icon name="save" className="material-symbols-outlined" />
                   Save Changes
                 </button>
               )}
               {showDetail.status === 'ACTIVE' && detailMode !== 'edit' && (
                 <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
-                  <span className="material-symbols-outlined">check_circle</span>
+                  <Icon name="check_circle" className="material-symbols-outlined" />
                   Mark Complete
                 </button>
               )}
               {detailMode !== 'edit' && (
                 <button className="btn btn-danger" onClick={() => confirmDeleteThesis(showDetail.id)}>
-                  <span className="material-symbols-outlined">delete</span>
+                  <Icon name="delete" className="material-symbols-outlined" />
                   Delete
                 </button>
               )}
@@ -800,17 +801,17 @@ return (
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
+          <div className="stat-icon"><Icon name="library_books" className="material-symbols-outlined" /></div>
           <div className="stat-number">{theses.length}</div>
           <div className="stat-label">Total Theses</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{assignedCount}</div>
           <div className="stat-label">Assigned</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">person_add</span></div>
+          <div className="stat-icon"><Icon name="person_add" className="material-symbols-outlined" /></div>
           <div className="stat-number">{pendingCount}</div>
           <div className="stat-label">Needs Supervisor</div>
         </div>
@@ -848,7 +849,7 @@ return (
                 loadData();
               } catch (err) { toast.error(err.response?.data?.error || 'Bulk activate failed'); }
             }}>
-              <span className="material-symbols-outlined">play_arrow</span>
+              <Icon name="play_arrow" className="material-symbols-outlined" />
               Make Active
             </button>
             <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
@@ -862,7 +863,7 @@ return (
                 loadData();
               } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
             }}>
-              <span className="material-symbols-outlined">calendar_month</span>
+              <Icon name="calendar_month" className="material-symbols-outlined" />
               Set End Date
             </button>
             <button className="btn btn-sm btn-success" onClick={async () => {
@@ -880,7 +881,7 @@ return (
                 toast.error(err.response?.data?.error || 'Bulk complete failed');
               }
             }}>
-              <span className="material-symbols-outlined">check_circle</span>
+              <Icon name="check_circle" className="material-symbols-outlined" />
               Mark Complete
             </button>
             <button className="btn btn-sm btn-danger" onClick={() => {
@@ -904,7 +905,7 @@ return (
                 danger: true,
               });
             }}>
-              <span className="material-symbols-outlined">delete</span>
+              <Icon name="delete" className="material-symbols-outlined" />
               Delete
             </button>
           </div>
@@ -930,7 +931,7 @@ return (
           <TableSkeleton rows={5} cols={5} />
         ) : sortedTheses.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">library_books</span>
+            <Icon name="library_books" className="material-symbols-outlined" />
             <h3>No theses found</h3>
             <p>{searchQuery || statusFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a thesis to get started.'}</p>
           </div>
@@ -1009,7 +1010,7 @@ return (
                         {t.crossProgramRequestedBy && (
                           <>
                             <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 9, verticalAlign: 'middle' }}>swap_horiz</span>
+                              <Icon name="swap_horiz" className="material-symbols-outlined" style={{ fontSize: 9, verticalAlign: 'middle' }} />
                               Cross-Program
                             </span>
                             {t.crossProgramRequestedBy.id === user.id && (
@@ -1024,14 +1025,14 @@ return (
                                   title="Approve cross-program thesis"
                                   onClick={async (e) => { e.stopPropagation(); try { await api.put(`/theses/${t.id}/approve-cross-program`); toast.success('Cross-program thesis approved'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Approve failed'); } }}
                                 >
-                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check</span>
+                                  <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                                 </button>
                                 <button
                                   className="icon-btn-sm danger"
                                   title="Reject cross-program thesis"
                                   onClick={(e) => { e.stopPropagation(); confirmRejectCrossProgram(t.id); }}
                                 >
-                                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                                  <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                                 </button>
                               </div>
                             )}
@@ -1045,34 +1046,34 @@ return (
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
                         <button className="icon-btn-sm" title="View" aria-label="View thesis details" onClick={() => openDetail(t, 'view')}>
-                          <span className="material-symbols-outlined">visibility</span>
+                          <Icon name="visibility" className="material-symbols-outlined" />
                         </button>
                         <div style={{ position: 'relative' }}>
                           <button className="icon-btn-sm" title="More actions" aria-label="More actions" onClick={(e) => { e.stopPropagation(); setActionMenuRow(actionMenuRow === t.id ? null : t.id); }}>
-                            <span className="material-symbols-outlined">more_vert</span>
+                            <Icon name="more_vert" className="material-symbols-outlined" />
                           </button>
                           {actionMenuRow === t.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
                               <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                  <Icon name="edit" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Edit
                                 </div>
                               {t.status === 'ACTIVE' && (
                                 <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                                  <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Complete
                                 </div>
                               )}
                               <div className="menu-item" onClick={() => setPdfPreviewItem(t)}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                                <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                 PDF Preview
                               </div>
                               <div className="menu-item" onClick={() => downloadEvalPdf(t)}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                 Export PDF
                               </div>
                               <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                 Delete
                               </div>
                             </div>
@@ -1108,7 +1109,7 @@ return (
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">add</span>
+                <Icon name="add" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Create Thesis</h2>
@@ -1124,7 +1125,7 @@ return (
                 <label>Student</label>
                 <div className="sup-dropdown-trigger" ref={createStudentRef}>
                   <div className="sup-search-wrapper" onClick={() => setCreateStudentOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
+                    <Icon name="search" className="material-symbols-outlined" />
                     <input
                       type="text"
                       placeholder={createForm.studentId ? students.find(s => String(s.id) === String(createForm.studentId))?.firstName + ' ' + students.find(s => String(s.id) === String(createForm.studentId))?.lastName || 'Search student...' : 'Search student...'}
@@ -1134,10 +1135,10 @@ return (
                     />
                     {createForm.studentId && (
                       <button className="sup-clear" onClick={e => { e.stopPropagation(); setCreateForm({...createForm, studentId: ''}); setCreateStudentSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{createStudentOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                    <Icon name={createStudentOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                   </div>
                   {createStudentOpen && (
                     <div className="sup-dropdown">
@@ -1171,7 +1172,7 @@ return (
                                 <div className="sup-dropdown-item-email">{s.email || ''}</div>
                               </div>
                               {isSelected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                                <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
                               )}
                             </div>
                           );
@@ -1200,7 +1201,7 @@ return (
                 <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
                 <div className="sup-dropdown-trigger">
                   <div className="sup-search-wrapper" onClick={() => setCreateSupOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
+                    <Icon name="search" className="material-symbols-outlined" />
                     <input
                       type="text"
                       placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
@@ -1210,10 +1211,10 @@ return (
                     />
                     {createForm.supervisorId && (
                       <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, supervisorId: ''}); setCreateSupSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{createSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                    <Icon name={createSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                   </div>
                   {createSupOpen && (
                     <div className="sup-dropdown">
@@ -1236,7 +1237,7 @@ return (
                                 <div className="sup-dropdown-item-email">{s.email}</div>
                               </div>
                               {selected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                                <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
                               )}
                             </div>
                           );
@@ -1250,7 +1251,7 @@ return (
                 <label>Internal Examiner <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
                 <div className="sup-dropdown-trigger">
                   <div className="sup-search-wrapper" onClick={() => setExamOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
+                    <Icon name="search" className="material-symbols-outlined" />
                     <input
                       type="text"
                       placeholder={createForm.examinerId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createForm.examinerId)) : 'Search examiner...'}
@@ -1260,10 +1261,10 @@ return (
                     />
                     {createForm.examinerId && (
                       <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, examinerId: ''}); setExamSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{examOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                    <Icon name={examOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                   </div>
                   {examOpen && (
                     <div className="sup-dropdown">
@@ -1286,7 +1287,7 @@ return (
                                 <div className="sup-dropdown-item-email">{e.email}</div>
                               </div>
                               {selected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                                <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
                               )}
                             </div>
                           );
@@ -1298,11 +1299,11 @@ return (
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={creating}>
-                  <span className="material-symbols-outlined">{creating ? 'progress_activity' : 'add'}</span>
+                  <Icon name={creating ? 'progress_activity' : 'add'} className="material-symbols-outlined" />
                   {creating ? 'Creating...' : 'Create'}
                 </button>
               </div>

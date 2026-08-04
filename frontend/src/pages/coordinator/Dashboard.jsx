@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import api from '../../services/api';
 
@@ -56,7 +57,7 @@ function CoordinatorDashboard() {
         {statCards.map((card, i) => (
           <div key={i} className="stat-card bento-card">
             <div className="stat-icon">
-              <span className="material-symbols-outlined">{card.icon}</span>
+              <Icon name={card.icon} className="material-symbols-outlined" />
             </div>
             <div className="stat-number">{card.value}</div>
             <div className="stat-label">{card.label}</div>

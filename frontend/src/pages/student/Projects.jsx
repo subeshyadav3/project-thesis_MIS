@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -28,7 +29,7 @@ function StudentProjects() {
   if (loading) {
     return (
       <ErrorBoundary><PageLayout title="My Projects" user={user}>
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
+        <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /><p>Loading...</p></div>
       </PageLayout></ErrorBoundary>
     );
   }
@@ -38,7 +39,7 @@ function StudentProjects() {
       <ErrorBoundary><PageLayout title="My Projects" user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 16px', background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>group</span>
+            <Icon name="group" className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }} />
           </div>
           <h3>No Projects</h3>
           <p style={{ color: 'var(--color-on-surface-variant)', marginTop: 8 }}>You have not been assigned to any bachelor project groups yet.</p>
@@ -63,13 +64,11 @@ function StudentProjects() {
                     background: g.status === 'COMPLETED' ? 'var(--color-success-container)' : g.status === 'ACTIVE' ? 'var(--color-primary-container)' : 'var(--color-surface-container)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <span className="material-symbols-outlined" style={{
+                    <Icon name={g.status === 'COMPLETED' ? 'checklist' : 'group'} className="material-symbols-outlined" style={{
                       color: g.status === 'COMPLETED' ? 'var(--color-on-success-container)' : g.status === 'ACTIVE' ? 'var(--color-on-primary-container)' : 'var(--color-on-surface)',
                       fontSize: 20,
                       fontVariationSettings: "'FILL' 1",
-                    }}>
-                      {g.status === 'COMPLETED' ? 'checklist' : 'group'}
-                    </span>
+                    }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -97,7 +96,7 @@ function StudentProjects() {
                       </span>
                     ) : null;
                   })()}
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }}>chevron_right</span>
+                  <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }} />
                 </div>
               </div>
               <div style={{ padding: '4px 16px 12px', display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>

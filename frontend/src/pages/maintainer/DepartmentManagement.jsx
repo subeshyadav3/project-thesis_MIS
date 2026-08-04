@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -85,11 +86,11 @@ function DepartmentManagement() {
   const actions = (
     <>
       <button className="btn btn-secondary btn-sm" onClick={() => setShowYearModal(true)}>
-        <span className="material-symbols-outlined">calendar_month</span>
+        <Icon name="calendar_month" className="material-symbols-outlined" />
         Add Academic Year
       </button>
       <button className="btn btn-primary btn-sm" onClick={() => setShowDeptModal(true)}>
-        <span className="material-symbols-outlined">add</span>
+        <Icon name="add" className="material-symbols-outlined" />
         Add Department
       </button>
     </>
@@ -100,7 +101,7 @@ function DepartmentManagement() {
       <PageLayout title="Departments" user={user} actions={actions}>
       <div className="page-header">
         <h1>
-          <span className="material-symbols-outlined">account_balance</span>
+          <Icon name="account_balance" className="material-symbols-outlined" />
           Departments & Academic Years
         </h1>
         <p>Manage departments and their academic year configurations</p>
@@ -109,14 +110,14 @@ function DepartmentManagement() {
       <div className="stats-grid" style={{ marginBottom: 32 }}>
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">account_balance</span>
+            <Icon name="account_balance" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{departments.length}</div>
           <div className="stat-label">Departments</div>
         </div>
         <div className="stat-card bento-card">
           <div className="stat-icon">
-            <span className="material-symbols-outlined">calendar_month</span>
+            <Icon name="calendar_month" className="material-symbols-outlined" />
           </div>
           <div className="stat-number">{academicYears.length}</div>
           <div className="stat-label">Academic Years</div>
@@ -213,7 +214,7 @@ function DepartmentManagement() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">add_business</span>
+                <Icon name="add_business" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Add Department</h2>
@@ -231,11 +232,11 @@ function DepartmentManagement() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowDeptModal(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'add'}</span>
+                  <Icon name={saving ? 'progress_activity' : 'add'} className="material-symbols-outlined" />
                   {saving ? 'Creating...' : 'Create'}
                 </button>
               </div>
@@ -249,7 +250,7 @@ function DepartmentManagement() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">calendar_month</span>
+                <Icon name="calendar_month" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Add Academic Year</h2>
@@ -274,11 +275,11 @@ function DepartmentManagement() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowYearModal(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  <span className="material-symbols-outlined">{saving ? 'progress_activity' : 'add'}</span>
+                  <Icon name={saving ? 'progress_activity' : 'add'} className="material-symbols-outlined" />
                   {saving ? 'Creating...' : 'Create'}
                 </button>
               </div>
