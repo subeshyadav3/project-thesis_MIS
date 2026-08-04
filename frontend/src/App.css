@@ -1,7 +1,58 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
   :root {
-    /* ─── Modern Academic Light Theme (base; dark theme via body.dark) ── */
+    /* ─── Modern Academic Light Theme (base; dark theme via body.dark) ──
+       RGB-channel twins (*-rgb) are the single source of truth so Tailwind
+       can apply alpha via rgb(var(--token) / <alpha-value>) and flip with the
+       theme. The hex vars below derive nothing — they are kept for existing
+       var(--color-*) usage in page CSS and stay in sync manually. ───────── */
+    --color-primary-rgb: 79 70 229;
+    --color-primary-hover-rgb: 67 56 202;
+    --color-primary-container-rgb: 224 231 255;
+    --color-on-primary-rgb: 255 255 255;
+    --color-on-primary-container-rgb: 55 48 163;
+    --color-primary-grand-rgb: 67 56 202;
+
+    --color-secondary-rgb: 245 158 11;
+    --color-secondary-hover-rgb: 217 119 6;
+    --color-secondary-container-rgb: 254 243 199;
+    --color-on-secondary-rgb: 255 255 255;
+    --color-on-secondary-container-rgb: 146 64 14;
+
+    --color-tertiary-rgb: 13 148 136;
+    --color-tertiary-hover-rgb: 15 118 110;
+    --color-tertiary-container-rgb: 204 251 241;
+    --color-on-tertiary-rgb: 255 255 255;
+    --color-on-tertiary-container-rgb: 19 78 74;
+
+    --color-surface-rgb: 246 248 251;
+    --color-surface-container-lowest-rgb: 255 255 255;
+    --color-surface-container-low-rgb: 238 241 246;
+    --color-surface-container-rgb: 227 232 240;
+    --color-surface-container-high-rgb: 203 212 225;
+    --color-surface-container-highest-rgb: 147 161 179;
+
+    --color-background-rgb: 238 242 247;
+    --color-on-surface-rgb: 15 23 42;
+    --color-on-surface-variant-rgb: 85 101 122;
+    --color-outline-rgb: 194 204 216;
+    --color-outline-variant-rgb: 223 229 236;
+
+    --color-error-rgb: 220 38 38;
+    --color-error-container-rgb: 254 226 226;
+    --color-on-error-rgb: 255 255 255;
+    --color-on-error-container-rgb: 153 27 27;
+
+    --color-success-rgb: 22 163 74;
+    --color-success-container-rgb: 220 252 231;
+    --color-on-success-rgb: 255 255 255;
+    --color-on-success-container-rgb: 21 128 61;
+
+    --color-warning-rgb: 249 115 22;
+    --color-warning-container-rgb: 255 243 224;
+    --color-on-warning-rgb: 255 255 255;
+    --color-on-warning-container-rgb: 194 65 12;
+
     --color-primary: #4f46e5;
     --color-primary-hover: #4338ca;
     --color-primary-container: #e0e7ff;
@@ -3926,6 +3977,54 @@ a:focus-visible {
    ========================================================================== */
 
 body.dark {
+  /* ── RGB-channel tokens (dark) — mirror of light for theme-aware Tailwind ── */
+  --color-primary-rgb: 165 180 252;
+  --color-primary-hover-rgb: 199 210 254;
+  --color-primary-container-rgb: 67 56 202;
+  --color-on-primary-rgb: 30 27 75;
+  --color-on-primary-container-rgb: 199 210 254;
+  --color-primary-grand-rgb: 99 102 241;
+
+  --color-secondary-rgb: 251 191 36;
+  --color-secondary-hover-rgb: 245 158 11;
+  --color-secondary-container-rgb: 120 53 15;
+  --color-on-secondary-rgb: 28 16 6;
+  --color-on-secondary-container-rgb: 253 230 138;
+
+  --color-tertiary-rgb: 45 212 191;
+  --color-tertiary-hover-rgb: 20 184 166;
+  --color-tertiary-container-rgb: 19 78 74;
+  --color-on-tertiary-rgb: 4 47 46;
+  --color-on-tertiary-container-rgb: 153 246 228;
+
+  --color-surface-rgb: 15 23 42;
+  --color-surface-container-lowest-rgb: 15 23 42;
+  --color-surface-container-low-rgb: 30 41 59;
+  --color-surface-container-rgb: 39 52 72;
+  --color-surface-container-high-rgb: 51 65 85;
+  --color-surface-container-highest-rgb: 71 85 105;
+
+  --color-background-rgb: 11 17 32;
+  --color-on-surface-rgb: 226 232 240;
+  --color-on-surface-variant-rgb: 148 163 184;
+  --color-outline-rgb: 51 65 85;
+  --color-outline-variant-rgb: 31 42 58;
+
+  --color-error-rgb: 248 113 113;
+  --color-error-container-rgb: 127 29 29;
+  --color-on-error-rgb: 255 255 255;
+  --color-on-error-container-rgb: 254 202 202;
+
+  --color-success-rgb: 74 222 128;
+  --color-success-container-rgb: 20 83 45;
+  --color-on-success-rgb: 5 46 22;
+  --color-on-success-container-rgb: 187 247 208;
+
+  --color-warning-rgb: 251 146 60;
+  --color-warning-container-rgb: 124 45 18;
+  --color-on-warning-rgb: 39 16 6;
+  --color-on-warning-container-rgb: 254 215 170;
+
   --color-primary: #a5b4fc;
   --color-primary-hover: #c7d2fe;
   --color-primary-container: #4338ca;

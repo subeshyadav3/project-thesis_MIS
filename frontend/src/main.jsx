@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/material-symbols-outlined/full.css';
+import './tailwind.css';
 import App from './App.jsx';
 
 // Apply the saved theme preference before first paint so there's no flash.
