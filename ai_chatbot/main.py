@@ -34,7 +34,18 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Backend URL: %s", settings.backend_base_url)
     logger.info("Vector store: %s", settings.chroma_persist_dir)
-    logger.info("LLM provider: %s (model=%s)", settings.nvidia_base_url, settings.nvidia_model)
+    if settings.llm_provider == "groq":
+        logger.info(
+            "LLM provider: groq (%s) [model=%s] — nvidia fallback enabled",
+            settings.groq_base_url,
+            settings.groq_model,
+        )
+    else:
+        logger.info(
+            "LLM provider: nvidia (%s) [model=%s] — groq fallback enabled",
+            settings.nvidia_base_url,
+            settings.nvidia_model,
+        )
     yield
     logger.info("Shutting down %s", settings.service_title)
 

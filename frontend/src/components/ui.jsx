@@ -1,8 +1,129 @@
 import React from 'react';
+import {
+  AlertCircle, ArrowLeft, ArrowLeftRight, ArrowRight, Award, BadgeCheck, Ban,
+  Bell, BellOff, BookOpen, Bot, Brain, Building2, Calendar, Check, CheckCheck,
+  CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp,
+  Circle, CircleStop, CircleX, ClipboardCheck, Clock, Download, EllipsisVertical,
+  ExternalLink, Eye, FastForward, FileText, FileUp, Flag, Folder, FolderX,
+  GraduationCap, Hourglass, Info, Key, Landmark, LayoutDashboard, LayoutGrid,
+  ListChecks, ListFilter, LoaderCircle, Lock, LogOut, Megaphone, Menu, MessageSquare,
+  Moon, Pencil, Play, Plus, RefreshCw, RotateCcw, Route, Save, Search, Send, Shield,
+  ShieldCheck, Sparkles, Square, Star, Store, Sun, Target, Trash2, TrendingUp,
+  TriangleAlert, Upload, User, UserCheck, UserCog, UserPlus, Users, UserX, X,
+} from 'lucide-react';
 
-export const Icon = ({ name, className = '', ...rest }) => (
-  <span className={`material-symbols-outlined ${className}`} {...rest}>{name}</span>
-);
+// Legacy Material Symbols name → lucide-react component.
+// Icons render at size="1em" so existing `text-[18px]`-style sizing classes
+// (and `currentColor` stroke) keep working exactly as before.
+const iconMap = {
+  account_balance: Landmark,
+  add: Plus,
+  add_business: Store,
+  admin_panel_settings: ShieldCheck,
+  arrow_back: ArrowLeft,
+  arrow_drop_up: ChevronUp,
+  arrow_forward: ArrowRight,
+  assignment: FileText,
+  assignment_ind: UserCheck,
+  auto_awesome: Sparkles,
+  badge: BadgeCheck,
+  block: Ban,
+  calendar_month: Calendar,
+  campaign: Megaphone,
+  cancel: CircleX,
+  check: Check,
+  check_circle: CheckCircle,
+  checklist: ListChecks,
+  chevron_left: ChevronLeft,
+  chevron_right: ChevronRight,
+  close: X,
+  compare_arrows: ArrowLeftRight,
+  dashboard: LayoutDashboard,
+  delete: Trash2,
+  done_all: CheckCheck,
+  download: Download,
+  edit: Pencil,
+  error: AlertCircle,
+  fact_check: ClipboardCheck,
+  filter_alt: ListFilter,
+  first_page: ChevronsLeft,
+  flag: Flag,
+  forward: FastForward,
+  grading: GraduationCap,
+  group_add: UserPlus,
+  groups: Users,
+  hourglass_top: Hourglass,
+  info: Info,
+  key: Key,
+  last_page: ChevronsRight,
+  library_books: BookOpen,
+  lock: Lock,
+  logout: LogOut,
+  menu: Menu,
+  more_vert: EllipsisVertical,
+  notifications: Bell,
+  overview: LayoutGrid,
+  pending_actions: Clock,
+  person: User,
+  person_add: UserPlus,
+  picture_as_pdf: FileText,
+  play_arrow: Play,
+  progress_activity: LoaderCircle,
+  psychology: Brain,
+  refresh: RefreshCw,
+  route: Route,
+  save: Save,
+  school: GraduationCap,
+  score: Award,
+  search: Search,
+  send: Send,
+  shield: Shield,
+  smart_toy: Bot,
+  star: Star,
+  stars: Star,
+  stop: Square,
+  stop_circle: CircleStop,
+  supervisor_account: UserCog,
+  track_changes: Target,
+  trending_up: TrendingUp,
+  upload: Upload,
+  upload_file: FileUp,
+  verified: BadgeCheck,
+  visibility: Eye,
+  warning: TriangleAlert,
+  // Extended mappings used across pages (sidebar, modals, theming)
+  apartment: Building2,
+  article: FileText,
+  award_star: Award,
+  calendar_today: Calendar,
+  chat_bubble_outline: MessageSquare,
+  compare: ArrowLeftRight,
+  dark_mode: Moon,
+  description: FileText,
+  edit_note: Pencil,
+  error_outline: AlertCircle,
+  folder: Folder,
+  folder_off: FolderX,
+  group: Users,
+  history: RotateCcw,
+  light_mode: Sun,
+  lock_reset: RefreshCw,
+  notifications_off: BellOff,
+  open_in_new: ExternalLink,
+  people: Users,
+  person_apron: User,
+  person_off: UserX,
+  question_answer: MessageSquare,
+  radio_button_unchecked: Circle,
+  reviews: Star,
+  summarize: ListChecks,
+  swap_horiz: ArrowLeftRight,
+};
+
+export const Icon = ({ name, className = '', ...rest }) => {
+  const LucideIcon = iconMap[name] || CircleX;
+  return <LucideIcon className={className} size="1em" strokeWidth={2} {...rest} />;
+};
 
 export const Spinner = ({ className = '' }) => (
   <Icon name="progress_activity" className={`animate-spin inline-block ${className}`} />
@@ -17,7 +138,7 @@ export const Button = ({
   type = 'button',
   ...rest
 }) => {
-  const base = 'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-150 gap-2 leading-none whitespace-nowrap select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-950/30 disabled:opacity-50 disabled:cursor-not-allowed';
+  const base = 'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-150 gap-2 leading-none whitespace-nowrap select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 disabled:cursor-not-allowed';
   const sizes = {
     xs: 'px-2.5 py-1.5 text-xs',
     sm: 'px-3.5 py-2 text-[13px]',
@@ -26,14 +147,14 @@ export const Button = ({
   };
   const iconSizes = { xs: 'text-[14px]', sm: 'text-base', md: 'text-[18px]', lg: 'text-[20px]' };
   const variants = {
-    primary: 'bg-primary-950 text-white hover:bg-primary-900',
-    secondary: 'bg-secondary-600 text-white hover:bg-secondary-700',
-    tertiary: 'bg-tertiary-700 text-white hover:bg-tertiary-800',
-    danger: 'bg-error text-white hover:bg-red-700',
-    success: 'bg-success text-white hover:bg-emerald-700',
-    outline: 'bg-transparent text-slate-600 border border-slate-300 hover:bg-slate-100 hover:text-primary-950 hover:border-primary-950',
-    outlinePrimary: 'bg-transparent text-primary-950 border border-primary-950 hover:bg-primary-100',
-    ghost: 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-primary-950',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover',
+    tertiary: 'bg-tertiary text-tertiary-foreground hover:bg-tertiary-hover',
+    danger: 'bg-error text-error-foreground hover:bg-error/85',
+    success: 'bg-success text-success-foreground hover:bg-success/85',
+    outline: 'bg-transparent text-muted-foreground border border-input hover:bg-muted hover:text-primary hover:border-primary',
+    outlinePrimary: 'bg-transparent text-primary border border-primary hover:bg-primary-container',
+    ghost: 'bg-transparent text-muted-foreground hover:bg-muted hover:text-primary',
   };
   return (
     <button
@@ -62,11 +183,11 @@ export const Input = ({ icon, suffix, className = '', ...rest }) => (
     {icon && (
       <Icon
         name={icon}
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[18px] pointer-events-none"
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px] pointer-events-none"
       />
     )}
     <input
-      className={`w-full ${icon ? 'pl-10' : 'pl-3.5'} pr-${suffix ? '10' : '3.5'} py-2.5 border border-slate-300 rounded-md text-sm bg-white text-slate-900 placeholder:text-slate-500 outline-none transition focus:border-primary-950 focus:shadow-[0_0_0_3px_rgba(30,41,59,0.08)] disabled:bg-slate-100 disabled:opacity-70 disabled:cursor-not-allowed ${className}`}
+      className={`w-full ${icon ? 'pl-10' : 'pl-3.5'} ${suffix ? 'pr-10' : 'pr-3.5'} py-2.5 border border-input rounded-md text-sm bg-card text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-muted disabled:opacity-70 disabled:cursor-not-allowed ${className}`}
       {...rest}
     />
     {suffix}
@@ -75,7 +196,7 @@ export const Input = ({ icon, suffix, className = '', ...rest }) => (
 
 export const Select = ({ options = [], placeholder, className = '', ...rest }) => (
   <select
-    className={`w-full px-3.5 py-2.5 border border-slate-300 rounded-md text-sm bg-white text-slate-900 outline-none transition focus:border-primary-950 focus:shadow-[0_0_0_3px_rgba(30,41,59,0.08)] ${className}`}
+    className={`w-full px-3.5 py-2.5 border border-input rounded-md text-sm bg-card text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 ${className}`}
     {...rest}
   >
     {placeholder && <option value="">{placeholder}</option>}
@@ -89,7 +210,7 @@ export const Select = ({ options = [], placeholder, className = '', ...rest }) =
 
 export const Textarea = ({ className = '', ...rest }) => (
   <textarea
-    className={`w-full px-3.5 py-2.5 border border-slate-300 rounded-md text-sm bg-white text-slate-900 placeholder:text-slate-500 outline-none transition focus:border-primary-950 focus:shadow-[0_0_0_3px_rgba(30,41,59,0.08)] min-h-[100px] resize-y ${className}`}
+    className={`w-full px-3.5 py-2.5 border border-input rounded-md text-sm bg-card text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 min-h-[100px] resize-y ${className}`}
     {...rest}
   />
 );
@@ -97,27 +218,27 @@ export const Textarea = ({ className = '', ...rest }) => (
 export const FormGroup = ({ label, children, hint, error }) => (
   <div className="mb-5">
     {label && (
-      <label className="block text-[13px] font-medium uppercase tracking-wider text-slate-600 mb-1.5">
+      <label className="block text-[13px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
         {label}
       </label>
     )}
     {children}
     {error && <p className="mt-1.5 text-xs text-error">{error}</p>}
-    {!error && hint && <p className="mt-1.5 text-xs text-slate-500">{hint}</p>}
+    {!error && hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
   </div>
 );
 
 export const Card = ({ children, className = '', padded = true }) => (
-  <div className={`bg-white border border-slate-200 rounded-xl shadow-sm ${padded ? 'p-6' : ''} ${className}`}>
+  <div className={`bg-card border border-border rounded-xl shadow-sm ${padded ? 'p-6' : ''} ${className}`}>
     {children}
   </div>
 );
 
 export const CardHeader = ({ title, subtitle, actions }) => (
-  <div className="flex items-center justify-between flex-wrap gap-3 mb-5 pb-4 border-b border-slate-200">
+  <div className="flex items-center justify-between flex-wrap gap-3 mb-5 pb-4 border-b border-border">
     <div>
-      <h3 className="text-lg font-semibold text-slate-900 m-0">{title}</h3>
-      {subtitle && <p className="text-sm text-slate-500 m-0 mt-1">{subtitle}</p>}
+      <h3 className="text-lg font-semibold text-foreground m-0">{title}</h3>
+      {subtitle && <p className="text-sm text-muted-foreground m-0 mt-1">{subtitle}</p>}
     </div>
     {actions && <div className="flex items-center gap-2">{actions}</div>}
   </div>
@@ -125,22 +246,22 @@ export const CardHeader = ({ title, subtitle, actions }) => (
 
 export const Badge = ({ variant = 'inactive', children, dot = true }) => {
   const variants = {
-    pending: 'bg-warning-container text-warning-700 border-orange-200',
-    active: 'bg-success-container text-emerald-700 border-green-200',
-    completed: 'bg-primary-100 text-primary-900 border-blue-200',
-    danger: 'bg-error-container text-red-700 border-red-200',
-    inactive: 'bg-slate-200 text-slate-600 border-slate-300',
-    info: 'bg-orange-50 text-amber-800 border-orange-200',
-    warning: 'bg-teal-50 text-teal-800 border-teal-200',
+    pending: 'bg-warning-container text-warning-on-container border-warning/20',
+    active: 'bg-success-container text-success-on-container border-success/20',
+    completed: 'bg-primary-container text-primary-on-container border-primary/20',
+    danger: 'bg-error-container text-error-on-container border-error/20',
+    inactive: 'bg-muted text-muted-foreground border-border',
+    info: 'bg-secondary-container text-secondary-on-container border-secondary/20',
+    warning: 'bg-tertiary-container text-tertiary-on-container border-tertiary/20',
   };
   const dotColors = {
     pending: 'bg-warning',
     active: 'bg-success',
-    completed: 'bg-primary-950',
+    completed: 'bg-primary',
     danger: 'bg-error',
-    inactive: 'bg-slate-400',
-    info: 'bg-secondary-600',
-    warning: 'bg-tertiary-700',
+    inactive: 'bg-muted-foreground',
+    info: 'bg-secondary',
+    warning: 'bg-tertiary',
   };
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${variants[variant]}`}>
@@ -150,13 +271,13 @@ export const Badge = ({ variant = 'inactive', children, dot = true }) => {
   );
 };
 
-export const StatCard = ({ icon, value, label, iconClassName = 'bg-primary-100 text-primary-950' }) => (
-  <div className="bg-white border border-slate-200 rounded-xl p-5 transition-all duration-300 shadow-sm hover:-translate-y-0.5 hover:shadow-md">
+export const StatCard = ({ icon, value, label, iconClassName = 'bg-primary-container text-primary' }) => (
+  <div className="bg-card border border-border rounded-xl p-5 transition-all duration-300 shadow-sm hover:-translate-y-0.5 hover:shadow-md">
     <div className={`w-11 h-11 rounded-md flex items-center justify-center mb-4 ${iconClassName}`}>
       <Icon name={icon} className="text-[22px]" />
     </div>
-    <div className="text-3xl font-bold text-primary-950 mb-1 break-words leading-tight">{value}</div>
-    <div className="text-[13px] text-slate-500 font-medium">{label}</div>
+    <div className="text-3xl font-bold text-primary mb-1 break-words leading-tight">{value}</div>
+    <div className="text-[13px] text-muted-foreground font-medium">{label}</div>
   </div>
 );
 
@@ -172,15 +293,15 @@ export const PageHeader = ({ title, subtitle, icon, actions }) => (
       {icon && (
         <Icon
           name={icon}
-          className="text-[32px] text-primary-950 flex-shrink-0"
+          className="text-[32px] text-primary flex-shrink-0"
         />
       )}
       <div className="min-w-0">
-        <h1 className="text-[28px] font-bold text-primary-950 leading-tight m-0 tracking-tight break-words">
+        <h1 className="text-[28px] font-bold text-primary leading-tight m-0 tracking-tight break-words">
           {title}
         </h1>
         {subtitle && (
-          <p className="text-[15px] text-slate-500 mt-2 m-0">{subtitle}</p>
+          <p className="text-[15px] text-muted-foreground mt-2 m-0">{subtitle}</p>
         )}
       </div>
     </div>
@@ -189,15 +310,15 @@ export const PageHeader = ({ title, subtitle, icon, actions }) => (
 );
 
 export const TableCard = ({ toolbar, children, footer }) => (
-  <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+  <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
     {toolbar && (
-      <div className="flex items-center justify-between flex-wrap gap-3 p-4 border-b border-slate-200">
+      <div className="flex items-center justify-between flex-wrap gap-3 p-4 border-b border-border">
         {toolbar}
       </div>
     )}
     <div className="overflow-x-auto">{children}</div>
     {footer && (
-      <div className="flex items-center gap-4 flex-wrap p-3.5 border-t border-slate-200">
+      <div className="flex items-center gap-4 flex-wrap p-3.5 border-t border-border">
         {footer}
       </div>
     )}
@@ -214,7 +335,7 @@ export const Modal = ({ open, onClose, children, size = 'md' }) => {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`bg-white rounded-2xl w-full p-8 shadow-2xl border border-slate-200 ${widths[size]}`}
+        className={`bg-card rounded-2xl w-full p-8 shadow-2xl border border-border ${widths[size]}`}
       >
         {children}
       </div>
@@ -224,7 +345,7 @@ export const Modal = ({ open, onClose, children, size = 'md' }) => {
 
 export const ModalHeader = ({ icon, iconVariant = 'info', title, subtitle }) => {
   const variants = {
-    info: 'bg-primary-100 text-primary-950',
+    info: 'bg-primary-container text-primary',
     danger: 'bg-error-container text-error',
     success: 'bg-success-container text-success',
   };
@@ -236,29 +357,29 @@ export const ModalHeader = ({ icon, iconVariant = 'info', title, subtitle }) => 
         </div>
       )}
       <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-1">{title}</h2>
-        {subtitle && <p className="text-sm text-slate-500 m-0">{subtitle}</p>}
+        <h2 className="text-xl font-bold text-foreground mb-1">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground m-0">{subtitle}</p>}
       </div>
     </div>
   );
 };
 
 export const ModalActions = ({ children }) => (
-  <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-slate-200 flex-wrap">
+  <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-border flex-wrap">
     {children}
   </div>
 );
 
 export const Tabs = ({ tabs, active, onChange }) => (
-  <div className="flex border-b-2 border-slate-200 mb-6 gap-1 overflow-x-auto">
+  <div className="flex border-b-2 border-border mb-6 gap-1 overflow-x-auto">
     {tabs.map((t) => (
       <button
         key={t.value}
         onClick={() => onChange(t.value)}
         className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors -mb-0.5 border-b-2 ${
           active === t.value
-            ? 'text-primary-950 font-semibold border-primary-950'
-            : 'text-slate-500 border-transparent hover:text-primary-950 hover:bg-slate-100 rounded-t'
+            ? 'text-primary font-semibold border-primary'
+            : 'text-muted-foreground border-transparent hover:text-primary hover:bg-muted rounded-t'
         }`}
       >
         {t.icon && <Icon name={t.icon} className="text-[18px]" />}
@@ -270,23 +391,23 @@ export const Tabs = ({ tabs, active, onChange }) => (
 
 export const EmptyState = ({ icon = 'info', title, message, action }) => (
   <div className="flex flex-col items-center justify-center text-center py-12 px-4">
-    <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mb-4">
+    <div className="w-16 h-16 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center mb-4">
       <Icon name={icon} className="text-[32px]" />
     </div>
-    <h3 className="text-base font-semibold text-slate-900 mb-1">{title}</h3>
-    {message && <p className="text-sm text-slate-500 max-w-md m-0">{message}</p>}
+    <h3 className="text-base font-semibold text-foreground mb-1">{title}</h3>
+    {message && <p className="text-sm text-muted-foreground max-w-md m-0">{message}</p>}
     {action && <div className="mt-5">{action}</div>}
   </div>
 );
 
 export const FilterBar = ({ children }) => (
-  <div className="flex flex-wrap gap-3 p-4 border-b border-slate-200">{children}</div>
+  <div className="flex flex-wrap gap-3 p-4 border-b border-border">{children}</div>
 );
 
 export const FilterItem = ({ label, children }) => (
   <div className="flex items-center gap-2">
     {label && (
-      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
         {label}
       </label>
     )}
@@ -300,42 +421,42 @@ export const DetailGrid = ({ children }) => (
 
 export const DetailItem = ({ label, value, className = '' }) => (
   <div className={`flex flex-col gap-1 ${className}`}>
-    <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{label}</span>
-    <span className="text-sm font-semibold text-slate-900 break-words">{value ?? '—'}</span>
+    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+    <span className="text-sm font-semibold text-foreground break-words">{value ?? '—'}</span>
   </div>
 );
 
 export const DetailSection = ({ title, children }) => (
   <div className="mb-6">
-    <h4 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500 m-0 mb-3 pb-2 border-b border-slate-200">
+    <h4 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground m-0 mb-3 pb-2 border-b border-border">
       {title}
     </h4>
     {children}
   </div>
 );
 
-export const QuickActionCard = ({ icon, title, description, onClick, iconClassName = 'bg-primary-100 text-primary-950' }) => (
+export const QuickActionCard = ({ icon, title, description, onClick, iconClassName = 'bg-primary-container text-primary' }) => (
   <button
     onClick={onClick}
-    className="flex items-center gap-4 p-5 rounded-xl border border-slate-200 bg-white text-left transition-all duration-200 hover:border-primary-950 hover:-translate-y-0.5 hover:shadow-md w-full"
+    className="flex items-center gap-4 p-5 rounded-xl border border-border bg-card text-left transition-all duration-200 hover:border-primary hover:-translate-y-0.5 hover:shadow-md w-full"
   >
     <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconClassName}`}>
       <Icon name={icon} className="text-[22px]" />
     </div>
     <div className="min-w-0">
-      <h4 className="text-[15px] font-semibold m-0 text-slate-900">{title}</h4>
-      <p className="text-[13px] text-slate-500 m-0 mt-0.5">{description}</p>
+      <h4 className="text-[15px] font-semibold m-0 text-foreground">{title}</h4>
+      <p className="text-[13px] text-muted-foreground m-0 mt-0.5">{description}</p>
     </div>
   </button>
 );
 
 export const SpinnerScreen = ({ label = 'Loading...' }) => (
-  <div className="flex items-center justify-center py-16 gap-3 text-slate-500">
+  <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
     <Spinner className="text-[24px]" />
     <span className="text-sm">{label}</span>
   </div>
 );
 
-export const StatusDot = ({ color = 'bg-slate-400' }) => (
+export const StatusDot = ({ color = 'bg-muted-foreground' }) => (
   <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${color}`} />
 );

@@ -1,12 +1,14 @@
-"""LLM factory — NVIDIA build API (OpenAI-compatible) client.
+"""LLM factory — Groq primary, NVIDIA build API fallback.
 
-Uses ``integrate.api.nvidia.com/v1`` as the upstream, with ``openai``'s
-AsyncOpenAI as the transport. All models in the NVIDIA catalog are listed at
-https://build.nvidia.com/explore/discover (and ``GET https://integrate.api.nvidia.com/v1/models``).
+Both providers are OpenAI-compatible and are used through ``openai``'s
+AsyncOpenAI transport. The active provider is chosen with ``LLM_PROVIDER``
+in ``ai_chatbot/.env`` ("groq" or "nvidia"); the other is kept as an
+automatic fallback when the primary is unreachable, rate-limited, or
+rejects the API key.
 
-Set ``NVIDIA_API_KEY`` (preferred) or ``OPENAI_API_KEY`` as the key. ``model``
-defaults to ``meta/llama-3.1-70b-instruct``, which is OpenAI-compatible and
-currently supported — override via ``NVIDIA_MODEL``.
+Keys:
+    GROQ_API_KEY      — https://console.groq.com/keys (fast, free tier)
+    NVIDIA_API_KEY    — https://build.nvidia.com (fallback)
 """
 
 from __future__ import annotations
@@ -46,38 +48,147 @@ class LLMOutputError(RuntimeError):
     """Raised when the model returns malformed output that we cannot parse."""
 
 
+# ──Provider registry ────────────────────────────────────────────────────────
+
+PROVIDERS = ("groq", "nvidia")
+
+# Maps a provider name to the settings attributes it uses.
+_PROVIDER_SETTINGS = {
+    "groq": {
+        "base_url": "groq_base_url",
+        "api_key": "groq_api_key",
+        "model": "groq_model",
+        "temperature": "groq_temperature",
+        "max_tokens": "groq_max_tokens",
+    },
+    "nvidia": {
+        "base_url": "nvidia_base_url",
+        "api_key": "nvidia_api_key",
+        "model": "nvidia_model",
+        "temperature": "nvidia_temperature",
+        "max_tokens": "nvidia_max_tokens",
+    },
+}
+
+
+def _fallback_provider(provider: str) -> Optional[str]:
+    """Return the other provider, or None if only one is configured."""
+    others = [p for p in PROVIDERS if p != provider]
+    return others[0] if others else None
+
+
 # ──Factory ──────────────────────────────────────────────────────────────────
 
 
 class LLMFactory:
-    """Thin async wrapper around the NVIDIA build API.
+    """Thin async wrapper around Groq / NVIDIA OpenAI-compatible APIs.
 
-    • Enforces presence of an API key (env: ``NVIDIA_API_KEY``).
-    • Centralizes the default model + temperature.
+    • Enforces presence of an API key (env: ``GROQ_API_KEY`` / ``NVIDIA_API_KEY``).
+    • Centralizes the default model + temperature per provider.
+    • Falls back to the other provider once when the primary fails with an
+      auth, connection, or rate-limit error.
     • Provides structured JSON helpers.
-    • Handles retries / connection-failure mapping consistently.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or settings.nvidia_api_key
-        self.model = model or settings.nvidia_model
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        provider: Optional[str] = None,
+        fallback: bool = True,
+    ):
+        self.provider = (provider or settings.llm_provider).lower()
+        if self.provider not in PROVIDERS:
+            raise LLMAuthError(
+                f"Unknown LLM_PROVIDER '{self.provider}'. Use one of: {', '.join(PROVIDERS)}"
+            )
+        self._fallback_enabled = fallback
+        self._cfg = _PROVIDER_SETTINGS[self.provider]
+
+        key = api_key or getattr(settings, self._cfg["api_key"])
+        # If the primary key is missing, fall back to the other provider's key
+        # so the service still works with whichever one is configured.
+        if not key:
+            fb = _fallback_provider(self.provider)
+            if fb and getattr(settings, _PROVIDER_SETTINGS[fb]["api_key"]):
+                self.provider = fb
+                self._cfg = _PROVIDER_SETTINGS[fb]
+                key = getattr(settings, self._cfg["api_key"])
+                logger.warning("No key for primary provider, using %s instead", fb)
+
+        self.api_key = key
+        self.model = model or getattr(settings, self._cfg["model"])
         if not self.api_key:
             raise LLMAuthError(
-                "NVIDIA_API_KEY is not configured. Set it in ai_chatbot/.env."
+                "No LLM API key configured. Set GROQ_API_KEY and/or NVIDIA_API_KEY "
+                "in ai_chatbot/.env."
             )
 
-    @property
-    def provider(self) -> str:
-        return "nvidia-build"
-
-    # ──Client construction ────────────────────────────────────────────────
-    def _client(self) -> AsyncOpenAI:
+    def _client_for(self, provider: str) -> AsyncOpenAI:
+        cfg = _PROVIDER_SETTINGS[provider]
         return AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=settings.nvidia_base_url,
+            api_key=getattr(settings, cfg["api_key"]) or self.api_key,
+            base_url=getattr(settings, cfg["base_url"]),
             timeout=settings.llm_request_timeout,
             max_retries=0,
         )
+
+    def _temp(self, temperature: Optional[float]) -> float:
+        return temperature if temperature is not None else getattr(settings, self._cfg["temperature"])
+
+    def _max_tokens(self, max_tokens: Optional[int]) -> int:
+        return max_tokens if max_tokens is not None else getattr(settings, self._cfg["max_tokens"])
+
+    def _swap_to_fallback(self) -> bool:
+        """Switch this factory to the fallback provider. Returns False if none."""
+        fb = _fallback_provider(self.provider)
+        if not fb or not self._fallback_enabled:
+            return False
+        self.provider = fb
+        self._cfg = _PROVIDER_SETTINGS[fb]
+        self.model = getattr(settings, self._cfg["model"])
+        if not getattr(settings, self._cfg["api_key"]):
+            return False
+        logger.warning("LLM provider switched to fallback '%s' (model %s)", fb, self.model)
+        return True
+
+    @staticmethod
+    def _map_error(provider: str, exc: BaseException, model: str) -> BaseException:
+        if isinstance(exc, AuthenticationError):
+            return LLMAuthError(f"{provider} API key rejected: {exc}")
+        if isinstance(exc, NotFoundError):
+            return LLMAuthError(f"{provider} model '{model}' not found: {exc}")
+        if isinstance(exc, (APIConnectionError, APIError, RateLimitError)):
+            return LLMUnavailableError(f"{provider} unavailable: {exc}")
+        return exc
+
+    async def _run_once(
+        self, kwargs: Dict[str, Any], *, stream: bool
+    ):
+        client = self._client_for(self.provider)
+        kwargs["model"] = self.model
+        kwargs["temperature"] = self._temp(kwargs.get("temperature"))
+        kwargs["max_tokens"] = self._max_tokens(kwargs.get("max_tokens"))
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001 — normalized below
+            mapped = self._map_error(self.provider, exc, self.model)
+            raise mapped from exc
+
+    async def _run_with_fallback(self, kwargs: Dict[str, Any], *, stream: bool):
+        """Execute once on the primary provider; retry once on the fallback."""
+        try:
+            return await self._run_once(kwargs, stream=stream)
+        except (LLMAuthError, LLMUnavailableError) as exc:
+            if not self._swap_to_fallback():
+                raise
+            logger.warning(
+                "Falling back to provider '%s' after primary failed: %s", self.provider, exc
+            )
+            try:
+                return await self._run_once(kwargs, stream=stream)
+            except (LLMAuthError, LLMUnavailableError) as exc2:
+                raise exc2 from exc
 
     # ──Plain completion ───────────────────────────────────────────────────
     async def acomplete(
@@ -90,49 +201,35 @@ class LLMFactory:
         stop: Optional[List[str]] = None,
     ) -> str:
         """Return raw text content. Strips trailing whitespace."""
-        client = self._client()
         kwargs: Dict[str, Any] = {
-            "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": (
-                temperature if temperature is not None else settings.nvidia_temperature
-            ),
-            "max_tokens": (
-                max_tokens if max_tokens is not None else settings.nvidia_max_tokens
-            ),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "stream": False,
         }
         if stop:
             kwargs["stop"] = stop
 
         try:
-            resp = await client.chat.completions.create(**kwargs)
-        except AuthenticationError as exc:
-            raise LLMAuthError(f"NVIDIA API key rejected: {exc}") from exc
-        except NotFoundError as exc:
-            # Most common cause: decommissioned/typo'd model name.
-            raise LLMAuthError(
-                f"NVIDIA model '{self.model}' not found. Set NVIDIA_MODEL to a currently "
-                f"supported one (see https://build.nvidia.com/explore/discover). Detail: {exc}"
-            ) from exc
-        except APIConnectionError as exc:
-            raise LLMUnavailableError(f"NVIDIA connection failed: {exc}") from exc
-        except RateLimitError as exc:
-            raise LLMUnavailableError(f"NVIDIA rate-limited: {exc}") from exc
-        except APIError as exc:
-            raise LLMUnavailableError(f"NVIDIA API error: {exc}") from exc
+            resp = await self._run_with_fallback(kwargs, stream=False)
+        except LLMUnavailableError:
+            raise
+        except LLMAuthError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise LLMUnavailableError(f"{self.provider} API error: {exc}") from exc
 
         try:
             message = resp.choices[0].message
             content = getattr(message, "content", None) if message else None
         except (IndexError, AttributeError) as exc:
-            raise LLMOutputError(f"Unexpected NVIDIA response shape: {exc}") from exc
+            raise LLMOutputError(f"Unexpected {self.provider} response shape: {exc}") from exc
 
         if not content or not content.strip():
-            raise LLMOutputError("NVIDIA returned empty content.")
+            raise LLMOutputError(f"{self.provider} returned empty content.")
         return content.strip()
 
     # ──Structured JSON ────────────────────────────────────────────────────
@@ -181,34 +278,24 @@ class LLMFactory:
         max_tokens: Optional[int] = None,
     ):
         """Yield content chunks as they arrive. Used by /chat streaming."""
-        client = self._client()
         kwargs: Dict[str, Any] = {
-            "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": (
-                temperature if temperature is not None else settings.nvidia_temperature
-            ),
-            "max_tokens": (
-                max_tokens if max_tokens is not None else settings.nvidia_max_tokens
-            ),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "stream": True,
         }
 
         try:
-            stream = await client.chat.completions.create(**kwargs)
-        except AuthenticationError as exc:
-            raise LLMAuthError(f"NVIDIA API key rejected: {exc}") from exc
-        except NotFoundError as exc:
-            raise LLMAuthError(
-                f"NVIDIA model '{self.model}' not found: {exc}"
-            ) from exc
-        except APIConnectionError as exc:
-            raise LLMUnavailableError(f"NVIDIA connection failed: {exc}") from exc
-        except APIError as exc:
-            raise LLMUnavailableError(f"NVIDIA API error: {exc}") from exc
+            stream = await self._run_with_fallback(kwargs, stream=True)
+        except LLMUnavailableError:
+            raise
+        except LLMAuthError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise LLMUnavailableError(f"{self.provider} API error: {exc}") from exc
 
         async for chunk in stream:
             try:
@@ -281,11 +368,29 @@ def get_llm_factory() -> LLMFactory:
 
 
 def get_llm():
-    """Return a LangChain-compatible LLM backed by the NVIDIA API.
+    """Return a LangChain-compatible LLM for the configured primary provider.
 
     Used by the legacy LangGraph agents (ask_agent, marker, summarizer).
-    Falls back gracefully if langchain-nvidia-ai-endpoints is not installed.
+    Groq is preferred when ``LLM_PROVIDER=groq`` (and langchain-groq is
+    installed); otherwise it falls back to NVIDIA.
     """
+    if settings.llm_provider == "groq":
+        try:
+            from langchain_groq import ChatGroq
+
+            if not settings.groq_api_key:
+                raise LLMAuthError("GROQ_API_KEY is not configured.")
+            return ChatGroq(
+                model=settings.groq_model,
+                api_key=settings.groq_api_key,
+                temperature=settings.groq_temperature,
+                max_tokens=settings.groq_max_tokens,
+            )
+        except ImportError:
+            logger.warning(
+                "langchain-groq not installed — falling back to NVIDIA for agents"
+            )
+
     try:
         from langchain_nvidia_ai_endpoints import ChatNVIDIA
     except ImportError:

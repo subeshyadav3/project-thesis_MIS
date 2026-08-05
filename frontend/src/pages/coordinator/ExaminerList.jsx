@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -175,23 +176,23 @@ function ExaminerList() {
     <>
       {isMasterCoordinator ? (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-          <span className="material-symbols-outlined">upload_file</span>
+          <Icon name="upload_file" className="material-symbols-outlined" />
           Upload Examiner Assignments
         </button>
       ) : (
         <button className="btn btn-secondary btn-sm" onClick={() => setShowGroupUpload(true)}>
-          <span className="material-symbols-outlined">upload_file</span>
+          <Icon name="upload_file" className="material-symbols-outlined" />
           Upload Examiner Assignments
         </button>
       )}
       
       <button className="btn btn-secondary btn-sm" onClick={() => setShowExaminerUpload(true)}>
-        <span className="material-symbols-outlined">upload_file</span>
+        <Icon name="upload_file" className="material-symbols-outlined" />
         Bulk Add
       </button>
 
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-        <span className="material-symbols-outlined">add</span>
+        <Icon name="add" className="material-symbols-outlined" />
         Add Examiner
       </button>
     </>
@@ -226,7 +227,7 @@ function ExaminerList() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">person_add</span>
+                <Icon name="person_add" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Add Internal Examiner</h2>
@@ -264,11 +265,11 @@ function ExaminerList() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  <span className="material-symbols-outlined">add</span>
+                  <Icon name="add" className="material-symbols-outlined" />
                   {submitting ? 'Creating...' : 'Create'}
                 </button>
               </div>
@@ -283,7 +284,7 @@ function ExaminerList() {
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">person</span>
+                <Icon name="person" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>{showDetail.firstName} {showDetail.lastName}</h2>
@@ -343,11 +344,11 @@ function ExaminerList() {
             )}
             <div className="modal-actions">
               <button className="btn btn-danger" onClick={() => { handleDelete(showDetail.id); setShowDetail(null); }}>
-                <span className="material-symbols-outlined">delete</span>
+                <Icon name="delete" className="material-symbols-outlined" />
                 Remove Examiner
               </button>
               <button className="btn btn-outline" onClick={() => setShowDetail(null)}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
                 Close
               </button>
             </div>
@@ -361,7 +362,7 @@ function ExaminerList() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon warning">
-                <span className="material-symbols-outlined">edit</span>
+                <Icon name="edit" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Edit Examiner</h2>
@@ -404,18 +405,18 @@ function ExaminerList() {
                     {editForm.active ? 'Active' : 'Inactive'}
                   </span>
                   <button type="button" className="btn btn-sm" style={{ background: editForm.active ? 'var(--color-error-container)' : 'var(--color-success-container)', color: editForm.active ? 'var(--color-on-error-container)' : 'var(--color-on-success-container)' }} onClick={() => setEditForm({ ...editForm, active: !editForm.active })}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{editForm.active ? 'cancel' : 'check_circle'}</span>
+                    <Icon name={editForm.active ? 'cancel' : 'check_circle'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
                     {editForm.active ? 'Mark as Inactive' : 'Mark as Active'}
                   </button>
                 </div>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowEdit(null)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  <span className="material-symbols-outlined">save</span>
+                  <Icon name="save" className="material-symbols-outlined" />
                   {submitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
@@ -426,7 +427,7 @@ function ExaminerList() {
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">person</span></div>
+          <div className="stat-icon"><Icon name="person" className="material-symbols-outlined" /></div>
           {loading ? (
             <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
           ) : (
@@ -435,7 +436,7 @@ function ExaminerList() {
           <div className="stat-label">Total Examiners</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">assignment_ind</span></div>
+          <div className="stat-icon"><Icon name="assignment_ind" className="material-symbols-outlined" /></div>
           {loading ? (
             <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
           ) : (
@@ -444,7 +445,7 @@ function ExaminerList() {
           <div className="stat-label">Total Assignments</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">school</span></div>
+          <div className="stat-icon"><Icon name="school" className="material-symbols-outlined" /></div>
           {loading ? (
             <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
           ) : (
@@ -454,7 +455,7 @@ function ExaminerList() {
         </div>
         {isMasterCoordinator && (
           <div className="stat-card bento-card">
-            <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
+            <div className="stat-icon"><Icon name="library_books" className="material-symbols-outlined" /></div>
             {loading ? (
               <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
             ) : (
@@ -478,7 +479,7 @@ function ExaminerList() {
           <TableSkeleton rows={5} cols={4} />
         ) : filteredExaminers.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">person</span>
+            <Icon name="person" className="material-symbols-outlined" />
             <h3>No examiners found</h3>
             <p>{searchQuery ? 'Try adjusting your search.' : 'No internal examiners have been registered yet.'}</p>
           </div>
@@ -509,9 +510,7 @@ function ExaminerList() {
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.designation || '—'}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{s.email}</td>
                     <td>
-                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }}>
-                        {s.active ? 'check_circle' : 'cancel'}
-                      </span>
+                      <Icon name={s.active ? 'check_circle' : 'cancel'} className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }} />
                     </td>
                     <td><span className="stat-chip">{s.groupCount}</span></td>
                     {isMasterCoordinator && <td><span className="stat-chip">{s.thesisCount}</span></td>}
@@ -519,11 +518,11 @@ function ExaminerList() {
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         <button className="btn btn-sm btn-outline-primary" onClick={() => setShowDetail(s)}>
-                          <span className="material-symbols-outlined">visibility</span>
+                          <Icon name="visibility" className="material-symbols-outlined" />
                           View
                         </button>
                         <button className="btn btn-sm btn-outline" onClick={() => openEdit(s)}>
-                          <span className="material-symbols-outlined">edit</span>
+                          <Icon name="edit" className="material-symbols-outlined" />
                           Edit
                         </button>
                       </div>

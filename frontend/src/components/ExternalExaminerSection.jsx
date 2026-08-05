@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
@@ -66,7 +67,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
             background: 'var(--color-tertiary-container)', color: 'var(--color-on-tertiary-container)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>person_apron</span>
+            <Icon name="person_apron" className="material-symbols-outlined" style={{ fontSize: 20 }} />
           </div>
           <div>
             <h3 style={{ margin: 0 }}>External ({label})</h3>
@@ -77,7 +78,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
         </div>
         {!currentExaminer && !showAssign && !disabled && (
           <button className="btn btn-primary btn-sm" onClick={() => setShowAssign(true)}>
-            <span className="material-symbols-outlined">person_add</span>
+            <Icon name="person_add" className="material-symbols-outlined" />
             Assign {label}
           </button>
         )}
@@ -96,7 +97,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
               </select>
             </div>
             <button className="btn btn-primary" onClick={handleAssign} disabled={loading || !selectedExaminerId}>
-              <span className="material-symbols-outlined">{loading ? 'progress_activity' : 'check'}</span>
+              <Icon name={loading ? 'progress_activity' : 'check'} className="material-symbols-outlined" />
               {loading ? 'Assigning...' : 'Assign'}
             </button>
             <button className="btn btn-outline" onClick={() => { setShowAssign(false); setSelectedExaminerId(''); }}>
@@ -144,14 +145,14 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
             </div>
             {!disabled && (
               <button className="btn btn-sm btn-outline" onClick={() => setConfirmRemove(true)} disabled={removing} style={{ color: 'var(--color-error)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{removing ? 'progress_activity' : 'close'}</span>
+                <Icon name={removing ? 'progress_activity' : 'close'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                 Remove
               </button>
             )}
           </div>
         ) : (
           <div className="empty-state" style={{ padding: '16px 0' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--color-outline)' }}>person_off</span>
+            <Icon name="person_off" className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--color-outline)' }} />
             <p style={{ fontSize: 13, marginTop: 8 }}>
               {disabled ? 'No examiner assigned.' : `No external (${label}) examiner assigned yet.`}
             </p>

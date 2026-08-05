@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Icon } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -541,11 +542,11 @@ const filteredGroups = useMemo(() => {
   const actions = (
     <>
       <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-        <span className="material-symbols-outlined">upload_file</span>
+        <Icon name="upload_file" className="material-symbols-outlined" />
         Bulk Upload
       </button>
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-        <span className="material-symbols-outlined">add</span>
+        <Icon name="add" className="material-symbols-outlined" />
         Add Group
       </button>
       <button className="btn btn-outline btn-sm" onClick={async () => {
@@ -559,7 +560,7 @@ const filteredGroups = useMemo(() => {
           toast.error('Export failed');
         }
       }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Export
+        <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Export
       </button>
     </>
   );
@@ -604,7 +605,7 @@ const filteredGroups = useMemo(() => {
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">school</span>
+                <Icon name="school" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>{showDetail.name}</h2>
@@ -613,7 +614,7 @@ const filteredGroups = useMemo(() => {
               <div className="modal-header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {showDetail.status === 'PENDING' && detailMode === 'view' && (
                   <button className="btn btn-sm btn-primary" onClick={() => { setDetailMode('edit'); setEditTitle(showDetail.projectTitle || ''); setEditDescription(showDetail.description || ''); setEditStatus('ACTIVE'); }}>
-                    <span className="material-symbols-outlined">play_arrow</span>
+                    <Icon name="play_arrow" className="material-symbols-outlined" />
                     Make Active
                   </button>
                 )}
@@ -727,7 +728,7 @@ const filteredGroups = useMemo(() => {
                     <label>Supervisor</label>
                     <div className="sup-dropdown-trigger">
                       <div className="sup-search-wrapper" onClick={() => setEditSupOpen(true)}>
-                        <span className="material-symbols-outlined">search</span>
+                        <Icon name="search" className="material-symbols-outlined" />
                         <input
                           type="text"
                           placeholder={editSupId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === editSupId)) : 'No supervisor'}
@@ -737,10 +738,10 @@ const filteredGroups = useMemo(() => {
                         />
                         {editSupId && (
                           <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditSupId(''); setEditSupSearch(''); }}>
-                            <span className="material-symbols-outlined">close</span>
+                            <Icon name="close" className="material-symbols-outlined" />
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <Icon name={editSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                       </div>
                       {editSupOpen && (
                         <div className="sup-dropdown">
@@ -775,7 +776,7 @@ const filteredGroups = useMemo(() => {
                     <label>Internal Examiner</label>
                     <div className="sup-dropdown-trigger">
                       <div className="sup-search-wrapper" onClick={() => setEditExamOpen(true)}>
-                        <span className="material-symbols-outlined">search</span>
+                        <Icon name="search" className="material-symbols-outlined" />
                         <input
                           type="text"
                           placeholder={editExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editExamId)) : 'No examiner'}
@@ -785,10 +786,10 @@ const filteredGroups = useMemo(() => {
                         />
                         {editExamId && (
                           <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditExamId(''); setEditExamSearch(''); }}>
-                            <span className="material-symbols-outlined">close</span>
+                            <Icon name="close" className="material-symbols-outlined" />
                           </button>
                         )}
-                        <span className="material-symbols-outlined sup-dropdown-arrow">{editExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                        <Icon name={editExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
@@ -823,24 +824,24 @@ const filteredGroups = useMemo(() => {
               </div>
             )}
             <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>                <span className="material-symbols-outlined">close</span>
+              <button className="btn btn-outline" onClick={() => { setShowDetail(null); setDetailMode('view'); }}>                <Icon name="close" className="material-symbols-outlined" />
                 Close
               </button>
               {detailMode === 'edit' && (
                 <button className="btn btn-primary" onClick={() => handleEditSave(showDetail.id)}>
-                  <span className="material-symbols-outlined">save</span>
+                  <Icon name="save" className="material-symbols-outlined" />
                   Save Changes
                 </button>
               )}
               {showDetail.status === 'ACTIVE' && detailMode !== 'edit' && (
                 <button className="btn btn-success" onClick={() => confirmComplete(showDetail.id)}>
-                  <span className="material-symbols-outlined">check_circle</span>
+                  <Icon name="check_circle" className="material-symbols-outlined" />
                   Mark Complete
                 </button>
               )}
               {detailMode !== 'edit' && (
                 <button className="btn btn-danger" onClick={() => confirmDeleteGroup(showDetail.id)}>
-                  <span className="material-symbols-outlined">delete</span>
+                  <Icon name="delete" className="material-symbols-outlined" />
                   Delete
                 </button>
               )}
@@ -852,27 +853,27 @@ const filteredGroups = useMemo(() => {
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">groups</span></div>
+          <div className="stat-icon"><Icon name="groups" className="material-symbols-outlined" /></div>
           <div className="stat-number">{groups.length}</div>
           <div className="stat-label">Total Groups</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{assignedCount}</div>
           <div className="stat-label">Assigned</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">person_add</span></div>
+          <div className="stat-icon"><Icon name="person_add" className="material-symbols-outlined" /></div>
           <div className="stat-number">{pendingCount}</div>
           <div className="stat-label">Needs Supervisor</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">star</span></div>
+          <div className="stat-icon"><Icon name="star" className="material-symbols-outlined" /></div>
           <div className="stat-number">{minorCount}</div>
           <div className="stat-label">Minor</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">stars</span></div>
+          <div className="stat-icon"><Icon name="stars" className="material-symbols-outlined" /></div>
           <div className="stat-number">{majorCount}</div>
           <div className="stat-label">Major</div>
         </div>
@@ -910,7 +911,7 @@ const filteredGroups = useMemo(() => {
                 toast.error(err.response?.data?.error || 'Bulk activate failed');
               }
             }}>
-              <span className="material-symbols-outlined">play_arrow</span>
+              <Icon name="play_arrow" className="material-symbols-outlined" />
               Make Active
             </button>
             <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
@@ -925,7 +926,7 @@ const filteredGroups = useMemo(() => {
                 loadData();
               } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
             }}>
-              <span className="material-symbols-outlined">calendar_month</span>
+              <Icon name="calendar_month" className="material-symbols-outlined" />
               Set End Date
             </button>
             <button className="btn btn-sm btn-success" onClick={async () => {
@@ -940,7 +941,7 @@ const filteredGroups = useMemo(() => {
                 toast.error(err.response?.data?.error || 'Bulk complete failed');
               }
             }}>
-              <span className="material-symbols-outlined">check_circle</span>
+              <Icon name="check_circle" className="material-symbols-outlined" />
               Mark Complete
             </button>
             <button className="btn btn-sm btn-danger" onClick={() => {
@@ -964,7 +965,7 @@ const filteredGroups = useMemo(() => {
                 danger: true,
               });
             }}>
-              <span className="material-symbols-outlined">delete</span>
+              <Icon name="delete" className="material-symbols-outlined" />
               Delete
             </button>
           </div>
@@ -990,7 +991,7 @@ const filteredGroups = useMemo(() => {
           <TableSkeleton rows={5} cols={6} />
         ) : sortedGroups.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">school</span>
+            <Icon name="school" className="material-symbols-outlined" />
             <h3>No groups found</h3>
             <p>{searchTerm || statusFilter !== 'ALL' || supervisorFilter !== 'ALL' ? 'Try adjusting your filters or search.' : 'Upload an Excel file or create a group to get started.'}</p>
           </div>
@@ -1064,34 +1065,34 @@ const filteredGroups = useMemo(() => {
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap', padding: '6px 10px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
                         <button className="icon-btn-sm" title="View" aria-label="View group details" onClick={() => openDetail(g, 'view')}>
-                          <span className="material-symbols-outlined">visibility</span>
+                          <Icon name="visibility" className="material-symbols-outlined" />
                         </button>
                         <div style={{ position: 'relative' }}>
                           <button className="icon-btn-sm" title="More actions" aria-label="More actions" onClick={(e) => { e.stopPropagation(); setActionMenuRow(actionMenuRow === g.id ? null : g.id); }}>
-                            <span className="material-symbols-outlined">more_vert</span>
+                            <Icon name="more_vert" className="material-symbols-outlined" />
                           </button>
                           {actionMenuRow === g.id && (
                             <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
                               <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                  <Icon name="edit" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Edit
                                 </div>
                               {g.status === 'ACTIVE' && (
                                 <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                                  <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Complete
                                 </div>
                               )}
                               <div className="menu-item" onClick={() => setPdfPreviewItem(g)}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                                <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                 PDF Preview
                               </div>
                               <div className="menu-item" onClick={() => downloadEvalPdf(g)}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                 Export PDF
                               </div>
                               <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: g.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteGroup(g.id); }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                 Delete
                               </div>
                             </div>
@@ -1120,7 +1121,7 @@ const filteredGroups = useMemo(() => {
           <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">upload_file</span>
+                <Icon name="upload_file" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>{showReview ? 'Review Users to Create' : (bulkPreview ? 'Preview Import' : 'Bulk Upload Groups')}</h2>
@@ -1154,16 +1155,16 @@ const filteredGroups = useMemo(() => {
                     download
                     style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+                    <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
                     {' '}Download blank template
                   </a>
                 </div>
                 <div className="modal-actions">
                   <button type="button" className="btn btn-outline" onClick={resetUploadModal}>
-                    <span className="material-symbols-outlined">close</span>Cancel
+                    <Icon name="close" className="material-symbols-outlined" />Cancel
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
-                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                    <Icon name={bulkLoading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" />
                     {bulkLoading ? 'Analyzing...' : 'Preview'}
                   </button>
                 </div>
@@ -1211,8 +1212,8 @@ const filteredGroups = useMemo(() => {
                           };
                           const isError = a.type === 'exact_duplicate';
                           const style = {
-                            background: isError ? 'var(--color-error)' : 'var(--color-warning)',
-                            color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
+                            background: isError ? 'var(--color-error-container)' : 'var(--color-warning-container)',
+                            color: isError ? 'var(--color-on-error-container)' : 'var(--color-on-warning-container)', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
                           };
                           return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
                         };
@@ -1252,9 +1253,7 @@ const filteredGroups = useMemo(() => {
                               cursor: 'pointer',
                             }} onClick={toggleExpand}>
                               <td>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>
-                                  {isExpanded ? 'expand_less' : 'expand_more'}
-                                </span>
+                                <Icon name={isExpanded ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }} />
                               </td>
                               <td>{p.row}</td>
                               <td style={{ fontWeight: 600 }}>
@@ -1291,14 +1290,9 @@ const filteredGroups = useMemo(() => {
                               <td>{edits.batch || p.batch || '—'}</td>
                               <td onClick={e => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                  <span
-                                    className="material-symbols-outlined"
-                                    style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }}
+                                  <Icon name={isSkipped ? 'undo' : 'delete'} className="material-symbols-outlined" style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }}
                                     onClick={toggleSkip}
-                                    title={isSkipped ? 'Unskip' : 'Skip'}
-                                  >
-                                    {isSkipped ? 'undo' : 'delete'}
-                                  </span>
+                                    title={isSkipped ? 'Unskip' : 'Skip'} />
                                 </div>
                               </td>
                             </tr>
@@ -1418,15 +1412,15 @@ const filteredGroups = useMemo(() => {
                 </div>
                 <div className="modal-actions">
                   <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
-                    <span className="material-symbols-outlined">arrow_back</span>Back
+                    <Icon name="arrow_back" className="material-symbols-outlined" />Back
                   </button>
                   {hasPendingUsers && (
                     <button type="button" className="btn btn-secondary" onClick={() => setShowReview(true)}>
-                      <span className="material-symbols-outlined">person_add</span>Next — Create Users
+                      <Icon name="person_add" className="material-symbols-outlined" />Next — Create Users
                     </button>
                   )}
                   <button className="btn btn-primary" onClick={() => handleBulkConfirm()} disabled={bulkLoading || bulkPreview.preview.length === 0}>
-                    <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                    <Icon name={bulkLoading ? 'progress_activity' : 'check'} className="material-symbols-outlined" />
                     {bulkLoading ? 'Importing...' : `Import ${bulkPreview.preview.length - duplicateCount - skipCount} groups`}
                   </button>
                 </div>
@@ -1441,7 +1435,7 @@ const filteredGroups = useMemo(() => {
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">add</span>
+                <Icon name="add" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Create Group</h2>
@@ -1489,7 +1483,7 @@ const filteredGroups = useMemo(() => {
                 <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
                 <div className="sup-dropdown-trigger">
                   <div className="sup-search-wrapper" onClick={() => setCreateSupOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
+                    <Icon name="search" className="material-symbols-outlined" />
                     <input
                       type="text"
                       placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
@@ -1499,10 +1493,10 @@ const filteredGroups = useMemo(() => {
                     />
                     {createForm.supervisorId && (
                       <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, supervisorId: ''}); setCreateSupSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{createSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                    <Icon name={createSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                   </div>
                   {createSupOpen && (
                     <div className="sup-dropdown">
@@ -1525,7 +1519,7 @@ const filteredGroups = useMemo(() => {
                                 <div className="sup-dropdown-item-email">{s.email}</div>
                               </div>
                               {selected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                                <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
                               )}
                             </div>
                           );
@@ -1540,7 +1534,7 @@ const filteredGroups = useMemo(() => {
                 <label>Internal Examiner <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
                 <div className="sup-dropdown-trigger">
                   <div className="sup-search-wrapper" onClick={() => setExamOpen(true)}>
-                    <span className="material-symbols-outlined">search</span>
+                    <Icon name="search" className="material-symbols-outlined" />
                     <input
                       type="text"
                       placeholder={createForm.examinerId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createForm.examinerId)) : 'Search examiner...'}
@@ -1550,10 +1544,10 @@ const filteredGroups = useMemo(() => {
                     />
                     {createForm.examinerId && (
                       <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, examinerId: ''}); setExamSearch(''); }}>
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     )}
-                    <span className="material-symbols-outlined sup-dropdown-arrow">{examOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+                    <Icon name={examOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                   </div>
                   {examOpen && (
                     <div className="sup-dropdown">
@@ -1576,7 +1570,7 @@ const filteredGroups = useMemo(() => {
                                 <div className="sup-dropdown-item-email">{e.email}</div>
                               </div>
                               {selected && (
-                                <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                                <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
                               )}
                             </div>
                           );
@@ -1592,7 +1586,7 @@ const filteredGroups = useMemo(() => {
                   <h4 className="detail-section-title" style={{ margin: 0, border: 'none', padding: 0 }}>Students (max 4)</h4>
                   {createForm.students.length < 4 && (
                     <button type="button" className="btn btn-xs btn-outline" onClick={addStudentField}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                      <Icon name="add" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                       Add Student
                     </button>
                   )}
@@ -1607,7 +1601,7 @@ const filteredGroups = useMemo(() => {
           <label style={{ fontSize: 11 }}>Student {idx + 1}</label>
           <div className="sup-dropdown-trigger" ref={isEditing ? newStudentRef : undefined}>
             <div className="sup-search-wrapper" onClick={() => startEditStudent(idx)}>
-              <span className="material-symbols-outlined">search</span>
+              <Icon name="search" className="material-symbols-outlined" />
               <input
                 type="text"
                 placeholder={st.studentId ? `${st.firstName} ${st.lastName} (${st.rollNumber || 'no roll'})` : 'Click to select student...'}
@@ -1618,10 +1612,10 @@ const filteredGroups = useMemo(() => {
               />
               {st.studentId && isEditing && (
                 <button className="sup-clear" onClick={(e) => { e.stopPropagation(); clearStudent(idx); setEditingStudentIdx(null); }}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                 </button>
               )}
-              <span className="material-symbols-outlined sup-dropdown-arrow">{isEditing && newStudentOpen ? 'arrow_drop_up' : 'arrow_drop_down'}</span>
+              <Icon name={isEditing && newStudentOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
             </div>
             {isEditing && newStudentOpen && (
               <div className="sup-dropdown">
@@ -1652,7 +1646,7 @@ const filteredGroups = useMemo(() => {
                           <div className="sup-dropdown-item-email">{s.email || ''}</div>
                         </div>
                         {isSelected && (
-                          <span className="material-symbols-outlined sup-dropdown-item-check">check_circle</span>
+                          <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
                         )}
                       </div>
                     );
@@ -1665,7 +1659,7 @@ const filteredGroups = useMemo(() => {
       </div>
       {createForm.students.length > 1 && (
         <button type="button" className="btn btn-xs btn-ghost" onClick={() => removeStudentField(idx)} style={{ color: 'var(--color-error)' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+          <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 16 }} />
         </button>
       )}
     </div>
@@ -1675,11 +1669,11 @@ const filteredGroups = useMemo(() => {
 
             <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">add</span>
+                  <Icon name="add" className="material-symbols-outlined" />
                   Create
                 </button>
               </div>

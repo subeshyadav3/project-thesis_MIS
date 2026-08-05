@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -126,10 +127,10 @@ function ExternalEvaluationsList() {
         <>
           <div className="tabs" style={{ marginBottom: 24 }}>
             <div className={`tab ${activeTab === 'groups' ? 'active' : ''}`} onClick={() => setActiveTab('groups')}>
-              <span className="material-symbols-outlined">school</span> Bachelor Projects ({groups.length})
+              <Icon name="school" className="material-symbols-outlined" /> Bachelor Projects ({groups.length})
             </div>
             <div className={`tab ${activeTab === 'theses' ? 'active' : ''}`} onClick={() => setActiveTab('theses')}>
-              <span className="material-symbols-outlined">library_books</span> Master's Theses ({theses.length})
+              <Icon name="library_books" className="material-symbols-outlined" /> Master's Theses ({theses.length})
             </div>
           </div>
 
@@ -140,7 +141,7 @@ function ExternalEvaluationsList() {
           {activeTab === 'groups' ? (
             groups.length === 0 ? (
               <div className="empty-state" style={{ padding: 40 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 48 }}>school</span>
+                <Icon name="school" className="material-symbols-outlined" style={{ fontSize: 48 }} />
                 <p>No bachelor projects assigned for evaluation.</p>
               </div>
             ) : (
@@ -173,10 +174,10 @@ function ExternalEvaluationsList() {
                         <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                             <button className="btn btn-sm btn-outline" onClick={() => navigate(`/external/evaluate/group/${g.id}`)}>
-                              <span className="material-symbols-outlined">visibility</span> View
+                              <Icon name="visibility" className="material-symbols-outlined" /> View
                             </button>
                             <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(g); }}>
-                              <span className="material-symbols-outlined">picture_as_pdf</span> PDF
+                              <Icon name="picture_as_pdf" className="material-symbols-outlined" /> PDF
                             </button>
                           </div>
                         </td>
@@ -189,7 +190,7 @@ function ExternalEvaluationsList() {
           ) : (
             theses.length === 0 ? (
               <div className="empty-state" style={{ padding: 40 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 48 }}>library_books</span>
+                <Icon name="library_books" className="material-symbols-outlined" style={{ fontSize: 48 }} />
                 <p>No master's theses assigned for evaluation.</p>
               </div>
             ) : (
@@ -235,10 +236,10 @@ function ExternalEvaluationsList() {
                         <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                             <button className="btn btn-sm btn-outline" onClick={() => navigate(`/external/evaluate/thesis/${t.id}`)}>
-                              <span className="material-symbols-outlined">visibility</span> View
+                              <Icon name="visibility" className="material-symbols-outlined" /> View
                             </button>
                             <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(t); }}>
-                              <span className="material-symbols-outlined">picture_as_pdf</span> PDF
+                              <Icon name="picture_as_pdf" className="material-symbols-outlined" /> PDF
                             </button>
                           </div>
                         </td>

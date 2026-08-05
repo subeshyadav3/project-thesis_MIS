@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -186,18 +187,18 @@ function UserManagement() {
     <>
       {!isCoordinator && (
         <button className="btn btn-outline btn-sm" onClick={() => setShowBulk(true)}>
-          <span className="material-symbols-outlined">upload_file</span>
+          <Icon name="upload_file" className="material-symbols-outlined" />
           Bulk Import
         </button>
       )}
       {isCoordinator && (
         <button className="btn btn-secondary btn-sm" onClick={() => { setShowExcelBulk(true); setExcelResult(null); setExcelFile(null); }}>
-          <span className="material-symbols-outlined">upload_file</span>
+          <Icon name="upload_file" className="material-symbols-outlined" />
           Bulk Upload
         </button>
       )}
       <button className="btn btn-primary btn-sm" onClick={openCreate}>
-        <span className="material-symbols-outlined">add</span>
+        <Icon name="add" className="material-symbols-outlined" />
         Add User
       </button>
     </>
@@ -212,10 +213,10 @@ function UserManagement() {
   };
 
   return (
-    <PageLayout title={isCoordinator ? 'Manage Users' : 'Users'} user={user} actions={actions}>
+    <PageLayout user={user} actions={actions}>
       <div className="page-header">
         <h1>
-          <span className="material-symbols-outlined">groups</span>
+          <Icon name="groups" className="material-symbols-outlined" />
           {isCoordinator ? 'Manage Users' : 'System Users'}
         </h1>
         <p>Create, edit, and manage {isCoordinator ? 'program ' : ''}users</p>
@@ -225,7 +226,7 @@ function UserManagement() {
         <div className="table-toolbar">
           <div className="table-toolbar-left">
             <div className="search-input-wrapper">
-              <span className="material-symbols-outlined">search</span>
+              <Icon name="search" className="material-symbols-outlined" />
               <input
                 type="text"
                 placeholder="Search users..."
@@ -284,12 +285,12 @@ function UserManagement() {
 
         {loading ? (
           <div className="loading-state">
-            <span className="material-symbols-outlined">progress_activity</span>
+            <Icon name="progress_activity" className="material-symbols-outlined" />
             <p>Loading users...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">groups</span>
+            <Icon name="groups" className="material-symbols-outlined" />
             <h3>No users found</h3>
             <p>{searchTerm ? 'Try adjusting your search criteria.' : 'Create your first user to get started.'}</p>
           </div>
@@ -371,10 +372,10 @@ function UserManagement() {
                     <td style={{ textAlign: 'right' }}>
                       <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
                         <button className="icon-btn" title="Edit User" onClick={() => openEdit(u)}>
-                          <span className="material-symbols-outlined">edit</span>
+                          <Icon name="edit" className="material-symbols-outlined" />
                         </button>
                         <button className="icon-btn danger" title="Delete User" onClick={() => handleDelete(u)}>
-                          <span className="material-symbols-outlined">delete</span>
+                          <Icon name="delete" className="material-symbols-outlined" />
                         </button>
                       </div>
                     </td>
@@ -402,7 +403,7 @@ function UserManagement() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">upload_file</span>
+                <Icon name="upload_file" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Bulk Import Users</h2>
@@ -426,7 +427,7 @@ function UserManagement() {
             </div>
             <div className="modal-actions">
               <button type="button" className="btn btn-outline" onClick={() => setShowBulk(false)}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
                 Cancel
               </button>
               <button type="button" className="btn btn-primary" onClick={async () => {
@@ -442,7 +443,7 @@ function UserManagement() {
                   toast.error(err.response?.data?.error || err.message || 'Invalid JSON');
                 }
               }}>
-                <span className="material-symbols-outlined">upload</span>
+                <Icon name="upload" className="material-symbols-outlined" />
                 Import
               </button>
             </div>
@@ -455,7 +456,7 @@ function UserManagement() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">upload_file</span>
+                <Icon name="upload_file" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>Bulk Upload Users</h2>
@@ -496,7 +497,7 @@ function UserManagement() {
               <label>Excel file (.xlsx)</label>
               <input type="file" accept=".xlsx,.xls" onChange={e => setExcelFile(e.target.files[0])} />
               <a href={excelTemplateHref} download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, display: 'inline-block' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
                 {' '}Download blank template
               </a>
             </div>
@@ -516,7 +517,7 @@ function UserManagement() {
 
             <div className="modal-actions">
               <button type="button" className="btn btn-outline" onClick={() => setShowExcelBulk(false)}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
                 Cancel
               </button>
               <button
@@ -542,7 +543,7 @@ function UserManagement() {
                   }
                 }}
               >
-                <span className="material-symbols-outlined">{excelUploading ? 'progress_activity' : 'upload'}</span>
+                <Icon name={excelUploading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" />
                 {excelUploading ? 'Uploading...' : 'Upload'}
               </button>
             </div>
@@ -555,7 +556,7 @@ function UserManagement() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">{editUser ? 'edit' : 'person_add'}</span>
+                <Icon name={editUser ? 'edit' : 'person_add'} className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>{editUser ? 'Edit User' : 'Create User'}</h2>
@@ -639,11 +640,11 @@ function UserManagement() {
               )}
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>
-                  <span className="material-symbols-outlined">close</span>
+                  <Icon name="close" className="material-symbols-outlined" />
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  <span className="material-symbols-outlined">{editUser ? 'save' : 'add'}</span>
+                  <Icon name={editUser ? 'save' : 'add'} className="material-symbols-outlined" />
                   {editUser ? 'Update' : 'Create'}
                 </button>
               </div>

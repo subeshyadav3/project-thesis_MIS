@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Icon } from './ui';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -115,7 +116,7 @@ function NotificationBell() {
         onClick={() => setOpen(o => !o)}
         aria-label="Notifications"
       >
-        <span className="material-symbols-outlined">notifications</span>
+        <Icon name="notifications" className="material-symbols-outlined" />
         {unreadCount > 0 && (
           <span className="notification-badge">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -136,11 +137,11 @@ function NotificationBell() {
           <div className="notification-dropdown-body">
             {loading ? (
               <div className="notification-loading">
-                <span className="material-symbols-outlined spin">progress_activity</span>
+                <Icon name="progress_activity" className="material-symbols-outlined spin" />
               </div>
             ) : notifications.length === 0 ? (
               <div className="notification-empty">
-                <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }}>notifications_off</span>
+                <Icon name="notifications_off" className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }} />
                 <p>No notifications yet</p>
               </div>
             ) : (
@@ -151,9 +152,7 @@ function NotificationBell() {
                   onClick={() => { if (!n.read) handleMarkRead(n.id, { stopPropagation: () => {} }); }}
                 >
                   <div className="notification-item-icon">
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                      {TYPE_ICON[n.type] || 'info'}
-                    </span>
+                    <Icon name={TYPE_ICON[n.type] || 'info'} className="material-symbols-outlined" style={{ fontSize: 18 }} />
                   </div>
                   <div className="notification-item-content">
                     <p className="notification-item-text">{n.message}</p>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -82,16 +83,16 @@ function StudentNotifications() {
     <PageLayout title="Notifications" subtitle="Stay updated with your project/thesis activity" user={user}
       actions={notifications.some(n => !n.read) ? (
         <button className="btn btn-outline btn-sm" onClick={markAllRead}>
-          <span className="material-symbols-outlined">done_all</span>
+          <Icon name="done_all" className="material-symbols-outlined" />
           Mark all read
         </button>
       ) : undefined}
     >
       {loading ? (
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading notifications...</p></div>
+        <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /><p>Loading notifications...</p></div>
       ) : notifications.length === 0 ? (
         <div className="empty-state" style={{ padding: 40 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>notifications_off</span>
+          <Icon name="notifications_off" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
           <p>No notifications yet</p>
         </div>
       ) : (
@@ -103,9 +104,7 @@ function StudentNotifications() {
               border: `1px solid ${n.read ? 'var(--color-outline-variant)' : 'var(--color-primary)'}`,
               opacity: n.read ? 0.85 : 1
             }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 24, color: n.read ? 'var(--color-on-surface-variant)' : 'var(--color-primary)' }}>
-                {n.read ? 'check_circle' : 'notifications'}
-              </span>
+              <Icon name={n.read ? 'check_circle' : 'notifications'} className="material-symbols-outlined" style={{ fontSize: 24, color: n.read ? 'var(--color-on-surface-variant)' : 'var(--color-primary)' }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: n.read ? 400 : 600 }}>{n.message}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
@@ -114,7 +113,7 @@ function StudentNotifications() {
               </div>
               {!n.read && (
                 <button className="btn btn-sm btn-outline" onClick={() => markRead(n.id)}>
-                  <span className="material-symbols-outlined">check</span>
+                  <Icon name="check" className="material-symbols-outlined" />
                   Mark as read
                 </button>
               )}
@@ -124,11 +123,11 @@ function StudentNotifications() {
                 return (
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button className="btn btn-sm btn-success" onClick={() => handleApprove(req.id)}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>
+                      <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                       Approve
                     </button>
                     <button className="btn btn-sm btn-danger" onClick={() => { setRejectingId(req.id); setRejectReason(''); }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                      <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                       Reject
                     </button>
                   </div>
@@ -143,7 +142,7 @@ function StudentNotifications() {
         <div className="modal-overlay" onClick={() => setRejectingId(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
             <div className="modal-header">
-              <div className="modal-header-icon danger"><span className="material-symbols-outlined">block</span></div>
+              <div className="modal-header-icon danger"><Icon name="block" className="material-symbols-outlined" /></div>
               <div className="modal-header-text">
                 <h2>Reject request</h2>
                 <p>Provide a reason before rejecting this cross-program assignment request.</p>
@@ -161,7 +160,7 @@ function StudentNotifications() {
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setRejectingId(null)}>Cancel</button>
               <button className="btn btn-danger" onClick={() => handleReject(rejectingId)} disabled={rejectSubmitting}>
-                <span className="material-symbols-outlined">{rejectSubmitting ? 'progress_activity' : 'close'}</span>
+                <Icon name={rejectSubmitting ? 'progress_activity' : 'close'} className="material-symbols-outlined" />
                 {rejectSubmitting ? 'Rejecting...' : 'Reject'}
               </button>
             </div>

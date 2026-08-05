@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Icon } from './ui';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 
@@ -155,7 +156,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
     }
     setStreamingText('');
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || '/api';
+    const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
@@ -428,14 +429,14 @@ export default function AiAssistantModal({ proposal, onClose }) {
             <div className="ai-header-glow" />
             <div className="ai-header-content">
               <div className="ai-header-icon">
-                <span className="material-symbols-outlined">psychology</span>
+                <Icon name="psychology" className="material-symbols-outlined" />
               </div>
               <div className="ai-header-text">
                 <h2>AI Assistant</h2>
                 <p>Analyzing <strong>{proposal?.documentUrl?.split('/').pop() || 'document'}</strong></p>
               </div>
               <button className="ai-close-btn" onClick={onClose}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
               </button>
             </div>
           </div>
@@ -455,7 +456,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                     setResult(cached || null);
                   }}
                 >
-                  <span className="material-symbols-outlined">{meta.icon}</span>
+                  <Icon name={meta.icon} className="material-symbols-outlined" />
                   <span>{meta.label}</span>
                 </button>
               );
@@ -469,11 +470,11 @@ export default function AiAssistantModal({ proposal, onClose }) {
             {tab === 'summarize' && !result && !loading && (
               <div className="ai-action-area">
                 <div className="ai-summarize-preview">
-                  <div className="ai-preview-item"><span className="material-symbols-outlined">checklist</span> Executive Summary</div>
-                  <div className="ai-preview-item"><span className="material-symbols-outlined">track_changes</span> Objectives</div>
-                  <div className="ai-preview-item"><span className="material-symbols-outlined">route</span> Methodology</div>
-                  <div className="ai-preview-item"><span className="material-symbols-outlined">flag</span> Expected Outcomes</div>
-                  <div className="ai-preview-item"><span className="material-symbols-outlined">check_circle</span> Strengths & Weaknesses</div>
+                  <div className="ai-preview-item"><Icon name="checklist" className="material-symbols-outlined" /> Executive Summary</div>
+                  <div className="ai-preview-item"><Icon name="track_changes" className="material-symbols-outlined" /> Objectives</div>
+                  <div className="ai-preview-item"><Icon name="route" className="material-symbols-outlined" /> Methodology</div>
+                  <div className="ai-preview-item"><Icon name="flag" className="material-symbols-outlined" /> Expected Outcomes</div>
+                  <div className="ai-preview-item"><Icon name="check_circle" className="material-symbols-outlined" /> Strengths & Weaknesses</div>
                 </div>
 
                 <div className="ai-custom-prompt">
@@ -498,7 +499,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                 </div>
 
                 <button className="btn btn-primary ai-cta" onClick={handleSummarize} disabled={useCustomPrompt && !customPrompt.trim()}>
-                  <span className="material-symbols-outlined">auto_awesome</span>
+                  <Icon name="auto_awesome" className="material-symbols-outlined" />
                   {useCustomPrompt ? 'Summarize with my prompt' : 'Generate Summary'}
                 </button>
               </div>
@@ -528,7 +529,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                     autoFocus
                   />
                   <button className="btn btn-primary" onClick={handleAsk} disabled={!question.trim()}>
-                    <span className="material-symbols-outlined">send</span>
+                    <Icon name="send" className="material-symbols-outlined" />
                   </button>
                 </div>
               </div>
@@ -573,12 +574,12 @@ export default function AiAssistantModal({ proposal, onClose }) {
                         />
                       </div>
                       <button className="ai-remove-btn" onClick={() => removeCriterion(idx)}>
-                        <span className="material-symbols-outlined">close</span>
+                        <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     </div>
                   ))}
                   <button className="ai-add-criterion" onClick={() => addCriterion()}>
-                    <span className="material-symbols-outlined">add</span>
+                    <Icon name="add" className="material-symbols-outlined" />
                     Add Criterion
                   </button>
                 </div>
@@ -588,7 +589,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   onClick={handleEvaluate}
                   disabled={criteriaList.length === 0 || (useCustomInstructions && !customInstructions.trim())}
                 >
-                  <span className="material-symbols-outlined">grading</span>
+                  <Icon name="grading" className="material-symbols-outlined" />
                   Run Evaluation ({criteriaList.length} criteria)
                 </button>
 
@@ -659,7 +660,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   </div>
                 </div>
                 <button className="btn btn-primary ai-cta" onClick={handleSimilarity}>
-                  <span className="material-symbols-outlined">compare_arrows</span>
+                  <Icon name="compare_arrows" className="material-symbols-outlined" />
                   Find similar documents
                 </button>
               </div>
@@ -670,14 +671,14 @@ export default function AiAssistantModal({ proposal, onClose }) {
               <div className="ai-loading">
                 {streamingText ? (
                   <div className="ai-streaming">
-                    <span className="material-symbols-outlined">psychology</span>
+                    <Icon name="psychology" className="material-symbols-outlined" />
                     <span>{streamingText}</span>
                   </div>
                 ) : (
                   <>
                     <div className="ai-loading-spinner">
                       <div className="ai-spinner-ring" />
-                      <span className="material-symbols-outlined">psychology</span>
+                      <Icon name="psychology" className="material-symbols-outlined" />
                     </div>
                     <div className="ai-loading-text">
                       <p className="ai-loading-title">AI is analyzing the document...</p>
@@ -689,7 +690,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   </>
                 )}
                 <button className="btn btn-outline btn-sm ai-abort-btn" onClick={abortStream}>
-                  <span className="material-symbols-outlined">stop</span>
+                  <Icon name="stop" className="material-symbols-outlined" />
                   Cancel
                 </button>
               </div>
@@ -700,9 +701,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
               <div className="ai-result" ref={resultRef}>
                 <div className="ai-result-header">
                   <div className="ai-result-title">
-                    <span className="material-symbols-outlined">
-                      {result.type === 'summary' ? 'summarize' : result.type === 'answer' ? 'psychology' : result.type === 'similarity' ? 'compare_arrows' : 'grading'}
-                    </span>
+                    <Icon name={result.type === 'summary' ? 'summarize' : result.type === 'answer' ? 'psychology' : result.type === 'similarity' ? 'compare_arrows' : 'grading'} className="material-symbols-outlined" />
                     <span>
                       {result.type === 'summary' ? 'Summary' : result.type === 'answer' ? 'Answer' : result.type === 'similarity' ? 'Similar Documents' : 'Evaluation Results'}
                     </span>
@@ -714,7 +713,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                     )}
                   </div>
                   <button className="ai-copy-btn" onClick={copyResult} title="Copy to clipboard">
-                    <span className="material-symbols-outlined">{showCopied ? 'check' : 'content_copy'}</span>
+                    <Icon name={showCopied ? 'check' : 'content_copy'} className="material-symbols-outlined" />
                     {showCopied ? 'Copied' : 'Copy'}
                   </button>
                 </div>
@@ -728,12 +727,12 @@ export default function AiAssistantModal({ proposal, onClose }) {
                 <div className="ai-result-actions">
                   {result._streaming && streamingTabs[result.type === 'similarity' ? 'similarity' : result.type === 'answer' ? 'ask' : result.type === 'evaluation' ? 'evaluate' : 'summarize'] && (
                     <button className="btn btn-outline btn-sm" onClick={abortStream}>
-                      <span className="material-symbols-outlined">stop_circle</span>
+                      <Icon name="stop_circle" className="material-symbols-outlined" />
                       Cancel
                     </button>
                   )}
                   <button className="btn btn-outline btn-sm" onClick={() => { abortStream(); setResult(null); setCachedResults(prev => { const n = { ...prev }; delete n[tab]; return n; }); }}>
-                    <span className="material-symbols-outlined">refresh</span>
+                    <Icon name="refresh" className="material-symbols-outlined" />
                     {tab === 'ask' ? 'Ask Another' : tab === 'similarity' ? 'Re-scan' : 'Re-run'}
                   </button>
                 </div>
@@ -742,7 +741,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
           </div>
 
           <div className="ai-footer">
-            <span className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.6 }}>info</span>
+            <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.6 }} />
             <span>AI responses are generated by NVIDIA Llama and may not be perfectly accurate. Always review before making decisions.</span>
           </div>
         </div>
@@ -773,7 +772,7 @@ function SummaryView({ data, custom, streaming }) {
     return (
       <div className="ai-summary">
         <div className="ai-pill">
-          <span className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }}>psychology</span>
+          <Icon name="psychology" className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }} />
           Generating summary...
         </div>
       </div>
@@ -784,7 +783,7 @@ function SummaryView({ data, custom, streaming }) {
     <div className="ai-summary">
       {custom && (
         <div className="ai-pill">
-          <span className="material-symbols-outlined">auto_awesome</span> Custom prompt summary
+          <Icon name="auto_awesome" className="material-symbols-outlined" /> Custom prompt summary
         </div>
       )}
       {sections.map(sec => {
@@ -793,7 +792,7 @@ function SummaryView({ data, custom, streaming }) {
         return (
           <div key={sec.key} className="ai-summary-section">
             <div className="ai-summary-section-header" style={{ '--section-color': sec.color }}>
-              <span className="material-symbols-outlined">{sec.icon}</span>
+              <Icon name={sec.icon} className="material-symbols-outlined" />
               {sec.label}
             </div>
             <div className="ai-summary-section-body">
@@ -815,12 +814,12 @@ function AnswerView({ data, question, streaming }) {
     <div className="ai-answer">
       {question && (
         <div className="ai-answer-question">
-          <span className="material-symbols-outlined">person</span>
+          <Icon name="person" className="material-symbols-outlined" />
           <span>{question}</span>
         </div>
       )}
       <div className="ai-answer-response">
-        <span className="material-symbols-outlined">smart_toy</span>
+        <Icon name="smart_toy" className="material-symbols-outlined" />
         <p>{data}{streaming && data && <span className="ai-cursor">▍</span>}</p>
       </div>
     </div>
@@ -834,7 +833,7 @@ function EvaluationView({ data, streaming }) {
     return (
       <div className="ai-evaluation">
         <div className="ai-pill">
-          <span className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }}>psychology</span>
+          <Icon name="psychology" className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }} />
           Evaluating...
         </div>
         {data.summary_text && (
@@ -849,7 +848,7 @@ function EvaluationView({ data, streaming }) {
       return (
         <div className="ai-evaluation">
           <div className="ai-pill">
-            <span className="material-symbols-outlined">hourglass_top</span> Evaluation pending…
+            <Icon name="hourglass_top" className="material-symbols-outlined" /> Evaluation pending…
           </div>
           <p style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{data.summary_text}</p>
         </div>
@@ -896,7 +895,7 @@ function SimilarityView({ data }) {
   return (
     <div className="ai-similarity">
       <div className="ai-pill">
-        <span className="material-symbols-outlined">filter_alt</span> Scope: {data?.scope || 'all'} · {matches.length} matches from {data?.compared ?? 0} documents
+        <Icon name="filter_alt" className="material-symbols-outlined" /> Scope: {data?.scope || 'all'} · {matches.length} matches from {data?.compared ?? 0} documents
       </div>
       {matches.length === 0 ? (
         <p className="ai-similarity-empty">No similar documents matched the current threshold.</p>
@@ -910,10 +909,10 @@ function SimilarityView({ data }) {
                 <div className="ai-similarity-info">
                   <div className="ai-similarity-title">{m.title || '(untitled)'}</div>
                   <div className="ai-similarity-meta">
-                    {m.year && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>calendar_today</span> {m.year}</span>}
-                    {m.department && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>apartment</span> {m.department}</span>}
-                    {m.documentType && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>description</span> {m.documentType}</span>}
-                    {m.submittedBy && <span><span className="material-symbols-outlined" style={{ fontSize: 12 }}>person</span> {m.submittedBy}</span>}
+                    {m.year && <span><Icon name="calendar_today" className="material-symbols-outlined" style={{ fontSize: 12 }} /> {m.year}</span>}
+                    {m.department && <span><Icon name="apartment" className="material-symbols-outlined" style={{ fontSize: 12 }} /> {m.department}</span>}
+                    {m.documentType && <span><Icon name="description" className="material-symbols-outlined" style={{ fontSize: 12 }} /> {m.documentType}</span>}
+                    {m.submittedBy && <span><Icon name="person" className="material-symbols-outlined" style={{ fontSize: 12 }} /> {m.submittedBy}</span>}
                   </div>
                 </div>
               </div>

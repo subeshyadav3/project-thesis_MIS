@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -28,17 +29,17 @@ function ExternalDashboard() {
     <PageLayout title="External Examiner Dashboard" subtitle="Overview of projects and theses assigned for evaluation" user={user}>
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">assignment_ind</span></div>
+          <div className="stat-icon"><Icon name="assignment_ind" className="material-symbols-outlined" /></div>
           <div className="stat-number">{totalAssigned}</div>
           <div className="stat-label">Total Assigned</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
+          <div className="stat-icon"><Icon name="pending_actions" className="material-symbols-outlined" /></div>
           <div className="stat-number">{totalAssigned - evaluatedCount}</div>
           <div className="stat-label">Pending Evaluation</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{evaluatedCount}</div>
           <div className="stat-label">Evaluated</div>
         </div>
@@ -53,11 +54,11 @@ function ExternalDashboard() {
           <div style={{ padding: '16px 0' }}>
             {loading ? (
               <div className="loading-state" style={{ padding: 20 }}>
-                <span className="material-symbols-outlined">progress_activity</span>
+                <Icon name="progress_activity" className="material-symbols-outlined" />
               </div>
             ) : groups.length === 0 ? (
               <div className="empty-state" style={{ padding: 24 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>school</span>
+                <Icon name="school" className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }} />
                 <p style={{ fontSize: 14 }}>No projects assigned</p>
               </div>
             ) : (
@@ -77,7 +78,7 @@ function ExternalDashboard() {
                       <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
                         <span className="dot" />{g.status || 'PENDING'}
                       </span>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>chevron_right</span>
+                      <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }} />
                     </div>
                   </Link>
                 ))}
@@ -99,11 +100,11 @@ function ExternalDashboard() {
           <div style={{ padding: '16px 0' }}>
             {loading ? (
               <div className="loading-state" style={{ padding: 20 }}>
-                <span className="material-symbols-outlined">progress_activity</span>
+                <Icon name="progress_activity" className="material-symbols-outlined" />
               </div>
             ) : theses.length === 0 ? (
               <div className="empty-state" style={{ padding: 24 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>library_books</span>
+                <Icon name="library_books" className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }} />
                 <p style={{ fontSize: 14 }}>No theses assigned</p>
               </div>
             ) : (
@@ -123,7 +124,7 @@ function ExternalDashboard() {
                       <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
                         <span className="dot" />{t.status || 'PENDING'}
                       </span>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }}>chevron_right</span>
+                      <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }} />
                     </div>
                   </Link>
                 ))}

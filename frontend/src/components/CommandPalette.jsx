@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from './ui';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -129,7 +130,7 @@ function CommandPalette({ isOpen, onClose, user }) {
         style={{ maxWidth: 580, width: '92%', padding: 0, borderRadius: 16, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--color-outline-variant)', background: 'var(--color-surface)' }}>
-          <span className="material-symbols-outlined" style={{ color: 'var(--color-on-surface-variant)', fontSize: 20, marginRight: 10 }}>search</span>
+          <Icon name="search" className="material-symbols-outlined" style={{ color: 'var(--color-on-surface-variant)', fontSize: 20, marginRight: 10 }} />
           <input
             type="text"
             placeholder="Search projects, theses, or type a command... (Esc to close)"
@@ -169,7 +170,7 @@ function CommandPalette({ isOpen, onClose, user }) {
                 width: 32, height: 32, borderRadius: 8, background: 'var(--color-surface-container)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
               }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }}>{item.icon}</span>
+                <Icon name={item.icon} className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>

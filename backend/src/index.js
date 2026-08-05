@@ -72,6 +72,7 @@ app.use('/api/proposals', proposalCommentRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
+app.delete('/api/upload/proposal/:proposalId', authenticate, uploadController.deleteProposal);
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();

@@ -1,0 +1,78 @@
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities";
+
+/* ── v4 CSS-first design tokens (theme-aware via App.css RGB-channel twins) ──
+   Colors reference --color-*-rgb variables defined in App.css :root & body.dark.
+   v4 generates utilities (bg-*, text-*, border-*) AND handles opacity modifiers
+   (e.g. bg-primary/50) via color-mix — no <alpha-value> placeholder needed. ── */
+@theme {
+  /* Brand */
+  --color-primary: rgb(var(--color-primary-rgb));
+  --color-primary-hover: rgb(var(--color-primary-hover-rgb));
+  --color-primary-foreground: rgb(var(--color-on-primary-rgb));
+  --color-primary-container: rgb(var(--color-primary-container-rgb));
+  --color-primary-on-container: rgb(var(--color-on-primary-container-rgb));
+
+  --color-secondary: rgb(var(--color-secondary-rgb));
+  --color-secondary-hover: rgb(var(--color-secondary-hover-rgb));
+  --color-secondary-foreground: rgb(var(--color-on-secondary-rgb));
+  --color-secondary-container: rgb(var(--color-secondary-container-rgb));
+  --color-secondary-on-container: rgb(var(--color-on-secondary-container-rgb));
+
+  --color-tertiary: rgb(var(--color-tertiary-rgb));
+  --color-tertiary-hover: rgb(var(--color-tertiary-hover-rgb));
+  --color-tertiary-foreground: rgb(var(--color-on-tertiary-rgb));
+  --color-tertiary-container: rgb(var(--color-tertiary-container-rgb));
+  --color-tertiary-on-container: rgb(var(--color-on-tertiary-container-rgb));
+
+  /* Semantic surface / text / border */
+  --color-background: rgb(var(--color-background-rgb));
+  --color-foreground: rgb(var(--color-on-surface-rgb));
+  --color-card: rgb(var(--color-surface-container-lowest-rgb));
+  --color-card-foreground: rgb(var(--color-on-surface-rgb));
+  --color-muted: rgb(var(--color-surface-container-low-rgb));
+  --color-muted-foreground: rgb(var(--color-on-surface-variant-rgb));
+  --color-border: rgb(var(--color-outline-variant-rgb));
+  --color-input: rgb(var(--color-outline-rgb));
+  --color-ring: rgb(var(--color-primary-rgb));
+
+  /* Status */
+  --color-error: rgb(var(--color-error-rgb));
+  --color-error-foreground: rgb(var(--color-on-error-rgb));
+  --color-error-container: rgb(var(--color-error-container-rgb));
+  --color-error-on-container: rgb(var(--color-on-error-container-rgb));
+  --color-success: rgb(var(--color-success-rgb));
+  --color-success-foreground: rgb(var(--color-on-success-rgb));
+  --color-success-container: rgb(var(--color-success-container-rgb));
+  --color-success-on-container: rgb(var(--color-on-success-container-rgb));
+  --color-warning: rgb(var(--color-warning-rgb));
+  --color-warning-foreground: rgb(var(--color-on-warning-rgb));
+  --color-warning-container: rgb(var(--color-warning-container-rgb));
+  --color-warning-on-container: rgb(var(--color-on-warning-container-rgb));
+
+  /* Backward-compatible numeric shades used by existing pages */
+  --color-primary-100: rgb(var(--color-primary-container-rgb));
+  --color-primary-200: rgb(var(--color-primary-container-rgb));
+  --color-primary-900: rgb(var(--color-primary-hover-rgb));
+  --color-primary-950: rgb(var(--color-primary-rgb));
+  --color-secondary-600: rgb(var(--color-secondary-rgb));
+  --color-secondary-700: rgb(var(--color-secondary-hover-rgb));
+  --color-tertiary-700: rgb(var(--color-tertiary-rgb));
+  --color-tertiary-800: rgb(var(--color-tertiary-hover-rgb));
+  --color-warning-700: rgb(var(--color-on-warning-container-rgb));
+
+  /* Theme-aware slate shades (replaces hardcoded light-only slate) */
+  --color-slate-100: rgb(var(--color-surface-container-low-rgb));
+  --color-slate-200: rgb(var(--color-outline-variant-rgb));
+  --color-slate-300: rgb(var(--color-outline-rgb));
+  --color-slate-400: rgb(var(--color-surface-container-highest-rgb));
+  --color-slate-500: rgb(var(--color-on-surface-variant-rgb));
+  --color-slate-600: rgb(var(--color-on-surface-variant-rgb));
+  --color-slate-900: rgb(var(--color-on-surface-rgb));
+
+  /* Border radius (match previous config) */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}

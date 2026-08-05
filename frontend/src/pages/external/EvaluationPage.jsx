@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
@@ -148,7 +149,7 @@ function ExternalExaminerEvaluationPage() {
   if (loading) {
     return (
       <PageLayout title="Internal Examiner Evaluation" user={user}>
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading evaluation...</p></div>
+        <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /><p>Loading evaluation...</p></div>
       </PageLayout>
     );
   }
@@ -167,10 +168,10 @@ function ExternalExaminerEvaluationPage() {
       actions={
         <>
           <button className="btn btn-outline btn-sm" onClick={() => setShowPdfPreview(true)}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>picture_as_pdf</span> PDF Preview
+            <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 18 }} /> PDF Preview
           </button>
           <button className="btn btn-outline btn-sm" onClick={() => navigate('/external/evaluations')}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back to List
+            <Icon name="arrow_back" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Back to List
           </button>
         </>
       }
@@ -178,10 +179,10 @@ function ExternalExaminerEvaluationPage() {
       {/* Horizontal tab bar */}
       <div className="tabs" style={{ marginBottom: 24 }}>
         <div className={`tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-          <span className="material-symbols-outlined">overview</span> Overview
+          <Icon name="overview" className="material-symbols-outlined" /> Overview
         </div>
         <div className={`tab ${activeTab === 'evaluation' ? 'active' : ''}`} onClick={() => setActiveTab('evaluation')}>
-          <span className="material-symbols-outlined">grading</span> Evaluation
+          <Icon name="grading" className="material-symbols-outlined" /> Evaluation
         </div>
       </div>
 
@@ -278,7 +279,7 @@ function ExternalExaminerEvaluationPage() {
           {/* Stats Summary — only show user's own totals */}
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card bento-card">
-              <div className="stat-icon"><span className="material-symbols-outlined">score</span></div>
+              <div className="stat-icon"><Icon name="score" className="material-symbols-outlined" /></div>
               <div className="stat-number">
                 {currentUserComponents.reduce((s, c) => {
                   const e = evaluationForComponent(c.id);
@@ -288,7 +289,7 @@ function ExternalExaminerEvaluationPage() {
               <div className="stat-label">Your Total / {currentUserComponents.reduce((s, c) => s + c.maxMarks, 0)}</div>
             </div>
             <div className="stat-card bento-card">
-              <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+              <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
               <div className="stat-number">
                 {currentUserComponents.filter(c => {
                   const e = evaluationForComponent(c.id);
@@ -324,9 +325,7 @@ function ExternalExaminerEvaluationPage() {
                         color: hasMarks ? 'var(--color-on-success-container)' : 'var(--color-on-primary-container)',
                         flexShrink: 0,
                       }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                          {hasMarks ? 'check_circle' : 'pending'}
-                        </span>
+                        <Icon name={hasMarks ? 'check_circle' : 'pending'} className="material-symbols-outlined" style={{ fontSize: 20 }} />
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
@@ -381,11 +380,11 @@ function ExternalExaminerEvaluationPage() {
                           <td style={{ padding: '8px 14px', textAlign: 'center' }}>
                             {hasMarks ? (
                               <span className="badge badge-completed" style={{ fontSize: 10 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>check_circle</span> Saved
+                                <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} /> Saved
                               </span>
                             ) : (
                               <span className="badge badge-pending" style={{ fontSize: 10 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>radio_button_unchecked</span> Pending
+                                <Icon name="radio_button_unchecked" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} /> Pending
                               </span>
                             )}
                           </td>
@@ -451,9 +450,7 @@ function ExternalExaminerEvaluationPage() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                           <button className="btn btn-primary btn-sm" onClick={() => handleSaveFeedback(typeKey)} disabled={savingFeedback}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                              {savingFeedback ? 'progress_activity' : 'save'}
-                            </span>
+                            <Icon name={savingFeedback ? 'progress_activity' : 'save'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                             {savingFeedback ? 'Saving...' : `Save ${sectionLabel} Feedback`}
                           </button>
                         </div>
@@ -495,9 +492,7 @@ function ExternalExaminerEvaluationPage() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <button className="btn btn-primary btn-sm" onClick={() => handleSaveFeedback('EXTERNAL_EXAMINER')} disabled={savingFeedback}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                          {savingFeedback ? 'progress_activity' : 'save'}
-                        </span>
+                        <Icon name={savingFeedback ? 'progress_activity' : 'save'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         {savingFeedback ? 'Saving...' : 'Save'}
                       </button>
                     </div>
@@ -509,7 +504,7 @@ function ExternalExaminerEvaluationPage() {
 
           {currentUserComponents.length === 0 && (
             <div className="card" style={{ marginBottom: 24, textAlign: 'center', padding: 32 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>info</span>
+              <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
               <h3 style={{ marginTop: 12 }}>No evaluation component assigned</h3>
               <p style={{ color: 'var(--color-on-surface-variant)' }}>You don't have an evaluation component assigned for this project.</p>
             </div>
@@ -597,10 +592,10 @@ function ExaminerEvaluationForm({ component, evaluation, onSave }) {
         {saving ? '...' : 'Save'}
       </button>
       {saveStatus === 'saved' && (
-        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-success)' }}>check</span>
+        <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-success)' }} />
       )}
       {saveStatus === 'error' && (
-        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }}>error</span>
+        <Icon name="error" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }} />
       )}
     </div>
   );

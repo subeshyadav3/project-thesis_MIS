@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import ProposalsSection from '../../components/ProposalsSection';
@@ -226,7 +227,7 @@ function ProjectDetail() {
     return (
       <PageLayout title="" user={user}>
         <div className="empty-state" style={{ padding: 48, textAlign: 'center' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>error</span>
+          <Icon name="error" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
           <h3>Project not found</h3>
           <button className="btn" onClick={() => navigate(backPath)}>Go back</button>
         </div>
@@ -239,7 +240,7 @@ function ProjectDetail() {
       <PageLayout title="" user={user}>
         {/* ─── HERO HEADER ─── */}
         <div style={{
-          background: 'linear-gradient(135deg, var(--color-primary) 0%, #0f172a 100%)',
+          background: 'linear-gradient(135deg, #3730a3 0%, #0f172a 100%)',
           borderRadius: 16, padding: '28px 32px', marginBottom: 24,
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap',
         }}>
@@ -273,7 +274,7 @@ function ProjectDetail() {
             <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 4px', lineHeight: 1.3 }}>
               {title || 'Loading...'}
             </h1>
-            <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>
+            <p style={{ color: '#cbd5e1', fontSize: 14, margin: 0 }}>
               {name}
               {item?.batch ? ` · Batch ${item.batch}` : ''}
             </p>
@@ -281,12 +282,12 @@ function ProjectDetail() {
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button className="btn" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Back
+              <Icon name="arrow_back" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Back
             </button>
             {isCoordinator && item?.status === 'ACTIVE' && (
               <button className="btn" style={{ background: 'rgba(34,197,94,0.2)', color: '#86efac', border: '1px solid rgba(34,197,94,0.3)' }}
                 onClick={() => setConfirmDialog({ open: true, title: 'Finalize', message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED?`, confirmLabel: 'Finalize', onConfirm: doFinalize, danger: true })}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span> Finalize
+                <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Finalize
               </button>
             )}
           </div>
@@ -296,7 +297,7 @@ function ProjectDetail() {
         <div className="tabs" style={{ marginBottom: 24 }}>
           {tabs.map(t => (
             <div key={t.key} className={`tab ${activeTab === t.key ? 'active' : ''}`} onClick={() => setActiveTab(t.key)}>
-              <span className="material-symbols-outlined">{t.icon}</span> {t.label}
+              <Icon name={t.icon} className="material-symbols-outlined" /> {t.label}
             </div>
           ))}
         </div>
@@ -310,7 +311,7 @@ function ProjectDetail() {
             <div className="stats-grid" style={{ marginBottom: 24 }}>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
                 <div className="stat-icon" style={{ background: 'var(--color-primary-container)' }}>
-                  <span className="material-symbols-outlined">score</span>
+                  <Icon name="score" className="material-symbols-outlined" />
                 </div>
                 <div className="stat-number">
                   {progress.earned}
@@ -320,7 +321,7 @@ function ProjectDetail() {
               </div>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-success)' }}>
                 <div className="stat-icon" style={{ background: 'var(--color-success-container)' }}>
-                  <span className="material-symbols-outlined">checklist</span>
+                  <Icon name="checklist" className="material-symbols-outlined" />
                 </div>
                 <div className="stat-number">
                   {progress.completed}
@@ -330,7 +331,7 @@ function ProjectDetail() {
               </div>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-tertiary)' }}>
                 <div className="stat-icon" style={{ background: 'var(--color-tertiary-container)' }}>
-                  <span className="material-symbols-outlined">trending_up</span>
+                  <Icon name="trending_up" className="material-symbols-outlined" />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                   <div className="stat-number">{progress.pct}%</div>
@@ -345,7 +346,7 @@ function ProjectDetail() {
             {/* Project info card */}
             <div className="card" style={{ marginBottom: 24, overflow: 'hidden' }}>
               <div className="card-header">
-                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>info</span>Project Details</h3>
+                <h3><Icon name="info" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />Project Details</h3>
               </div>
               <div style={{ padding: '8px 0' }}>
                 <InfoRow label="Title" value={title} />
@@ -402,7 +403,7 @@ function ProjectDetail() {
             </div>              {/* Evaluation breakdown — only user's own components for non-coordinators */}
             <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
-                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>assignment</span>{isCoordinator ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
+                <h3><Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />{isCoordinator ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
               </div>
               <div style={{ padding: '4px 0' }}>
                 {(() => {
@@ -410,7 +411,7 @@ function ProjectDetail() {
                   if (visibleComponents.length === 0) {
                     return (
                       <div className="empty-state" style={{ padding: 24 }}>
-                        <span className="material-symbols-outlined">info</span>
+                        <Icon name="info" className="material-symbols-outlined" />
                         <p>No evaluation components yet.</p>
                       </div>
                     );
@@ -433,9 +434,7 @@ function ProjectDetail() {
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               color: hasMarks ? 'var(--color-on-success-container)' : 'var(--color-on-surface-variant)',
                             }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                                {hasMarks ? 'check_circle' : 'radio_button_unchecked'}
-                              </span>
+                              <Icon name={hasMarks ? 'check_circle' : 'radio_button_unchecked'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface)' }}>{c.name}</div>
@@ -466,9 +465,7 @@ function ProjectDetail() {
                         <div style={{ textAlign: 'center', padding: '8px 20px' }}>
                           <button className="btn btn-ghost btn-sm" onClick={() => setShowAllBreakdown(!showAllBreakdown)}
                             style={{ fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer', border: 'none', background: 'none' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>
-                              {showAllBreakdown ? 'expand_less' : 'expand_more'}
-                            </span>
+                            <Icon name={showAllBreakdown ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
                             {showAllBreakdown ? 'Show less' : `Show all (${visibleComponents.length} components)`}
                           </button>
                         </div>
@@ -478,7 +475,7 @@ function ProjectDetail() {
                         <div style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           padding: '16px 20px', margin: '8px 12px', borderRadius: 10,
-                          background: 'linear-gradient(135deg, var(--color-primary-grand) 0%, var(--color-primary) 100%)',
+                          background: 'linear-gradient(135deg, #3730a3 0%, #4338ca 100%)',
                         }}>
                           <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Grand Total</span>
                           <span style={{ fontWeight: 800, fontSize: 22, color: '#fff' }}>
@@ -527,7 +524,7 @@ function ProjectDetail() {
             {isCoordinator && (item?.status === 'ACTIVE' || item?.status === 'PENDING') && (
               <div className="card" style={{ marginBottom: 24 }}>
                 <div className="card-header">
-                  <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>upload_file</span>Upload Document</h3>
+                  <h3><Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />Upload Document</h3>
                 </div>
                 <div style={{ padding: '0 20px 20px', display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                   <div className="form-group" style={{ marginBottom: 0, minWidth: 160, flex: 1 }}>
@@ -544,7 +541,7 @@ function ProjectDetail() {
                     <input type="file" className="form-input" onChange={e => setUploadFile(e.target.files[0])} accept=".pdf,.doc,.docx" />
                   </div>
                   <button className="btn btn-primary" onClick={handleUploadProposal} disabled={!uploadFile || !uploadStage || uploading}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{uploading ? 'progress_activity' : 'upload'}</span>
+                    <Icon name={uploading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                     {uploading ? 'Uploading...' : 'Upload'}
                   </button>
                 </div>
@@ -552,7 +549,7 @@ function ProjectDetail() {
             )}
 
             {/* Proposals */}
-            <ProposalsSection proposals={item?.proposals || []} user={user} />
+            <ProposalsSection proposals={item?.proposals || []} user={user} onRefresh={() => loadData()} />
           </>
         )}
 
@@ -562,20 +559,20 @@ function ProjectDetail() {
             {/* Evaluation progress summary */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
-                <div className="stat-icon"><span className="material-symbols-outlined">score</span></div>
+                <div className="stat-icon"><Icon name="score" className="material-symbols-outlined" /></div>
                 <div className="stat-number">{progress.earned}<span style={{ fontSize: 16, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{progress.total}</span></div>
                 <div className="stat-label">Your Total</div>
               </div>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-success)' }}>
-                <div className="stat-icon"><span className="material-symbols-outlined">checklist</span></div>
+                <div className="stat-icon"><Icon name="checklist" className="material-symbols-outlined" /></div>
                 <div className="stat-number">{progress.completed}<span style={{ fontSize: 16, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>/{progress.count}</span></div>
                 <div className="stat-label">Components Done</div>
               </div>
               <div className="stat-card bento-card" style={{ borderLeft: '3px solid var(--color-secondary)' }}>
-                <div className="stat-icon"><span className="material-symbols-outlined">download</span></div>
+                <div className="stat-icon"><Icon name="download" className="material-symbols-outlined" /></div>
                 <div style={{ marginBottom: 8 }}>
                   <button className="btn btn-outline btn-sm" onClick={() => setShowPdfPreview(true)}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span> PDF Preview
+                    <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} /> PDF Preview
                   </button>
                 </div>
                 <div className="stat-label">Download Evaluation Sheet</div>
@@ -611,11 +608,11 @@ function ProjectDetail() {
                           <td style={{ padding: '8px 14px', textAlign: 'center' }}>
                             {hasMarks ? (
                               <span className="badge badge-completed" style={{ fontSize: 10, cursor: 'pointer' }} title="Marks saved">
-                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>check_circle</span> Saved
+                                <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} /> Saved
                               </span>
                             ) : (
                               <span className="badge badge-pending" style={{ fontSize: 10 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }}>radio_button_unchecked</span> Pending
+                                <Icon name="radio_button_unchecked" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} /> Pending
                               </span>
                             )}
                           </td>
@@ -653,9 +650,7 @@ function ProjectDetail() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <button className="btn btn-primary btn-sm" onClick={handleSaveFeedback} disabled={savingFeedback}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                          {savingFeedback ? 'progress_activity' : 'save'}
-                        </span>
+                        <Icon name={savingFeedback ? 'progress_activity' : 'save'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         {savingFeedback ? 'Saving...' : 'Save Feedback'}
                       </button>
                     </div>
@@ -679,7 +674,7 @@ function ProjectDetail() {
             {/* No component fallback */}
             {currentUserComponents.length === 0 && !isCoordinator && (
               <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }}>info</span>
+                <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
                 <h3 style={{ marginTop: 12 }}>No Evaluation Component</h3>
                 <p style={{ color: 'var(--color-on-surface-variant)', maxWidth: 400, margin: '0 auto' }}>
                   You don't have an evaluation component assigned for this {type === 'group' ? 'project' : 'thesis'}.
@@ -695,7 +690,7 @@ function ProjectDetail() {
             {/* Recommendation list */}
             <div className="card">
               <div className="card-header">
-                <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>verified</span>Issued Recommendations</h3>
+                <h3><Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />Issued Recommendations</h3>
                 {(item?.recommendations?.length || 0) > 0 && (
                   <span className="badge badge-primary" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)' }}>
                     {item?.recommendations?.length}
@@ -705,7 +700,7 @@ function ProjectDetail() {
               <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {(!item?.recommendations || item.recommendations.length === 0) ? (
                   <div className="empty-state" style={{ padding: 32 }}>
-                    <span className="material-symbols-outlined">verified</span>
+                    <Icon name="verified" className="material-symbols-outlined" />
                     <h3>No recommendations yet</h3>
                     <p>Issued recommendations will appear here and be visible to the student.</p>
                   </div>
@@ -723,7 +718,7 @@ function ProjectDetail() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: '#fff',
                       }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>
+                        <Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.6, color: 'var(--color-on-surface)' }}>
@@ -739,7 +734,7 @@ function ProjectDetail() {
                         <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
                           onClick={() => window.open(`/api/supervisors/recommendation/${r.id}/pdf`, '_blank')}
                           title="View Recommendation PDF">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>picture_as_pdf</span>
+                          <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         </button>
                         <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }}
                           onClick={(e) => {
@@ -750,7 +745,7 @@ function ProjectDetail() {
                             document.body.appendChild(a); a.click(); document.body.removeChild(a);
                           }}
                           title="Download PDF">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                          <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         </button>
                         {(isSupervisor || isCoordinator) && (
                           <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-error)' }}
@@ -759,7 +754,7 @@ function ProjectDetail() {
                               setConfirmDialog({ open: true, title: 'Delete recommendation', message: 'Delete this recommendation letter? This cannot be undone.', confirmLabel: 'Delete', danger: true, onConfirm: () => handleDeleteRecommendation(r.id) });
                             }}
                             title="Delete Recommendation">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                            <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                           </button>
                         )}
                       </div>
@@ -773,7 +768,7 @@ function ProjectDetail() {
             {(isSupervisor || isCoordinator) && (
               <div className="card">
                 <div className="card-header">
-                  <h3><span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }}>edit_note</span>Issue Recommendation</h3>
+                  <h3><Icon name="edit_note" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />Issue Recommendation</h3>
                 </div>
                 <div style={{ padding: '0 20px 20px' }}>
                   <div style={{
@@ -788,7 +783,7 @@ function ProjectDetail() {
                   </div>
                   <button className="btn btn-primary btn-block" onClick={handleIssueRecommendation}
                     disabled={issuingRecommendation}>
-                    <span className="material-symbols-outlined">verified</span>
+                    <Icon name="verified" className="material-symbols-outlined" />
                     {issuingRecommendation ? 'Issuing...' : 'Issue Recommendation'}
                   </button>
                 </div>
@@ -881,9 +876,7 @@ function DefenseCard({ component, evaluation, onSave }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 16, color: hasValue ? 'var(--color-success)' : 'var(--color-outline)' }}>
-          {hasValue ? 'check_circle' : 'radio_button_unchecked'}
-        </span>
+        <Icon name={hasValue ? 'check_circle' : 'radio_button_unchecked'} className="material-symbols-outlined" style={{ fontSize: 16, color: hasValue ? 'var(--color-success)' : 'var(--color-outline)' }} />
         <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{component.name}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -905,10 +898,10 @@ function DefenseCard({ component, evaluation, onSave }) {
           {saving ? '...' : 'Save'}
         </button>
         {saveStatus === 'saved' && (
-          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-success)' }}>check</span>
+          <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-success)' }} />
         )}
         {saveStatus === 'error' && (
-          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }}>error</span>
+          <Icon name="error" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }} />
         )}
       </div>
     </div>
@@ -919,7 +912,7 @@ function CoordinatorEvaluationView({ type, orderedComponents, componentByType, e
   if (orderedComponents.length === 0) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 32, marginBottom: 24 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-primary)' }}>info</span>
+        <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-primary)' }} />
         <h3 style={{ marginTop: 8, fontSize: 15 }}>Coordinator View</h3>
         <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>All evaluation components are shown below. You can view and edit marks for any component.</p>
       </div>
@@ -966,7 +959,7 @@ function CoordinatorEvaluationView({ type, orderedComponents, componentByType, e
           })}
         </tbody>
       </table>
-      <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-primary)', color: '#fff' }}>
+      <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
         <span style={{ fontWeight: 600, fontSize: 13, opacity: 0.9 }}>Grand Total</span>
         <span style={{ fontWeight: 700, fontSize: 16 }}>
           {progress.earned} <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.7 }}>/{progress.total}</span>

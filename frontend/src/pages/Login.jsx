@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Icon } from '../components/ui';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
@@ -39,7 +40,7 @@ function Login() {
         {/* Left: Branding */}
         <div className="login-brand">
           <div className="login-brand-badge">
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>verified</span>
+            <Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 16 }} />
             SECURE INSTITUTIONAL PORTAL
           </div>
 
@@ -49,14 +50,14 @@ function Login() {
           <div className="login-features">
             <div className="login-feature-card">
               <div className="feature-icon">
-                <span className="material-symbols-outlined">groups</span>
+                <Icon name="groups" className="material-symbols-outlined" />
               </div>
               <h3>Project Management</h3>
               <p>Streamlined group creation, supervisor assignments, and tracking for bachelor projects.</p>
             </div>
             <div className="login-feature-card">
               <div className="feature-icon">
-                <span className="material-symbols-outlined">shield</span>
+                <Icon name="shield" className="material-symbols-outlined" />
               </div>
               <h3>Role-Based Access</h3>
               <p>Secure role-based authorization with full audit trails for all administrative actions.</p>
@@ -71,7 +72,7 @@ function Login() {
 
           {error && (
             <div className="login-error">
-              <span className="material-symbols-outlined">error</span>
+              <Icon name="error" className="material-symbols-outlined" />
               {error}
             </div>
           )}
@@ -80,7 +81,7 @@ function Login() {
             <div className="login-field">
               <label>EMAIL</label>
               <div className="input-wrapper">
-                <span className="material-symbols-outlined">badge</span>
+                <Icon name="badge" className="material-symbols-outlined" />
                 <input
                   type="email"
                   placeholder="e.g. name@ioe.edu"
@@ -95,7 +96,7 @@ function Login() {
             <div className="login-field">
               <label>PASSWORD</label>
               <div className="input-wrapper">
-                <span className="material-symbols-outlined">lock</span>
+                <Icon name="lock" className="material-symbols-outlined" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
@@ -109,9 +110,7 @@ function Login() {
                   className="toggle-password"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  <span className="material-symbols-outlined">
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
+                  <Icon name={showPassword ? 'visibility_off' : 'visibility'} className="material-symbols-outlined" />
                 </button>
               </div>
             </div>
@@ -127,13 +126,13 @@ function Login() {
             <button type="submit" className="login-submit" disabled={loading}>
               {loading ? (
                 <>
-                  <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                  <Icon name="progress_activity" className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }} />
                   Signing in...
                 </>
               ) : (
                 <>
                   Access Portal
-                  <span className="material-symbols-outlined">arrow_forward</span>
+                  <Icon name="arrow_forward" className="material-symbols-outlined" />
                 </>
               )}
             </button>

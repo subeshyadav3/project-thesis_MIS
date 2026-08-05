@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import BulkPendingUsersModal from './BulkPendingUsersModal';
@@ -120,7 +121,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
       <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-header-icon info">
-            <span className="material-symbols-outlined">upload_file</span>
+            <Icon name="upload_file" className="material-symbols-outlined" />
           </div>
           <div className="modal-header-text">
             <h2>{showReview ? 'Review Users to Create' : (bulkPreview ? 'Preview Import' : 'Bulk Upload Groups')}</h2>
@@ -152,10 +153,10 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
             </div>
             <div className="modal-actions">
               <button type="button" className="btn btn-outline" onClick={resetModal}>
-                <span className="material-symbols-outlined">close</span>Cancel
+                <Icon name="close" className="material-symbols-outlined" />Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
-                <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                <Icon name={bulkLoading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" />
                 {bulkLoading ? 'Analyzing...' : 'Preview'}
               </button>
             </div>
@@ -197,7 +198,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                     const anomalyBadge = (a) => {
                       const labels = { exact_duplicate: 'Duplicate', group_name_exists: 'Name taken', student_in_group: 'Student conflict' };
                       const isError = a.type === 'exact_duplicate';
-                      const style = { background: isError ? 'var(--color-error)' : 'var(--color-warning)', color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default' };
+                      const style = { background: isError ? 'var(--color-error-container)' : 'var(--color-warning-container)', color: isError ? 'var(--color-on-error-container)' : 'var(--color-on-warning-container)', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default' };
                       return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
                     };
 
@@ -209,7 +210,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                     return (
                       <React.Fragment key={p.row}>
                         <tr style={{ background: isSkipped ? 'var(--color-surface-variant)' : hasAnomaly ? 'var(--color-error-container)' : p.warnings.length ? 'var(--color-warning-container)' : 'transparent', opacity: isSkipped ? 0.5 : 1, cursor: 'pointer' }} onClick={toggleExpand}>
-                          <td><span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>{isExpanded ? 'expand_less' : 'expand_more'}</span></td>
+                          <td><Icon name={isExpanded ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }} /></td>
                           <td>{p.row}</td>
                           <td style={{ fontWeight: 600 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -234,7 +235,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                           <td>{edits.batch || p.batch || '—'}</td>
                           <td onClick={e => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }} onClick={toggleSkip} title={isSkipped ? 'Unskip' : 'Skip'}>{isSkipped ? 'undo' : 'delete'}</span>
+                              <Icon name={isSkipped ? 'undo' : 'delete'} className="material-symbols-outlined" style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }} onClick={toggleSkip} title={isSkipped ? 'Unskip' : 'Skip'} />
                             </div>
                           </td>
                         </tr>
@@ -275,10 +276,10 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
               </table>
             </div>
             <div className="modal-actions">
-              <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}><span className="material-symbols-outlined">arrow_back</span>Back</button>
-              {hasPendingUsers && <button type="button" className="btn btn-secondary" onClick={() => setShowReview(true)}><span className="material-symbols-outlined">person_add</span>Next — Create Users</button>}
+              <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}><Icon name="arrow_back" className="material-symbols-outlined" />Back</button>
+              {hasPendingUsers && <button type="button" className="btn btn-secondary" onClick={() => setShowReview(true)}><Icon name="person_add" className="material-symbols-outlined" />Next — Create Users</button>}
               <button className="btn btn-primary" onClick={() => handleBulkConfirm()} disabled={bulkLoading || bulkPreview.preview.length === 0}>
-                <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                <Icon name={bulkLoading ? 'progress_activity' : 'check'} className="material-symbols-outlined" />
                 {bulkLoading ? 'Importing...' : `Import ${bulkPreview.preview.length - duplicateCount - skipCount} groups`}
               </button>
             </div>

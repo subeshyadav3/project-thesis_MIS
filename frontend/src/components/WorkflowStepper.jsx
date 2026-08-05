@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './ui';
 
 const BACHELOR_STEPS = [
   { id: 'PENDING', label: 'Group Formation', description: 'Group created & supervisor pending' },
@@ -86,9 +87,22 @@ function WorkflowStepper({ status, degreeType = 'BACHELOR', components = [], eva
             return Math.round((compIds.filter(hasMarks).length / compIds.length) * 100);
           })();
 
+          const reviewedTotal = (() => {
+            const required = requirements[step.id] || [];
+            return required.flatMap(t => components.filter(c => c.evaluationType === t).map(c => c.id)).length;
+          })();
+          const reviewedCount = (() => {
+            const required = requirements[step.id] || [];
+            const compIds = required.flatMap(t => components.filter(c => c.evaluationType === t).map(c => c.id));
+            return compIds.filter(hasMarks).length;
+          })();
+
           return (
             <React.Fragment key={step.id}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, zIndex: 2, textAlign: 'center' }}>
+              <div
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, zIndex: 2, textAlign: 'center', position: 'relative' }}
+                title={`${step.label}: ${isCompleted ? 'Completed' : isPartial ? `${reviewedCount}/${reviewedTotal} reviewer marks — ${pct}%` : isActive ? 'In progress' : 'Pending'}`}
+              >
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%',
                   background: isCompleted ? 'var(--color-success)'
@@ -102,12 +116,23 @@ function WorkflowStepper({ status, degreeType = 'BACHELOR', components = [], eva
                   transition: 'all 0.3s ease',
                 }}>
                   {isCompleted ? (
-                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>check</span>
+                    <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 20 }} />
                   ) : (
                     idx + 1
                   )}
                 </div>
-                <div style={{ marginTop: 8, fontWeight: (isActive || isPartial) ? 700 : 600, fontSize: 12, color: (isActive || isPartial) ? 'var(--color-primary)' : 'var(--color-on-surface)' }}>
+                {isPartial && reviewedTotal > 0 && (
+                  <div
+                    style={{
+                      marginTop: 4, fontSize: 10, fontWeight: 700, padding: '1px 7px',
+                      borderRadius: 99, color: 'var(--color-on-primary-container)',
+                      background: 'var(--color-primary-container)',
+                    }}
+                  >
+                    {reviewedCount}/{reviewedTotal} reviewed
+                  </div>
+                )}
+                <div style={{ marginTop: isPartial && reviewedTotal > 0 ? 2 : 8, fontWeight: (isActive || isPartial) ? 700 : 600, fontSize: 12, color: (isActive || isPartial) ? 'var(--color-primary)' : 'var(--color-on-surface)' }}>
                   {step.label}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2, maxWidth: 120 }}>

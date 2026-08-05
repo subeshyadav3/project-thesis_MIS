@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
@@ -66,7 +67,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
             background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>supervisor_account</span>
+            <Icon name="supervisor_account" className="material-symbols-outlined" style={{ fontSize: 20 }} />
           </div>
           <div>
             <h3 style={{ margin: 0 }}>Supervisor</h3>
@@ -77,7 +78,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
         </div>
         {!showAssign && !disabled && !currentSupervisor && (
           <button className="btn btn-primary btn-sm" onClick={() => setShowAssign(true)}>
-            <span className="material-symbols-outlined">person_add</span>
+            <Icon name="person_add" className="material-symbols-outlined" />
             Assign Supervisor
           </button>
         )}
@@ -96,7 +97,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
               </select>
             </div>
             <button className="btn btn-primary" onClick={handleAssign} disabled={loading || !selectedSupId}>
-              <span className="material-symbols-outlined">{loading ? 'progress_activity' : 'check'}</span>
+              <Icon name={loading ? 'progress_activity' : 'check'} className="material-symbols-outlined" />
               {loading ? 'Assigning...' : 'Assign'}
             </button>
             <button className="btn btn-outline" onClick={() => { setShowAssign(false); setSelectedSupId(''); }}>
@@ -144,14 +145,14 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
             </div>
             {!disabled && (
               <button className="btn btn-sm btn-outline" onClick={() => setConfirmRemove(true)} disabled={removing} style={{ color: 'var(--color-error)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{removing ? 'progress_activity' : 'close'}</span>
+                <Icon name={removing ? 'progress_activity' : 'close'} className="material-symbols-outlined" style={{ fontSize: 16 }} />
                 Remove
               </button>
             )}
           </div>
         ) : (
           <div className="empty-state" style={{ padding: '16px 0' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--color-outline)' }}>person_off</span>
+            <Icon name="person_off" className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--color-outline)' }} />
             <p style={{ fontSize: 13, marginTop: 8 }}>
               {disabled ? 'No supervisor assigned.' : 'No supervisor assigned yet.'}
             </p>

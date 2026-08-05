@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Icon } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -138,7 +139,7 @@ function SupervisorMasterThesis() {
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-icon info">
-                <span className="material-symbols-outlined">library_books</span>
+                <Icon name="library_books" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
                 <h2>{showDetail.student?.firstName} {showDetail.student?.lastName}{showDetail.student?.rollNumber ? ` (${showDetail.student.rollNumber})` : ''}</h2>
@@ -183,11 +184,11 @@ function SupervisorMasterThesis() {
 
             <div className="modal-actions">
               <button className="btn btn-outline" onClick={() => setShowDetail(null)}>
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="material-symbols-outlined" />
                 Close
               </button>
               <button className="btn btn-outline" onClick={() => { setPdfPreviewItem(showDetail); setShowDetail(null); }}>
-                <span className="material-symbols-outlined">picture_as_pdf</span>
+                <Icon name="picture_as_pdf" className="material-symbols-outlined" />
                 PDF
               </button>
             </div>
@@ -197,17 +198,17 @@ function SupervisorMasterThesis() {
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">library_books</span></div>
+          <div className="stat-icon"><Icon name="library_books" className="material-symbols-outlined" /></div>
           <div className="stat-number">{theses.length}</div>
           <div className="stat-label">Total Theses</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
+          <div className="stat-icon"><Icon name="pending_actions" className="material-symbols-outlined" /></div>
           <div className="stat-number">{activeCount}</div>
           <div className="stat-label">Active / Pending</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{completedCount}</div>
           <div className="stat-label">Completed</div>
         </div>
@@ -231,7 +232,7 @@ function SupervisorMasterThesis() {
           <TableSkeleton rows={5} cols={6} />
         ) : sortedTheses.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">library_books</span>
+            <Icon name="library_books" className="material-symbols-outlined" />
             <h3>No theses assigned</h3>
             <p>{searchTerm || statusFilter !== 'ALL' ? 'Try adjusting your filters or search.' : "You haven't been assigned any master's theses yet."}</p>
           </div>
@@ -275,11 +276,11 @@ function SupervisorMasterThesis() {
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         <button className="btn btn-sm btn-outline" onClick={() => setShowDetail(t)}>
-                          <span className="material-symbols-outlined">visibility</span>
+                          <Icon name="visibility" className="material-symbols-outlined" />
                           View
                         </button>
                         <button className="btn btn-sm btn-outline" onClick={(e) => { e.stopPropagation(); setPdfPreviewItem(t); }}>
-                          <span className="material-symbols-outlined">picture_as_pdf</span>
+                          <Icon name="picture_as_pdf" className="material-symbols-outlined" />
                           PDF
                         </button>
                       </div>

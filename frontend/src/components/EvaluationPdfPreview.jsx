@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Icon } from './ui';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
-const ROLE_LABEL = { SUPERVISOR: 'Supervisor', EXTERNAL_EXAMINER: 'External Examiner' };
+const ROLE_LABEL = { SUPERVISOR: 'Supervisor', EXTERNAL_EXAMINER: 'External Examiner', COORDINATOR: 'Coordinator' };
 
 /** Editable review surface shared by coordinators, supervisors and externals. */
 export default function EvaluationPdfPreview({ type, id, onClose, onSave, initialScope, hideScopeSelector }) {
@@ -189,7 +190,7 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   return <>
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
       <div className="modal" style={{ maxWidth: 1240, width: '96%', height: '88vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-        <div className="modal-header"><div className="modal-header-icon info"><span className="material-symbols-outlined">picture_as_pdf</span></div><div className="modal-header-text"><h2>Evaluation review & PDF</h2><p>Correct marks or feedback, then review the live print layout.</p></div></div>
+        <div className="modal-header"><div className="modal-header-icon info"><Icon name="picture_as_pdf" className="material-symbols-outlined" /></div><div className="modal-header-text"><h2>Evaluation review & PDF</h2><p>Correct marks or feedback, then review the live print layout.</p></div></div>
         {error && <div style={{ margin: '0 16px 8px', color: 'var(--color-error)', fontSize: 13 }}>{error}</div>}
         <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, .85fr) minmax(0, 1.35fr)', gap: 16, padding: '0 16px 16px' }}>
           <section style={{ overflowY: 'auto', paddingRight: 4 }}>
@@ -243,14 +244,21 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
               const components = groupedByRole[role];
               // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
               const shouldShowBothExt = role === 'EXTERNAL_EXAMINER' && (pdfScope === 'both' || pdfScope === 'external-both');
-              const sections = shouldShowBothExt
+              // Split external sections only when actual mid-term/final components exist (master thesis).
+              // Otherwise (e.g. bachelor "Internal Examiner") fall back to a single generic section.
+              const extSections = shouldShowBothExt
                 ? [
                     { key: 'EXTERNAL_MIDTERM', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
                     { key: 'EXTERNAL_FINAL', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
                   ].filter(s => components.some(s.filter))
+                : [];
+              const sections = extSections.length
+                ? extSections
                 : [{ key: components[0]?.evaluationType || 'UNKNOWN', label: role === 'SUPERVISOR' ? 'Supervisor'
-                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external' ? 'External (Mid-Term)'
-                    : role === 'EXTERNAL_EXAMINER' && pdfScope === 'external-final' ? 'External (Final)'
+                    : role === 'EXTERNAL_EXAMINER'
+                      ? (components[0]?.evaluationType === 'EXTERNAL_MIDTERM' ? 'External (Mid-Term)'
+                          : components[0]?.evaluationType === 'EXTERNAL_FINAL' ? 'External (Final)'
+                          : (ROLE_LABEL[role] || 'External Examiner'))
                     : (ROLE_LABEL[role] || role), filter: () => true }];
               return sections.map((section, si) => {
                 const fb = feedback[section.key] || { comments: '', suggestions: '' };
@@ -273,7 +281,7 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
                       <div key={component.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '6px 8px', border: `1px solid ${invalid ? 'var(--color-error)' : 'var(--color-outline-variant)'}`, borderRadius: 8 }}>
                         <label style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{component.name}<small style={{ display: 'block', fontWeight: 400, color: invalid ? 'var(--color-error)' : 'var(--color-on-surface-variant)' }}>Max {component.maxMarks}</small></label>
                         <input type="number" min="0" max={component.maxMarks} step="0.01" value={cur ?? ''} onChange={e => { setMarks(prev => ({ ...prev, [component.id]: e.target.value })); setSaved(false); }} style={{ width: 72, padding: '5px 6px', fontSize: 13, border: invalid ? '1px solid var(--color-error)' : '1px solid var(--color-outline)', borderRadius: 4, outline: 'none' }} />
-                        {invalid && <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }}>warning</span>}
+                        {invalid && <Icon name="warning" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-error)' }} />}
                       </div>
                     );
                   })}
@@ -295,17 +303,17 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {editableComponents.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
                 <button className="btn btn-outline btn-sm" onClick={saveChanges} disabled={saving}>
-                  <span className="material-symbols-outlined">save</span>{saving ? 'Saving...' : 'Save changes'}
+                  <Icon name="save" className="material-symbols-outlined" />{saving ? 'Saving...' : 'Save changes'}
                 </button>
-                {saved && !saving && <span style={{ fontSize: 11, color: 'var(--color-success)' }}><span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>check</span> Saved</span>}
+                {saved && !saving && <span style={{ fontSize: 11, color: 'var(--color-success)' }}><Icon name="check" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} /> Saved</span>}
               </div>
             )}
           </section>
           <div style={{ minWidth: 0, border: '1px solid var(--color-outline-variant)', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
-            {loading ? <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span></div> : <iframe srcDoc={previewHtml} style={{ width: '100%', height: '100%', border: 'none' }} title="Evaluation PDF preview" />}
+            {loading ? <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /></div> : <iframe srcDoc={previewHtml} style={{ width: '100%', height: '100%', border: 'none' }} title="Evaluation PDF preview" />}
           </div>
         </div>
-        <div className="modal-actions" style={{ padding: '12px 16px' }}><button className="btn btn-outline" onClick={onClose}>Close</button><button className="btn btn-primary" onClick={() => setConfirmOpen(true)} disabled={downloading || loading}><span className="material-symbols-outlined">download</span>{downloading ? 'Downloading...' : 'Download PDF'}</button></div>
+        <div className="modal-actions" style={{ padding: '12px 16px' }}><button className="btn btn-outline" onClick={onClose}>Close</button><button className="btn btn-primary" onClick={() => setConfirmOpen(true)} disabled={downloading || loading}><Icon name="download" className="material-symbols-outlined" />{downloading ? 'Downloading...' : 'Download PDF'}</button></div>
       </div>
     </div>
     <ConfirmDialog open={confirmOpen} title="Download evaluation PDF" message="Are you sure you want to download this evaluation sheet?" onConfirm={confirmDownload} onCancel={() => setConfirmOpen(false)} confirmLabel="Download" />

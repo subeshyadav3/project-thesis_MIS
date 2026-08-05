@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 
@@ -216,10 +217,10 @@ export default function BulkPendingUsersModal({ open, previewRows, type, departm
       )}
       <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="btn btn-outline" onClick={onBack} disabled={creating}>
-          <span className="material-symbols-outlined">arrow_back</span>Back
+          <Icon name="arrow_back" className="material-symbols-outlined" />Back
         </button>
         <button type="button" className="btn btn-primary" onClick={handleCreate} disabled={creating || pendingUsers.length === 0}>
-          <span className="material-symbols-outlined">{creating ? 'progress_activity' : 'person_add'}</span>
+          <Icon name={creating ? 'progress_activity' : 'person_add'} className="material-symbols-outlined" />
           {creating ? 'Creating...' : pendingUsers.length > 0 ? `Create ${pendingUsers.length} user(s) & Continue` : 'Continue'}
         </button>
       </div>

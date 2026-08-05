@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Icon } from './ui';
 import { downloadFile } from '../utils/download';
 import DocumentViewer from './DocumentViewer';
 import AiAssistantModal from './AiAssistantModal';
@@ -24,7 +25,7 @@ const ROLE_COLORS = {
   EXTERNAL_EXAMINER: { bg: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)', label: 'External' },
 };
 
-function ProposalsSection({ proposals = [], title = 'Submitted Documents', user }) {
+function ProposalsSection({ proposals = [], title = 'Submitted Documents', user, onRefresh }) {
   const [viewerDoc, setViewerDoc] = useState(null);
   const [aiProposal, setAiProposal] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
@@ -35,10 +36,14 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
   const [loadingComments, setLoadingComments] = useState({});
   const [deletingComment, setDeletingComment] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deletingDoc, setDeletingDoc] = useState(null);
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState(null);
   const toast = useToast();
 
   const canComment = user && ['SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'].includes(user.role);
   const openAI = canComment;
+  const MANAGER_ROLES = ['COORDINATOR', 'MAINTAINER', 'SUPERVISOR'];
+  const canDeleteDoc = (doc) => doc && (String(doc.submittedById) === String(user?.id) || MANAGER_ROLES.includes(user?.role));
 
   const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const byStage = stages.reduce((acc, stage) => {
@@ -122,12 +127,29 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
     }
   };
 
+  const handleDeleteDocument = async () => {
+    if (!confirmDeleteDoc) return;
+    if (deletingDoc === confirmDeleteDoc.id) return;
+    setDeletingDoc(confirmDeleteDoc.id);
+    try {
+      await api.delete(`/upload/proposal/${confirmDeleteDoc.id}`);
+      toast.success('Document removed');
+      if (viewerDoc?.url === confirmDeleteDoc.url) setViewerDoc(null);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete document');
+    } finally {
+      setDeletingDoc(null);
+      setConfirmDeleteDoc(null);
+    }
+  };
+
   if (!hasAny) {
     return (
       <div className="card">
         <div className="card-header"><h3>{title}</h3></div>
         <div className="empty-state" style={{ padding: '24px 16px' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }}>folder_off</span>
+          <Icon name="folder_off" className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }} />
           <h3 style={{ fontSize: 14, margin: '8px 0 4px' }}>No documents submitted yet</h3>
           <p style={{ fontSize: 13 }}>Documents uploaded by the student will appear here.</p>
         </div>
@@ -160,9 +182,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                 background: 'var(--color-surface-container-low)',
                 borderBottom: '1px solid var(--color-outline-variant)',
               }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }}>
-                  {STAGE_ICON[stage]}
-                </span>
+                <Icon name={STAGE_ICON[stage]} className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }} />
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{stageLabel} Stage</span>
                 <span className="badge badge-sm" style={{
                   background: 'var(--color-primary-container)',
@@ -197,7 +217,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             flexShrink: 0,
                           }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>description</span>
+                            <Icon name="description" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -223,17 +243,17 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                           <button className="btn btn-sm btn-outline-primary" style={{ padding: '4px 8px', fontSize: 12 }}
                             onClick={() => setViewerDoc({ url: doc.documentUrl, name: fileName })}
                             title="Preview">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
+                            <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                           </button>
                           <button className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
                             onClick={() => downloadFile(doc.documentUrl, fileName)}
                             title="Download">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                            <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                           </button>
                           <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer"
                             className="btn btn-sm btn-outline" style={{ padding: '4px 8px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
                             title="Open in new tab">
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
+                            <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                           </a>
                           {openAI && (
                             <button
@@ -242,7 +262,18 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                               onClick={() => setAiProposal({ id: doc.id, documentUrl: doc.documentUrl })}
                               title="AI Assistant"
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>psychology</span>
+                              <Icon name="psychology" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                            </button>
+                          )}
+                          {canDeleteDoc(doc) && (
+                            <button
+                              className="btn btn-sm"
+                              style={{ padding: '4px 8px', fontSize: 12, color: 'var(--color-error)', borderColor: 'var(--color-error)', background: 'transparent', opacity: deletingDoc === doc.id ? 0.5 : 1 }}
+                              onClick={() => setConfirmDeleteDoc({ id: doc.id, name: fileName, stageLabel, url: doc.documentUrl })}
+                              disabled={deletingDoc === doc.id}
+                              title="Remove document"
+                            >
+                              <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                             </button>
                           )}
                         </div>
@@ -287,17 +318,21 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
                                             Cancel
                                           </span>
                                         ) : (
-                                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', cursor: 'pointer' }}
+                                          <Icon
+                                            name="edit"
+                                            className="material-symbols-outlined"
+                                            style={{ fontSize: 14, color: 'var(--color-on-surface-variant)', cursor: 'pointer' }}
                                             onClick={() => { setEditingId(comment.id); setEditInputs(prev => ({ ...prev, [comment.id]: comment.content })); }}
-                                            title="Edit">
-                                            edit
-                                          </span>
+                                            title="Edit"
+                                          />
                                         )}
-                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-error)', cursor: 'pointer', opacity: deletingComment === comment.id ? 0.5 : 1 }}
+                                        <Icon
+                                          name="delete"
+                                          className="material-symbols-outlined"
+                                          style={{ fontSize: 14, color: 'var(--color-error)', cursor: 'pointer', opacity: deletingComment === comment.id ? 0.5 : 1 }}
                                           onClick={() => setConfirmDelete({ proposalId: doc.id, commentId: comment.id })}
-                                          title="Delete">
-                                          delete
-                                        </span>
+                                          title="Delete"
+                                        />
                                       </>
                                     )}
                                   </div>
@@ -369,6 +404,16 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user 
         onConfirm={handleDeleteComment}
         onCancel={() => setConfirmDelete(null)}
         confirmLabel="Delete"
+        danger
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteDoc}
+        title="Remove document"
+        message={confirmDeleteDoc ? `Remove "${confirmDeleteDoc.name}"? The uploaded file and its AI summary will be permanently deleted.` : ''}
+        onConfirm={handleDeleteDocument}
+        onCancel={() => setConfirmDeleteDoc(null)}
+        confirmLabel="Remove"
         danger
       />
     </div>

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { Icon } from '../components/ui';
 
 const ToastContext = createContext();
 
@@ -35,12 +36,10 @@ export function ToastProvider({ children }) {
             style={{ animationDelay: `${index * 0.1}s` }}
             onClick={() => removeToast(toast.id)}
           >
-            <span className="material-symbols-outlined toast-icon">
-              {toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : toast.type === 'warning' ? 'warning' : 'info'}
-            </span>
+            <Icon name={toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : toast.type === 'warning' ? 'warning' : 'info'} className="material-symbols-outlined toast-icon" />
             <span className="toast-message">{toast.message}</span>
             <button className="toast-close" onClick={() => removeToast(toast.id)}>
-              <span className="material-symbols-outlined">close</span>
+              <Icon name="close" className="material-symbols-outlined" />
             </button>
           </div>
         ))}

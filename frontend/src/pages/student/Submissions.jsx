@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import DocumentViewer from '../../components/DocumentViewer';
 import { useToast } from '../../contexts/ToastContext';
@@ -88,7 +89,7 @@ function StudentSubmissions() {
   if (loading) {
     return (
       <ErrorBoundary><PageLayout title="Submissions" user={user}>
-        <div className="loading-state"><span className="material-symbols-outlined">progress_activity</span><p>Loading...</p></div>
+        <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined" /><p>Loading...</p></div>
       </PageLayout></ErrorBoundary>
     );
   }
@@ -98,7 +99,7 @@ function StudentSubmissions() {
       <ErrorBoundary><PageLayout title="Document Submissions" user={user}>
         <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 16px', background: 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }}>upload_file</span>
+            <Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--color-outline)' }} />
           </div>
           <h3>No Assignments</h3>
           <p style={{ color: 'var(--color-on-surface-variant)', marginTop: 8 }}>You have no projects or theses to submit documents for.</p>
@@ -113,10 +114,10 @@ function StudentSubmissions() {
       {groups.length > 0 && theses.length > 0 && (
         <div className="tabs" style={{ marginBottom: 16 }}>
           <div className={`tab ${activeTab === 'groups' ? 'active' : ''}`} onClick={() => { setActiveTab('groups'); setSelectedId(null); }}>
-            <span className="material-symbols-outlined">school</span>Projects
+            <Icon name="school" className="material-symbols-outlined" />Projects
           </div>
           <div className={`tab ${activeTab === 'theses' ? 'active' : ''}`} onClick={() => { setActiveTab('theses'); setSelectedId(null); }}>
-            <span className="material-symbols-outlined">library_books</span>Theses
+            <Icon name="library_books" className="material-symbols-outlined" />Theses
           </div>
         </div>
       )}
@@ -124,9 +125,7 @@ function StudentSubmissions() {
       {/* Assignment selector — always shown so user can pick which project/thesis to upload to */}
       <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
-            {activeTab === 'groups' ? 'school' : 'library_books'}
-          </span>
+          <Icon name={activeTab === 'groups' ? 'school' : 'library_books'} className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }} />
           {itemLabel}:
         </span>
         <select
@@ -157,12 +156,10 @@ function StudentSubmissions() {
                   <div style={{
                     width: 36, height: 36, borderRadius: 8,
                     background: existing?.documentUrl ? 'var(--color-primary)' : 'var(--color-surface-container)',
-                    color: existing?.documentUrl ? '#fff' : 'var(--color-on-surface)',
+                    color: existing?.documentUrl ? 'var(--color-on-primary)' : 'var(--color-on-surface)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                      {stage === 'PROPOSAL' ? 'description' : stage === 'MID_TERM' ? 'schedule' : 'flag'}
-                    </span>
+                    <Icon name={stage === 'PROPOSAL' ? 'description' : stage === 'MID_TERM' ? 'schedule' : 'flag'} className="material-symbols-outlined" style={{ fontSize: 20 }} />
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 15 }}>{stageLabel} Stage</h3>
@@ -186,7 +183,7 @@ function StudentSubmissions() {
                     color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                     borderBottom: '1px solid var(--color-outline-variant)',
                   }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'}</span>
+                    <Icon name={info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
                     {info.label}
                   </div>
                 );
@@ -205,7 +202,7 @@ function StudentSubmissions() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--color-primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <span className="material-symbols-outlined" style={{ color: 'var(--color-on-primary-container)', fontSize: 22 }}>description</span>
+                          <Icon name="description" className="material-symbols-outlined" style={{ color: 'var(--color-on-primary-container)', fontSize: 22 }} />
                         </div>
                         <div>
                           <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: 14 }}>
@@ -223,17 +220,17 @@ function StudentSubmissions() {
                         <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12 }}
                           onClick={(e) => { e.stopPropagation(); setViewerDoc({ url: existing.documentUrl, name: `${stageLabel}_Document.${existing.documentUrl.match(/\.(\w+)$/)?.[1] || 'pdf'}` }); }}
                           title="Preview">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
+                          <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         </button>
                         <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12 }}
                           onClick={(e) => { e.stopPropagation(); downloadFile(existing.documentUrl, `${stageLabel}_Document`); }}
                           title="Download">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                          <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         </button>
                         <a href={existing.documentUrl} target="_blank" rel="noopener noreferrer"
                           className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12, textDecoration: 'none' }}
                           title="Open in new tab">
-                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
+                          <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         </a>
                       </div>
                     </div>
@@ -243,13 +240,13 @@ function StudentSubmissions() {
                   </div>
                 ) : (
                   <div className="empty-state" style={{ padding: '16px 0' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }}>upload_file</span>
+                    <Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }} />
                     <p style={{ margin: '4px 0 12px', fontSize: 13 }}>Upload your {stageLabel.toLowerCase()} document</p>
                   </div>
                 )}
 
                 <label className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload</span>
+                  <Icon name="upload" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                   {uploading[stage] ? 'Uploading...' : existing?.documentUrl ? 'Upload New Version' : 'Upload Document'}
                   <input type="file" accept=".pdf,.doc,.docx,.zip" style={{ display: 'none' }}
                     onChange={(e) => handleUpload(stage, e)} disabled={uploading[stage]} />

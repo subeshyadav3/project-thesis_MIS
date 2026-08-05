@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
@@ -164,11 +165,11 @@ function Evaluations() {
   const actions = (
     <>
       <button className="btn btn-outline btn-sm" onClick={() => handlePrintAll()} disabled={printingAll}>
-        <span className="material-symbols-outlined">{printingAll ? 'progress_activity' : 'print'}</span>
+        <Icon name={printingAll ? 'progress_activity' : 'print'} className="material-symbols-outlined" />
         {printingAll ? 'Printing...' : 'Print All'}
       </button>
       <button className="btn btn-success btn-sm" onClick={() => setShowForward(true)}>
-        <span className="material-symbols-outlined">forward</span>
+        <Icon name="forward" className="material-symbols-outlined" />
         Forward to Exam Dept
       </button>
     </>
@@ -210,22 +211,22 @@ function Evaluations() {
 
       <div className="stats-grid" style={{ marginBottom: 16 }}>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">checklist</span></div>
+          <div className="stat-icon"><Icon name="checklist" className="material-symbols-outlined" /></div>
           <div className="stat-number">{total}</div>
           <div className="stat-label">Total {viewMode === 'bachelor' ? 'Projects' : 'Theses'}</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">check_circle</span></div>
+          <div className="stat-icon"><Icon name="check_circle" className="material-symbols-outlined" /></div>
           <div className="stat-number">{completed}</div>
           <div className="stat-label">Fully Evaluated</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">progress_activity</span></div>
+          <div className="stat-icon"><Icon name="progress_activity" className="material-symbols-outlined" /></div>
           <div className="stat-number">{partial}</div>
           <div className="stat-label">In Progress</div>
         </div>
         <div className="stat-card bento-card">
-          <div className="stat-icon"><span className="material-symbols-outlined">pending_actions</span></div>
+          <div className="stat-icon"><Icon name="pending_actions" className="material-symbols-outlined" /></div>
           <div className="stat-number">{pending}</div>
           <div className="stat-label">Not Started</div>
         </div>
@@ -236,12 +237,12 @@ function Evaluations() {
           <div className="tabs" style={{ margin: 0, borderBottom: 'none' }}>
             {isBachelorCoordinator && (
               <div className={`tab ${viewMode === 'bachelor' ? 'active' : ''}`} onClick={() => setViewMode('bachelor')}>
-                <span className="material-symbols-outlined">school</span>Bachelor Projects
+                <Icon name="school" className="material-symbols-outlined" />Bachelor Projects
               </div>
             )}
             {isMasterCoordinator && (
               <div className={`tab ${viewMode === 'master' ? 'active' : ''}`} onClick={() => setViewMode('master')}>
-                <span className="material-symbols-outlined">library_books</span>Master's Thesis
+                <Icon name="library_books" className="material-symbols-outlined" />Master's Thesis
               </div>
             )}
           </div>
@@ -251,7 +252,7 @@ function Evaluations() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 12, borderBottom: '1px solid var(--color-outline-variant)' }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div className="search-input-wrapper" style={{ width: '100%' }}>
-              <span className="material-symbols-outlined">search</span>
+              <Icon name="search" className="material-symbols-outlined" />
               <input
                 type="text"
                 placeholder={`Search by ${viewMode === 'bachelor' ? 'group, project, member, roll' : 'student, thesis, supervisor'}...`}
@@ -282,7 +283,7 @@ function Evaluations() {
           <TableSkeleton rows={5} cols={4} />
         ) : filteredItems.length === 0 ? (
           <div className="empty-state">
-            <span className="material-symbols-outlined">grading</span>
+            <Icon name="grading" className="material-symbols-outlined" />
             <h3>No evaluations match</h3>
             <p>{searchTerm || statusFilter !== 'ALL' ? 'Try adjusting your filters.' : `No ${viewMode === 'bachelor' ? 'projects' : 'theses'} registered yet.`}</p>
           </div>
@@ -334,10 +335,10 @@ function Evaluations() {
                       <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                           <button className="btn btn-outline btn-sm" onClick={() => handleOpenSummaryModal(item)} title="View all components" style={{ minWidth: 32, padding: '6px 8px' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
+                            <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                           </button>
                           <button className="btn btn-outline btn-sm" onClick={() => setPdfPreviewItem(item)} title="Open PDF Preview" style={{ minWidth: 32, padding: '6px 8px' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>picture_as_pdf</span>
+                            <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 18 }} />
                           </button>
                         </div>
                       </td>
@@ -355,7 +356,7 @@ function Evaluations() {
         <div className="modal-overlay" onClick={() => setShowSummaryModal(false)}>
           <div className="modal" style={{ maxWidth: 600, width: '90%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-header-icon info"><span className="material-symbols-outlined">fact_check</span></div>
+              <div className="modal-header-icon info"><Icon name="fact_check" className="material-symbols-outlined" /></div>
               <div className="modal-header-text">
                 <h2>Evaluation Summary</h2>
                 <p>{selectedItem.project}</p>
@@ -368,7 +369,7 @@ function Evaluations() {
                 return (
                   <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8, marginBottom: 8, background: status === 'done' ? 'var(--color-surface-container-low)' : 'transparent', border: '1px solid var(--color-outline-variant)' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: status === 'done' ? 'var(--color-success-container)' : 'var(--color-surface-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: status === 'done' ? 'var(--color-on-success-container)' : 'var(--color-on-surface-variant)', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{status === 'done' ? 'check_circle' : 'pending'}</span>
+                      <Icon name={status === 'done' ? 'check_circle' : 'pending'} className="material-symbols-outlined" style={{ fontSize: 20 }} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
@@ -390,7 +391,7 @@ function Evaluations() {
               }}>
                 <div style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#94a3b8' }}>award_star</span>
+                    <Icon name="award_star" className="material-symbols-outlined" style={{ fontSize: 16, color: '#94a3b8' }} />
                     <span style={{ fontWeight: 600, fontSize: 12, color: '#94a3b8', letterSpacing: 0.5, textTransform: 'uppercase' }}>Grand Total</span>
                   </div>
                 </div>
@@ -404,8 +405,8 @@ function Evaluations() {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => setShowSummaryModal(false)}><span className="material-symbols-outlined">close</span>Close</button>
-              <button className="btn btn-primary" onClick={() => { setShowSummaryModal(false); setPdfPreviewItem(selectedItem); }}><span className="material-symbols-outlined">picture_as_pdf</span>Open PDF Preview</button>
+              <button className="btn btn-outline" onClick={() => setShowSummaryModal(false)}><Icon name="close" className="material-symbols-outlined" />Close</button>
+              <button className="btn btn-primary" onClick={() => { setShowSummaryModal(false); setPdfPreviewItem(selectedItem); }}><Icon name="picture_as_pdf" className="material-symbols-outlined" />Open PDF Preview</button>
             </div>
           </div>
         </div>
@@ -415,15 +416,15 @@ function Evaluations() {
         <div className="modal-overlay" onClick={() => setShowForward(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-header-icon success"><span className="material-symbols-outlined">forward</span></div>
+              <div className="modal-header-icon success"><Icon name="forward" className="material-symbols-outlined" /></div>
               <div className="modal-header-text">
                 <h2>Forward Results</h2>
                 <p>This will send all completed evaluations to the Examination Department. This action cannot be undone.</p>
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => setShowForward(false)}><span className="material-symbols-outlined">close</span>Cancel</button>
-              <button className="btn btn-success" onClick={handleForward}><span className="material-symbols-outlined">check</span>Confirm Forward</button>
+              <button className="btn btn-outline" onClick={() => setShowForward(false)}><Icon name="close" className="material-symbols-outlined" />Cancel</button>
+              <button className="btn btn-success" onClick={handleForward}><Icon name="check" className="material-symbols-outlined" />Confirm Forward</button>
             </div>
           </div>
         </div>

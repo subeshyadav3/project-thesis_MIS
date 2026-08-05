@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import BulkPendingUsersModal from './BulkPendingUsersModal';
@@ -127,8 +128,9 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
     };
     const isError = a.type === 'exact_duplicate';
     const style = {
-      background: isError ? 'var(--color-error)' : 'var(--color-warning)',
-      color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
+      background: isError ? 'var(--color-error-container)' : 'var(--color-warning-container)',
+      color: isError ? 'var(--color-on-error-container)' : 'var(--color-on-warning-container)',
+      padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap', cursor: 'default',
     };
     return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
   };
@@ -137,7 +139,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
     if (!p.warnings) return null;
     const cp = p.warnings.find(w => w.toLowerCase().includes('does not match selected program'));
     if (!cp) return null;
-    return <span style={{ background: 'var(--color-error)', color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap' }} title={cp}>Cross-program</span>;
+    return <span style={{ background: 'var(--color-error-container)', color: 'var(--color-on-error-container)', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap' }} title={cp}>Cross-program</span>;
   };
 
   const setStudentEdit = (field, value) => {
@@ -152,7 +154,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
       <div className="modal" style={{ maxWidth: 900, width: '95%' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-header-icon info">
-            <span className="material-symbols-outlined">upload_file</span>
+            <Icon name="upload_file" className="material-symbols-outlined" />
           </div>
           <div className="modal-header-text">
             <h2>{bulkPreview ? (showReview ? 'Review Users to Create' : 'Preview Import') : title}</h2>
@@ -176,16 +178,16 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                     download
                     style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>download</span>
+                    <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
                     {' '}Download blank template
                   </a>
             </div>
             <div className="modal-actions">
               <button type="button" className="btn btn-outline" onClick={resetAndClose}>
-                <span className="material-symbols-outlined">close</span>Cancel
+                <Icon name="close" className="material-symbols-outlined" />Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={bulkLoading}>
-                <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'upload'}</span>
+                <Icon name={bulkLoading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" />
                 {bulkLoading ? 'Analyzing...' : 'Preview'}
               </button>
             </div>
@@ -259,9 +261,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                           cursor: 'pointer',
                         }} onClick={toggleExpand}>
                           <td>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>
-                              {isExpanded ? 'expand_less' : 'expand_more'}
-                            </span>
+                            <Icon name={isExpanded ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }} />
                           </td>
                           <td>{p.row}</td>
                           <td>
@@ -281,14 +281,9 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                           <td>{edits.batch || p.batch || '—'}</td>
                           <td onClick={e => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                              <span
-                                className="material-symbols-outlined"
-                                style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }}
+                              <Icon name={isSkipped ? 'undo' : 'delete'} className="material-symbols-outlined" style={{ fontSize: 18, color: isSkipped ? 'var(--color-success)' : 'var(--color-error)', cursor: 'pointer' }}
                                 onClick={toggleSkip}
-                                title={isSkipped ? 'Unskip' : 'Skip'}
-                              >
-                                {isSkipped ? 'undo' : 'delete'}
-                              </span>
+                                title={isSkipped ? 'Unskip' : 'Skip'} />
                             </div>
                           </td>
                         </tr>
@@ -394,15 +389,15 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
             </div>
             <div className="modal-actions">
               <button type="button" className="btn btn-outline" onClick={() => setBulkPreview(null)}>
-                <span className="material-symbols-outlined">arrow_back</span>Back
+                <Icon name="arrow_back" className="material-symbols-outlined" />Back
               </button>
               {hasPendingUsers && (
                 <button type="button" className="btn btn-secondary" onClick={() => setShowReview(true)}>
-                  <span className="material-symbols-outlined">person_add</span>Next — Create Users
+                  <Icon name="person_add" className="material-symbols-outlined" />Next — Create Users
                 </button>
               )}
               <button className="btn btn-primary" onClick={() => handleBulkConfirm()} disabled={bulkLoading || bulkPreview.preview.length === 0}>
-                <span className="material-symbols-outlined">{bulkLoading ? 'progress_activity' : 'check'}</span>
+                <Icon name={bulkLoading ? 'progress_activity' : 'check'} className="material-symbols-outlined" />
                 {bulkLoading ? 'Importing...' : `Import ${bulkPreview.preview.length - duplicateCount - skipCount} theses`}
               </button>
             </div>

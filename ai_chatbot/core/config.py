@@ -59,20 +59,28 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 10
 
-    # LLM (NVIDIA build API -- OpenAI-compatible)
+    # ──LLM provider selection ─────────────────────────────────────────────
+    # Primary provider for the AI assistant. Options: "groq" | "nvidia".
+    # The other provider is used automatically as a fallback when the primary
+    # is unreachable, rate-limited, or rejects the API key.
+    llm_provider: str = Field(default="groq")
+
+    # ──Groq (default primary — very fast, free tier) ──────────────────────
+    groq_api_key: str = Field(default="")
+    groq_base_url: str = Field(default="https://api.groq.com/openai/v1")
+    groq_model: str = Field(default="llama-3.3-70b-versatile")
+    groq_temperature: float = 0.2
+    groq_max_tokens: int = 2048
+
+    # ──NVIDIA build API (fallback provider, OpenAI-compatible) ────────────
     # The Express bridge sends ``nvidia_api_key`` per-request; the service
-    # itself prefers NVIDIA_API_KEY (or OPENAI_API_KEY) from the environment.
+    # itself prefers NVIDIA_API_KEY from the environment.
     nvidia_api_key: str = Field(default="")
     nvidia_base_url: str = Field(default="https://integrate.api.nvidia.com/v1")
     nvidia_model: str = Field(default="meta/llama-3.1-70b-instruct")
     nvidia_temperature: float = 0.2
     nvidia_max_tokens: int = 2048
     llm_request_timeout: int = 120
-
-    # Legacy Groq keys kept so older .env files do not crash startup.
-    # They are no longer used at runtime.
-    groq_api_key: str = Field(default="")
-    groq_model: str = Field(default="llama-3.1-70b-versatile")
 
     # ──Embedding model (local sentence-transformers) ─────────────────────
     embedding_model_name: str = Field(default="BAAI/bge-small-en-v1.5")

@@ -114,3 +114,45 @@ exports.uploadProposal = async (req, res) => {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
+
+const MANAGER_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR'];
+
+exports.deleteProposal = async (req, res) => {
+  try {
+    const proposalId = parseInt(req.params.proposalId);
+    if (!proposalId) return res.status(400).json({ success: false, error: 'Invalid proposal id' });
+
+    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
+    if (!proposal) return res.status(404).json({ success: false, error: 'Proposal not found' });
+
+    const isOwner = proposal.submittedById === req.user.id;
+    const isManager = MANAGER_ROLES.includes(req.user.role);
+    if (!isOwner && !isManager) {
+      return res.status(403).json({ success: false, error: 'You are not allowed to delete this document' });
+    }
+
+    if (proposal.documentUrl) {
+      const relative = proposal.documentUrl.replace('/api/files/', '');
+      if (relative.includes('..')) {
+        return res.status(400).json({ success: false, error: 'Invalid document path' });
+      }
+      const filePath = path.join(__dirname, '..', '..', 'storage', relative);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (e) {
+          console.warn(`[upload] failed to remove file ${filePath}:`, e.message);
+        }
+      }
+    }
+
+    await prisma.proposal.delete({ where: { id: proposalId } });
+
+    audit.log({ action: 'DELETE_DOCUMENT', entity: 'Proposal', entityId: proposalId, details: `Document removed (stage: ${proposal.stage})`, performedById: req.user.id });
+
+    res.json({ success: true, message: 'Document deleted' });
+  } catch (error) {
+    console.error('Delete proposal error:', error.message);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
