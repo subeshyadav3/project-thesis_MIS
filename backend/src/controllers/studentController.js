@@ -75,18 +75,21 @@ exports.uploadDocument = async (req, res) => {
         if (isNaN(thesisId)) return res.status(400).json({ error: 'Invalid thesis ID' });
         thesis = await prisma.thesis.findFirst({
           where: { id: thesisId, studentId: req.user.id },
-          select: { id: true, status: true },
+          select: { id: true, status: true, crossProgramRequestedById: true },
         });
         if (!thesis) return res.status(403).json({ error: 'This thesis does not belong to you' });
       } else {
         thesis = await prisma.thesis.findFirst({
           where: { studentId: req.user.id },
-          select: { id: true, status: true },
+          select: { id: true, status: true, crossProgramRequestedById: true },
         });
         if (!thesis) return res.status(404).json({ error: 'You have no thesis' });
       }
       if (thesis.status === 'COMPLETED') {
         return res.status(403).json({ error: 'This thesis has been completed and is no longer accepting document uploads' });
+      }
+      if (thesis.crossProgramRequestedById) {
+        return res.status(403).json({ error: 'This thesis is awaiting cross-program coordinator approval. You can submit documents once it is approved.' });
       }
       whereClause = { thesisId: thesis.id, stage };
     }
@@ -172,7 +175,7 @@ exports.getMyGroups = async (req, res) => {
 exports.getMyTheses = async (req, res) => {
   try {
     const theses = await prisma.thesis.findMany({
-      where: { studentId: req.user.id },
+      where: { studentId: req.user.id, crossProgramRequestedById: null },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, program: { include: { department: { select: { id: true, name: true } } } } } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -251,6 +254,9 @@ exports.getThesisById = async (req, res) => {
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (thesis.studentId !== req.user.id) return res.status(403).json({ error: 'This thesis does not belong to you' });
+    if (thesis.crossProgramRequestedById) {
+      return res.status(403).json({ error: 'This thesis is awaiting cross-program coordinator approval' });
+    }
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
