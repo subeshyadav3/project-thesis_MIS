@@ -12,10 +12,10 @@ const ROLE_LABEL = {
 /**
  * Create a notification for a single user.
  */
-async function notify(userId, type, message) {
+async function notify(userId, type, message, linkTo) {
   if (!userId) return null;
   try {
-    return await prisma.notification.create({ data: { userId, type, message } });
+    return await prisma.notification.create({ data: { userId, type, message, linkTo: linkTo || null } });
   } catch (e) {
     console.error('notify error:', e.message);
     return null;

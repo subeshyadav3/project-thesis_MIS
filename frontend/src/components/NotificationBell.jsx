@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from './ui';
 import api from '../services/api';
+import CrossProgramReviewModal from './CrossProgramReviewModal';
+import ConfirmDialog from './ConfirmDialog';
+import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 
 const TYPE_ICON = {
@@ -27,6 +30,9 @@ function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [reviewThesisId, setReviewThesisId] = useState(null);
+  const [confirmRejectNotif, setConfirmRejectNotif] = useState(null);
+  const toast = useToast();
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
@@ -82,6 +88,31 @@ function NotificationBell() {
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     } catch {}
+  };
+
+  const parseThesisId = (n) => {
+    const m = (n.linkTo || '').match(/\/theses\/(\d+)/);
+    return m ? parseInt(m[1]) : null;
+  };
+
+  const handleCrossDecision = async (n, action) => {
+    const id = parseThesisId(n);
+    if (!id) {
+      toast.error('This request is no longer available');
+      setConfirmRejectNotif(null);
+      return;
+    }
+    try {
+      await api.put(`/theses/${id}/${action === 'approve' ? 'approve' : 'reject'}-cross-program`);
+      toast.success(action === 'approve' ? 'Cross-program thesis approved' : 'Cross-program thesis rejected');
+      await api.put(`/notifications/${n.id}/read`).catch(() => {});
+      fetchAll();
+      fetchUnread();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Action failed');
+    } finally {
+      setConfirmRejectNotif(null);
+    }
   };
 
   const formatTime = (dateStr) => {
@@ -157,6 +188,25 @@ function NotificationBell() {
                   <div className="notification-item-content">
                     <p className="notification-item-text">{n.message}</p>
                     <span className="notification-item-time">{formatTime(n.createdAt)}</span>
+                    {n.type === 'CROSS_PROGRAM_THESIS' && !n.read && parseThesisId(n) && (
+                      <div style={{ display: 'flex', gap: 4, marginTop: 8 }} onClick={e => e.stopPropagation()}>
+                        <button className="btn btn-sm btn-outline" style={{ padding: '2px 8px', fontSize: 11 }}
+                          onClick={() => setReviewThesisId(parseThesisId(n))}>
+                          <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 14 }} />
+                          View
+                        </button>
+                        <button className="btn btn-sm btn-success" style={{ padding: '2px 8px', fontSize: 11 }}
+                          onClick={() => handleCrossDecision(n, 'approve')}>
+                          <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 14 }} />
+                          Accept
+                        </button>
+                        <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 11 }}
+                          onClick={() => setConfirmRejectNotif(n)}>
+                          <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
+                          Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
                   {!n.read && <span className="notification-item-dot" />}
                 </div>
@@ -170,6 +220,24 @@ function NotificationBell() {
           )}
         </div>
       )}
+
+      {reviewThesisId && (
+        <CrossProgramReviewModal
+          thesisId={reviewThesisId}
+          onClose={() => setReviewThesisId(null)}
+          onDecision={() => { fetchAll(); fetchUnread(); }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!confirmRejectNotif}
+        title="Reject cross-program thesis?"
+        message="Rejecting will delete this thesis and notify the requesting coordinator. This cannot be undone."
+        onConfirm={() => handleCrossDecision(confirmRejectNotif, 'reject')}
+        onCancel={() => setConfirmRejectNotif(null)}
+        confirmLabel="Reject"
+        danger
+      />
     </div>
   );
 }

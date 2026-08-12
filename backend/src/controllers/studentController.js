@@ -42,7 +42,7 @@ exports.uploadDocument = async (req, res) => {
     const allowedStages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
     if (!allowedStages.includes(stage)) return res.status(400).json({ error: 'Invalid stage' });
 
-    const documentUrl = `/api/files/${type}s/${req.file.filename}`;
+    const documentUrl = `/api/files/${type === 'thesis' ? 'theses' : 'groups'}/${req.file.filename}`;
 
     let whereClause = {};
     if (type === 'group') {

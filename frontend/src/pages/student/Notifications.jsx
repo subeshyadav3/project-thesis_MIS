@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
+import CrossProgramReviewModal from '../../components/CrossProgramReviewModal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 
@@ -11,8 +13,55 @@ function StudentNotifications() {
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [reviewThesisId, setReviewThesisId] = useState(null);
+  const [confirmRejectNotif, setConfirmRejectNotif] = useState(null);
+  const [crossTheses, setCrossTheses] = useState(null);
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const loadCrossTheses = () => {
+    if (user.role !== 'COORDINATOR') return;
+    api.get('/theses')
+      .then(({ data }) => setCrossTheses(data))
+      .catch(() => {});
+  };
+
+  useEffect(() => { loadCrossTheses(); }, []);
+
+  const pendingCrossIds = new Set((crossTheses || []).filter(t => t.crossProgramRequestedBy).map(t => t.id));
+  const knownCrossIds = new Set((crossTheses || []).map(t => t.id));
+  const crossStatus = (n) => {
+    const id = parseThesisId(n);
+    if (!id || crossTheses === null) return null;
+    if (pendingCrossIds.has(id)) return 'pending';
+    if (knownCrossIds.has(id)) return 'approved';
+    return 'rejected';
+  };
+
+  const parseThesisId = (n) => {
+    const m = (n.linkTo || '').match(/\/theses\/(\d+)/);
+    return m ? parseInt(m[1]) : null;
+  };
+
+  const handleCrossDecision = async (n, action) => {
+    const id = parseThesisId(n);
+    if (!id) {
+      toast.error('This request is no longer available');
+      setConfirmRejectNotif(null);
+      return;
+    }
+    try {
+      await api.put(`/theses/${id}/${action === 'approve' ? 'approve' : 'reject'}-cross-program`);
+      toast.success(action === 'approve' ? 'Cross-program thesis approved' : 'Cross-program thesis rejected');
+      await api.put(`/notifications/${n.id}/read`).catch(() => {});
+      loadNotifications();
+      loadCrossTheses();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Action failed');
+    } finally {
+      setConfirmRejectNotif(null);
+    }
+  };
 
   const loadNotifications = () => {
     setLoading(true);
@@ -117,6 +166,42 @@ function StudentNotifications() {
                   Mark as read
                 </button>
               )}
+              {n.type === 'CROSS_PROGRAM_THESIS' && user.role === 'COORDINATOR' && (() => {
+                if (!parseThesisId(n)) return null;
+                if (crossStatus(n) === 'pending') {
+                  return (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button className="btn btn-sm btn-outline" onClick={() => setReviewThesisId(parseThesisId(n))}>
+                        <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                        View
+                      </button>
+                      <button className="btn btn-sm btn-success" onClick={() => handleCrossDecision(n, 'approve')}>
+                        <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                        Accept
+                      </button>
+                      <button className="btn btn-sm btn-danger" onClick={() => setConfirmRejectNotif(n)}>
+                        <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                        Reject
+                      </button>
+                    </div>
+                  );
+                }
+                if (crossStatus(n) === 'approved') {
+                  return (
+                    <span className="badge" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)', flexShrink: 0 }}>
+                      <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} /> Approved
+                    </span>
+                  );
+                }
+                if (crossStatus(n) === 'rejected') {
+                  return (
+                    <span className="badge" style={{ background: 'var(--color-error-container)', color: 'var(--color-on-error-container)', flexShrink: 0 }}>
+                      <Icon name="cancel" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} /> Rejected
+                    </span>
+                  );
+                }
+                return null;
+              })()}
               {n.type === 'CROSS_PROGRAM_REQUEST' && user.role === 'COORDINATOR' && (() => {
                 const req = pendingRequests.find(r => r.notificationId === n.id && r.status === 'PENDING');
                 if (!req) return null;
@@ -167,6 +252,24 @@ function StudentNotifications() {
           </div>
         </div>
       )}
+
+      {reviewThesisId && (
+        <CrossProgramReviewModal
+          thesisId={reviewThesisId}
+          onClose={() => setReviewThesisId(null)}
+          onDecision={() => { loadNotifications(); loadCrossTheses(); }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!confirmRejectNotif}
+        title="Reject cross-program thesis?"
+        message="Rejecting will delete this thesis and notify the requesting coordinator. This cannot be undone."
+        onConfirm={() => handleCrossDecision(confirmRejectNotif, 'reject')}
+        onCancel={() => setConfirmRejectNotif(null)}
+        confirmLabel="Reject"
+        danger
+      />
     </PageLayout>
   );
 }

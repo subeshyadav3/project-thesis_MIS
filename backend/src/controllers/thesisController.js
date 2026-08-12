@@ -139,7 +139,7 @@ exports.createThesis = async (req, res) => {
     if (isCrossProgram && studentCoordinator) {
       const requester = await prisma.user.findUnique({ where: { id: req.user.id } });
       const msg = `[URGENT] ${requester.firstName} ${requester.lastName} (${requestingCoordinatorProgram.code} coordinator) has created a thesis for your student ${student.firstName} ${student.lastName} — "${thesis.title}". Please approve or reject this cross-program thesis.`;
-      const notification = await notifSvc.notify(studentCoordinator.id, 'CROSS_PROGRAM_THESIS', msg);
+      const notification = await notifSvc.notify(studentCoordinator.id, 'CROSS_PROGRAM_THESIS', msg, `/theses/${thesis.id}`);
 
       // Also send email
       try {
