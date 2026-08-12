@@ -3,7 +3,28 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import PrivateRoute from './components/PrivateRoute';
 import DegreeGuard from './components/DegreeGuard';
+import AppLayout from './components/AppLayout';
 import './App.css';
+
+const routeFallback = (
+  <div
+    style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', color: 'var(--color-on-surface-variant)',
+      fontFamily: 'var(--font-body)', fontSize: 14, gap: 10,
+    }}
+  >
+    <span
+      style={{
+        width: 18, height: 18, borderRadius: '50%', display: 'inline-block',
+        border: '2px solid var(--color-outline)',
+        borderTopColor: 'var(--color-primary)',
+        animation: 'spin 0.9s linear infinite',
+      }}
+    />
+    Loading…
+  </div>
+);
 
 // Route-level code splitting: each page loads only when its route is visited.
 const Login = lazy(() => import('./pages/Login'));
@@ -36,72 +57,53 @@ const ExternalEvaluationsList = lazy(() => import('./pages/external/EvaluationsL
 const ExternalEvaluationPage = lazy(() => import('./pages/external/EvaluationPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
-const routeFallback = (
-  <div
-    style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', color: 'var(--color-on-surface-variant)',
-      fontFamily: 'var(--font-body)', fontSize: 14, gap: 10,
-    }}
-  >
-    <span
-      style={{
-        width: 18, height: 18, borderRadius: '50%', display: 'inline-block',
-        border: '2px solid var(--color-outline)',
-        borderTopColor: 'var(--color-primary)',
-        animation: 'spin 0.9s linear infinite',
-      }}
-    />
-    Loading…
-  </div>
-);
-
 
 function App() {
   return (
     <Router>
       <ToastProvider>
-        <Suspense fallback={routeFallback}>
-          <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/maintainer/users" element={<PrivateRoute role="MAINTAINER"><UserManagement /></PrivateRoute>} />
-          <Route path="/maintainer/departments" element={<PrivateRoute role="MAINTAINER"><DepartmentManagement /></PrivateRoute>} />
-          <Route path="/maintainer/*" element={<PrivateRoute role="MAINTAINER"><MaintainerDashboard /></PrivateRoute>} />
-          <Route path="/coordinator/bachelor" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="BACHELOR"><BachelorProjects /></DegreeGuard></PrivateRoute>} />
-          <Route path="/coordinator/master" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="MASTER"><MasterThesis /></DegreeGuard></PrivateRoute>} />
-          <Route path="/coordinator/evaluations" element={<PrivateRoute role="COORDINATOR"><Evaluations /></PrivateRoute>} />
-          <Route path="/coordinator/supervisors" element={<PrivateRoute role="COORDINATOR"><SupervisorList /></PrivateRoute>} />
-          <Route path="/coordinator/examiners" element={<PrivateRoute role="COORDINATOR"><ExaminerList /></PrivateRoute>} />
-          <Route path="/coordinator/project/:type/:id" element={<PrivateRoute role="COORDINATOR"><ProjectDetail /></PrivateRoute>} />
-          <Route path="/coordinator/audit-log" element={<PrivateRoute role="COORDINATOR"><AuditLog /></PrivateRoute>} />
-          <Route path="/coordinator/announcements" element={<PrivateRoute role="COORDINATOR"><CoordinatorAnnouncements /></PrivateRoute>} />
-          <Route path="/coordinator/users" element={<PrivateRoute role="COORDINATOR"><UserManagement /></PrivateRoute>} />
-          <Route path="/coordinator/notifications" element={<PrivateRoute role="COORDINATOR"><StudentNotifications /></PrivateRoute>} />
-          <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
-          <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />
-          <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
-          <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
-          <Route path="/supervisor/notifications" element={<PrivateRoute role="SUPERVISOR"><StudentNotifications /></PrivateRoute>} />
-          <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
-          <Route path="/student/projects" element={<PrivateRoute role="STUDENT"><StudentProjects /></PrivateRoute>} />
-          <Route path="/student/theses" element={<PrivateRoute role="STUDENT"><StudentTheses /></PrivateRoute>} />
-          <Route path="/student/groups" element={<PrivateRoute role="STUDENT"><StudentGroups /></PrivateRoute>} />
-          <Route path="/student/:type/:id" element={<PrivateRoute role="STUDENT"><StudentProjectDetail /></PrivateRoute>} />
-          <Route path="/student/submissions" element={<PrivateRoute role="STUDENT"><StudentSubmissions /></PrivateRoute>} />
-          <Route path="/student/notifications" element={<PrivateRoute role="STUDENT"><StudentNotifications /></PrivateRoute>} />
-          <Route path="/student/*" element={<PrivateRoute role="STUDENT"><StudentDashboard /></PrivateRoute>} />
-          <Route path="/external/groups" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-          <Route path="/external/theses" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-          <Route path="/external/evaluations" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-          <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationPage /></PrivateRoute>} />
-          <Route path="/external/notifications" element={<PrivateRoute role="EXTERNAL_EXAMINER"><StudentNotifications /></PrivateRoute>} />
-          <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
-          <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-          <Route path="/" element={<Login />} />
-          <Route path="*" element={<NotFound />} />
+        <Routes>
+          <Route path="/login" element={<Suspense fallback={routeFallback}><Login /></Suspense>} />
+          <Route path="/reset-password" element={<Suspense fallback={routeFallback}><ResetPassword /></Suspense>} />
+          <Route path="/" element={<Suspense fallback={routeFallback}><Login /></Suspense>} />
+          <Route path="*" element={<Suspense fallback={routeFallback}><NotFound /></Suspense>} />
+
+          <Route element={<AppLayout />}>
+            <Route path="/maintainer/users" element={<PrivateRoute role="MAINTAINER"><UserManagement /></PrivateRoute>} />
+            <Route path="/maintainer/departments" element={<PrivateRoute role="MAINTAINER"><DepartmentManagement /></PrivateRoute>} />
+            <Route path="/maintainer/*" element={<PrivateRoute role="MAINTAINER"><MaintainerDashboard /></PrivateRoute>} />
+            <Route path="/coordinator/bachelor" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="BACHELOR"><BachelorProjects /></DegreeGuard></PrivateRoute>} />
+            <Route path="/coordinator/master" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="MASTER"><MasterThesis /></DegreeGuard></PrivateRoute>} />
+            <Route path="/coordinator/evaluations" element={<PrivateRoute role="COORDINATOR"><Evaluations /></PrivateRoute>} />
+            <Route path="/coordinator/supervisors" element={<PrivateRoute role="COORDINATOR"><SupervisorList /></PrivateRoute>} />
+            <Route path="/coordinator/examiners" element={<PrivateRoute role="COORDINATOR"><ExaminerList /></PrivateRoute>} />
+            <Route path="/coordinator/project/:type/:id" element={<PrivateRoute role="COORDINATOR"><ProjectDetail /></PrivateRoute>} />
+            <Route path="/coordinator/audit-log" element={<PrivateRoute role="COORDINATOR"><AuditLog /></PrivateRoute>} />
+            <Route path="/coordinator/announcements" element={<PrivateRoute role="COORDINATOR"><CoordinatorAnnouncements /></PrivateRoute>} />
+            <Route path="/coordinator/users" element={<PrivateRoute role="COORDINATOR"><UserManagement /></PrivateRoute>} />
+            <Route path="/coordinator/notifications" element={<PrivateRoute role="COORDINATOR"><StudentNotifications /></PrivateRoute>} />
+            <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
+            <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />
+            <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
+            <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
+            <Route path="/supervisor/notifications" element={<PrivateRoute role="SUPERVISOR"><StudentNotifications /></PrivateRoute>} />
+            <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
+            <Route path="/student/projects" element={<PrivateRoute role="STUDENT"><StudentProjects /></PrivateRoute>} />
+            <Route path="/student/theses" element={<PrivateRoute role="STUDENT"><StudentTheses /></PrivateRoute>} />
+            <Route path="/student/groups" element={<PrivateRoute role="STUDENT"><StudentGroups /></PrivateRoute>} />
+            <Route path="/student/:type/:id" element={<PrivateRoute role="STUDENT"><StudentProjectDetail /></PrivateRoute>} />
+            <Route path="/student/submissions" element={<PrivateRoute role="STUDENT"><StudentSubmissions /></PrivateRoute>} />
+            <Route path="/student/notifications" element={<PrivateRoute role="STUDENT"><StudentNotifications /></PrivateRoute>} />
+            <Route path="/student/*" element={<PrivateRoute role="STUDENT"><StudentDashboard /></PrivateRoute>} />
+            <Route path="/external/groups" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/theses" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/evaluations" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationPage /></PrivateRoute>} />
+            <Route path="/external/notifications" element={<PrivateRoute role="EXTERNAL_EXAMINER"><StudentNotifications /></PrivateRoute>} />
+            <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
+            <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+          </Route>
         </Routes>
-        </Suspense>
       </ToastProvider>
     </Router>
   );

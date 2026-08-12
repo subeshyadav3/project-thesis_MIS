@@ -15,7 +15,11 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1E9)}${ext}`);
+    const base = path.basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1E9)}-${base || 'document'}${ext}`);
   },
 });
 const upload = multer({

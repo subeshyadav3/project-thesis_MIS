@@ -56,6 +56,8 @@ function StudentSubmissions() {
 
   const items = activeTab === 'groups' ? groups : theses;
   const itemLabel = activeTab === 'groups' ? 'Project' : 'Thesis';
+  const selectedItem = items.find(i => i.id === selectedId);
+  const completed = selectedItem?.status === 'COMPLETED';
 
   useEffect(() => {
     if (items.length > 0 && !selectedId) {
@@ -66,6 +68,12 @@ function StudentSubmissions() {
   const handleUpload = async (stage, e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (selectedItem?.status === 'COMPLETED') {
+      toast.error('This project has been completed and no longer accepts document uploads');
+      e.target.value = '';
+      return;
+    }
 
     setUploading(prev => ({ ...prev, [stage]: true }));
     try {
@@ -143,13 +151,43 @@ function StudentSubmissions() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {completed && (
+          <div className="card" style={{
+            border: '1px solid var(--color-primary)',
+            background: 'var(--color-primary-container)',
+            overflow: 'hidden',
+            marginBottom: 0,
+          }}>
+            <div style={{ padding: 20, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: 'var(--color-primary)', color: 'var(--color-on-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name="verified" className="material-symbols-outlined" style={{ fontSize: 24 }} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, color: 'var(--color-on-primary-container)' }}>
+                  {activeTab === 'groups' ? 'Project Completed' : 'Thesis Completed'}
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-on-primary-container)' }}>
+                  This {activeTab === 'groups' ? 'project' : 'thesis'} has been marked as completed. No further document
+                  uploads are allowed. You can still view and download the documents already submitted.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {stages.map(stage => {
           const existing = proposals.find(p => p.stage === stage);
           const stageLabel = stage === 'MID_TERM' ? 'Mid-Term' : stage.charAt(0) + stage.slice(1).toLowerCase();
           return (
-            <div key={stage} className="card" style={{ overflow: 'hidden' }}>
+            <div key={stage} className="card" style={{ overflow: 'hidden', padding: 0, marginBottom: 0 }}>
               <div className="card-header" style={{
-                background: existing?.documentUrl ? 'var(--color-primary-container)' : 'transparent',
+                margin: 0,
+                padding: '12px 16px',
+                background: existing?.documentUrl ? 'var(--color-primary-container)' : 'var(--color-surface-container-low)',
                 borderBottom: '1px solid var(--color-outline-variant)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -240,17 +278,26 @@ function StudentSubmissions() {
                   </div>
                 ) : (
                   <div className="empty-state" style={{ padding: '16px 0' }}>
-                    <Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--color-outline)' }} />
-                    <p style={{ margin: '4px 0 12px', fontSize: 13 }}>Upload your {stageLabel.toLowerCase()} document</p>
+                    <Icon name={completed ? 'lock' : 'upload_file'} className="material-symbols-outlined" style={{ fontSize: 32, color: completed ? 'var(--color-outline)' : 'var(--color-outline)' }} />
+                    <p style={{ margin: '4px 0 12px', fontSize: 13 }}>
+                      {completed ? `No ${stageLabel.toLowerCase()} document was uploaded before completion` : `Upload your ${stageLabel.toLowerCase()} document`}
+                    </p>
                   </div>
                 )}
 
-                <label className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                  <Icon name="upload" className="material-symbols-outlined" style={{ fontSize: 18 }} />
-                  {uploading[stage] ? 'Uploading...' : existing?.documentUrl ? 'Upload New Version' : 'Upload Document'}
-                  <input type="file" accept=".pdf,.doc,.docx,.zip" style={{ display: 'none' }}
-                    onChange={(e) => handleUpload(stage, e)} disabled={uploading[stage]} />
-                </label>
+                {completed ? (
+                  <button className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'not-allowed', opacity: 0.6 }} disabled title="Project completed — uploads are closed">
+                    <Icon name="lock" className="material-symbols-outlined" style={{ fontSize: 18 }} />
+                    Upload Disabled — Completed
+                  </button>
+                ) : (
+                  <label className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <Icon name="upload" className="material-symbols-outlined" style={{ fontSize: 18 }} />
+                    {uploading[stage] ? 'Uploading...' : existing?.documentUrl ? 'Upload New Version' : 'Upload Document'}
+                    <input type="file" accept=".pdf,.doc,.docx,.zip" style={{ display: 'none' }}
+                      onChange={(e) => handleUpload(stage, e)} disabled={uploading[stage]} />
+                  </label>
+                )}
               </div>
             </div>
           );

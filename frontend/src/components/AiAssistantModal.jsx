@@ -58,12 +58,21 @@ export default function AiAssistantModal({ proposal, onClose }) {
   const [cachedResults, setCachedResults] = useState({});
   const abortRef = useRef(null);
   const resultRef = useRef(null);
+  const tabRef = useRef(tab);
   const toast = useToast();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isNonStudent = ['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'].includes(user.role);
   const canUseSimilarity = ['COORDINATOR', 'SUPERVISOR'].includes(user.role);
   if (!isNonStudent) return null;
+
+  const analyzingName = (proposal?.documentUrl?.split('/').pop() || 'document').replace(/^\d+-(?:\d+-)?/, '');
+
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
+
+  const isTabBusy = (key) => !!cachedResults[key]?._streaming;
 
   const parseJSONFromText = (text) => {
     if (!text) return null;
@@ -245,14 +254,18 @@ export default function AiAssistantModal({ proposal, onClose }) {
           const sanitized = sanitizeSummary(partial);
           const partialEntry = { type: 'summary', data: sanitized, custom: false, _streaming: true };
           // Only update active tab's result if user is still on summarize tab
-          if (tab === 'summarize') setResult(partialEntry);
+          if (tabRef.current === 'summarize') setResult(partialEntry);
           setCachedResults(prev => ({ ...prev, summarize: partialEntry }));
         } else {
           setStreamingText('Generating summary...');
         }
       },
     });
-    if (!res) return;
+    if (!res) {
+      setCachedResults(prev => { const n = { ...prev }; delete n.summarize; return n; });
+      if (tabRef.current === 'summarize') setResult(null);
+      return;
+    }
     const { finalResult, accumulatedText } = res;
 
     let summary = parseJSONFromText(accumulatedText);
@@ -274,7 +287,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
     if (summary && typeof summary === 'object' && (summary.executive_summary || summary.objectives || summary.methodology)) {
       const entry = { type: 'summary', data: summary, custom: finalResult?.custom, _streaming: false };
       // Only push to result if user is currently viewing this tab
-      if (tab === 'summarize') setResult(entry);
+      if (tabRef.current === 'summarize') setResult(entry);
       setCachedResults(prev => ({ ...prev, summarize: entry }));
     } else {
       toast.error('Failed to parse AI summary. Please try again.');
@@ -291,17 +304,24 @@ export default function AiAssistantModal({ proposal, onClose }) {
       streamKey: 'ask',
       onDelta: (text) => {
         const partialEntry = { type: 'answer', data: text, question: qQuestion, _streaming: true };
-        if (tab === 'ask') setResult(partialEntry);
+        if (tabRef.current === 'ask') setResult(partialEntry);
         setCachedResults(prev => ({ ...prev, ask: partialEntry }));
       },
     });
-    if (!res) return;
+    if (!res) {
+      setCachedResults(prev => { const n = { ...prev }; delete n.ask; return n; });
+      if (tabRef.current === 'ask') setResult(null);
+      return;
+    }
     const { finalResult, accumulatedText } = res;
     const answer = finalResult?.answer || accumulatedText || '';
     if (answer) {
       const entry = { type: 'answer', data: answer, question: qQuestion, _streaming: false };
-      if (tab === 'ask') setResult(entry);
+      if (tabRef.current === 'ask') setResult(entry);
       setCachedResults(prev => ({ ...prev, ask: entry }));
+    } else {
+      setCachedResults(prev => { const n = { ...prev }; delete n.ask; return n; });
+      if (tabRef.current === 'ask') setResult(null);
     }
   };
 
@@ -327,11 +347,11 @@ export default function AiAssistantModal({ proposal, onClose }) {
             const total_marks = scores.reduce((sum, s) => sum + s.marks, 0);
             const max_marks = scores.reduce((sum, s) => sum + s.max_marks, 0);
             const partialEntry = { type: 'evaluation', data: { scores, total_marks, max_marks }, _streaming: true };
-            if (tab === 'evaluate') setResult(partialEntry);
+            if (tabRef.current === 'evaluate') setResult(partialEntry);
             setCachedResults(prev => ({ ...prev, evaluate: partialEntry }));
           } else if (partial.summary) {
             const partialEntry = { type: 'evaluation', data: { scores: [], total_marks: 0, max_marks: 0, summary_text: extractStringValue(partial.summary) || partial.summary }, _streaming: true };
-            if (tab === 'evaluate') setResult(partialEntry);
+            if (tabRef.current === 'evaluate') setResult(partialEntry);
             setCachedResults(prev => ({ ...prev, evaluate: partialEntry }));
           }
         } else {
@@ -339,7 +359,11 @@ export default function AiAssistantModal({ proposal, onClose }) {
         }
       },
     });
-    if (!res) return;
+    if (!res) {
+      setCachedResults(prev => { const n = { ...prev }; delete n.evaluate; return n; });
+      if (tabRef.current === 'evaluate') setResult(null);
+      return;
+    }
     const { finalResult, accumulatedText } = res;
 
     let evalData = parseJSONFromText(accumulatedText);
@@ -356,35 +380,55 @@ export default function AiAssistantModal({ proposal, onClose }) {
       const total_marks = scores.reduce((sum, s) => sum + s.marks, 0);
       const max_marks = scores.reduce((sum, s) => sum + s.max_marks, 0);
       const entry = { type: 'evaluation', data: { scores, total_marks, max_marks }, _streaming: false };
-      if (tab === 'evaluate') setResult(entry);
+      if (tabRef.current === 'evaluate') setResult(entry);
       setCachedResults(prev => ({ ...prev, evaluate: entry }));
     } else if (evalData?.summary) {
       const entry = { type: 'evaluation', data: { scores: [], summary_text: evalData.summary, total_marks: 0, max_marks: 0 }, _streaming: false };
-      if (tab === 'evaluate') setResult(entry);
+      if (tabRef.current === 'evaluate') setResult(entry);
       setCachedResults(prev => ({ ...prev, evaluate: entry }));
     } else {
+      setCachedResults(prev => { const n = { ...prev }; delete n.evaluate; return n; });
+      if (tabRef.current === 'evaluate') setResult(null);
       toast.error('Failed to parse evaluation. Please try again.');
     }
   };
 
   const handleSimilarity = async () => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const placeholder = { type: 'similarity', data: {}, _streaming: true };
+    setResult(placeholder);
+    setCachedResults(prev => ({ ...prev, similarity: placeholder }));
+    setStreamingTabs(prev => ({ ...prev, similarity: controller }));
     setLoading(true);
-    setResult(null);
     try {
       const { data } = await api.post(`/ai/similarity/${proposal.id}`, {
         scope: similarityScope,
         top_k: Number(similarityTopK) || 5,
         threshold: Number(similarityThreshold) || 0,
-      });
+      }, { signal: controller.signal });
       if (data) {
         const entry = { type: 'similarity', data };
-        setResult(entry);
+        if (tabRef.current === 'similarity') setResult(entry);
         setCachedResults(prev => ({ ...prev, similarity: entry }));
       }
     } catch (err) {
+      if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
+        setCachedResults(prev => { const n = { ...prev }; delete n.similarity; return n; });
+        if (tabRef.current === 'similarity') setResult(null);
+        return;
+      }
       toast.error(err.response?.data?.error || 'AI service unavailable. Is the AI server running?');
+      setCachedResults(prev => { const n = { ...prev }; delete n.similarity; return n; });
+      if (tabRef.current === 'similarity') setResult(null);
     } finally {
-      setLoading(false);
+      setStreamingTabs(prev => {
+        const n = { ...prev };
+        delete n.similarity;
+        setLoading(Object.keys(n).length > 0);
+        return n;
+      });
+      abortRef.current = null;
     }
   };
 
@@ -411,7 +455,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
     navigator.clipboard.writeText(text).then(() => {
       setShowCopied(true);
       setTimeout(() => setShowCopied(false), 2000);
-    }).catch(() => toast.success('Copied!'));
+    }).catch(() => toast.error('Failed to copy to clipboard'));
   };
 
   const tabMeta = {
@@ -433,7 +477,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
               </div>
               <div className="ai-header-text">
                 <h2>AI Assistant</h2>
-                <p>Analyzing <strong>{proposal?.documentUrl?.split('/').pop() || 'document'}</strong></p>
+                <p title={analyzingName}>Analyzing <strong>{analyzingName}</strong></p>
               </div>
               <button className="ai-close-btn" onClick={onClose}>
                 <Icon name="close" className="material-symbols-outlined" />
@@ -467,7 +511,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
             <p className="ai-desc">{tabMeta[tab]?.desc}</p>
 
             {/* ─── SUMMARIZE TAB ─── */}
-            {tab === 'summarize' && !result && !loading && (
+            {tab === 'summarize' && !result && !isTabBusy('summarize') && (
               <div className="ai-action-area">
                 <div className="ai-summarize-preview">
                   <div className="ai-preview-item"><Icon name="checklist" className="material-symbols-outlined" /> Executive Summary</div>
@@ -506,7 +550,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
             )}
 
             {/* ─── ASK TAB ─── */}
-            {tab === 'ask' && !result && !loading && (
+            {tab === 'ask' && !result && !isTabBusy('ask') && (
               <div className="ai-action-area">
                 <div className="ai-suggested-questions">
                   {SUGGESTED_QUESTIONS.map((q, i) => (
@@ -536,7 +580,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
             )}
 
             {/* ─── EVALUATE TAB ─── */}
-            {tab === 'evaluate' && !result && !loading && (
+            {tab === 'evaluate' && !result && !isTabBusy('evaluate') && (
               <div className="ai-action-area">
                 <div className="ai-presets">
                   <label>Quick presets:</label>
@@ -617,7 +661,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
             )}
 
             {/* ─── SIMILARITY TAB ─── */}
-            {tab === 'similarity' && !result && !loading && canUseSimilarity && (
+            {tab === 'similarity' && !result && !isTabBusy('similarity') && canUseSimilarity && (
               <div className="ai-action-area">
                 <div className="ai-similarity-options">
                   <div className="form-group">
@@ -667,7 +711,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
             )}
 
             {/* ─── LOADING / STREAMING ─── */}
-            {loading && !(result && (result._streaming || result.type === 'ask' || result.type === 'summary' || result.type === 'evaluation')) && (
+            {loading && isTabBusy(tab) && !(result && result._streaming) && (
               <div className="ai-loading">
                 {streamingText ? (
                   <div className="ai-streaming">
@@ -721,7 +765,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
                   {result.type === 'summary' && <SummaryView data={result.data} custom={result.custom} streaming={result._streaming} />}
                   {result.type === 'answer' && <AnswerView data={result.data} question={result.question} streaming={result._streaming} />}
                   {result.type === 'evaluation' && <EvaluationView data={result.data} streaming={result._streaming} />}
-                  {result.type === 'similarity' && <SimilarityView data={result.data} />}
+                  {result.type === 'similarity' && <SimilarityView data={result.data} streaming={result._streaming} />}
                   {result._streaming && <span className="ai-streaming-tail"><span className="ai-streaming-dot" /> streaming…</span>}
                 </div>
                 <div className="ai-result-actions">
@@ -890,8 +934,16 @@ function EvaluationView({ data, streaming }) {
   );
 }
 
-function SimilarityView({ data }) {
+function SimilarityView({ data, streaming }) {
   const matches = data?.matches || [];
+  if (streaming && matches.length === 0) {
+    return (
+      <div className="ai-pill">
+        <Icon name="psychology" className="material-symbols-outlined" style={{ animation: 'aiPulse 1s ease-in-out infinite' }} />
+        Scanning for similar documents…
+      </div>
+    );
+  }
   return (
     <div className="ai-similarity">
       <div className="ai-pill">

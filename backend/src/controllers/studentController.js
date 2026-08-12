@@ -46,33 +46,49 @@ exports.uploadDocument = async (req, res) => {
 
     let whereClause = {};
     if (type === 'group') {
+      let group;
       if (req.body.groupId) {
         const groupId = parseInt(req.body.groupId);
         if (isNaN(groupId)) return res.status(400).json({ error: 'Invalid group ID' });
         const member = await prisma.groupMember.findFirst({
           where: { studentId: req.user.id, groupId },
+          include: { group: { select: { id: true, status: true } } },
         });
         if (!member) return res.status(403).json({ error: 'You are not a member of this group' });
-        whereClause = { groupId: member.groupId, stage };
+        group = member.group;
       } else {
-        const member = await prisma.groupMember.findFirst({ where: { studentId: req.user.id } });
+        const member = await prisma.groupMember.findFirst({
+          where: { studentId: req.user.id },
+          include: { group: { select: { id: true, status: true } } },
+        });
         if (!member) return res.status(404).json({ error: 'You are not in any group' });
-        whereClause = { groupId: member.groupId, stage };
+        group = member.group;
       }
+      if (group && group.status === 'COMPLETED') {
+        return res.status(403).json({ error: 'This project has been completed and is no longer accepting document uploads' });
+      }
+      whereClause = { groupId: group.id, stage };
     } else {
+      let thesis;
       if (req.body.thesisId) {
         const thesisId = parseInt(req.body.thesisId);
         if (isNaN(thesisId)) return res.status(400).json({ error: 'Invalid thesis ID' });
-        const thesis = await prisma.thesis.findFirst({
+        thesis = await prisma.thesis.findFirst({
           where: { id: thesisId, studentId: req.user.id },
+          select: { id: true, status: true },
         });
         if (!thesis) return res.status(403).json({ error: 'This thesis does not belong to you' });
-        whereClause = { thesisId: thesis.id, stage };
       } else {
-        const thesis = await prisma.thesis.findFirst({ where: { studentId: req.user.id } });
+        thesis = await prisma.thesis.findFirst({
+          where: { studentId: req.user.id },
+          select: { id: true, status: true },
+        });
         if (!thesis) return res.status(404).json({ error: 'You have no thesis' });
-        whereClause = { thesisId: thesis.id, stage };
       }
+      if (thesis.status === 'COMPLETED') {
+        return res.status(403).json({ error: 'This thesis has been completed and is no longer accepting document uploads' });
+      }
+      whereClause = { thesisId: thesis.id, stage };
     }
 
     // Always create a new Proposal record — keep full version history.

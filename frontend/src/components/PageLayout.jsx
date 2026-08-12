@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Icon } from './ui';
-import Sidebar from './Sidebar';
-import NotificationBell from './NotificationBell';
-import CommandPalette from './CommandPalette';
+import { useLayout } from './AppLayout';
 
 const ROLE_LABEL = {
   maintainer: 'Maintainer', coordinator: 'Coordinator', supervisor: 'Supervisor',
@@ -32,110 +30,56 @@ function buildCrumbs(pathname, pageTitle) {
   return crumbs;
 }
 
-function PageLayout({ children, title, subtitle, actions, user }) {
+function PageLayout({ children, title, subtitle, actions }) {
   const { pathname } = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [dark, setDark] = useState(() => localStorage.getItem('tpms-theme') === 'dark');
-  const currentUser = user || JSON.parse(localStorage.getItem('user') || '{}');
+  const { setActions } = useLayout();
+
+  useEffect(() => {
+    setActions(actions || null);
+    return () => setActions(null);
+  }, [actions, setActions]);
 
   const crumbs = title ? buildCrumbs(pathname, title) : [];
 
-  const toggleTheme = () => {
-    const next = !dark;
-    setDark(next);
-    try {
-      localStorage.setItem('tpms-theme', next ? 'dark' : 'light');
-      document.body.classList.toggle('dark', next);
-    } catch (_) { /* ignore */ }
-  };
-
   return (
-    <div className="app-layout">
-      {/* Sidebar gets the toggle state and the closing handler */}
-      <Sidebar user={currentUser} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} user={currentUser} />
-      
-      <div className="main-content">
-        <header className="top-bar">
-          <div className="top-bar-left">
-            {/* Hamburger Button: Visible on mobile, hidden on desktop */}
-            <button
-              className="hamburger-btn"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
-            >
-              <Icon name="menu" className="material-symbols-outlined" />
-            </button>
-            
-            {/* Quick Command Palette trigger */}
-            <button
-              onClick={() => setCommandPaletteOpen(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
-                background: 'var(--color-surface-container-low)', border: '1px solid var(--color-outline-variant)',
-                borderRadius: 'var(--border-radius-md)', color: 'var(--color-on-surface-variant)',
-                fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)',
-              }}
-            >
-              <Icon name="search" className="material-symbols-outlined" style={{ fontSize: 18 }} />
-              <span>Search or type <kbd style={{ fontSize: 10, background: 'var(--color-surface-container)', padding: '1px 5px', borderRadius: 3 }}>Ctrl K</kbd></span>
-            </button>
-          </div>
-          <div className="top-bar-actions">
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleTheme}
-              title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-              aria-label="Toggle dark mode"
-            >
-              <Icon name={dark ? 'light_mode' : 'dark_mode'} className="material-symbols-outlined" />
-            </button>
-            <NotificationBell />
-            {actions}
-          </div>
-        </header>
-
-        <main className="page-content">
-          {crumbs.length > 0 && (
-            <nav aria-label="Breadcrumb" style={{
-              display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4,
-              marginBottom: 10, fontSize: 12, color: 'var(--color-on-surface-variant)',
-            }}>
-              {crumbs.map((c, i) => (
-                <React.Fragment key={c.to + i}>
-                  {i > 0 && (
-                    <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-outline)' }} />
-                  )}
-                  {i === crumbs.length - 1 ? (
-                    <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{c.label}</span>
-                  ) : (
-                    <Link
-                      to={c.to}
-                      style={{ color: 'var(--color-on-surface-variant)', textDecoration: 'none', transition: 'color 0.15s' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-primary)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-on-surface-variant)')}
-                    >
-                      {c.label}
-                    </Link>
-                  )}
-                </React.Fragment>
-              ))}
-            </nav>
-          )}
-          {(title || subtitle) && (
-            <div className="page-header">
-              <h1>
-                <Icon name={title === 'Dashboard' ? 'dashboard' : 'folder'} className="material-symbols-outlined" />
-                {title}
-              </h1>
-              {subtitle && <p>{subtitle}</p>}
-            </div>
-          )}
-          {children}
-        </main>
-      </div>
-    </div>
+    <main className="page-content">
+      {crumbs.length > 0 && (
+        <nav aria-label="Breadcrumb" style={{
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4,
+          marginBottom: 10, fontSize: 12, color: 'var(--color-on-surface-variant)',
+        }}>
+          {crumbs.map((c, i) => (
+            <React.Fragment key={c.to + i}>
+              {i > 0 && (
+                <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--color-outline)' }} />
+              )}
+              {i === crumbs.length - 1 ? (
+                <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{c.label}</span>
+              ) : (
+                <Link
+                  to={c.to}
+                  style={{ color: 'var(--color-on-surface-variant)', textDecoration: 'none', transition: 'color 0.15s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-primary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-on-surface-variant)')}
+                >
+                  {c.label}
+                </Link>
+              )}
+            </React.Fragment>
+          ))}
+        </nav>
+      )}
+      {(title || subtitle) && (
+        <div className="page-header">
+          <h1>
+            <Icon name={title === 'Dashboard' ? 'dashboard' : 'folder'} className="material-symbols-outlined" />
+            {title}
+          </h1>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+      )}
+      {children}
+    </main>
   );
 }
 
