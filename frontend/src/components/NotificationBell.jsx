@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './ui';
 import api from '../services/api';
 import CrossProgramReviewModal from './CrossProgramReviewModal';
@@ -191,7 +192,7 @@ function NotificationBell() {
                     {n.type === 'CROSS_PROGRAM_THESIS' && !n.read && parseThesisId(n) && (
                       <div style={{ display: 'flex', gap: 4, marginTop: 8 }} onClick={e => e.stopPropagation()}>
                         <button className="btn btn-sm btn-outline" style={{ padding: '2px 8px', fontSize: 11 }}
-                          onClick={() => setReviewThesisId(parseThesisId(n))}>
+                          onClick={() => { setOpen(false); setReviewThesisId(parseThesisId(n)); }}>
                           <Icon name="visibility" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                           View
                         </button>
@@ -221,23 +222,27 @@ function NotificationBell() {
         </div>
       )}
 
-      {reviewThesisId && (
+      {reviewThesisId && createPortal(
         <CrossProgramReviewModal
           thesisId={reviewThesisId}
           onClose={() => setReviewThesisId(null)}
           onDecision={() => { fetchAll(); fetchUnread(); }}
-        />
+        />,
+        document.body,
       )}
 
-      <ConfirmDialog
-        open={!!confirmRejectNotif}
-        title="Reject cross-program thesis?"
-        message="Rejecting will delete this thesis and notify the requesting coordinator. This cannot be undone."
-        onConfirm={() => handleCrossDecision(confirmRejectNotif, 'reject')}
-        onCancel={() => setConfirmRejectNotif(null)}
-        confirmLabel="Reject"
-        danger
-      />
+      {confirmRejectNotif && createPortal(
+        <ConfirmDialog
+          open
+          title="Reject cross-program thesis?"
+          message="Rejecting will delete this thesis and notify the requesting coordinator. This cannot be undone."
+          onConfirm={() => handleCrossDecision(confirmRejectNotif, 'reject')}
+          onCancel={() => setConfirmRejectNotif(null)}
+          confirmLabel="Reject"
+          danger
+        />,
+        document.body,
+      )}
     </div>
   );
 }

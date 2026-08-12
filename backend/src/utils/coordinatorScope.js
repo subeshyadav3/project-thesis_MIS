@@ -73,6 +73,7 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
       where.OR = [
         { student: { programId: scope.program.id } },
         { crossProgramRequestedById: user.id },
+        { programId: scope.program.id },
       ];
     } else {
       // BACHELOR (or anything non-master) — strictly own program.
@@ -126,6 +127,7 @@ function isThesisVisibleToCoordinator(thesis, scope, user) {
     if (scope.degreeType === 'MASTER') {
       return thesis.student?.programId === scope.program.id ||
         thesis.crossProgramRequestedById === user.id ||
+        thesis.programId === scope.program.id ||
         (thesis.student && !thesis.student.programId);
     }
     return thesis.student?.programId === scope.program.id ||

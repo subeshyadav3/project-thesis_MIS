@@ -467,20 +467,22 @@ async function checkPrintAccess(req, res, type, id) {
         const g = await prisma.projectGroup.findUnique({ where: { id }, select: { programId: true } });
         itemProgramId = g?.programId;
       } else {
-        const t = await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { programId: true } } } });
-        itemProgramId = t?.student?.programId;
-      }
-      if (itemProgramId && itemProgramId !== program.id) {
-        res.status(403).json({ error: 'Access denied. Item belongs to another program.' });
-        return false;
+        const t = await prisma.thesis.findUnique({ where: { id }, select: { programId: true, student: { select: { programId: true } } } });
+        const byStudent = t?.student?.programId;
+        const byOwner = t?.programId;
+        const visible = (byOwner && byOwner === program.id) || (byStudent && byStudent === program.id);
+        if (!visible) {
+          res.status(403).json({ error: 'Access denied. Item belongs to another program.' });
+          return false;
+        }
       }
     } else {
       const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
       if (dept) {
         const item = type === 'group'
           ? await prisma.projectGroup.findUnique({ where: { id }, include: { program: { select: { departmentId: true } } } })
-          : await prisma.thesis.findUnique({ where: { id }, include: { student: { select: { program: { select: { departmentId: true } } } } } });
-        const itemDeptId = type === 'group' ? item?.program?.departmentId : item?.student?.program?.departmentId;
+          : await prisma.thesis.findUnique({ where: { id }, include: { program: { select: { departmentId: true } }, student: { select: { program: { select: { departmentId: true } } } } } });
+        let itemDeptId = type === 'group' ? item?.program?.departmentId : (item?.student?.program?.departmentId || item?.program?.departmentId);
         if (itemDeptId && itemDeptId !== dept.id) {
           res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
           return false;

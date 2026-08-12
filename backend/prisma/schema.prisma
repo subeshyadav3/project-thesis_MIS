@@ -219,6 +219,7 @@ model Program {
 
   students User[]        @relation("StudentProgram")
   groups   ProjectGroup[]
+  theses   Thesis[]
 }
 
 model AcademicYear {
@@ -302,6 +303,8 @@ model Thesis {
   externalFinal     User?    @relation("ExternalFinal", fields: [externalFinalId], references: [id], onDelete: SetNull)
   crossProgramRequestedById Int?
   crossProgramRequestedBy   User?   @relation("CrossProgramRequester", fields: [crossProgramRequestedById], references: [id], onDelete: SetNull)
+  programId      Int?
+  program        Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
   cluster        String?
   batch          String?
   startDate      DateTime?

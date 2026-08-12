@@ -118,6 +118,7 @@ exports.createThesis = async (req, res) => {
         studentId: parseInt(studentId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
+        programId: requestingCoordinatorProgram?.id ?? student.programId ?? null,
         batch: student.batch || null,
         cluster: req.body.cluster || student.program?.cluster || null,
         startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
