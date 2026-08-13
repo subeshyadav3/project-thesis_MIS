@@ -26,12 +26,7 @@ function MasterThesis() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const CLUSTERS = [
-    'AI/ML and image processing',
-    'Audio, NLP and data/text analytics',
-    'Electronic devices, circuits and communication',
-    'Computer networks and security',
-  ];
+  const todayStr = new Date().toISOString().split('T')[0];
   const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
   const [creating, setCreating] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
