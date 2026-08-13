@@ -38,7 +38,23 @@ function MasterThesis() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
   const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
+  const [batchFilter, setBatchFilter] = useState('ALL');
   const [coordinatorProgram, setCoordinatorProgram] = useState(null);
+
+  const normalizeBatch = (v) => {
+    if (!v) return '';
+    if (/^\d{3}$/.test(v)) return `2${v}`;
+    return String(v);
+  };
+
+  const batchOptions = useMemo(() => {
+    const set = new Set();
+    theses.forEach(t => {
+      const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
+      if (b) set.add(normalizeBatch(b));
+    });
+    return [...set].sort((a, b) => b.localeCompare(a)).map(b => ({ value: b, label: `Batch ${b}` }));
+  }, [theses]);
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
@@ -340,9 +356,14 @@ const handleComplete = async (id) => {
         programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
         !isCrossProgram;
 
-      return matchesSearch && matchesStatus && matchesSupervisor && matchesScope;
+      const matchesBatch = batchFilter === 'ALL' || (() => {
+        const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
+        return normalizeBatch(b) === batchFilter;
+      })();
+
+      return matchesSearch && matchesStatus && matchesSupervisor && matchesScope && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -920,6 +941,7 @@ return (
             ]}
             allLabel="All Department Theses"
           />
+          <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>

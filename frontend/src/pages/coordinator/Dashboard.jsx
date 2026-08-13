@@ -206,7 +206,7 @@ function CoordinatorDashboard() {
               value={selectedBatch}
               onChange={e => setSelectedBatch(e.target.value)}
             >
-              <option value="ALL">All Batches ({allStudents.length})</option>
+              <option value="ALL">All Batches</option>
               {batchOptions.map(b => (
                 <option key={b} value={b}>Batch {b}</option>
               ))}
