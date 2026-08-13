@@ -558,26 +558,112 @@ function CoordinatorAnnouncements() {
                             These are all the fields students will see on the registration form.
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {/* MSc Concept Note Standard Form Fields Preview */}
                             <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                 <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Thesis Title <span style={{ color: 'var(--color-error)' }}>*</span>
+                                  Email, Name, Roll Number <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Auto-Linked</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="account_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Auto-populated from student profile
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Program <span style={{ color: 'var(--color-error)' }}>*</span>
                                 </span>
                                 <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="school" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Dropdown (MSDSA, MSCSK, MSICE, MSNCS)
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Research Project Cluster / Area <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="category" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Dropdown (4 Fixed Department Clusters)
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Project / Thesis Concept Title <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
                                 <Icon name="short_text" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text input
                               </div>
                             </div>
+
                             <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                 <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Abstract / Description <span style={{ color: 'var(--color-error)' }}>*</span>
+                                  Concept Note Proposal Document (PDF, max 10MB) <span style={{ color: 'var(--color-error)' }}>*</span>
                                 </span>
                                 <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="subject" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Paragraph input
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 16 }} /> PDF File Upload (Named with Roll e.g., 080MSDSA010.pdf)
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Is it a guided proposal? <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="flaky" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Radio Choice (Yes / No)
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Primary Faculty Member Consulted / Preferred Supervisor <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="person" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text / Faculty Selection
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Secondary Faculty Member(s) Consulted / Preferred Supervisor <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="group" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text / Faculty Selection
+                              </div>
+                            </div>
+
+                            <div style={{ border: '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Remarks (if any)
+                                </span>
+                                <span className="badge badge-info" style={{ fontSize: 10 }}>Optional</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="notes" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text input
                               </div>
                             </div>
                             {form.formFields.map((f, idx) => (
