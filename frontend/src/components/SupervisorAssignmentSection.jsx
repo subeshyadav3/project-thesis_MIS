@@ -4,7 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
 
-function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, disabled = false }) {
+function SupervisorAssignmentSection({ type, id, currentSupervisor, supervisorAssignmentStatus, onRefresh, disabled = false }) {
   const [supervisors, setSupervisors] = useState([]);
   const [showAssign, setShowAssign] = useState(false);
   const [selectedSupId, setSelectedSupId] = useState('');
@@ -136,13 +136,26 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, onRefresh, d
                 {currentSupervisor.email}
               </div>
             </div>
-            <div style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 4,
-              background: currentSupervisor.active ? 'var(--color-success-container)' : 'var(--color-error-container)',
-              color: currentSupervisor.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)',
-            }}>
-              {currentSupervisor.active ? 'Active' : 'Inactive'}
-            </div>
+            {supervisorAssignmentStatus === 'PENDING' && (
+              <span className="badge badge-warning" style={{ fontSize: 11, padding: '2px 8px' }}>
+                <span className="dot" />Awaiting Response
+              </span>
+            )}
+            {supervisorAssignmentStatus === 'ACCEPTED' && (
+              <span className="badge badge-completed" style={{ fontSize: 11, padding: '2px 8px' }}>
+                <span className="dot" />Accepted
+              </span>
+            )}
+            {supervisorAssignmentStatus === 'REJECTED' && (
+              <span className="badge badge-error" style={{ fontSize: 11, padding: '2px 8px' }}>
+                Declined
+              </span>
+            )}
+            {!supervisorAssignmentStatus && currentSupervisor && (
+              <span className="badge badge-completed" style={{ fontSize: 11, padding: '2px 8px' }}>
+                <span className="dot" />Assigned
+              </span>
+            )}
             {!disabled && (
               <button className="btn btn-sm btn-outline" onClick={() => setConfirmRemove(true)} disabled={removing} style={{ color: 'var(--color-error)' }}>
                 <Icon name={removing ? 'progress_activity' : 'close'} className="material-symbols-outlined" style={{ fontSize: 16 }} />

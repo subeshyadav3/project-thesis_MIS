@@ -495,7 +495,9 @@ function ProjectDetail() {
               <div style={{ display: 'grid', gap: 24, marginBottom: 24 }}>
                 <SupervisorAssignmentSection
                   type={type} id={parseInt(id)}
-                  currentSupervisor={item?.supervisor} onRefresh={loadData} disabled={false}
+                  currentSupervisor={item?.supervisor}
+                  supervisorAssignmentStatus={item?.supervisorAssignmentStatus}
+                  onRefresh={loadData} disabled={false}
                 />
                 {type === 'thesis' && (
                   <>
