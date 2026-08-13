@@ -21,6 +21,136 @@ const DEFAULT_FORM_FIELDS = [
   { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
 ];
 
+function MatrixSupervisorSelect({ value, onChange, supervisors }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const ref = useRef(null);
+
+  const selectedSup = supervisors.find(s => String(s.id) === String(value));
+
+  const updateCoords = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 220 && rect.top > 220) {
+        setCoords({ top: rect.top - 204, left: rect.left });
+      } else {
+        setCoords({ top: rect.bottom + 4, left: rect.left });
+      }
+    }
+  };
+
+  const handleOpen = () => {
+    updateCoords();
+    setOpen(!open);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target) && !e.target.closest('.matrix-sup-portal')) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = supervisors.filter(s => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    return `${s.designation || ''} ${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div ref={ref} className="sup-dropdown-trigger" style={{ width: 175, position: 'relative' }}>
+      <div
+        className="sup-search-wrapper form-input"
+        style={{ padding: '2px 6px', height: 32, fontSize: 12, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+        onClick={(e) => { if (e.target === e.currentTarget) { updateCoords(); setOpen(true); } }}
+      >
+        <Icon name="search" className="material-symbols-outlined" style={{ fontSize: 15, marginRight: 4 }} />
+        <input
+          type="text"
+          style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, width: '100%', padding: 0 }}
+          placeholder={selectedSup ? `${selectedSup.designation ? selectedSup.designation + ' ' : ''}${selectedSup.firstName} ${selectedSup.lastName}` : 'Search supervisor...'}
+          value={search}
+          onChange={e => { setSearch(e.target.value); updateCoords(); setOpen(true); }}
+          onFocus={() => { updateCoords(); setOpen(true); }}
+        />
+        {value && (
+          <button
+            type="button"
+            className="sup-clear"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, display: 'flex', marginRight: 2 }}
+            onClick={e => { e.stopPropagation(); onChange(''); setSearch(''); }}
+          >
+            <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
+          </button>
+        )}
+        <Icon name={open ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" style={{ fontSize: 16, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleOpen(); }} />
+      </div>
+
+      {open && (
+        <div
+          className="matrix-sup-portal"
+          style={{
+            position: 'fixed',
+            top: coords.top,
+            left: coords.left,
+            width: 220,
+            maxHeight: 200,
+            zIndex: 99999,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            background: 'var(--color-surface-container-lowest)',
+            borderRadius: 8,
+            border: '1px solid var(--color-outline)',
+            overflowY: 'auto',
+          }}
+        >
+          <div
+            className="sup-dropdown-item"
+            style={{ padding: '6px 10px', cursor: 'pointer' }}
+            onClick={() => { onChange(''); setSearch(''); setOpen(false); }}
+          >
+            <div className="sup-dropdown-item-info">
+              <div className="sup-dropdown-item-name" style={{ fontStyle: 'italic', color: 'var(--color-outline)' }}>Unassigned (No supervisor)</div>
+            </div>
+          </div>
+          {filtered.length === 0 ? (
+            <div className="sup-dropdown-empty">No supervisors found</div>
+          ) : (
+            filtered.map(s => {
+              const isSelected = String(value) === String(s.id);
+              return (
+                <div
+                  key={s.id}
+                  className={`sup-dropdown-item ${isSelected ? 'sup-dropdown-item-selected' : ''}`}
+                  style={{ padding: '6px 10px' }}
+                  onClick={() => {
+                    onChange(s.id.toString());
+                    setSearch('');
+                    setOpen(false);
+                  }}
+                >
+                  <div className="sup-dropdown-item-avatar" style={{ width: 24, height: 24, fontSize: 11 }}>{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                  <div className="sup-dropdown-item-info">
+                    <div className="sup-dropdown-item-name" style={{ fontSize: 12 }}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
+                    <div className="sup-dropdown-item-email" style={{ fontSize: 10 }}>{s.email || ''}</div>
+                  </div>
+                  {isSelected && (
+                    <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" style={{ fontSize: 15 }} />
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CoordinatorAnnouncements() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const degreeType = user.program?.degreeType || '';
@@ -55,6 +185,17 @@ function CoordinatorAnnouncements() {
   const [viewResponses, setViewResponses] = useState(null);
   const [responses, setResponses] = useState(null);
   const [responsesLoading, setResponsesLoading] = useState(false);
+  const [matrixEdits, setMatrixEdits] = useState({});
+  const [selectedResponseIds, setSelectedResponseIds] = useState([]);
+  const [showRemainingStudents, setShowRemainingStudents] = useState(false);
+  const [editingResponse, setEditingResponse] = useState(null);
+  const [editResponseForm, setEditResponseForm] = useState({});
+  const [savingResponse, setSavingResponse] = useState(false);
+  const [finalizingResponse, setFinalizingResponse] = useState(null);
+  const [finalizeSupervisorId, setFinalizeSupervisorId] = useState('');
+  const [finalizeTitle, setFinalizeTitle] = useState('');
+  const [finalizeCluster, setFinalizeCluster] = useState('');
+  const [supervisors, setSupervisors] = useState([]);
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -67,6 +208,7 @@ function CoordinatorAnnouncements() {
       api.get('/announcements').then(({ data }) => setAnnouncements(data)),
       api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data)),
+      api.get('/users/role/supervisor?all=true').then(({ data }) => setSupervisors(data)),
       api.get('/departments/programs').then(({ data }) => setPrograms(data.filter(p => p.coordinatorId === user.id))),
     ]).catch(e => toast.error('Failed to load data')).finally(() => setLoading(false));
   }, []);
@@ -220,6 +362,22 @@ function CoordinatorAnnouncements() {
     try {
       const { data } = await api.get(`/announcements/${ann.id}/form-responses`);
       setResponses(data);
+      const edits = {};
+      (data.filled || []).forEach(({ response }) => {
+        const d = response.formData || {};
+        edits[response.id] = {
+          title: d.title || '',
+          cluster: d.cluster || '',
+          is_guided: d.is_guided || 'No',
+          primary_supervisor: d.primary_supervisor || '',
+          secondary_supervisor: d.secondary_supervisor || '',
+          finalSupervisorId: response.thesis?.supervisorId ? response.thesis.supervisorId.toString() : '',
+          pdfUrl: d.pdfUrl || d.pdf_document || '',
+          remarks: d.remarks || d.description || d.feedback || '',
+        };
+      });
+      setMatrixEdits(edits);
+      setSelectedResponseIds([]);
     } catch (err) {
       toast.error('Failed to load form responses');
       setResponses(null);
@@ -322,11 +480,6 @@ function CoordinatorAnnouncements() {
                           <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
                             <Icon name="delete" className="material-symbols-outlined" />
                           </button>
-                          {hasGF && (
-                            <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
-                              <Icon name="visibility" className="material-symbols-outlined" /> View Submissions
-                            </button>
-                          )}
                           {a.formEnabled && (
                             <button className="btn btn-sm btn-outline" onClick={() => loadResponses(a)}>
                               <Icon name="fact_check" className="material-symbols-outlined" /> Responses
@@ -723,93 +876,561 @@ function CoordinatorAnnouncements() {
 
         {viewResponses && (
           <div className="modal-overlay" onClick={() => { setViewResponses(null); setResponses(null); }}>
-            <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ width: '96vw', maxWidth: '96vw', height: '92vh', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
               <div className="modal-header">
                 <div className="modal-header-icon warning"><Icon name="fact_check" className="material-symbols-outlined" /></div>
-                <div className="modal-header-text"><h2>Form Responses: {viewResponses.title}</h2><p>{TYPE_LABELS[viewResponses.type] || viewResponses.type}</p></div>
+                <div className="modal-header-text">
+                  <h2>Form Responses Matrix: {viewResponses.title}</h2>
+                  <p>Interactive Spreadsheet — Edit fields inline, tick supervisor preferences, & batch finalize theses</p>
+                </div>
               </div>
-              <div className="modal-body">
+
+              <div className="modal-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {responsesLoading ? (
-                  <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading responses...</p></div>
+                  <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading responses matrix...</p></div>
                 ) : responses ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div className="stats-grid" style={{ marginBottom: 0 }}>
-                      <div className="stat-card bento-card">
-                        <div className="stat-icon"><Icon name="groups" className="material-symbols-outlined" /></div>
-                        <div className="stat-number">{responses.total}</div>
-                        <div className="stat-label">Eligible Students</div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-surface-container-high)', fontSize: 12, fontWeight: 600 }}>
+                        <Icon name="groups" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Eligible: {responses.total}
                       </div>
-                      <div className="stat-card bento-card">
-                        <div className="stat-icon" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}><Icon name="check_circle" className="material-symbols-outlined" /></div>
-                        <div className="stat-number">{responses.filled.length}</div>
-                        <div className="stat-label">Filled</div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-success-container)', color: 'var(--color-on-success-container)', fontSize: 12, fontWeight: 600 }}>
+                        <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Filled: {responses.filled.length}
                       </div>
-                      <div className="stat-card bento-card">
-                        <div className="stat-icon" style={{ background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)' }}><Icon name="pending" className="material-symbols-outlined" /></div>
-                        <div className="stat-number">{responses.remaining.length}</div>
-                        <div className="stat-label">Remaining</div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)', fontSize: 12, fontWeight: 600 }}>
+                        <Icon name="pending" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Remaining: {responses.remaining.length}
                       </div>
                     </div>
 
                     <div>
-                      <div className="card-header"><h3 style={{ margin: 0 }}>Filled ({responses.filled.length})</h3></div>
-                      <div className="table-container">
-                        <table className="table">
-                          <thead><tr><th>Student</th><th>Roll</th><th>Status</th><th>Submitted</th><th>Thesis</th></tr></thead>
+                      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0 }}>Submitted Form Responses ({responses.filled.length})</h3>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={async () => {
+                              try {
+                                const res = await api.get(`/announcements/${viewResponses.id}/export-responses`, { responseType: 'blob' });
+                                const url = window.URL.createObjectURL(new Blob([res.data]));
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `Form_Responses_${viewResponses.title.replace(/\s+/g, '_')}.xlsx`;
+                                a.click();
+                                toast.success('Downloaded Form Responses Excel sheet!');
+                              } catch (err) {
+                                toast.error('Failed to download Excel sheet');
+                              }
+                            }}
+                          >
+                            <Icon name="download" className="material-symbols-outlined" /> Export Excel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            disabled={!selectedResponseIds.length || savingResponse}
+                            onClick={async () => {
+                              if (!selectedResponseIds.length) return toast.warning('Select at least one response to finalize');
+                              setSavingResponse(true);
+                              try {
+                                let count = 0;
+                                for (const id of selectedResponseIds) {
+                                  const edit = matrixEdits[id] || {};
+                                  const resp = responses.filled.find(r => r.response.id === id)?.response;
+                                  if (resp && resp.status !== 'APPROVED') {
+                                    await api.put(`/announcements/responses/${id}`, { formData: edit });
+                                    await api.post(`/announcements/responses/${id}/finalize`, {
+                                      title: edit.title || resp.formData?.title || 'Master Thesis',
+                                      cluster: edit.cluster || resp.formData?.cluster || undefined,
+                                      supervisorId: edit.finalSupervisorId ? parseInt(edit.finalSupervisorId) : undefined,
+                                    });
+                                    count++;
+                                  }
+                                }
+                                toast.success(`Finalized & created ${count} thesis record(s)!`);
+                                setSelectedResponseIds([]);
+                                loadResponses(viewResponses);
+                              } catch (err) {
+                                toast.error(err.response?.data?.error || 'Failed to batch finalize');
+                              } finally {
+                                setSavingResponse(false);
+                              }
+                            }}
+                          >
+                            <Icon name="check_circle" className="material-symbols-outlined" /> Finalize Selected ({selectedResponseIds.length})
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="table-container" style={{ overflowX: 'auto' }}>
+                        <table className="table" style={{ fontSize: 13, minWidth: 1400, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ width: 36, textAlign: 'center', verticalAlign: 'middle' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={responses.filled.length > 0 && selectedResponseIds.length === responses.filled.filter(r => r.response.status !== 'APPROVED').length}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSelectedResponseIds(responses.filled.filter(r => r.response.status !== 'APPROVED').map(r => r.response.id));
+                                    } else {
+                                      setSelectedResponseIds([]);
+                                    }
+                                  }}
+                                />
+                              </th>
+                              <th style={{ width: 140, verticalAlign: 'middle' }}>Student & Roll</th>
+                              <th style={{ width: 200, verticalAlign: 'middle' }}>Concept Thesis Title</th>
+                              <th style={{ width: 160, verticalAlign: 'middle' }}>Research Cluster</th>
+                              <th style={{ width: 75, verticalAlign: 'middle' }}>Guided?</th>
+                              <th style={{ width: 150, verticalAlign: 'middle' }}>Primary Supervisor Pref</th>
+                              <th style={{ width: 150, verticalAlign: 'middle' }}>Secondary Supervisor Pref</th>
+                              <th style={{ width: 160, verticalAlign: 'middle' }}>Remarks / Feedback</th>
+                              <th style={{ width: 170, verticalAlign: 'middle' }}>Final Supervisor</th>
+                              <th style={{ width: 65, textAlign: 'center', verticalAlign: 'middle' }}>Proposal</th>
+                              <th style={{ width: 80, verticalAlign: 'middle' }}>Status</th>
+                              <th style={{ width: 120, textAlign: 'right', verticalAlign: 'middle' }}>Actions</th>
+                            </tr>
+                          </thead>
                           <tbody>
                             {responses.filled.length === 0 ? (
-                              <tr><td colSpan={5} className="empty-cell">No responses yet</td></tr>
-                            ) : responses.filled.map(({ student, response }) => (
-                              <tr key={student.id}>
-                                <td style={{ fontWeight: 500 }}>{student.firstName} {student.lastName}</td>
-                                <td style={{ fontSize: 13 }}>{student.rollNumber || '—'}</td>
-                                <td>
-                                  {response.status === 'LATE_SUBMITTED' ? (
-                                    <span className="badge badge-warning"><span className="dot" />Late — proposal pending approval</span>
-                                  ) : (
-                                    <span className="badge badge-completed"><span className="dot" />Submitted</span>
-                                  )}
-                                </td>
-                                <td style={{ fontSize: 13 }}>{new Date(response.createdAt).toLocaleString()}</td>
-                                <td>
-                                  {response.thesis ? (
-                                    <a href={`/coordinator/project/thesis/${response.thesis.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
-                                      {response.thesis.title} <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} />
-                                    </a>
-                                  ) : '—'}
-                                </td>
-                              </tr>
-                            ))}
+                              <tr><td colSpan={12} className="empty-cell">No student responses submitted yet</td></tr>
+                            ) : responses.filled.map(({ student, response }) => {
+                              const edit = matrixEdits[response.id] || {};
+                              const isSelected = selectedResponseIds.includes(response.id);
+                              return (
+                                <tr key={student.id} style={{ background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : undefined }}>
+                                  <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                    {response.status !== 'APPROVED' && (
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={e => {
+                                          if (e.target.checked) setSelectedResponseIds(prev => [...prev, response.id]);
+                                          else setSelectedResponseIds(prev => prev.filter(id => id !== response.id));
+                                        }}
+                                      />
+                                    )}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{student.firstName} {student.lastName}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', whiteSpace: 'nowrap' }}>{student.rollNumber || '—'} ({student.program?.code || 'MSc'})</div>
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <input
+                                      className="form-input"
+                                      style={{ padding: '4px 8px', fontSize: 12, width: '100%' }}
+                                      value={edit.title ?? ''}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), title: e.target.value } }))}
+                                      placeholder="Thesis title"
+                                    />
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <select
+                                      className="form-input"
+                                      style={{ padding: '4px 6px', fontSize: 12, width: '100%' }}
+                                      value={edit.cluster ?? ''}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), cluster: e.target.value } }))}
+                                    >
+                                      <option value="">Select Cluster...</option>
+                                      <option value="AI/ML and image processing">AI/ML and image processing</option>
+                                      <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                                      <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                                      <option value="Computer networks and security">Computer networks and security</option>
+                                    </select>
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <select
+                                      className="form-input"
+                                      style={{ padding: '4px 4px', fontSize: 12, width: '100%' }}
+                                      value={edit.is_guided ?? 'No'}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), is_guided: e.target.value } }))}
+                                    >
+                                      <option value="Yes">Yes</option>
+                                      <option value="No">No</option>
+                                    </select>
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.primary_supervisor || 'None'}</div>
+                                    {edit.primary_supervisor && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline"
+                                        style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
+                                        onClick={() => {
+                                          const pref = edit.primary_supervisor;
+                                          const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
+                                          const input = norm(pref);
+                                          let matched = supervisors.find(s => {
+                                            const fn = norm(`${s.firstName} ${s.lastName}`);
+                                            return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                          });
+                                          if (matched) {
+                                            setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
+                                            toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                          } else {
+                                            toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                          }
+                                        }}
+                                      >
+                                        <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.secondary_supervisor || 'None'}</div>
+                                    {edit.secondary_supervisor && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline"
+                                        style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
+                                        onClick={() => {
+                                          const pref = edit.secondary_supervisor;
+                                          const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
+                                          const input = norm(pref);
+                                          let matched = supervisors.find(s => {
+                                            const fn = norm(`${s.firstName} ${s.lastName}`);
+                                            return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                          });
+                                          if (matched) {
+                                            setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
+                                            toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                          } else {
+                                            toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                          }
+                                        }}
+                                      >
+                                        <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <input
+                                      className="form-input"
+                                      style={{ padding: '4px 8px', fontSize: 12, width: '100%' }}
+                                      value={edit.remarks ?? ''}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), remarks: e.target.value } }))}
+                                      placeholder="Remarks / Feedback"
+                                    />
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <MatrixSupervisorSelect
+                                      value={edit.finalSupervisorId ?? ''}
+                                      onChange={val => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: val } }))}
+                                      supervisors={supervisors}
+                                    />
+                                  </td>
+                                  <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                    {edit.pdfUrl ? (
+                                      <a href={edit.pdfUrl} target="_blank" rel="noreferrer" title="View Proposal PDF">
+                                        <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 18 }} />
+                                      </a>
+                                    ) : '—'}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    {response.status === 'APPROVED' ? (
+                                      <a href={`/coordinator/project/thesis/${response.thesis.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                                        Finalized <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 11 }} />
+                                      </a>
+                                    ) : response.status === 'LATE_SUBMITTED' ? (
+                                      <span className="badge badge-warning" style={{ fontSize: 10 }}>Late</span>
+                                    ) : (
+                                      <span className="badge badge-completed" style={{ fontSize: 10 }}>Submitted</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline"
+                                        disabled={savingResponse}
+                                        onClick={async () => {
+                                          setSavingResponse(true);
+                                          try {
+                                            await api.put(`/announcements/responses/${response.id}`, { formData: edit });
+                                            toast.success('Row saved');
+                                          } catch (err) {
+                                            toast.error(err.response?.data?.error || 'Failed to save');
+                                          } finally {
+                                            setSavingResponse(false);
+                                          }
+                                        }}
+                                      >
+                                        Save
+                                      </button>
+                                      {response.status !== 'APPROVED' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-success"
+                                          disabled={savingResponse}
+                                          onClick={async () => {
+                                            setSavingResponse(true);
+                                            try {
+                                              await api.put(`/announcements/responses/${response.id}`, { formData: edit });
+                                              await api.post(`/announcements/responses/${response.id}/finalize`, {
+                                                title: edit.title || response.formData?.title || 'Master Thesis',
+                                                cluster: edit.cluster || response.formData?.cluster || undefined,
+                                                supervisorId: edit.finalSupervisorId ? parseInt(edit.finalSupervisorId) : undefined,
+                                              });
+                                              toast.success('Thesis finalized & created!');
+                                              loadResponses(viewResponses);
+                                            } catch (err) {
+                                              toast.error(err.response?.data?.error || 'Failed to finalize');
+                                            } finally {
+                                              setSavingResponse(false);
+                                            }
+                                          }}
+                                        >
+                                          Finalize
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
                     </div>
 
                     <div>
-                      <div className="card-header"><h3 style={{ margin: 0 }}>Remaining ({responses.remaining.length})</h3></div>
-                      <div className="table-container">
-                        <table className="table">
-                          <thead><tr><th>Student</th><th>Roll</th><th>Program</th><th>Email</th></tr></thead>
-                          <tbody>
-                            {responses.remaining.length === 0 ? (
-                              <tr><td colSpan={4} className="empty-cell">All eligible students have responded</td></tr>
-                            ) : responses.remaining.map(s => (
-                              <tr key={s.id}>
-                                <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
-                                <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
-                                <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
-                                <td style={{ fontSize: 13 }}>{s.email}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => setShowRemainingStudents(!showRemainingStudents)}
+                      >
+                        <Icon name={showRemainingStudents ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" />
+                        {showRemainingStudents ? 'Hide' : 'Show'} Remaining Eligible Students ({responses.remaining.length})
+                      </button>
+
+                      {showRemainingStudents && (
+                        <div className="table-container" style={{ marginTop: 10 }}>
+                          <table className="table" style={{ fontSize: 13 }}>
+                            <thead><tr><th>Student Name</th><th>Roll Number</th><th>Program</th><th>Email Address</th></tr></thead>
+                            <tbody>
+                              {responses.remaining.length === 0 ? (
+                                <tr><td colSpan={4} className="empty-cell">All eligible students have filled and submitted the form</td></tr>
+                              ) : responses.remaining.map(s => (
+                                <tr key={s.id}>
+                                  <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
+                                  <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
+                                  <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
+                                  <td style={{ fontSize: 13 }}>{s.email}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : null}
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => { setViewResponses(null); setResponses(null); }}><Icon name="close" className="material-symbols-outlined" /> Close</button>
+                <button type="button" className="btn btn-outline" onClick={() => { setViewResponses(null); setResponses(null); }}><Icon name="close" className="material-symbols-outlined" /> Close Matrix</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal for Editing Student Form Response */}
+        {editingResponse && (
+          <div className="modal-overlay" onClick={() => setEditingResponse(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header">
+                <div className="modal-header-icon primary"><Icon name="edit_note" className="material-symbols-outlined" /></div>
+                <div className="modal-header-text">
+                  <h2>Edit Student Form Submission</h2>
+                  <p>{editingResponse.student?.firstName} {editingResponse.student?.lastName} ({editingResponse.student?.rollNumber || 'No Roll'})</p>
+                </div>
+                <button className="modal-close-btn" onClick={() => setEditingResponse(null)}><Icon name="close" className="material-symbols-outlined" /></button>
+              </div>
+
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Concept Title</label>
+                  <input className="form-input" value={editResponseForm.title || ''} onChange={e => setEditResponseForm({ ...editResponseForm, title: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Research Cluster / Area</label>
+                  <select className="form-input" value={editResponseForm.cluster || ''} onChange={e => setEditResponseForm({ ...editResponseForm, cluster: e.target.value })}>
+                    <option value="">Select Cluster...</option>
+                    <option value="AI/ML and image processing">AI/ML and image processing</option>
+                    <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                    <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                    <option value="Computer networks and security">Computer networks and security</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Guided Proposal?</label>
+                  <select className="form-input" value={editResponseForm.is_guided || ''} onChange={e => setEditResponseForm({ ...editResponseForm, is_guided: e.target.value })}>
+                    <option value="">Select option...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Primary Supervisor Preference</label>
+                  <input className="form-input" value={editResponseForm.primary_supervisor || ''} onChange={e => setEditResponseForm({ ...editResponseForm, primary_supervisor: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Secondary Supervisor Preference</label>
+                  <input className="form-input" value={editResponseForm.secondary_supervisor || ''} onChange={e => setEditResponseForm({ ...editResponseForm, secondary_supervisor: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>PDF Proposal URL</label>
+                  <input className="form-input" value={editResponseForm.pdfUrl || editResponseForm.pdf_document || ''} onChange={e => setEditResponseForm({ ...editResponseForm, pdfUrl: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Remarks / Description</label>
+                  <textarea className="form-input" rows={3} value={editResponseForm.description || editResponseForm.remarks || ''} onChange={e => setEditResponseForm({ ...editResponseForm, description: e.target.value, remarks: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setEditingResponse(null)}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  disabled={savingResponse}
+                  onClick={async () => {
+                    setSavingResponse(true);
+                    try {
+                      await api.put(`/announcements/responses/${editingResponse.id}`, { formData: editResponseForm });
+                      toast.success('Form response updated!');
+                      setEditingResponse(null);
+                      if (viewResponses) loadResponses(viewResponses);
+                    } catch (err) {
+                      toast.error(err.response?.data?.error || 'Failed to update response');
+                    } finally {
+                      setSavingResponse(false);
+                    }
+                  }}
+                >
+                  <Icon name={savingResponse ? 'sync' : 'save'} className="material-symbols-outlined" /> Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal for Finalizing Form Response to Thesis */}
+        {finalizingResponse && (
+          <div className="modal-overlay" onClick={() => setFinalizingResponse(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+              <div className="modal-header">
+                <div className="modal-header-icon success"><Icon name="task_alt" className="material-symbols-outlined" /></div>
+                <div className="modal-header-text">
+                  <h2>Finalize Response & Create Thesis</h2>
+                  <p>Student: {finalizingResponse.student?.firstName} {finalizingResponse.student?.lastName}</p>
+                </div>
+                <button className="modal-close-btn" onClick={() => setFinalizingResponse(null)}><Icon name="close" className="material-symbols-outlined" /></button>
+              </div>
+
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Thesis Title</label>
+                  <input className="form-input" value={finalizeTitle} onChange={e => setFinalizeTitle(e.target.value)} placeholder="Enter finalized thesis title" />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Research Cluster / Area</label>
+                  <select className="form-input" value={finalizeCluster} onChange={e => setFinalizeCluster(e.target.value)}>
+                    <option value="">Select Cluster...</option>
+                    <option value="AI/ML and image processing">AI/ML and image processing</option>
+                    <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                    <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                    <option value="Computer networks and security">Computer networks and security</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Student Supervisor Preferences</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--color-surface-container-lowest)', padding: 10, borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                      <span>Primary: <strong>{finalizingResponse.formData?.primary_supervisor || 'None specified'}</strong></span>
+                      {finalizingResponse.formData?.primary_supervisor && (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-outline"
+                          onClick={() => {
+                            const pref = finalizingResponse.formData?.primary_supervisor;
+                            const matched = supervisors.find(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(pref.toLowerCase()) || pref.toLowerCase().includes(s.lastName.toLowerCase()));
+                            if (matched) {
+                              setFinalizeSupervisorId(matched.id.toString());
+                              toast.success(`Selected ${matched.firstName} ${matched.lastName}`);
+                            } else {
+                              toast.info(`Could not auto-match "${pref}". Please choose from the dropdown below.`);
+                            }
+                          }}
+                        >
+                          <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 13 }} /> Tick to Select
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                      <span>Secondary: <strong>{finalizingResponse.formData?.secondary_supervisor || 'None specified'}</strong></span>
+                      {finalizingResponse.formData?.secondary_supervisor && (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-outline"
+                          onClick={() => {
+                            const pref = finalizingResponse.formData?.secondary_supervisor;
+                            const matched = supervisors.find(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(pref.toLowerCase()) || pref.toLowerCase().includes(s.lastName.toLowerCase()));
+                            if (matched) {
+                              setFinalizeSupervisorId(matched.id.toString());
+                              toast.success(`Selected ${matched.firstName} ${matched.lastName}`);
+                            } else {
+                              toast.info(`Could not auto-match "${pref}". Please choose from the dropdown below.`);
+                            }
+                          }}
+                        >
+                          <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 13 }} /> Tick to Select
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Assigned Supervisor (Optional)</label>
+                  <select className="form-input" value={finalizeSupervisorId} onChange={e => setFinalizeSupervisorId(e.target.value)}>
+                    <option value="">Select Supervisor (or leave empty to assign later)...</option>
+                    {supervisors.map(s => (
+                      <option key={s.id} value={s.id}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setFinalizingResponse(null)}>Cancel</button>
+                <button
+                  className="btn btn-success"
+                  onClick={async () => {
+                    try {
+                      await api.post(`/announcements/responses/${finalizingResponse.id}/finalize`, {
+                        title: finalizeTitle,
+                        cluster: finalizeCluster,
+                        supervisorId: finalizeSupervisorId ? parseInt(finalizeSupervisorId) : undefined,
+                      });
+                      toast.success('Thesis record finalized & created!');
+                      setFinalizingResponse(null);
+                      if (viewResponses) loadResponses(viewResponses);
+                    } catch (err) {
+                      toast.error(err.response?.data?.error || 'Failed to finalize response');
+                    }
+                  }}
+                >
+                  <Icon name="check_circle" className="material-symbols-outlined" /> Finalize Thesis
+                </button>
               </div>
             </div>
           </div>

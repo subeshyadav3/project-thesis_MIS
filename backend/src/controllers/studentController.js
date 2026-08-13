@@ -40,11 +40,18 @@ function triggerAIPipeline({ proposalId, documentUrl, documentType, authToken })
 exports.uploadDocument = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const { stage, type } = req.body;
-    const allowedStages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
-    if (!allowedStages.includes(stage)) return res.status(400).json({ error: 'Invalid stage' });
+    // Build the URL from the folder multer actually stored the file in, so the link
+    // always resolves (multer uses: type === 'thesis' ? 'theses' : 'groups').
+    const storageType = req.body.type === 'thesis' ? 'theses' : 'groups';
+    const documentUrl = `/api/files/${storageType}/${req.file.filename}`;
 
-    const documentUrl = `/api/files/${type === 'thesis' ? 'theses' : 'groups'}/${req.file.filename}`;
+    const { stage, type, thesisId, groupId, isStandalone } = req.body;
+    const allowedStages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
+
+    // Standalone file upload for form responses / registration before thesis creation
+    if (!stage || !allowedStages.includes(stage) || isStandalone === 'true' || isStandalone === true || (!type && !thesisId && !groupId)) {
+      return res.json({ documentUrl, url: documentUrl, filename: req.file.filename });
+    }
 
     let whereClause = {};
     if (type === 'group') {
@@ -207,60 +214,41 @@ exports.submitFormResponse = async (req, res) => {
       include: { program: { select: { id: true, code: true, name: true, cluster: true } } },
     });
 
-    // Auto-generate the proposal PDF from the submitted form data
-    const { generateFormProposalPDF } = require('../services/pdfService');
-    const pdfBuffer = await generateFormProposalPDF({
-      title,
-      description,
-      studentName: student ? `${student.firstName} ${student.lastName}` : '',
-      rollNumber: student?.rollNumber,
-      programName: student?.program ? (student.program.name || student.program.code) : undefined,
-      batch: student?.batch,
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    });
-    const storageDir = path.join(__dirname, '..', '..', 'storage', 'theses');
-    if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
-    const filename = `form_proposal_${Date.now()}.pdf`;
-    fs.writeFileSync(path.join(storageDir, filename), pdfBuffer);
-    const documentUrl = `/api/files/theses/${filename}`;
+    // Auto-generate a fallback proposal PDF from the submitted form data. This is used only when
+    // the student did not upload their own document. The actual thesis + proposal are created by
+    // the coordinator when the response is finalized.
+    let documentUrl = null;
+    try {
+      const { generateFormProposalPDF } = require('../services/pdfService');
+      const pdfBuffer = await generateFormProposalPDF({
+        title,
+        description,
+        studentName: student ? `${student.firstName} ${student.lastName}` : '',
+        rollNumber: student?.rollNumber,
+        programName: student?.program ? (student.program.name || student.program.code) : undefined,
+        batch: student?.batch,
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      });
+      const storageDir = path.join(__dirname, '..', '..', 'storage', 'theses');
+      if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+      const filename = `form_proposal_${Date.now()}.pdf`;
+      fs.writeFileSync(path.join(storageDir, filename), pdfBuffer);
+      documentUrl = `/api/files/theses/${filename}`;
+    } catch (e) { console.error('generate form proposal pdf error:', e.message); }
 
-    let thesis, proposal, formResponse;
-    await prisma.$transaction(async (tx) => {
-      thesis = await tx.thesis.create({
-        data: {
-          title,
-          description,
-          projectType: 'MASTER',
-          studentId: req.user.id,
-          status: 'PENDING',
-          createdVia: 'FORM',
-          supervisorAssignmentStatus: 'PENDING',
-          programId: student?.programId || null,
-          cluster: student?.program?.cluster || null,
-          batch: req.user.batch || student?.batch || null,
-          startDate: new Date(),
-          announcementId,
-        },
-      });
-      proposal = await tx.proposal.create({
-        data: {
-          stage: 'PROPOSAL',
-          documentType: 'PROPOSAL',
-          documentUrl,
-          status: late ? 'PENDING_APPROVAL' : 'VISIBLE',
-          thesisId: thesis.id,
-          submittedById: req.user.id,
-        },
-      });
-      formResponse = await tx.formResponse.create({
-        data: {
-          announcementId,
-          studentId: req.user.id,
-          thesisId: thesis.id,
-          formData,
-          status: late ? 'LATE_SUBMITTED' : 'SUBMITTED',
-        },
-      });
+    // Preserve any student-uploaded document; otherwise use the auto-generated fallback.
+    const savedFormData = { ...formData };
+    if (!savedFormData.pdfUrl && documentUrl) savedFormData.pdfUrl = documentUrl;
+
+    // Only create the form response here — do NOT create the thesis/proposal yet.
+    // The coordinator reviews the submission and creates the thesis on finalize.
+    const formResponse = await prisma.formResponse.create({
+      data: {
+        announcementId,
+        studentId: req.user.id,
+        formData: savedFormData,
+        status: late ? 'LATE_SUBMITTED' : 'SUBMITTED',
+      },
     });
 
     // Notify program + department coordinators
@@ -280,9 +268,9 @@ exports.submitFormResponse = async (req, res) => {
       }
     } catch (e) { console.error('notify coordinators error:', e.message); }
 
-    audit.log({ action: 'CREATE', entity: 'Thesis', entityId: thesis.id, details: `Thesis created via form submission for "${title}"${late ? ' (late)' : ''}`, performedById: req.user.id });
+    audit.log({ action: 'CREATE', entity: 'FormResponse', entityId: formResponse.id, details: `Concept note submitted for "${title}"${late ? ' (late)' : ''}`, performedById: req.user.id });
 
-    res.status(201).json({ message: 'Form submitted successfully', formResponse, thesis, proposal, late });
+    res.status(201).json({ message: 'Form submitted successfully. It is now pending coordinator review.', formResponse, thesis: null, proposal: null, late });
   } catch (e) {
     console.error('submitFormResponse error:', e);
     res.status(500).json({ error: 'Internal server error', details: e.message });

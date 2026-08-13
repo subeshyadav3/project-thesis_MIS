@@ -67,30 +67,43 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
   if (scope.kind === 'program') {
     const isMaster = scope.degreeType === 'MASTER';
     if (isMaster) {
-      // Whole department: all master programs under the same department
       const deptPrograms = await prisma.program.findMany({
         where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
       });
       const programIds = deptPrograms.map(p => p.id);
+
       where.OR = [
-        { student: { programId: { in: programIds } } },
-        { programId: { in: programIds } },
+        // Theses this coordinator supervises (may be cross-program / cross-degree as a supervisor)
+        { supervisorId: user.id },
+        // Own program theses (bulk or manual)
+        { student: { programId: scope.program.id } },
+        // Cross-program theses manually created by this coordinator or explicitly assigned
+        {
+          AND: [
+            { createdVia: 'MANUAL' },
+            { OR: [{ programId: scope.program.id }, { student: { programId: { in: programIds } } }] }
+          ]
+        }
       ];
     } else {
-      // BACHELOR (or anything non-master) — strictly own program.
-      where.student = { ...(where.student || {}), programId: scope.program.id };
+      // BACHELOR (or non-master) — strictly own program, plus theses this coordinator supervises.
+      where.OR = [
+        { supervisorId: user.id },
+        { student: { ...(where.student || {}), programId: scope.program.id } },
+      ];
     }
     return { where, allowCrossProgram: isMaster, scope };
   }
 
   if (scope.kind === 'department') {
     const programIds = scope.programs.map(p => p.id);
-    where.student = { ...(where.student || {}), programId: { in: programIds } };
+    where.OR = [
+      { supervisorId: user.id },
+      { student: { ...(where.student || {}), programId: { in: programIds } } },
+    ];
     return { where, allowCrossProgram: false, scope };
   }
 
-  // No scope — return an impossible `where` so coordinators with no
-  // program/department linkage see nothing rather than everything.
   where.id = -1;
   return { where, allowCrossProgram: false, scope };
 }
@@ -123,6 +136,9 @@ async function buildGroupWhereForCoordinator(user, baseWhere = {}) {
  * don't have to construct the same predicate twice.
  */
 async function isThesisVisibleToCoordinator(thesis, scope, user) {
+  // A coordinator who is also the assigned supervisor of this thesis can always
+  // access it, regardless of which program/degree it belongs to.
+  if (thesis.supervisorId === user.id) return true;
   if (!scope || scope.kind === 'none') return false;
   if (scope.kind === 'program') {
     if (scope.degreeType === 'MASTER') {

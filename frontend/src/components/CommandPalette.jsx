@@ -35,46 +35,46 @@ function CommandPalette({ isOpen, onClose, user }) {
       try {
         const role = user?.role;
         const promises = [];
-        if (['COORDINATOR', 'SUPERVISOR', 'STUDENT'].includes(role)) {
-          promises.push(
-            api.get('/groups').then(({ data }) =>
-              data
-                .filter(g =>
-                  g.name.toLowerCase().includes(query.toLowerCase()) ||
-                  g.projectTitle.toLowerCase().includes(query.toLowerCase())
-                )
-                .slice(0, 4)
-                .map(g => ({
-                  id: `group-${g.id}`,
-                  title: g.name,
-                  subtitle: g.projectTitle,
-                  category: 'Bachelor Project',
-                  icon: 'school',
-                  path: role === 'SUPERVISOR' ? `/supervisor/project/group/${g.id}` : `/coordinator/project/group/${g.id}`,
-                }))
+    if (role === 'COORDINATOR' || role === 'SUPERVISOR') {
+      promises.push(
+        api.get('/groups').then(({ data }) =>
+          data
+            .filter(g =>
+              g.name.toLowerCase().includes(query.toLowerCase()) ||
+              g.projectTitle.toLowerCase().includes(query.toLowerCase())
             )
-          );
-        }
-        if (['COORDINATOR', 'SUPERVISOR', 'STUDENT'].includes(role)) {
-          promises.push(
-            api.get('/theses').then(({ data }) =>
-              data
-                .filter(t =>
-                  t.title.toLowerCase().includes(query.toLowerCase()) ||
-                  (t.student && `${t.student.firstName} ${t.student.lastName}`.toLowerCase().includes(query.toLowerCase()))
-                )
-                .slice(0, 4)
-                .map(t => ({
-                  id: `thesis-${t.id}`,
-                  title: t.title,
-                  subtitle: t.student ? `${t.student.firstName} ${t.student.lastName}` : 'Thesis',
-                  category: "Master's Thesis",
-                  icon: 'library_books',
-                  path: role === 'SUPERVISOR' ? `/supervisor/project/thesis/${t.id}` : `/coordinator/project/thesis/${t.id}`,
-                }))
+            .slice(0, 4)
+            .map(g => ({
+              id: `group-${g.id}`,
+              title: g.name,
+              subtitle: g.projectTitle,
+              category: 'Bachelor Project',
+              icon: 'school',
+              path: role === 'SUPERVISOR' ? `/supervisor/project/group/${g.id}` : `/coordinator/project/group/${g.id}`,
+            }))
+        )
+      );
+    }
+    if (role === 'COORDINATOR' || role === 'SUPERVISOR') {
+      promises.push(
+        api.get('/theses').then(({ data }) =>
+          data
+            .filter(t =>
+              t.title.toLowerCase().includes(query.toLowerCase()) ||
+              (t.student && `${t.student.firstName} ${t.student.lastName}`.toLowerCase().includes(query.toLowerCase()))
             )
-          );
-        }
+            .slice(0, 4)
+            .map(t => ({
+              id: `thesis-${t.id}`,
+              title: t.title,
+              subtitle: t.student ? `${t.student.firstName} ${t.student.lastName}` : 'Thesis',
+              category: "Master's Thesis",
+              icon: 'library_books',
+              path: role === 'SUPERVISOR' ? `/supervisor/project/thesis/${t.id}` : `/coordinator/project/thesis/${t.id}`,
+            }))
+        )
+      );
+    }
         const res = await Promise.all(promises);
         setSearchResults(res.flat());
       } catch (_) {
@@ -92,13 +92,35 @@ function CommandPalette({ isOpen, onClose, user }) {
 
   if (!isOpen) return null;
 
-  const defaultNavigation = [
-    { title: 'Dashboard', category: 'Navigation', icon: 'dashboard', path: user?.role === 'SUPERVISOR' ? '/supervisor' : '/coordinator' },
-    { title: 'Bachelor Projects', category: 'Navigation', icon: 'school', path: user?.role === 'SUPERVISOR' ? '/supervisor/bachelor' : '/coordinator/bachelor' },
-    { title: "Master's Thesis", category: 'Navigation', icon: 'library_books', path: user?.role === 'SUPERVISOR' ? '/supervisor/master' : '/coordinator/master' },
-    { title: 'Evaluations', category: 'Navigation', icon: 'grading', path: user?.role === 'SUPERVISOR' ? '/supervisor/bachelor' : '/coordinator/evaluations' },
-    { title: 'Notifications', category: 'Navigation', icon: 'notifications', path: user?.role === 'SUPERVISOR' ? '/supervisor/notifications' : '/coordinator/notifications' },
-  ];
+  const role = user?.role;
+  const defaultNavigationMap = {
+    STUDENT: [
+      { title: 'Dashboard', category: 'Navigation', icon: 'dashboard', path: '/student' },
+      { title: 'Thesis Forms', category: 'Navigation', icon: 'description', path: '/student/forms' },
+      { title: 'Project Submission', category: 'Navigation', icon: 'upload_file', path: '/student/submissions' },
+      { title: 'Notifications', category: 'Navigation', icon: 'notifications', path: '/student/notifications' },
+    ],
+    COORDINATOR: [
+      { title: 'Dashboard', category: 'Navigation', icon: 'dashboard', path: '/coordinator' },
+      { title: "Master's Thesis", category: 'Navigation', icon: 'library_books', path: '/coordinator/master' },
+      { title: 'Evaluations', category: 'Navigation', icon: 'grading', path: '/coordinator/evaluations' },
+      { title: 'Supervisors', category: 'Navigation', icon: 'supervisor_account', path: '/coordinator/supervisors' },
+      { title: 'Announcements', category: 'Navigation', icon: 'campaign', path: '/coordinator/announcements' },
+      { title: 'Notifications', category: 'Navigation', icon: 'notifications', path: '/coordinator/notifications' },
+    ],
+    SUPERVISOR: [
+      { title: 'Dashboard', category: 'Navigation', icon: 'dashboard', path: '/supervisor' },
+      { title: "Master's Thesis", category: 'Navigation', icon: 'library_books', path: '/supervisor/master' },
+      { title: 'Bachelor Projects', category: 'Navigation', icon: 'school', path: '/supervisor/bachelor' },
+      { title: 'Notifications', category: 'Navigation', icon: 'notifications', path: '/supervisor/notifications' },
+    ],
+    EXTERNAL_EXAMINER: [
+      { title: 'Dashboard', category: 'Navigation', icon: 'dashboard', path: '/external' },
+      { title: 'Evaluations', category: 'Navigation', icon: 'grading', path: '/external/evaluations' },
+      { title: 'Notifications', category: 'Navigation', icon: 'notifications', path: '/external/notifications' },
+    ],
+  };
+  const defaultNavigation = defaultNavigationMap[role] || defaultNavigationMap.COORDINATOR;
 
   const items = query.trim() ? searchResults : defaultNavigation;
 

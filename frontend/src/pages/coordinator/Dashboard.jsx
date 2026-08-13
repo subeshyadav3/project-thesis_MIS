@@ -194,15 +194,16 @@ function CoordinatorDashboard() {
       title="Dashboard"
       subtitle={degreeLabel + ' Program Overview'}
       user={user}
-      actions={
+      headerActions={
         isMaster && batchOptions.length > 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface-variant)', margin: 0, whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface-container-lowest)', padding: '6px 14px', borderRadius: 10, border: '1px solid var(--color-outline-variant)' }}>
+            <Icon name="filter_list" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }} />
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface)', margin: 0, whiteSpace: 'nowrap' }}>
               Filter Batch:
             </label>
             <select
               className="form-input"
-              style={{ padding: '5px 10px', fontSize: 13, borderRadius: 8, fontWeight: 600, minWidth: 130, cursor: 'pointer' }}
+              style={{ padding: '4px 10px', fontSize: 13, borderRadius: 6, fontWeight: 600, minWidth: 130, cursor: 'pointer', border: 'none', background: 'transparent' }}
               value={selectedBatch}
               onChange={e => setSelectedBatch(e.target.value)}
             >
@@ -395,8 +396,8 @@ function CoordinatorDashboard() {
       {/* Popup Modal for Assigned Students */}
       {showAssignedModal && (
         <div className="modal-overlay" onClick={() => setShowAssignedModal(false)}>
-          <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
-            <div className="modal-header">
+          <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxWidth: 960, width: '92%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header" style={{ flexShrink: 0 }}>
               <div className="modal-header-icon success">
                 <Icon name="assignment_turned_in" className="material-symbols-outlined" />
               </div>
@@ -408,42 +409,51 @@ function CoordinatorDashboard() {
                 <Icon name="close" className="material-symbols-outlined" />
               </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
               <div className="table-container">
-                <table className="table">
+                <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                  <colgroup>
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '33%' }} />
+                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '12%' }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>Student</th>
                       <th>Roll Number</th>
                       <th>Thesis Title</th>
                       <th>Supervisor</th>
-                      <th>Status</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      <th style={{ textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {assignedStudents.length === 0 ? (
-                      <tr><td colSpan={6} className="empty-cell">No assigned students found for this batch</td></tr>
+                      <tr><td colSpan={5} className="empty-cell">No assigned students found for this batch</td></tr>
                     ) : (
                       assignedStudents.map(s => {
                         const t = thesisByStudentId.get(s.id);
                         return (
                           <tr key={s.id}>
-                            <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
-                            <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
-                            <td style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-on-surface)' }}>{t?.title || '—'}</td>
-                            <td style={{ fontSize: 13 }}>
+                            <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.firstName} {s.lastName}
+                            </td>
+                            <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.rollNumber || '—'}
+                            </td>
+                            <td style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t?.title}>
+                              {t?.title || '—'}
+                            </td>
+                            <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {t?.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : <span style={{ color: 'var(--color-outline)' }}>Unassigned</span>}
                             </td>
-                            <td>
-                              <span className={`badge badge-${t?.status?.toLowerCase() || 'pending'}`}>{t?.status || 'PENDING'}</span>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              {t && (
-                                <Link to={`/coordinator/master`} className="btn btn-sm btn-outline" style={{ textDecoration: 'none' }}>
+                            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              {t ? (
+                                <Link to={`/coordinator/project/thesis/${t.id}`} className="btn btn-sm btn-outline" style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}>
                                   Manage →
                                 </Link>
-                              )}
+                              ) : '—'}
                             </td>
                           </tr>
                         );
@@ -453,7 +463,7 @@ function CoordinatorDashboard() {
                 </table>
               </div>
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions" style={{ flexShrink: 0 }}>
               <button className="btn btn-outline" onClick={() => setShowAssignedModal(false)}>Close</button>
             </div>
           </div>
@@ -463,8 +473,8 @@ function CoordinatorDashboard() {
       {/* Popup Modal for Unassigned Students */}
       {showUnassignedModal && (
         <div className="modal-overlay" onClick={() => setShowUnassignedModal(false)}>
-          <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
-            <div className="modal-header">
+          <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxWidth: 960, width: '92%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header" style={{ flexShrink: 0 }}>
               <div className="modal-header-icon warning">
                 <Icon name="person_off" className="material-symbols-outlined" />
               </div>
@@ -476,32 +486,50 @@ function CoordinatorDashboard() {
                 <Icon name="close" className="material-symbols-outlined" />
               </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
               <div className="table-container">
-                <table className="table">
+                <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                  <colgroup>
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '20%' }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>Student</th>
                       <th>Roll Number</th>
                       <th>Program</th>
                       <th>Email</th>
-                      <th>Batch</th>
                       <th style={{ textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {unassignedStudents.length === 0 ? (
-                      <tr><td colSpan={6} className="empty-cell">Great news! All students in this batch have assigned theses.</td></tr>
+                      <tr><td colSpan={5} className="empty-cell">Great news! All students in this batch have assigned theses.</td></tr>
                     ) : (
                       unassignedStudents.map(s => (
                         <tr key={s.id}>
-                          <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
-                          <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
-                          <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
-                          <td style={{ fontSize: 13 }}>{s.email}</td>
-                          <td style={{ fontSize: 13 }}>{normalizeBatch(s.batch || (s.rollNumber && /^\d{3}/.test(s.rollNumber) ? s.rollNumber.slice(0, 3) : '')) || '—'}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <Link to="/coordinator/master" className="btn btn-sm btn-primary" style={{ textDecoration: 'none' }}>
+                          <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.firstName} {s.lastName}
+                          </td>
+                          <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.rollNumber || '—'}
+                          </td>
+                          <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.program?.code || '—'}
+                          </td>
+                          <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.email}
+                          </td>
+                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <Link
+                              to="/coordinator/master"
+                              state={{ openCreate: true, studentId: s.id }}
+                              className="btn btn-sm btn-primary"
+                              style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}
+                            >
                               <Icon name="add" className="material-symbols-outlined" /> Assign Thesis
                             </Link>
                           </td>
@@ -512,7 +540,7 @@ function CoordinatorDashboard() {
                 </table>
               </div>
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions" style={{ flexShrink: 0 }}>
               <button className="btn btn-outline" onClick={() => setShowUnassignedModal(false)}>Close</button>
             </div>
           </div>

@@ -150,7 +150,7 @@ exports.getMyGroups = async (req, res) => {
     const groups = await prisma.projectGroup.findMany({
       where: { supervisorId: req.user.id },
       include: {
-        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -166,7 +166,7 @@ exports.getMyTheses = async (req, res) => {
     const theses = await prisma.thesis.findMany({
       where: { supervisorId: req.user.id },
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },

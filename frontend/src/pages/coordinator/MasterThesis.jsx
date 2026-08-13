@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../../components/ui';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -14,9 +14,17 @@ import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
+const CLUSTERS = [
+  'AI/ML and image processing',
+  'Audio, NLP and data/text analytics',
+  'Electronic devices, circuits and communication',
+  'Computer networks and security',
+];
+
 function MasterThesis() {
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [theses, setTheses] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allSupervisors, setAllSupervisors] = useState([]);
@@ -104,6 +112,15 @@ function MasterThesis() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (location.state?.openCreate) {
+      setShowCreate(true);
+      if (location.state?.studentId) {
+        setCreateForm(prev => ({ ...prev, studentId: Number(location.state.studentId) }));
+      }
+    }
+  }, [location.state]);
 
   const downloadEvalPdf = async (thesis) => {
     try {

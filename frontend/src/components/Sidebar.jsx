@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Icon } from './ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -7,15 +7,6 @@ function Sidebar({ user, isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [supervisorScope, setSupervisorScope] = useState(null);
-
-  useEffect(() => {
-    if (user?.role === 'COORDINATOR') {
-      api.get('/users/supervisor-scope')
-        .then(({ data }) => setSupervisorScope(data))
-        .catch(() => setSupervisorScope(null));
-    }
-  }, [user?.role]);
 
   const handleLogout = async () => {
     await api.post('/auth/logout').catch(() => {});
@@ -52,8 +43,8 @@ function Sidebar({ user, isOpen, onClose }) {
 
   const supervisorLinks = [
     { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' },
-    { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
+    ...(!isMaster ? [{ path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' }] : []),
+    ...(!isBachelor ? [{ path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' }] : []),
     { path: '/supervisor/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
@@ -63,16 +54,22 @@ function Sidebar({ user, isOpen, onClose }) {
   const studentLinks = [
     { path: '/student', label: 'Dashboard', icon: 'dashboard' },
     ...(sType === 'bachelor'
-      ? [{ path: '/student/projects', label: 'Projects', icon: 'school' }]
+      ? [
+          { path: '/student/projects', label: 'Projects', icon: 'school' },
+          { path: '/student/groups', label: 'Groups', icon: 'group_add' },
+        ]
       : sType === 'master'
-        ? [{ path: '/student/theses', label: 'Theses', icon: 'library_books' }]
+        ? [
+            { path: '/student/theses', label: 'Theses', icon: 'library_books' },
+            { path: '/student/forms', label: 'Thesis Forms', icon: 'description' },
+          ]
         : [
             { path: '/student/projects', label: 'Projects', icon: 'school' },
             { path: '/student/theses', label: 'Theses', icon: 'library_books' },
+            { path: '/student/groups', label: 'Groups', icon: 'group_add' },
+            { path: '/student/forms', label: 'Forms', icon: 'description' },
           ]
     ),
-    { path: '/student/groups', label: sType === 'master' ? 'Thesis Formation' : 'Groups', icon: 'group_add' },
-    ...(sType === 'master' ? [{ path: '/student/forms', label: 'Thesis Forms', icon: 'description' }] : []),
     { path: '/student/submissions', label: 'Project Submission', icon: 'upload_file' },
     { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
   ];
@@ -84,7 +81,7 @@ function Sidebar({ user, isOpen, onClose }) {
   ];
 
   const links = user?.role === 'MAINTAINER' ? maintainerLinks
-    : user?.role === 'COORDINATOR' ? (supervisorScope?.hasOtherProgramAssignments ? supervisorLinks : coordinatorLinks)
+    : user?.role === 'COORDINATOR' ? coordinatorLinks
     : user?.role === 'SUPERVISOR' ? supervisorLinks
     : user?.role === 'STUDENT' ? studentLinks
     : user?.role === 'EXTERNAL_EXAMINER' ? externalLinks

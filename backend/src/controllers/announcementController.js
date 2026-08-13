@@ -1,4 +1,5 @@
 
+const XLSX = require('xlsx');
 const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
@@ -353,7 +354,9 @@ exports.getFormResponses = async (req, res) => {
     const responses = await prisma.formResponse.findMany({
       where: { announcementId: id },
       include: {
-        thesis: { select: { id: true, title: true, status: true } },
+        thesis: {
+          select: { id: true, title: true, status: true, supervisorId: true, supervisor: { select: { id: true, firstName: true, lastName: true } } },
+        },
       },
     });
     const responseByStudent = new Map(responses.map(r => [r.studentId, r]));
@@ -370,21 +373,102 @@ exports.getFormResponses = async (req, res) => {
   }
 };
 
+exports.exportFormResponses = async (req, res) => {
+  try {
+    const announcementId = parseInt(req.params.id);
+    const responses = await prisma.formResponse.findMany({
+      where: { announcementId },
+      include: {
+        student: { include: { program: true } },
+        thesis: { include: { supervisor: true } },
+      },
+    });
+
+    const rows = responses.map(({ student, formData, status, thesis, createdAt }) => {
+      const d = formData || {};
+      const sup = thesis?.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : '';
+      return {
+        'Student Name': `${student.firstName} ${student.lastName}`,
+        'Roll Number': student.rollNumber || '',
+        'Program': student.program?.code || '',
+        'Email': student.email || '',
+        'Thesis Title': d.title || '',
+        'Research Cluster': d.cluster || '',
+        'Guided Proposal': d.is_guided || '',
+        'Primary Supervisor Preference': d.primary_supervisor || '',
+        'Secondary Supervisor Preference': d.secondary_supervisor || '',
+        'Remarks / Feedback': d.remarks || d.description || d.feedback || '',
+        'Final Assigned Supervisor': sup,
+        'PDF Proposal Document': d.pdfUrl || d.pdf_document || '',
+        'Submission Status': status,
+        'Submitted At': new Date(createdAt).toLocaleString(),
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Form Responses');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Form_Responses_${announcementId}.xlsx`);
+    res.send(buf);
+  } catch (err) {
+    console.error('exportFormResponses error:', err);
+    res.status(500).json({ error: 'Failed to export Excel' });
+  }
+};
+
 exports.updateFormResponse = async (req, res) => {
   try {
     const responseId = parseInt(req.params.responseId);
     const existing = await prisma.formResponse.findUnique({
       where: { id: responseId },
-      include: { student: true, announcement: true },
+      include: { student: true, announcement: true, thesis: true },
     });
     if (!existing) return res.status(404).json({ error: 'Form response not found' });
 
-    const { formData } = req.body;
+    // Scope guard: coordinators may only manage responses within their department
+    if (req.user.role === 'COORDINATOR' && existing.announcement?.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Forbidden: this response belongs to another department' });
+    }
+
+    const incoming = (req.body.formData && typeof req.body.formData === 'object') ? req.body.formData : {};
+
+    // Merge with existing formData instead of replacing (preserves student-submitted fields)
+    const mergedFormData = { ...(existing.formData || {}), ...incoming };
+    // finalSupervisorId is a coordinator-only control field — never part of the form submission
+    delete mergedFormData.finalSupervisorId;
+
     const updated = await prisma.formResponse.update({
       where: { id: responseId },
-      data: { formData: formData !== undefined ? formData : existing.formData },
+      data: { formData: mergedFormData },
       include: { student: true, thesis: true },
     });
+
+    // If a thesis already exists, apply the editable matrix changes to the thesis record too
+    if (existing.thesis) {
+      const thesisUpdates = {};
+      if (incoming.title && incoming.title.trim()) thesisUpdates.title = incoming.title.trim();
+      if (incoming.cluster !== undefined) thesisUpdates.cluster = incoming.cluster || null;
+      if (incoming.finalSupervisorId !== undefined) {
+        const nextSupId = incoming.finalSupervisorId ? parseInt(incoming.finalSupervisorId) : null;
+        const prevSupId = existing.thesis.supervisorId || null;
+        thesisUpdates.supervisorId = nextSupId;
+        thesisUpdates.supervisorAssignmentStatus = nextSupId ? 'PENDING' : null;
+        // Notify only when a supervisor was newly assigned or changed
+        if (nextSupId && nextSupId !== prevSupId) {
+          try {
+            const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+            await notifSvc.notify(nextSupId, 'SUPERVISOR_ASSIGNMENT',
+              `${assignerName} assigned you as supervisor for "${existing.thesis.title}" (Master Thesis) — pending your acceptance.`, `/theses/${existing.thesis.id}`);
+          } catch (e) { console.error('notify supervisor error:', e.message); }
+        }
+      }
+      if (Object.keys(thesisUpdates).length) {
+        await prisma.thesis.update({ where: { id: existing.thesis.id }, data: thesisUpdates });
+      }
+    }
 
     audit.log({ action: 'UPDATE_FORM_RESPONSE', entity: 'FormResponse', entityId: responseId, details: `Updated form response for student ${existing.studentId}`, performedById: req.user.id });
     res.json(updated);
@@ -405,12 +489,18 @@ exports.finalizeFormResponse = async (req, res) => {
     });
     if (!existing) return res.status(404).json({ error: 'Form response not found' });
 
+    // Scope guard: coordinators may only finalize responses within their department
+    if (req.user.role === 'COORDINATOR' && existing.announcement?.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Forbidden: this response belongs to another department' });
+    }
+
     const student = existing.student;
     const finalTitle = title || existing.formData?.title || 'Master Thesis';
     const finalCluster = cluster || existing.formData?.cluster || null;
     const finalProgramId = programId ? parseInt(programId) : (student.programId || null);
     const finalBatch = batch || student.batch || null;
     const selectedSupId = supervisorId ? parseInt(supervisorId) : null;
+    const previousSupId = existing.thesis?.supervisorId || null;
 
     let thesis = existing.thesis;
     if (thesis) {
@@ -444,7 +534,7 @@ exports.finalizeFormResponse = async (req, res) => {
       });
 
       // Create default evaluation components
-      const { getDefaultComponents } = require('../config/defaultComponents');
+      const { getDefaultComponents } = require('../config/evaluationScheme');
       const defaults = getDefaultComponents('MASTER');
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
@@ -468,7 +558,8 @@ exports.finalizeFormResponse = async (req, res) => {
       }
     }
 
-    if (selectedSupId) {
+    // Notify only when a supervisor was newly assigned or changed
+    if (selectedSupId && (!existing.thesis || selectedSupId !== previousSupId)) {
       try {
         const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
         await notifSvc.notify(selectedSupId, 'SUPERVISOR_ASSIGNMENT',
@@ -476,9 +567,15 @@ exports.finalizeFormResponse = async (req, res) => {
       } catch (e) { console.error('notify supervisor error:', e.message); }
     }
 
+    // Reflect the official title/cluster back into the response formData (merge, don't overwrite)
+    const officialData = { ...(existing.formData || {}) };
+    if (title) officialData.title = title;
+    if (cluster) officialData.cluster = cluster;
+    delete officialData.finalSupervisorId;
+
     const updatedResponse = await prisma.formResponse.update({
       where: { id: responseId },
-      data: { thesisId: thesis.id, status: 'APPROVED' },
+      data: { thesisId: thesis.id, status: 'APPROVED', formData: officialData },
       include: { student: true, thesis: true },
     });
 

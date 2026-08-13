@@ -86,8 +86,15 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
-    const filePath = path.join(__dirname, '..', 'storage', type, filename);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    let filePath = path.join(__dirname, '..', 'storage', type, filename);
+    if (!fs.existsSync(filePath)) {
+      // Some uploads were historically stored under the sibling folder while their URL
+      // referenced this one. Fall back so those links still resolve.
+      const altType = type === 'theses' ? 'groups' : 'theses';
+      const altPath = path.join(__dirname, '..', 'storage', altType, filename);
+      if (fs.existsSync(altPath)) return res.sendFile(altPath);
+      return res.status(404).json({ error: 'File not found' });
+    }
     res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });

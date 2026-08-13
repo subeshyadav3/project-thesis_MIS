@@ -7,6 +7,7 @@ router.use(authenticate);
 
 router.get('/eligible', ctrl.listEligible);
 router.get('/:id/form-responses', authorize('COORDINATOR', 'MAINTAINER'), ctrl.getFormResponses);
+router.get('/:id/export-responses', authorize('COORDINATOR', 'MAINTAINER'), ctrl.exportFormResponses);
 router.put('/responses/:responseId', authorize('COORDINATOR', 'MAINTAINER'), ctrl.updateFormResponse);
 router.post('/responses/:responseId/finalize', authorize('COORDINATOR', 'MAINTAINER'), ctrl.finalizeFormResponse);
 router.get('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.list);

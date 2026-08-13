@@ -67,6 +67,23 @@ exports.getThesis = async (req, res) => {
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    // Auto-initialize default evaluation components if missing
+    if (!thesis.evaluationComponents || thesis.evaluationComponents.length === 0) {
+      try {
+        const { getDefaultComponents } = require('../config/evaluationScheme');
+        const defaults = getDefaultComponents('MASTER');
+        for (const comp of defaults) {
+          await prisma.evaluationComponent.create({
+            data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
+          });
+        }
+        thesis.evaluationComponents = await prisma.evaluationComponent.findMany({ where: { thesisId: thesis.id } });
+      } catch (e) {
+        console.error('Auto-create evaluation components error:', e.message);
+      }
+    }
+
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
       if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {

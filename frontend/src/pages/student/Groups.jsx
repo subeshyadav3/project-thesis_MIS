@@ -334,9 +334,14 @@ function StudentGroups() {
                         onCreate={handleCreate}
                         onCancel={() => { setSelectedAnn(null); setCreateForm({ name: '', projectTitle: '' }); setSelectedMembers([]); }}
                       />
-                    ) : (                        <button className={`btn btn-sm ${a.type === 'THESIS' ? 'btn-warning' : 'btn-primary'}`} onClick={() => { setSelectedAnn(a); setCreateForm({ name: a.type === 'THESIS' ? '' : `Group of ${user.firstName}`, projectTitle: a.title }); }}>
-                          <Icon name={a.type === 'THESIS' ? 'description' : 'group_add'} className="material-symbols-outlined" /> {a.type === 'THESIS' ? 'Submit Thesis' : 'Create Group'}
-                        </button>
+                    ) : a.type === 'THESIS' ? (
+                      <Link to="/student/forms" className="btn btn-sm btn-warning" style={{ textDecoration: 'none' }}>
+                        <Icon name="description" className="material-symbols-outlined" /> Submit Thesis Form
+                      </Link>
+                    ) : (
+                      <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAnn(a); setCreateForm({ name: `Group of ${user.firstName}`, projectTitle: a.title }); }}>
+                        <Icon name="group_add" className="material-symbols-outlined" /> Create Group
+                      </button>
                     )}
                   </div>
                 ))}
