@@ -26,8 +26,13 @@ function MasterThesis() {
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+  const CLUSTERS = [
+    'AI/ML and image processing',
+    'Audio, NLP and data/text analytics',
+    'Electronic devices, circuits and communication',
+    'Computer networks and security',
+  ];
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
   const [creating, setCreating] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [editStartDate, setEditStartDate] = useState('');
@@ -1093,6 +1098,15 @@ return (
               <div className="form-group">
                 <label>Thesis Title</label>
                 <input value={createForm.title} onChange={e => setCreateForm({...createForm, title: e.target.value})} required placeholder="Enter thesis title" />
+              </div>
+              <div className="form-group">
+                <label>Research Project Cluster / Area <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <select value={createForm.cluster || ''} onChange={e => setCreateForm({...createForm, cluster: e.target.value})}>
+                  <option value="">Select cluster...</option>
+                  {CLUSTERS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
                 <label>Student</label>
