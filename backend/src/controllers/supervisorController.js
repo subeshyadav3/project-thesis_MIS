@@ -4,23 +4,41 @@ const audit = require('../services/auditService');
 const pdfService = require('../services/pdfService');
 const notifSvc = require('../services/notificationService');
 
-async function findCoordinatorIdsForStudent(studentId, programId, departmentId) {
+async function findCoordinatorIdsForStudent(studentId, programId, departmentId, thesisId) {
   const ids = [];
   try {
+    if (studentId) {
+      const student = await prisma.user.findUnique({ where: { id: studentId }, select: { programId: true, departmentId: true } });
+      if (student?.programId) {
+        const prog = await prisma.program.findUnique({ where: { id: student.programId }, select: { coordinatorId: true } });
+        if (prog?.coordinatorId && !ids.includes(prog.coordinatorId)) ids.push(prog.coordinatorId);
+      }
+      if (student?.departmentId && !departmentId) departmentId = student.departmentId;
+    }
     if (programId) {
       const prog = await prisma.program.findUnique({ where: { id: programId }, select: { coordinatorId: true } });
-      if (prog?.coordinatorId) ids.push(prog.coordinatorId);
+      if (prog?.coordinatorId && !ids.includes(prog.coordinatorId)) ids.push(prog.coordinatorId);
+    }
+    if (thesisId) {
+      const thesis = await prisma.thesis.findUnique({ where: { id: thesisId }, select: { crossProgramRequestedById: true } });
+      if (thesis?.crossProgramRequestedById && !ids.includes(thesis.crossProgramRequestedById)) {
+        ids.push(thesis.crossProgramRequestedById);
+      }
     }
     if (departmentId) {
       const dept = await prisma.department.findUnique({ where: { id: departmentId }, select: { coordinatorId: true } });
       if (dept?.coordinatorId && !ids.includes(dept.coordinatorId)) ids.push(dept.coordinatorId);
+    }
+    // Fallback: Notify all coordinators in department if no specific program coordinator found
+    if (ids.length === 0 && departmentId) {
+      const deptCoords = await prisma.user.findMany({ where: { role: 'COORDINATOR', departmentId }, select: { id: true } });
+      deptCoords.forEach(c => { if (!ids.includes(c.id)) ids.push(c.id); });
     }
   } catch (e) { console.error('findCoordinatorIdsForStudent error:', e.message); }
   return ids;
 }
 
 async function acceptAssignment({ type, id, user }) {
-  const where = { id: parseInt(id), supervisorId: user.id };
   const data = { supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' };
   if (type === 'thesis') {
     const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(id) }, include: { student: true } });
@@ -28,7 +46,7 @@ async function acceptAssignment({ type, id, user }) {
     if (thesis.supervisorId !== user.id) return { error: 'This thesis is not assigned to you', code: 403 };
     if (thesis.supervisorAssignmentStatus === 'ACCEPTED') return { error: 'Assignment already accepted', code: 400 };
     const updated = await prisma.thesis.update({ where: { id: thesis.id }, data });
-    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId);
+    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId, thesis.id);
     const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
     await notifSvc.notifySupervisorAccepted({ supervisorName, itemTitle: thesis.title, type: 'thesis', studentIds: [thesis.studentId], coordinatorIds: coordIds });
     audit.log({ action: 'SUPERVISOR_ACCEPT', entity: 'Thesis', entityId: thesis.id, details: `Supervisor accepted "${thesis.title}"`, performedById: user.id });
@@ -55,7 +73,7 @@ async function rejectAssignment({ type, id, user, reason }) {
       where: { id: thesis.id },
       data: { supervisorId: null, supervisorAssignmentStatus: 'REJECTED' },
     });
-    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId);
+    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId, thesis.id);
     const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
     await notifSvc.notifySupervisorRejected({ supervisorName, itemTitle: thesis.title, type: 'thesis', reason, studentIds: [thesis.studentId], coordinatorIds: coordIds });
     audit.log({ action: 'SUPERVISOR_REJECT', entity: 'Thesis', entityId: thesis.id, details: `Supervisor rejected "${thesis.title}" — ${reason || 'no reason'}`, performedById: user.id });
