@@ -11,8 +11,8 @@ const audit = require('../services/auditService');
 exports.createRequest = async (req, res) => {
   try {
     const { thesisId, supervisorId } = req.body;
-    if (!thesisId || !supervisorId) {
-      return res.status(400).json({ error: 'thesisId and supervisorId are required' });
+    if (!thesisId) {
+      return res.status(400).json({ error: 'thesisId is required' });
     }
 
     const thesis = await prisma.thesis.findUnique({
@@ -21,15 +21,46 @@ exports.createRequest = async (req, res) => {
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
 
-    const supUser = await prisma.user.findUnique({ where: { id: parseInt(supervisorId) }, select: { role: true } });
+    const oldSupervisorId = thesis.supervisorId;
+    const isRemoving = !supervisorId || supervisorId === 'NONE' || supervisorId === 'CLEAR' || isNaN(parseInt(supervisorId));
+
+    if (isRemoving) {
+      const updated = await prisma.thesis.update({
+        where: { id: thesis.id },
+        data: { supervisorId: null, supervisorAssignmentStatus: null },
+      });
+
+      if (oldSupervisorId) {
+        try {
+          const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+          await notifSvc.notify(oldSupervisorId, 'SUPERVISOR_REMOVED',
+            `${assignerName} unassigned you as supervisor for thesis "${thesis.title}".`, `/theses/${thesis.id}`);
+        } catch (e) { console.error('notify unassign error:', e.message); }
+      }
+
+      audit.log({ action: 'UNASSIGN_SUPERVISOR', entity: 'Thesis', entityId: thesis.id, details: `Supervisor unassigned from thesis ${thesisId}`, performedById: req.user.id });
+      return res.json({ message: 'Supervisor removed successfully', thesis: updated });
+    }
+
+    const supId = parseInt(supervisorId);
+    const supUser = await prisma.user.findUnique({ where: { id: supId }, select: { role: true } });
     const isCoordinatorSup = supUser?.role === 'COORDINATOR';
     // Assign — pending the supervisor's acceptance (coordinators are accepted immediately)
     const updated = await prisma.thesis.update({
       where: { id: thesis.id },
       data: isCoordinatorSup
-        ? { supervisorId: parseInt(supervisorId), supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' }
-        : { supervisorId: parseInt(supervisorId), supervisorAssignmentStatus: 'PENDING' },
+        ? { supervisorId: supId, supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' }
+        : { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
     });
+
+    // Notify old supervisor if changed
+    if (oldSupervisorId && oldSupervisorId !== supId) {
+      try {
+        const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+        await notifSvc.notify(oldSupervisorId, 'SUPERVISOR_REMOVED',
+          `${assignerName} unassigned you as supervisor for thesis "${thesis.title}".`, `/theses/${thesis.id}`);
+      } catch (e) { console.error('notify old supervisor error:', e.message); }
+    }
 
     // Notify the supervisor of the pending assignment
     try {

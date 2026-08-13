@@ -721,6 +721,33 @@ exports.assignSupervisor = async (req, res) => {
   try {
     const { id } = req.params;
     const { supervisorId } = req.body;
+
+    const groupBefore = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) } });
+    if (!groupBefore) return res.status(404).json({ error: 'Group not found' });
+    const oldSupervisorId = groupBefore.supervisorId;
+
+    const isRemoving = !supervisorId || supervisorId === 'NONE' || supervisorId === 'CLEAR' || isNaN(parseInt(supervisorId));
+
+    if (isRemoving) {
+      const group = await prisma.projectGroup.update({
+        where: { id: parseInt(id) },
+        data: { supervisorId: null, supervisorAssignmentStatus: null },
+        include: { members: { include: { student: true } } },
+      });
+
+      if (oldSupervisorId) {
+        try {
+          const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+          const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+          await notifSvc.notify(oldSupervisorId, 'SUPERVISOR_REMOVED',
+            `${assignerName} unassigned you as supervisor for project "${group.projectTitle || group.name}".`, `/groups/${group.id}`);
+        } catch (e) { console.error('notify unassign error:', e.message); }
+      }
+
+      audit.log({ action: 'UNASSIGN_SUPERVISOR', entity: 'ProjectGroup', entityId: group.id, details: `Unassigned supervisor from "${group.projectTitle || group.name}"`, performedById: req.user.id });
+      return res.json(group);
+    }
+
     const supId = parseInt(supervisorId);
     const supUser = await prisma.user.findUnique({ where: { id: supId }, select: { role: true } });
     const isCoordinatorSup = supUser?.role === 'COORDINATOR';
@@ -734,6 +761,16 @@ exports.assignSupervisor = async (req, res) => {
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
       },
     });
+
+    if (oldSupervisorId && oldSupervisorId !== supId) {
+      try {
+        const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+        const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+        await notifSvc.notify(oldSupervisorId, 'SUPERVISOR_REMOVED',
+          `${assignerName} unassigned you as supervisor for project "${group.projectTitle || group.name}".`, `/groups/${group.id}`);
+      } catch (e) { console.error('notify unassign error:', e.message); }
+    }
+
     const sup = group.supervisor;
     if (sup) {
       emailService.notifySupervisorAssigned(

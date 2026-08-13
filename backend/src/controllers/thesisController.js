@@ -762,7 +762,32 @@ exports.assignSupervisor = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    const supervisorId = parseInt(req.body.supervisorId);
+
+    const oldSupervisorId = existing.supervisorId;
+    const rawSupId = req.body.supervisorId;
+    const isRemoving = !rawSupId || rawSupId === 'NONE' || rawSupId === 'CLEAR' || isNaN(parseInt(rawSupId));
+
+    if (isRemoving) {
+      const thesis = await prisma.thesis.update({
+        where: { id },
+        data: { supervisorId: null, supervisorAssignmentStatus: null },
+        include: { student: true, supervisor: true },
+      });
+
+      if (oldSupervisorId) {
+        try {
+          const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+          const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+          await notifSvc.notify(oldSupervisorId, 'SUPERVISOR_REMOVED',
+            `${assignerName} unassigned you as supervisor for thesis "${thesis.title}".`, `/theses/${thesis.id}`);
+        } catch (e) { console.error('notify unassign error:', e.message); }
+      }
+
+      audit.log({ action: 'UNASSIGN_SUPERVISOR', entity: 'Thesis', entityId: thesis.id, details: `Unassigned supervisor from "${thesis.title}"`, performedById: req.user.id });
+      return res.json(thesis);
+    }
+
+    const supervisorId = parseInt(rawSupId);
     const supUser = await prisma.user.findUnique({ where: { id: supervisorId }, select: { role: true } });
     // A coordinator assigned as supervisor is treated as accepted (self/peer assignment is explicit)
     const isCoordinatorSup = supUser?.role === 'COORDINATOR';
@@ -773,6 +798,16 @@ exports.assignSupervisor = async (req, res) => {
         : { supervisorId, supervisorAssignmentStatus: 'PENDING' },
       include: { student: true, supervisor: true },
     });
+
+    if (oldSupervisorId && oldSupervisorId !== supervisorId) {
+      try {
+        const assigner = await prisma.user.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+        const assignerName = assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Coordinator';
+        await notifSvc.notify(oldSupervisorId, 'SUPERVISOR_REMOVED',
+          `${assignerName} unassigned you as supervisor for thesis "${thesis.title}".`, `/theses/${thesis.id}`);
+      } catch (e) { console.error('notify old supervisor error:', e.message); }
+    }
+
     const sup = thesis.supervisor;
     if (sup) {
       const emailService = require('../services/emailService');
