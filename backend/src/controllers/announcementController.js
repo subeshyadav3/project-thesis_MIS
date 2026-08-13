@@ -370,6 +370,126 @@ exports.getFormResponses = async (req, res) => {
   }
 };
 
+exports.updateFormResponse = async (req, res) => {
+  try {
+    const responseId = parseInt(req.params.responseId);
+    const existing = await prisma.formResponse.findUnique({
+      where: { id: responseId },
+      include: { student: true, announcement: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Form response not found' });
+
+    const { formData } = req.body;
+    const updated = await prisma.formResponse.update({
+      where: { id: responseId },
+      data: { formData: formData !== undefined ? formData : existing.formData },
+      include: { student: true, thesis: true },
+    });
+
+    audit.log({ action: 'UPDATE_FORM_RESPONSE', entity: 'FormResponse', entityId: responseId, details: `Updated form response for student ${existing.studentId}`, performedById: req.user.id });
+    res.json(updated);
+  } catch (e) {
+    console.error('updateFormResponse error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.finalizeFormResponse = async (req, res) => {
+  try {
+    const responseId = parseInt(req.params.responseId);
+    const { supervisorId, title, cluster, programId, batch } = req.body;
+
+    const existing = await prisma.formResponse.findUnique({
+      where: { id: responseId },
+      include: { student: { include: { program: true } }, announcement: true, thesis: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Form response not found' });
+
+    const student = existing.student;
+    const finalTitle = title || existing.formData?.title || 'Master Thesis';
+    const finalCluster = cluster || existing.formData?.cluster || null;
+    const finalProgramId = programId ? parseInt(programId) : (student.programId || null);
+    const finalBatch = batch || student.batch || null;
+    const selectedSupId = supervisorId ? parseInt(supervisorId) : null;
+
+    let thesis = existing.thesis;
+    if (thesis) {
+      thesis = await prisma.thesis.update({
+        where: { id: thesis.id },
+        data: {
+          title: finalTitle,
+          cluster: finalCluster,
+          programId: finalProgramId,
+          batch: finalBatch,
+          supervisorId: selectedSupId,
+          supervisorAssignmentStatus: selectedSupId ? 'PENDING' : null,
+          status: 'ACTIVE',
+        },
+      });
+    } else {
+      thesis = await prisma.thesis.create({
+        data: {
+          title: finalTitle,
+          projectType: 'MASTER',
+          studentId: student.id,
+          supervisorId: selectedSupId,
+          supervisorAssignmentStatus: selectedSupId ? 'PENDING' : null,
+          programId: finalProgramId,
+          batch: finalBatch,
+          cluster: finalCluster,
+          createdVia: 'FORM',
+          announcementId: existing.announcementId,
+          status: 'ACTIVE',
+        },
+      });
+
+      // Create default evaluation components
+      const { getDefaultComponents } = require('../config/defaultComponents');
+      const defaults = getDefaultComponents('MASTER');
+      for (const comp of defaults) {
+        await prisma.evaluationComponent.create({
+          data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
+        });
+      }
+
+      // Link PDF proposal document if present in formData
+      const pdfUrl = existing.formData?.pdfUrl || existing.formData?.fileUrl;
+      if (pdfUrl) {
+        await prisma.proposal.create({
+          data: {
+            stage: 'PROPOSAL',
+            documentUrl: pdfUrl,
+            documentType: 'PROPOSAL',
+            status: 'VISIBLE',
+            thesisId: thesis.id,
+            submittedById: student.id,
+          },
+        });
+      }
+    }
+
+    if (selectedSupId) {
+      try {
+        const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+        await notifSvc.notify(selectedSupId, 'SUPERVISOR_ASSIGNMENT',
+          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master Thesis) — pending your acceptance.`, `/theses/${thesis.id}`);
+      } catch (e) { console.error('notify supervisor error:', e.message); }
+    }
+
+    const updatedResponse = await prisma.formResponse.update({
+      where: { id: responseId },
+      data: { thesisId: thesis.id, status: 'APPROVED' },
+      include: { student: true, thesis: true },
+    });
+
+    audit.log({ action: 'FINALIZE_FORM_RESPONSE', entity: 'FormResponse', entityId: responseId, details: `Finalized thesis "${thesis.title}" for student ${student.id}`, performedById: req.user.id });
+    res.json({ message: 'Thesis finalized successfully', response: updatedResponse, thesis });
+  } catch (e) {
+    console.error('finalizeFormResponse error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.deactivate = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
