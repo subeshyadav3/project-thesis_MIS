@@ -10,14 +10,16 @@ async function findCoordinatorIdsForStudent(studentId, programId, departmentId, 
     if (studentId) {
       const student = await prisma.user.findUnique({ where: { id: studentId }, select: { programId: true, departmentId: true } });
       if (student?.programId) {
-        const prog = await prisma.program.findUnique({ where: { id: student.programId }, select: { coordinatorId: true } });
+        const prog = await prisma.program.findUnique({ where: { id: student.programId }, select: { coordinatorId: true, departmentId: true } });
         if (prog?.coordinatorId && !ids.includes(prog.coordinatorId)) ids.push(prog.coordinatorId);
+        if (prog?.departmentId && !departmentId) departmentId = prog.departmentId;
       }
       if (student?.departmentId && !departmentId) departmentId = student.departmentId;
     }
     if (programId) {
-      const prog = await prisma.program.findUnique({ where: { id: programId }, select: { coordinatorId: true } });
+      const prog = await prisma.program.findUnique({ where: { id: programId }, select: { coordinatorId: true, departmentId: true } });
       if (prog?.coordinatorId && !ids.includes(prog.coordinatorId)) ids.push(prog.coordinatorId);
+      if (prog?.departmentId && !departmentId) departmentId = prog.departmentId;
     }
     if (thesisId) {
       const thesis = await prisma.thesis.findUnique({ where: { id: thesisId }, select: { crossProgramRequestedById: true } });
@@ -29,10 +31,10 @@ async function findCoordinatorIdsForStudent(studentId, programId, departmentId, 
       const dept = await prisma.department.findUnique({ where: { id: departmentId }, select: { coordinatorId: true } });
       if (dept?.coordinatorId && !ids.includes(dept.coordinatorId)) ids.push(dept.coordinatorId);
     }
-    // Fallback: Notify all coordinators in department if no specific program coordinator found
-    if (ids.length === 0 && departmentId) {
-      const deptCoords = await prisma.user.findMany({ where: { role: 'COORDINATOR', departmentId }, select: { id: true } });
-      deptCoords.forEach(c => { if (!ids.includes(c.id)) ids.push(c.id); });
+    // Fallback: Notify all active coordinators if no specific program coordinator found
+    if (ids.length === 0) {
+      const allCoords = await prisma.user.findMany({ where: { role: 'COORDINATOR', active: true }, select: { id: true } });
+      allCoords.forEach(c => { if (!ids.includes(c.id)) ids.push(c.id); });
     }
   } catch (e) { console.error('findCoordinatorIdsForStudent error:', e.message); }
   return ids;
@@ -52,14 +54,16 @@ async function acceptAssignment({ type, id, user }) {
     audit.log({ action: 'SUPERVISOR_ACCEPT', entity: 'Thesis', entityId: thesis.id, details: `Supervisor accepted "${thesis.title}"`, performedById: user.id });
     return { data: updated };
   }
-  const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) }, include: { members: true } });
+  const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) }, include: { members: { include: { student: true } } } });
   if (!group) return { error: 'Group not found', code: 404 };
   if (group.supervisorId !== user.id) return { error: 'This group is not assigned to you', code: 403 };
   if (group.supervisorAssignmentStatus === 'ACCEPTED') return { error: 'Assignment already accepted', code: 400 };
   const updated = await prisma.projectGroup.update({ where: { id: group.id }, data });
-  const coordIds = await findCoordinatorIdsForStudent(group.members?.[0]?.studentId, group.programId, group.members?.[0]?.studentId ? (await prisma.user.findUnique({ where: { id: group.members[0].studentId }, select: { departmentId: true } }))?.departmentId : null);
+  const memberStudentIds = group.members?.map(m => m.studentId) || [];
+  const firstStudent = group.members?.[0]?.student;
+  const coordIds = await findCoordinatorIdsForStudent(memberStudentIds[0], group.programId, firstStudent?.departmentId);
   const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
-  await notifSvc.notifySupervisorAccepted({ supervisorName, itemTitle: group.projectTitle || group.name, type: 'group', studentIds: group.members?.map(m => m.studentId) || [], coordinatorIds: coordIds });
+  await notifSvc.notifySupervisorAccepted({ supervisorName, itemTitle: group.projectTitle || group.name, type: 'group', studentIds: memberStudentIds, coordinatorIds: coordIds });
   audit.log({ action: 'SUPERVISOR_ACCEPT', entity: 'ProjectGroup', entityId: group.id, details: `Supervisor accepted "${group.projectTitle || group.name}"`, performedById: user.id });
   return { data: updated };
 }
@@ -69,26 +73,28 @@ async function rejectAssignment({ type, id, user, reason }) {
     const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(id) }, include: { student: true } });
     if (!thesis) return { error: 'Thesis not found', code: 404 };
     if (thesis.supervisorId !== user.id) return { error: 'This thesis is not assigned to you', code: 403 };
+    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId, thesis.id);
     const updated = await prisma.thesis.update({
       where: { id: thesis.id },
       data: { supervisorId: null, supervisorAssignmentStatus: 'REJECTED' },
     });
-    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId, thesis.id);
     const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
     await notifSvc.notifySupervisorRejected({ supervisorName, itemTitle: thesis.title, type: 'thesis', reason, studentIds: [thesis.studentId], coordinatorIds: coordIds });
     audit.log({ action: 'SUPERVISOR_REJECT', entity: 'Thesis', entityId: thesis.id, details: `Supervisor rejected "${thesis.title}" — ${reason || 'no reason'}`, performedById: user.id });
     return { data: updated };
   }
-  const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) }, include: { members: true } });
+  const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) }, include: { members: { include: { student: true } } } });
   if (!group) return { error: 'Group not found', code: 404 };
   if (group.supervisorId !== user.id) return { error: 'This group is not assigned to you', code: 403 };
+  const memberStudentIds = group.members?.map(m => m.studentId) || [];
+  const firstStudent = group.members?.[0]?.student;
+  const coordIds = await findCoordinatorIdsForStudent(memberStudentIds[0], group.programId, firstStudent?.departmentId);
   const updated = await prisma.projectGroup.update({
     where: { id: group.id },
     data: { supervisorId: null, supervisorAssignmentStatus: 'REJECTED' },
   });
-  const coordIds = await findCoordinatorIdsForStudent(group.members?.[0]?.studentId, group.programId, null);
   const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
-  await notifSvc.notifySupervisorRejected({ supervisorName, itemTitle: group.projectTitle || group.name, type: 'group', reason, studentIds: group.members?.map(m => m.studentId) || [], coordinatorIds: coordIds });
+  await notifSvc.notifySupervisorRejected({ supervisorName, itemTitle: group.projectTitle || group.name, type: 'group', reason, studentIds: memberStudentIds, coordinatorIds: coordIds });
   audit.log({ action: 'SUPERVISOR_REJECT', entity: 'ProjectGroup', entityId: group.id, details: `Supervisor rejected "${group.projectTitle || group.name}" — ${reason || 'no reason'}`, performedById: user.id });
   return { data: updated };
 }

@@ -113,12 +113,14 @@ exports.createThesis = async (req, res) => {
       }
     }
 
+    const supId = supervisorId ? parseInt(supervisorId) : null;
     const thesis = await prisma.thesis.create({
       data: {
         title,
         projectType: 'MASTER',
         studentId: parseInt(studentId),
-        supervisorId: supervisorId ? parseInt(supervisorId) : null,
+        supervisorId: supId,
+        supervisorAssignmentStatus: supId ? 'PENDING' : null,
         programId: requestingCoordinatorProgram?.id ?? student.programId ?? null,
         batch: student.batch || null,
         cluster: req.body.cluster || student.program?.cluster || null,
@@ -126,6 +128,14 @@ exports.createThesis = async (req, res) => {
         status: status || 'ACTIVE',
       },
     });
+
+    if (supId) {
+      try {
+        const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
+        await notifSvc.notify(supId, 'SUPERVISOR_ASSIGNMENT',
+          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master Thesis) — pending your acceptance.`, `/theses/${thesis.id}`);
+      } catch (e) { console.error('notify supervisor error:', e.message); }
+    }
     const defaults = getDefaultComponents('MASTER');
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({

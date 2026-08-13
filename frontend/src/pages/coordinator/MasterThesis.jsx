@@ -981,9 +981,26 @@ return (
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.title}</td>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
                       {t.supervisor ? (
-                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
-                          {t.supervisor.firstName} {t.supervisor.lastName}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
+                            {t.supervisor.firstName} {t.supervisor.lastName}
+                          </span>
+                          {t.supervisorAssignmentStatus === 'PENDING' && (
+                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                              <span className="dot" />Awaiting Response
+                            </span>
+                          )}
+                          {t.supervisorAssignmentStatus === 'ACCEPTED' && (
+                            <span className="badge badge-completed" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                              <span className="dot" />Accepted
+                            </span>
+                          )}
+                          {t.supervisorAssignmentStatus === 'REJECTED' && (
+                            <span className="badge badge-error" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                              Declined
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
                           <span className="dot" />
