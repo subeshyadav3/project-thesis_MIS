@@ -35,6 +35,11 @@ function ProjectDetail() {
   const isSupervisor = user.role === 'SUPERVISOR';
   const isCoordinator = user.role === 'COORDINATOR';
   const isExternal = user.role === 'EXTERNAL_EXAMINER';
+  // Coordinator-level management is only granted when the backend confirms the
+  // item is inside this coordinator's scope (canManage). A coordinator who is
+  // merely the assigned supervisor gets supervisor-level access only.
+  const canManageItem = isCoordinator && item?.canManage === true;
+  const isItemSupervisor = item?.supervisor?.id === user.id;
   const [uploadStage, setUploadStage] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -75,11 +80,15 @@ function ProjectDetail() {
     return order.indexOf(a.evaluationType) - order.indexOf(b.evaluationType);
   }), [components]);
 
-  const currentUserComponents = useMemo(() =>
-    components.filter(c => c.evaluatorRole === user.role), [components, user.role]);
+  // Supervisors evaluate their SUPERVISOR components; an out-of-scope
+  // coordinator who is the assigned supervisor is treated the same way.
+  const currentUserComponents = useMemo(() => {
+    const evalRole = (isCoordinator && !canManageItem) ? 'SUPERVISOR' : user.role;
+    return components.filter(c => c.evaluatorRole === evalRole);
+  }, [components, user.role, isCoordinator, canManageItem]);
 
   const progress = useMemo(() => {
-    const visible = isCoordinator ? orderedComponents : currentUserComponents;
+    const visible = canManageItem ? orderedComponents : currentUserComponents;
     const total = visible.reduce((s, c) => s + c.maxMarks, 0);
     const earned = visible.reduce((s, c) => {
       const e = evaluationForComponent(c.id);
@@ -90,11 +99,11 @@ function ProjectDetail() {
       return e?.marks !== null && e?.marks !== undefined;
     }).length;
     return { total, earned, completed, count: visible.length, pct: total > 0 ? Math.round((earned / total) * 100) : 0 };
-  }, [orderedComponents, currentUserComponents, evaluations, isCoordinator]);
+  }, [orderedComponents, currentUserComponents, evaluations, canManageItem]);
 
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
   const title = type === 'group' ? item?.projectTitle : item?.title;
-  const backPath = isSupervisor
+  const backPath = (isSupervisor || (isCoordinator && !canManageItem))
     ? (type === 'group' ? '/supervisor/bachelor' : '/supervisor/master')
     : isCoordinator
       ? (type === 'group' ? '/coordinator/bachelor' : '/coordinator/master')
@@ -284,7 +293,7 @@ function ProjectDetail() {
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
               <Icon name="arrow_back" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Back
             </button>
-            {isCoordinator && item?.status === 'ACTIVE' && (
+            {canManageItem && item?.status === 'ACTIVE' && (
               <button className="btn" style={{ background: 'rgba(34,197,94,0.2)', color: '#86efac', border: '1px solid rgba(34,197,94,0.3)' }}
                 onClick={() => setConfirmDialog({ open: true, title: 'Finalize', message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED?`, confirmLabel: 'Finalize', onConfirm: doFinalize, danger: true })}>
                 <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Finalize
@@ -403,11 +412,11 @@ function ProjectDetail() {
             </div>              {/* Evaluation breakdown — only user's own components for non-coordinators */}
             <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
-                <h3><Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />{isCoordinator ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
+                <h3><Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />{canManageItem ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
               </div>
               <div style={{ padding: '4px 0' }}>
                 {(() => {
-                  const visibleComponents = isCoordinator ? orderedComponents : currentUserComponents;
+                  const visibleComponents = canManageItem ? orderedComponents : currentUserComponents;
                   if (visibleComponents.length === 0) {
                     return (
                       <div className="empty-state" style={{ padding: 24 }}>
@@ -470,8 +479,8 @@ function ProjectDetail() {
                           </button>
                         </div>
                       )}
-                      {/* Grand total bar — only for coordinator */}
-                      {isCoordinator && (
+                      {/* Grand total bar — only for coordinator with scope */}
+                      {canManageItem && (
                         <div style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           padding: '16px 20px', margin: '8px 12px', borderRadius: 10,
@@ -491,7 +500,7 @@ function ProjectDetail() {
             </div>
 
             {/* Coordinator sections */}
-            {isCoordinator && (
+            {canManageItem && (
               <div style={{ display: 'grid', gap: 24, marginBottom: 24 }}>
                 <SupervisorAssignmentSection
                   type={type} id={parseInt(id)}
@@ -523,7 +532,7 @@ function ProjectDetail() {
             )}
 
             {/* Proposal upload */}
-            {isCoordinator && (item?.status === 'ACTIVE' || item?.status === 'PENDING') && (
+            {canManageItem && (item?.status === 'ACTIVE' || item?.status === 'PENDING') && (
               <div className="card" style={{ marginBottom: 24 }}>
                 <div className="card-header">
                   <h3><Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />Upload Document</h3>
@@ -581,8 +590,8 @@ function ProjectDetail() {
               </div>
             </div>
 
-            {/* Non-coordinator: evaluation form(s) */}
-            {!isCoordinator && currentUserComponents.length > 0 && (
+            {/* Evaluation form for supervisors / out-of-scope coordinators */}
+            {!canManageItem && currentUserComponents.length > 0 && (
               <>
               <div className="card" style={{ marginBottom: 24, padding: 0, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -662,7 +671,7 @@ function ProjectDetail() {
             )}
 
             {/* Coordinator evaluation view */}
-            {isCoordinator && (
+            {canManageItem && (
               <CoordinatorEvaluationView
                 type={type}
                 orderedComponents={orderedComponents}
@@ -674,7 +683,7 @@ function ProjectDetail() {
             )}
 
             {/* No component fallback */}
-            {currentUserComponents.length === 0 && !isCoordinator && (
+            {currentUserComponents.length === 0 && !canManageItem && (
               <div className="card" style={{ textAlign: 'center', padding: 40 }}>
                 <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
                 <h3 style={{ marginTop: 12 }}>No Evaluation Component</h3>
@@ -688,7 +697,7 @@ function ProjectDetail() {
 
         {/* ═══════════════ RECOMMENDATIONS TAB ═══════════════ */}
         {activeTab === 'recommendations' && (
-          <div style={{ display: 'grid', gridTemplateColumns: (isSupervisor || isCoordinator) ? '1.5fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: (isSupervisor || canManageItem || (isCoordinator && isItemSupervisor)) ? '1.5fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
             {/* Recommendation list */}
             <div className="card">
               <div className="card-header">
@@ -749,7 +758,7 @@ function ProjectDetail() {
                           title="Download PDF">
                           <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                         </button>
-                        {(isSupervisor || isCoordinator) && (
+                        {(isSupervisor || canManageItem || (isCoordinator && isItemSupervisor)) && (
                           <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-error)' }}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -767,7 +776,7 @@ function ProjectDetail() {
             </div>
 
             {/* Issue recommendation form (supervisor & coordinator) */}
-            {(isSupervisor || isCoordinator) && (
+            {(isSupervisor || canManageItem || (isCoordinator && isItemSupervisor)) && (
               <div className="card">
                 <div className="card-header">
                   <h3><Icon name="edit_note" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />Issue Recommendation</h3>
@@ -800,12 +809,8 @@ function ProjectDetail() {
         <EvaluationPdfPreview
           type={type} id={id}
           onClose={() => setShowPdfPreview(false)}
-          {...(!isCoordinator && type === 'thesis'
-            ? isSupervisor
-              ? { initialScope: 'supervisor' }
-              : isExternal
-                ? {} /* handled by external-specific EvaluationPage.jsx */
-                : {}
+          {...(!canManageItem && type === 'thesis'
+            ? { initialScope: 'supervisor' }
             : {})}
         />
       )}

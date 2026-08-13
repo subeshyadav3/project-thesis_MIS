@@ -1,4 +1,3 @@
-
 const prisma = require('./prisma');
 
 /**
@@ -53,7 +52,8 @@ async function resolveCoordinatorScope(user) {
 
 /**
  * Build a Prisma `where` clause fragment for Thesis lookups that respects:
- *   - bachelor programs: only own program (no cross-program)
+ *   - bachelor programs: only the theses in the coordinator's own program
+ *     that the coordinator actually supervises (no cross-program)
  *   - master programs:  every MASTER program in the same department
  *     (any coordinator can see/assign across master programs)
  *   - department coordinators: all theses in the department.
@@ -86,10 +86,13 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
         }
       ];
     } else {
-      // BACHELOR (or non-master) — strictly own program, plus theses this coordinator supervises.
+      // BACHELOR (or non-master) — only theses in the coordinator's own program.
+      // Being the supervisor of a thesis in another program only gives
+      // supervisor-level access (visible via the supervisor pages), not
+      // coordinator-level access.
       where.OR = [
-        { supervisorId: user.id },
         { student: { ...(where.student || {}), programId: scope.program.id } },
+        { programId: scope.program.id },
       ];
     }
     return { where, allowCrossProgram: isMaster, scope };
@@ -109,13 +112,20 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
 }
 
 /**
- * Same-shape helper for ProjectGroup lookups. Currently groups are
- * restricted to the coordinator's program only (no cross-program).
+ * Same-shape helper for ProjectGroup lookups.
+ *   - bachelor programs: only the groups in the coordinator's own program
+ *     that the coordinator actually supervises
+ *   - master programs: all groups in the coordinator's own program
+ *   - department coordinators: all groups in the department's programs
  */
 async function buildGroupWhereForCoordinator(user, baseWhere = {}) {
   const scope = await resolveCoordinatorScope(user);
   const where = { ...baseWhere };
 
+  // Same for master and bachelor: a coordinator sees all groups in their own
+  // program (replicating the master behaviour, where the coordinator sees all
+  // theses in scope). Supervising an out-of-program group only grants
+  // supervisor-level access, not coordinator-level access.
   if (scope.kind === 'program') {
     where.programId = scope.program.id;
     return { where, scope };
@@ -131,18 +141,43 @@ async function buildGroupWhereForCoordinator(user, baseWhere = {}) {
 }
 
 /**
- * Check whether the given thesis is visible to the requesting user.
- * Mirrors the WHERE produced by buildThesisWhereForCoordinator() so we
- * don't have to construct the same predicate twice.
+ * Coordinator-level "manage" check for groups (bachelor projects).
+ *
+ * A coordinator can perform coordinator actions (finalize, assign
+ * supervisors/examiners, upload documents, …) only on groups that fall inside
+ * their coordinator scope. Merely being the assigned supervisor of a group
+ * does NOT grant coordinator access — that only gives supervisor-level access.
  */
-async function isThesisVisibleToCoordinator(thesis, scope, user) {
-  // A coordinator who is also the assigned supervisor of this thesis can always
-  // access it, regardless of which program/degree it belongs to.
-  if (thesis.supervisorId === user.id) return true;
-  if (!scope || scope.kind === 'none') return false;
+async function canManageGroupAsCoordinator(group, scope, user) {
+  if (!group || !scope || scope.kind === 'none') return false;
+
+  if (scope.kind === 'program') {
+    // Same for master and bachelor: the coordinator manages all groups in
+    // their own program. Being the supervisor of an out-of-program group only
+    // gives supervisor-level access, not coordinator-level access.
+    return group.programId === scope.program.id;
+  }
+
+  if (scope.kind === 'department') {
+    const programIds = scope.programs.map(p => p.id);
+    return programIds.includes(group.programId);
+  }
+
+  return false;
+}
+
+/**
+ * Coordinator-level "manage" check for theses. Mirrors the "manage" branches
+ * of buildThesisWhereForCoordinator() WITHOUT the supervisor escape hatch:
+ * being the supervisor of a thesis outside the coordinator's scope only gives
+ * supervisor-level access, not coordinator-level access.
+ */
+async function canManageThesisAsCoordinator(thesis, scope, user) {
+  if (!thesis || !scope || scope.kind === 'none') return false;
+
   if (scope.kind === 'program') {
     if (scope.degreeType === 'MASTER') {
-      // Whole department: all master programs under the same department
+      // Whole department: all MASTER programs under the same department
       const deptPrograms = await prisma.program.findMany({
         where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
       });
@@ -151,20 +186,50 @@ async function isThesisVisibleToCoordinator(thesis, scope, user) {
         programIds.includes(thesis.programId) ||
         (thesis.student && !thesis.student.programId);
     }
+    // BACHELOR — own-program theses. Being the supervisor of a thesis in
+    // another program only gives supervisor-level access, not coordinator-level.
     return thesis.student?.programId === scope.program.id ||
+      thesis.programId === scope.program.id ||
       (thesis.student && !thesis.student.programId);
   }
+
   if (scope.kind === 'department') {
     const programIds = scope.programs.map(p => p.id);
     return programIds.includes(thesis.student?.programId) ||
       (thesis.student && !thesis.student.programId);
   }
+
   return false;
+}
+
+/**
+ * View-level check: can this coordinator open the group at all?
+ * The assigned supervisor can always view their own group (supervisor-level),
+ * otherwise the group must be manageable within the coordinator's scope.
+ */
+async function isGroupVisibleToCoordinator(group, scope, user) {
+  if (!group || !scope || scope.kind === 'none') return false;
+  if (group.supervisorId === user.id) return true;
+  return canManageGroupAsCoordinator(group, scope, user);
+}
+
+/**
+ * View-level check: can this coordinator open the thesis at all?
+ * A coordinator who is the assigned supervisor can always access the thesis
+ * (supervisor-level), regardless of which program/degree it belongs to — but
+ * that access is supervisor-level only, not coordinator-level.
+ */
+async function isThesisVisibleToCoordinator(thesis, scope, user) {
+  if (thesis?.supervisorId === user.id) return true;
+  return canManageThesisAsCoordinator(thesis, scope, user);
 }
 
 module.exports = {
   resolveCoordinatorScope,
   buildThesisWhereForCoordinator,
   buildGroupWhereForCoordinator,
+  canManageGroupAsCoordinator,
+  canManageThesisAsCoordinator,
+  isGroupVisibleToCoordinator,
   isThesisVisibleToCoordinator,
 };

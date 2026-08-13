@@ -21,6 +21,17 @@ const DEFAULT_FORM_FIELDS = [
   { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
 ];
 
+const BACHELOR_DEFAULT_FORM_FIELDS = [
+  { key: 'program', label: 'Program', type: 'select', required: true },
+  { key: 'projectType', label: 'Project Type (Minor / Major)', type: 'select', required: true },
+  { key: 'title', label: 'Project Concept Title', type: 'text', required: true },
+  { key: 'pdf_document', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
+  { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
+  { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
+];
+
 function MatrixSupervisorSelect({ value, onChange, supervisors }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -67,7 +78,7 @@ function MatrixSupervisorSelect({ value, onChange, supervisors }) {
       <div
         className="sup-search-wrapper form-input"
         style={{ padding: '2px 6px', height: 32, fontSize: 12, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-        onClick={(e) => { if (e.target === e.currentTarget) { updateCoords(); setOpen(true); } }}
+        onClick={() => { updateCoords(); setOpen(!open); }}
       >
         <Icon name="search" className="material-symbols-outlined" style={{ fontSize: 15, marginRight: 4 }} />
         <input
@@ -76,19 +87,20 @@ function MatrixSupervisorSelect({ value, onChange, supervisors }) {
           placeholder={selectedSup ? `${selectedSup.designation ? selectedSup.designation + ' ' : ''}${selectedSup.firstName} ${selectedSup.lastName}` : 'Search supervisor...'}
           value={search}
           onChange={e => { setSearch(e.target.value); updateCoords(); setOpen(true); }}
-          onFocus={() => { updateCoords(); setOpen(true); }}
+          onFocus={(e) => { e.stopPropagation(); updateCoords(); setOpen(true); }}
+          onClick={(e) => e.stopPropagation()}
         />
         {value && (
           <button
             type="button"
             className="sup-clear"
             style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, display: 'flex', marginRight: 2 }}
-            onClick={e => { e.stopPropagation(); onChange(''); setSearch(''); }}
+            onClick={e => { e.stopPropagation(); onChange(''); setSearch(''); setOpen(false); }}
           >
             <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
           </button>
         )}
-        <Icon name={open ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" style={{ fontSize: 16, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleOpen(); }} />
+        <Icon name={open ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" style={{ fontSize: 16, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); updateCoords(); setOpen(!open); }} />
       </div>
 
       {open && (
@@ -683,14 +695,16 @@ function CoordinatorAnnouncements() {
                           onClick={() => {
                             const on = !form.formEnabled;
                             const today = new Date().toISOString().split('T')[0];
-                            setForm({ ...form, formEnabled: on, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
+                            const defaultFields = user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS;
+                            setForm({ ...form, formEnabled: on, formFields: on && !form.formFields?.length ? defaultFields : form.formFields, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
                           }}
                         >
-                          Enable Thesis Registration Form
+                          {user.program?.degreeType === 'BACHELOR' ? 'Enable Project Registration Form' : 'Enable Thesis Registration Form'}
                         </label>
                         <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                          Students fill a form; submitting creates their thesis + auto-generated proposal (PDF).
-                          Submissions after the deadline require your approval.
+                          {user.program?.degreeType === 'BACHELOR'
+                            ? 'Students fill out a project registration form; submitting creates their bachelor project proposal (PDF). Submissions after the deadline require approval.'
+                            : 'Students fill out a thesis registration form; submitting creates their master thesis proposal (PDF). Submissions after the deadline require approval.'}
                         </p>
                       </div>
                     </div>
@@ -712,11 +726,19 @@ function CoordinatorAnnouncements() {
                         </div>
 
                         <div style={{ marginTop: 16 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                             <label style={{ fontSize: 12, fontWeight: 600 }}>Form Fields (Google Forms Style Editor)</label>
-                            <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : DEFAULT_FORM_FIELDS), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
-                              <Icon name="add" className="material-symbols-outlined" /> Add Field
-                            </button>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: DEFAULT_FORM_FIELDS })}>
+                                Load Master Template
+                              </button>
+                              <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
+                                Load Bachelor Template
+                              </button>
+                              <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
+                                <Icon name="add" className="material-symbols-outlined" /> Add Field
+                              </button>
+                            </div>
                           </div>
                           <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
                             Customize field labels, select field types, or toggle Required / Optional for each question.

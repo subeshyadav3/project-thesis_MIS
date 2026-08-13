@@ -248,6 +248,7 @@ model ProjectGroup {
   projectTitle   String
   description    String             @default("")
   projectType    BachelorProjectType @default(MINOR)
+  cluster        String?
   batch          String?
   status         GroupStatus         @default(PENDING)
   supervisorAssignmentStatus String?

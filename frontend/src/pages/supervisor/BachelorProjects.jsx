@@ -199,6 +199,44 @@ function SupervisorBachelorProjects() {
         </div>
       </div>
 
+      {groups.filter(g => g.supervisorAssignmentStatus === 'PENDING').length > 0 && (
+        <div className="card" style={{ marginBottom: 24, border: '1px solid var(--color-warning-border, #f59e0b)', background: 'var(--color-warning-container-low, #fffbeb)', padding: 18, borderRadius: 'var(--border-radius-lg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="assignment_ind" className="material-symbols-outlined" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#92400e' }}>
+                  Pending Supervision Requests ({groups.filter(g => g.supervisorAssignmentStatus === 'PENDING').length})
+                </h3>
+                <p style={{ margin: 0, fontSize: 12, color: '#b45309' }}>
+                  A coordinator has assigned you as project supervisor for the following group(s). Please review and accept or decline.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {groups.filter(g => g.supervisorAssignmentStatus === 'PENDING').map(g => (
+              <div key={g.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+                padding: '14px 16px', background: '#ffffff', borderRadius: 'var(--border-radius-md)', border: '1px solid #fde68a',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#1e293b' }}>{g.name}: {g.projectTitle}</div>
+                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <span><strong>Members:</strong> {(g.members || []).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).filter(Boolean).join(', ') || '—'}</span>
+                    {g.batch && <span><strong>Batch:</strong> {g.batch}</span>}
+                  </div>
+                </div>
+                <SupervisionActions item={g} type="group" onDone={loadData} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">

@@ -1,6 +1,7 @@
 
 const prisma = require('../utils/prisma');
 const puppeteer = require('puppeteer-core');
+const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -460,35 +461,22 @@ function sendPdf(res, pdf, filename) {
 async function checkPrintAccess(req, res, type, id) {
   if (req.user.role === 'MAINTAINER') return true;
   if (req.user.role === 'COORDINATOR') {
-    const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-    if (program) {
-      let itemProgramId = null;
-      if (type === 'group') {
-        const g = await prisma.projectGroup.findUnique({ where: { id }, select: { programId: true } });
-        itemProgramId = g?.programId;
-      } else {
-        const t = await prisma.thesis.findUnique({ where: { id }, select: { programId: true, student: { select: { programId: true } } } });
-        const byStudent = t?.student?.programId;
-        const byOwner = t?.programId;
-        const visible = (byOwner && byOwner === program.id) || (byStudent && byStudent === program.id);
-        if (!visible) {
-          res.status(403).json({ error: 'Access denied. Item belongs to another program.' });
-          return false;
-        }
-      }
-    } else {
-      const dept = await prisma.department.findUnique({ where: { coordinatorId: req.user.id } });
-      if (dept) {
-        const item = type === 'group'
-          ? await prisma.projectGroup.findUnique({ where: { id }, include: { program: { select: { departmentId: true } } } })
-          : await prisma.thesis.findUnique({ where: { id }, include: { program: { select: { departmentId: true } }, student: { select: { program: { select: { departmentId: true } } } } } });
-        let itemDeptId = type === 'group' ? item?.program?.departmentId : (item?.student?.program?.departmentId || item?.program?.departmentId);
-        if (itemDeptId && itemDeptId !== dept.id) {
-          res.status(403).json({ error: 'Access denied. Item belongs to another department.' });
-          return false;
-        }
-      }
+    const scope = await resolveCoordinatorScope(req.user);
+    const item = type === 'group'
+      ? await prisma.projectGroup.findUnique({ where: { id }, select: { id: true, programId: true, supervisorId: true } })
+      : await prisma.thesis.findUnique({ where: { id }, select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } } });
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return false;
     }
+    const canManage = type === 'group'
+      ? await canManageGroupAsCoordinator(item, scope, req.user)
+      : await canManageThesisAsCoordinator(item, scope, req.user);
+    // The assigned supervisor can print (same as a plain supervisor); a
+    // coordinator who is neither in-scope nor the supervisor cannot.
+    if (canManage || item.supervisorId === req.user.id) return true;
+    res.status(403).json({ error: 'Access denied. Item is not within your coordinator scope.' });
+    return false;
   }
   return true;
 }

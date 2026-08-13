@@ -14,6 +14,16 @@ import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
 
 const PAGE_SIZE = 10;
 
+const BACHELOR_CLUSTERS = [
+  { value: 'AIML', label: 'AIML (AI & Machine Learning)' },
+  { value: 'IPCV', label: 'IPCV (Image Processing & Computer Vision)' },
+  { value: 'ANLP', label: 'ANLP (Audio & Natural Language Processing)' },
+  { value: 'NTS', label: 'NTS (Networks & Telecom Systems)' },
+  { value: 'EDMES', label: 'EDMES (Embedded & Digital Systems)' },
+  { value: 'ACOM', label: 'ACOM (Advanced Communication)' },
+  { value: 'EII', label: 'EII (Electrical & Industrial Instrumentation)' },
+];
+
 function BachelorProjects() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -30,7 +40,7 @@ function BachelorProjects() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
@@ -38,6 +48,9 @@ function BachelorProjects() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [batchFilter, setBatchFilter] = useState('ALL');
+  const [clusterFilter, setClusterFilter] = useState('ALL');
+  const [editCluster, setEditCluster] = useState('');
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
@@ -371,6 +384,9 @@ useEffect(() => {
           promises.push(api.put(`/groups/${groupId}`, { endDate: editEndDate || null }));
         }
       }
+      if (editCluster !== undefined && editCluster !== showDetail.cluster) {
+        promises.push(api.put(`/groups/${groupId}`, { cluster: editCluster }));
+      }
       await Promise.all(promises);
       toast.success('Changes saved successfully');
       setShowDetail(null);
@@ -382,8 +398,8 @@ useEffect(() => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!createForm.name.trim() || !createForm.projectTitle.trim()) {
-      toast.warning('Group name and project title are required');
+    if (!createForm.name.trim() || !createForm.projectTitle.trim() || !createForm.cluster) {
+      toast.warning('Group name, project title, and cluster are required');
       return;
     }
     const students = createForm.students.filter(s => s.studentId);
@@ -392,6 +408,7 @@ useEffect(() => {
         name: createForm.name,
         projectTitle: createForm.projectTitle,
         projectType: createForm.projectType,
+        cluster: createForm.cluster,
         status: createForm.status,
         startDate: createForm.startDate || null,
         batch: createForm.batch,
@@ -405,7 +422,7 @@ useEffect(() => {
       }
       toast.success('Group created successfully');
       setShowCreate(false);
-      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -466,6 +483,25 @@ const filteredGroups = useMemo(() => {
     });
   }, [groups, searchQuery]);
 
+  const normalizeBatch = useCallback((b) => {
+    if (!b) return '';
+    const str = String(b).trim();
+    if (/^0\d{2}$/.test(str)) return '2' + str;
+    return str;
+  }, []);
+
+  const batchOptions = useMemo(() => {
+    const set = new Set();
+    groups.forEach(g => {
+      const b = g.batch || (g.members?.[0]?.student?.batch ? g.members[0].student.batch : (g.members?.[0]?.rollNumber && /^\d{3}/.test(g.members[0].rollNumber) ? g.members[0].rollNumber.slice(0, 3) : null));
+      if (b) {
+        const norm = normalizeBatch(b);
+        if (norm) set.add(norm);
+      }
+    });
+    return Array.from(set).sort().reverse().map(b => ({ value: b, label: `Batch ${b}` }));
+  }, [groups, normalizeBatch]);
+
   const filteredByAdvanced = useMemo(() => {
     return filteredGroups.filter(g => {
       const searchStr = (
@@ -482,9 +518,17 @@ const filteredGroups = useMemo(() => {
         : supervisorFilter === 'NONE'
           ? !g.supervisor
           : g.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesType && matchesSupervisor;
+
+      const matchesBatch = batchFilter === 'ALL' || (() => {
+        const b = g.batch || (g.members?.[0]?.student?.batch ? g.members[0].student.batch : (g.members?.[0]?.rollNumber && /^\d{3}/.test(g.members[0].rollNumber) ? g.members[0].rollNumber.slice(0, 3) : ''));
+        return normalizeBatch(b) === batchFilter;
+      })();
+
+      const matchesCluster = clusterFilter === 'ALL' || g.cluster === clusterFilter;
+
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesBatch && matchesCluster;
     });
-  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter, batchFilter, clusterFilter, normalizeBatch]);
 
   const sortedGroups = useMemo(() => {
     return [...filteredByAdvanced].sort((a, b) => {
@@ -628,6 +672,12 @@ const filteredGroups = useMemo(() => {
                   <span className={`badge badge-${showDetail.projectType === 'MAJOR' ? 'warning' : 'info'}`}>
                     <span className="dot" />
                     {showDetail.projectType === 'MAJOR' ? 'Major' : 'Minor'}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Cluster</span>
+                  <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)', border: 'none' }}>
+                    {showDetail.cluster || 'Unassigned'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -984,6 +1034,8 @@ const filteredGroups = useMemo(() => {
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={typeOptions} allLabel="All Types" />
+          <FilterDropdown label="Cluster" value={clusterFilter} onChange={setClusterFilter} options={BACHELOR_CLUSTERS} allLabel="All Clusters" />
+          <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
 
@@ -1456,6 +1508,15 @@ const filteredGroups = useMemo(() => {
                 <select value={createForm.projectType} onChange={e => setCreateForm({...createForm, projectType: e.target.value})}>
                   <option value="MINOR">Minor Project</option>
                   <option value="MAJOR">Major Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Cluster <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                <select value={createForm.cluster} onChange={e => setCreateForm({...createForm, cluster: e.target.value})} required>
+                  <option value="">Select Cluster...</option>
+                  {BACHELOR_CLUSTERS.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">

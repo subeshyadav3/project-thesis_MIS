@@ -8,7 +8,7 @@ const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
-const { buildGroupWhereForCoordinator } = require('../utils/coordinatorScope');
+const { buildGroupWhereForCoordinator, resolveCoordinatorScope, isGroupVisibleToCoordinator, canManageGroupAsCoordinator } = require('../utils/coordinatorScope');
 const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 const normalizeBatch = (batch) => {
@@ -65,19 +65,13 @@ exports.getGroup = async (req, res) => {
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
     if (req.user.role === 'COORDINATOR') {
-      const { scope } = await buildGroupWhereForCoordinator(req.user);
-      if (scope.kind === 'program') {
-        if (group.programId !== scope.program.id) {
-          return res.status(403).json({ error: 'Access denied. Group belongs to another program.' });
-        }
-      } else if (scope.kind === 'department') {
-        const programIds = scope.programs.map(p => p.id);
-        if (!programIds.includes(group.programId)) {
-          return res.status(403).json({ error: 'Access denied. Group belongs to another department program.' });
-        }
-      } else if (scope.kind === 'none') {
-        return res.status(403).json({ error: 'Access denied. No coordinator scope.' });
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!await isGroupVisibleToCoordinator(group, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Group is not visible to your coordinator scope.' });
       }
+      // Tell the frontend whether the coordinator may act as coordinator on
+      // this group (in-scope) or only as the assigned supervisor.
+      group.canManage = await canManageGroupAsCoordinator(group, scope, req.user);
     }
     res.json(group);
   } catch (error) {
@@ -87,7 +81,7 @@ exports.getGroup = async (req, res) => {
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, projectTitle, supervisorId, students, projectType, programId, batch, status } = req.body;
+    const { name, projectTitle, supervisorId, students, projectType, cluster, programId, batch, status } = req.body;
     if (!name || !projectTitle) {
       return res.status(400).json({ error: 'name and projectTitle are required' });
     }
@@ -109,6 +103,7 @@ exports.createGroup = async (req, res) => {
         name,
         projectTitle,
         projectType: projectType || 'MINOR',
+        cluster: cluster || null,
         batch: batch || null,
         startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
@@ -724,6 +719,12 @@ exports.assignSupervisor = async (req, res) => {
 
     const groupBefore = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) } });
     if (!groupBefore) return res.status(404).json({ error: 'Group not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!await canManageGroupAsCoordinator(groupBefore, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
+      }
+    }
     const oldSupervisorId = groupBefore.supervisorId;
 
     const isRemoving = !supervisorId || supervisorId === 'NONE' || supervisorId === 'CLEAR' || isNaN(parseInt(supervisorId));
@@ -796,20 +797,30 @@ exports.assignSupervisor = async (req, res) => {
 
 exports.updateGroupStatus = async (req, res) => {
   try {
-    const oldGroup = await prisma.projectGroup.findUnique({ where: { id: parseInt(req.params.id) }, select: { status: true, projectTitle: true } });
+    const existing = await prisma.projectGroup.findUnique({
+      where: { id: parseInt(req.params.id) },
+      select: { id: true, status: true, projectTitle: true, programId: true, supervisorId: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Group not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!await canManageGroupAsCoordinator(existing, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
+      }
+    }
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
-    if (oldGroup && oldGroup.status !== req.body.status) {
+    if (existing.status !== req.body.status) {
       try {
         await notifSvc.notifyStatusChange({
-          groupId: group.id, oldStatus: oldGroup.status, newStatus: req.body.status,
-          itemTitle: oldGroup.projectTitle, changerId: req.user.id,
+          groupId: group.id, oldStatus: existing.status, newStatus: req.body.status,
+          itemTitle: existing.projectTitle, changerId: req.user.id,
         });
       } catch (e) { console.error('notifyStatusChange:', e.message); }
     }
-    audit.log({ action: 'UPDATE_STATUS', entity: 'ProjectGroup', entityId: group.id, details: `Status ${oldGroup?.status} → ${group.status} for "${oldGroup?.projectTitle}"`, performedById: req.user.id });
+    audit.log({ action: 'UPDATE_STATUS', entity: 'ProjectGroup', entityId: group.id, details: `Status ${existing.status} → ${group.status} for "${existing.projectTitle}"`, performedById: req.user.id });
     res.json(group);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -886,6 +897,15 @@ exports.bulkAssignSupervisor = async (req, res) => {
       include: { members: { include: { student: true } } },
     });
 
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      for (const g of groups) {
+        if (!await canManageGroupAsCoordinator(g, scope, req.user)) {
+          return res.status(403).json({ success: false, error: 'Access denied. One or more groups are outside your coordinator scope.' });
+        }
+      }
+    }
+
     const result = await prisma.projectGroup.updateMany({
       where: { id: { in: ids } },
       data: { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
@@ -942,6 +962,12 @@ exports.deleteGroup = async (req, res) => {
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
+      }
+    }
     if (group.status !== 'PENDING' && (group.proposals.length > 0 || group.evaluations.length > 0)) {
       return res.status(400).json({ error: 'Cannot delete: group has files uploaded or evaluations completed' });
     }
@@ -977,10 +1003,19 @@ exports.deleteGroup = async (req, res) => {
 exports.updateGroup = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { projectTitle, description, startDate, endDate } = req.body;
+    const existing = await prisma.projectGroup.findUnique({ where: { id }, select: { id: true, programId: true, supervisorId: true } });
+    if (!existing) return res.status(404).json({ error: 'Group not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (!await canManageGroupAsCoordinator(existing, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
+      }
+    }
+    const { projectTitle, description, cluster, startDate, endDate } = req.body;
     const data = {};
     if (projectTitle !== undefined) data.projectTitle = projectTitle;
     if (description !== undefined) data.description = description;
+    if (cluster !== undefined) data.cluster = cluster;
     if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     const group = await prisma.projectGroup.update({

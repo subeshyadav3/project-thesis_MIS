@@ -3,12 +3,20 @@ const prisma = require('../utils/prisma');
 const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
+const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
 
 exports.assignExaminerToGroup = async (req, res) => {
   try {
     const { externalExaminerId, groupId } = req.body;
     if (!externalExaminerId || !groupId) {
       return res.status(400).json({ error: 'externalExaminerId and groupId required' });
+    }
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { id: true, programId: true, supervisorId: true } });
+      if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
+      }
     }
     const assignment = await prisma.examinerAssignment.create({
       data: {
@@ -51,6 +59,13 @@ exports.assignExaminerToThesis = async (req, res) => {
     const { externalExaminerId, thesisId } = req.body;
     if (!externalExaminerId || !thesisId) {
       return res.status(400).json({ error: 'externalExaminerId and thesisId required' });
+    }
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } } });
+      if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Thesis is outside your coordinator scope.' });
+      }
     }
     const assignment = await prisma.examinerAssignment.create({
       data: {
@@ -129,6 +144,21 @@ exports.removeAssignment = async (req, res) => {
       },
     });
     if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (assignment.groupId) {
+        const group = await prisma.projectGroup.findUnique({ where: { id: assignment.groupId }, select: { id: true, programId: true, supervisorId: true } });
+        if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
+        }
+      } else if (assignment.thesisId) {
+        const thesis = await prisma.thesis.findUnique({ where: { id: assignment.thesisId }, select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } } });
+        if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied. Thesis is outside your coordinator scope.' });
+        }
+      }
+    }
 
     // Notify examiner
     const itemName = assignment.group?.name || assignment.thesis?.title || 'project';

@@ -3,6 +3,7 @@ const prisma = require('../utils/prisma');
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
+const { resolveCoordinatorScope, isGroupVisibleToCoordinator, isThesisVisibleToCoordinator, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
 
 // Submit / update marks for a specific evaluation component.
 // The component decides who can evaluate it (`evaluatorRole`).
@@ -26,18 +27,29 @@ exports.submitComponentMarks = async (req, res) => {
     });
     if (!component) return res.status(404).json({ error: 'Evaluation component not found' });
 
-    // Coordinators can evaluate theses in their home program, but NOT cross-program theses
-    if (req.user.role === 'COORDINATOR' && thesisId) {
-      const thesis = await prisma.thesis.findUnique({
-        where: { id: parseInt(thesisId) },
-        include: { student: true },
-      });
-      if (thesis) {
-        const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-        if (prog && thesis.student?.programId && thesis.student.programId !== prog.id) {
-          return res.status(403).json({
-            error: 'Only the home program coordinator can record evaluations and recommendations for this student.',
-          });
+    // Coordinators may record marks only on items inside their coordinator
+    // scope, or on their own supervised components acting as the supervisor.
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (groupId) {
+        const group = await prisma.projectGroup.findUnique({
+          where: { id: parseInt(groupId) },
+          select: { id: true, programId: true, supervisorId: true },
+        });
+        const canManage = await canManageGroupAsCoordinator(group, scope, req.user);
+        const ownSupervisorComponent = group?.supervisorId === req.user.id && component.evaluatorRole === 'SUPERVISOR';
+        if (!canManage && !ownSupervisorComponent) {
+          return res.status(403).json({ error: 'You cannot record evaluations for this group from your coordinator scope.' });
+        }
+      } else if (thesisId) {
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: parseInt(thesisId) },
+          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        });
+        const canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
+        const ownSupervisorComponent = thesis?.supervisorId === req.user.id && component.evaluatorRole === 'SUPERVISOR';
+        if (!canManage && !ownSupervisorComponent) {
+          return res.status(403).json({ error: 'You cannot record evaluations for this thesis from your coordinator scope.' });
         }
       }
     }
@@ -234,6 +246,16 @@ exports.submitFeedback = async (req, res) => {
 exports.getGroupEvaluations = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      const group = await prisma.projectGroup.findUnique({
+        where: { id },
+        select: { id: true, programId: true, supervisorId: true },
+      });
+      if (!await isGroupVisibleToCoordinator(group, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
     const [evaluations, components, group] = await Promise.all([
       prisma.evaluation.findMany({
         where: { groupId: id },
@@ -258,6 +280,16 @@ exports.getGroupEvaluations = async (req, res) => {
 exports.getThesisEvaluations = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      const thesis = await prisma.thesis.findUnique({
+        where: { id },
+        select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+      });
+      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
     const [evaluations, components] = await Promise.all([
       prisma.evaluation.findMany({
         where: { thesisId: id },
@@ -282,6 +314,26 @@ exports.getMarksSummary = async (req, res) => {
     const { groupId, thesisId } = req.query;
     if (!groupId && !thesisId) {
       return res.status(400).json({ error: 'groupId or thesisId required' });
+    }
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (groupId) {
+        const group = await prisma.projectGroup.findUnique({
+          where: { id: parseInt(groupId) },
+          select: { id: true, programId: true, supervisorId: true },
+        });
+        if (!await isGroupVisibleToCoordinator(group, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else {
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: parseInt(thesisId) },
+          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        });
+        if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      }
     }
     const where = groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) };
     const [evaluations, components] = await Promise.all([
@@ -332,6 +384,28 @@ exports.completeEvaluation = async (req, res) => {
     }
     if (!['COORDINATOR', 'MAINTAINER'].includes(req.user.role) && req.user.role !== evaluation.component.evaluatorRole) {
       return res.status(403).json({ error: 'You cannot complete this evaluation.' });
+    }
+
+    // Coordinators can only complete evaluations on items inside their scope
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (groupId) {
+        const group = await prisma.projectGroup.findUnique({
+          where: { id: parseInt(groupId) },
+          select: { id: true, programId: true, supervisorId: true },
+        });
+        if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else {
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: parseInt(thesisId) },
+          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        });
+        if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      }
     }
 
     await prisma.evaluation.update({

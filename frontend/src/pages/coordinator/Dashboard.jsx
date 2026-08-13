@@ -13,8 +13,10 @@ function CoordinatorDashboard() {
   const [program, setProgram] = useState(null);
   const [lateProposals, setLateProposals] = useState([]);
   const [mySupervisedTheses, setMySupervisedTheses] = useState([]);
+  const [mySupervisedGroups, setMySupervisedGroups] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [allTheses, setAllTheses] = useState([]);
+  const [allGroups, setAllGroups] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState('ALL');
   const [showAssignedModal, setShowAssignedModal] = useState(false);
   const [showUnassignedModal, setShowUnassignedModal] = useState(false);
@@ -26,22 +28,19 @@ function CoordinatorDashboard() {
   const isMaster = program?.degreeType === 'MASTER';
 
   const loadLate = () => {
-    if (isMaster) {
-      api.get('/proposals/pending').then(({ data }) => setLateProposals(data)).catch(() => setLateProposals([]));
-    } else {
-      setLateProposals([]);
-    }
+    api.get('/proposals/pending').then(({ data }) => setLateProposals(data)).catch(() => setLateProposals([]));
   };
 
   useEffect(() => {
     api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     api.get('/auth/me').then(({ data }) => setProgram(data.program || null)).catch(() => {});
     api.get('/supervisors/theses').then(({ data }) => setMySupervisedTheses(data)).catch(() => setMySupervisedTheses([]));
-    api.get('/users/role/STUDENT?all=true&degreeType=MASTER').then(({ data }) => setAllStudents(data)).catch(() => {});
+    api.get('/supervisors/groups').then(({ data }) => setMySupervisedGroups(data)).catch(() => setMySupervisedGroups([]));
+    api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data)).catch(() => {});
     api.get('/theses').then(({ data }) => setAllTheses(data)).catch(() => {});
+    api.get('/groups').then(({ data }) => setAllGroups(data)).catch(() => {});
+    loadLate();
   }, []);
-
-  useEffect(() => { loadLate(); }, [isMaster]);
 
   const normalizeBatch = (v) => {
     if (!v) return '';
@@ -66,21 +65,31 @@ function CoordinatorDashboard() {
     });
   }, [allStudents, selectedBatch]);
 
-  const thesisByStudentId = React.useMemo(() => {
+  const studentAssignmentMap = React.useMemo(() => {
     const map = new Map();
     allTheses.forEach(t => {
-      if (t.studentId) map.set(t.studentId, t);
+      if (t.studentId) map.set(t.studentId, { id: t.id, type: 'thesis', title: t.title, supervisor: t.supervisor });
+    });
+    allGroups.forEach(g => {
+      (g.members || []).forEach(m => {
+        const sid = m.studentId || m.student?.id;
+        if (sid) map.set(sid, { id: g.id, type: 'group', title: `${g.name}: ${g.projectTitle}`, supervisor: g.supervisor });
+      });
     });
     return map;
-  }, [allTheses]);
+  }, [allTheses, allGroups]);
+
+  const assignedStudentIds = React.useMemo(() => {
+    return new Set(studentAssignmentMap.keys());
+  }, [studentAssignmentMap]);
 
   const assignedStudents = React.useMemo(() => {
-    return filteredStudents.filter(s => thesisByStudentId.has(s.id));
-  }, [filteredStudents, thesisByStudentId]);
+    return filteredStudents.filter(s => assignedStudentIds.has(s.id));
+  }, [filteredStudents, assignedStudentIds]);
 
   const unassignedStudents = React.useMemo(() => {
-    return filteredStudents.filter(s => !thesisByStudentId.has(s.id));
-  }, [filteredStudents, thesisByStudentId]);
+    return filteredStudents.filter(s => !assignedStudentIds.has(s.id));
+  }, [filteredStudents, assignedStudentIds]);
 
   const approveLate = async (proposal) => {
     setBusyId(proposal.id);
@@ -129,17 +138,17 @@ function CoordinatorDashboard() {
       ]
     : [
         { icon: 'groups', value: stats?.totalGroups || 0, label: 'Total Groups' },
+        { icon: 'assignment_turned_in', value: assignedStudents.length, label: 'Assigned Students', onClick: () => setShowAssignedModal(true), clickable: true, badge: 'Click for details' },
+        { icon: 'person_off', value: unassignedStudents.length, label: 'Unassigned Students', warning: unassignedStudents.length > 0, onClick: () => setShowUnassignedModal(true), clickable: true, badge: 'Missing group' },
         { icon: 'pending_actions', value: stats?.pendingGroups || 0, label: 'Pending' },
         { icon: 'check_circle', value: stats?.activeGroups || 0, label: 'Active' },
         { icon: 'done_all', value: stats?.completedGroups || 0, label: 'Completed' },
       ];
 
-  if (isMaster) {
-    statCards.push(
-      { icon: 'supervisor_account', value: stats?.supervisorAssignmentPending || 0, label: 'Supervisor Pending', warning: (stats?.supervisorAssignmentPending || 0) > 0 },
-      { icon: 'fact_check', value: stats?.pendingLateProposals || 0, label: 'Late Proposals', warning: (stats?.pendingLateProposals || 0) > 0 },
-    );
-  }
+  statCards.push(
+    { icon: 'supervisor_account', value: stats?.supervisorAssignmentPending || 0, label: 'Supervisor Pending', warning: (stats?.supervisorAssignmentPending || 0) > 0 },
+    { icon: 'fact_check', value: stats?.pendingLateProposals || 0, label: 'Late Proposals', warning: (stats?.pendingLateProposals || 0) > 0 },
+  );
 
   const pending = isMaster ? (stats?.pendingTheses || 0) : (stats?.pendingGroups || 0);
   const active = isMaster ? (stats?.activeTheses || 0) : (stats?.activeGroups || 0);
@@ -151,13 +160,11 @@ function CoordinatorDashboard() {
     { name: 'Completed', value: completed, color: STATUS_COLORS.completed },
   ].filter((d) => d.value > 0);
 
-  const assignmentChartData = isMaster
-    ? [
-        { name: 'Accepted', value: stats?.supervisorAssignmentAccepted || 0, color: '#16a34a' },
-        { name: 'Pending', value: stats?.supervisorAssignmentPending || 0, color: '#f97316' },
-        { name: 'Declined', value: stats?.supervisorAssignmentRejected || 0, color: '#dc2626' },
-      ].filter((d) => d.value > 0)
-    : [];
+  const assignmentChartData = [
+    { name: 'Accepted', value: stats?.supervisorAssignmentAccepted || 0, color: '#16a34a' },
+    { name: 'Pending', value: stats?.supervisorAssignmentPending || 0, color: '#f97316' },
+    { name: 'Declined', value: stats?.supervisorAssignmentRejected || 0, color: '#dc2626' },
+  ].filter((d) => d.value > 0);
 
   const actions = isMaster
     ? [
@@ -195,7 +202,7 @@ function CoordinatorDashboard() {
       subtitle={degreeLabel + ' Program Overview'}
       user={user}
       headerActions={
-        isMaster && batchOptions.length > 0 ? (
+        batchOptions.length > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface-container-lowest)', padding: '6px 14px', borderRadius: 10, border: '1px solid var(--color-outline-variant)' }}>
             <Icon name="filter_list" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }} />
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface)', margin: 0, whiteSpace: 'nowrap' }}>
@@ -348,7 +355,38 @@ function CoordinatorDashboard() {
         </div>
       )}
 
-      {isMaster && lateProposals.length > 0 && (
+      {mySupervisedGroups.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: 0 }}>My Supervised Project Groups ({mySupervisedGroups.length})</h3>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Project groups where you are assigned as supervisor</p>
+            </div>
+            <Link to="/supervisor/bachelor" className="btn btn-sm btn-outline">Go to Supervisor Portal →</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, padding: '0 16px 16px' }}>
+            {mySupervisedGroups.slice(0, 4).map(g => (
+              <div key={g.id} style={{
+                padding: '14px 16px', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-outline-variant)',
+                background: 'var(--color-surface-container-lowest)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-on-surface)' }}>{g.name}: {g.projectTitle}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
+                    Members: {(g.members || []).map(m => `${m.student?.firstName || ''} ${m.student?.lastName || ''}`).filter(Boolean).join(', ') || '—'}
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11 }}>{g.status}</span>
+                  <Link to={`/supervisor/project/group/${g.id}`} style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Manage Group →</Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {lateProposals.length > 0 && (
         <div className="card" style={{ marginTop: 24 }}>
           <div className="card-header">
             <h3>Late Proposals Awaiting Approval ({lateProposals.length})</h3>
@@ -433,7 +471,7 @@ function CoordinatorDashboard() {
                       <tr><td colSpan={5} className="empty-cell">No assigned students found for this batch</td></tr>
                     ) : (
                       assignedStudents.map(s => {
-                        const t = thesisByStudentId.get(s.id);
+                        const item = studentAssignmentMap.get(s.id);
                         return (
                           <tr key={s.id}>
                             <td style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -442,15 +480,15 @@ function CoordinatorDashboard() {
                             <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {s.rollNumber || '—'}
                             </td>
-                            <td style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t?.title}>
-                              {t?.title || '—'}
+                            <td style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item?.title}>
+                              {item?.title || '—'}
                             </td>
                             <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {t?.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : <span style={{ color: 'var(--color-outline)' }}>Unassigned</span>}
+                              {item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : <span style={{ color: 'var(--color-outline)' }}>Unassigned</span>}
                             </td>
                             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                              {t ? (
-                                <Link to={`/coordinator/project/thesis/${t.id}`} className="btn btn-sm btn-outline" style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                              {item ? (
+                                <Link to={item.type === 'group' ? `/coordinator/project/group/${item.id}` : `/coordinator/project/thesis/${item.id}`} className="btn btn-sm btn-outline" style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}>
                                   Manage →
                                 </Link>
                               ) : '—'}

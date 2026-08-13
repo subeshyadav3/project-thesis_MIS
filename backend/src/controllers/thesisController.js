@@ -8,7 +8,7 @@ const audit = require('../services/auditService');
 const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
-const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator } = require('../utils/coordinatorScope');
+const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
 const { getEngagement } = require('../services/engagementGuard');
 
 const normalizeBatch = (batch) => {
@@ -89,6 +89,9 @@ exports.getThesis = async (req, res) => {
       if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
+      // Tell the frontend whether the coordinator may act as coordinator on
+      // this thesis (in-scope) or only as the assigned supervisor.
+      thesis.canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
     }
     res.json(thesis);
   } catch (error) {
@@ -754,7 +757,7 @@ exports.updateThesisStatus = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!await isThesisVisibleToCoordinator(existing, scope, req.user)) {
+      if (!await canManageThesisAsCoordinator(existing, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -785,7 +788,7 @@ exports.assignSupervisor = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!await isThesisVisibleToCoordinator(existing, scope, req.user)) {
+      if (!await canManageThesisAsCoordinator(existing, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -899,7 +902,7 @@ exports.deleteThesis = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -929,7 +932,7 @@ exports.assignMidTermExternal = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -986,7 +989,7 @@ exports.assignFinalExternal = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -1041,7 +1044,7 @@ exports.updateThesis = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!await isThesisVisibleToCoordinator(existing, scope, req.user)) {
+      if (!await canManageThesisAsCoordinator(existing, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }

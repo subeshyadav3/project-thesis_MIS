@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
+const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
 
 // Magic number signatures for common document types
 const MAGIC_SIGNATURES = {
@@ -70,12 +71,34 @@ exports.uploadProposal = async (req, res) => {
     if (!groupId && !thesisId) return res.status(400).json({ success: false, error: 'groupId or thesisId is required' });
 
     if (groupId) {
-      const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) } });
+      const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { id: true, programId: true, supervisorId: true } });
       if (!group) return res.status(404).json({ success: false, error: 'Group not found' });
     }
     if (thesisId) {
-      const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) } });
+      const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } } });
       if (!thesis) return res.status(404).json({ success: false, error: 'Thesis not found' });
+    }
+
+    // Coordinators can only upload documents for items inside their scope
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (groupId) {
+        const group = await prisma.projectGroup.findUnique({
+          where: { id: parseInt(groupId) },
+          select: { id: true, programId: true, supervisorId: true },
+        });
+        if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+          return res.status(403).json({ success: false, error: 'You cannot upload documents for this group from your coordinator scope.' });
+        }
+      } else {
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: parseInt(thesisId) },
+          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        });
+        if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
+          return res.status(403).json({ success: false, error: 'You cannot upload documents for this thesis from your coordinator scope.' });
+        }
+      }
     }
 
     const entityType = groupId ? 'groups' : 'theses';
