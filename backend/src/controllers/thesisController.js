@@ -9,6 +9,7 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator } = require('../utils/coordinatorScope');
+const { getEngagement } = require('../services/engagementGuard');
 
 const normalizeBatch = (batch) => {
   if (!batch) return batch;
@@ -36,7 +37,6 @@ exports.getTheses = async (req, res) => {
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        crossProgramRequestedBy: { select: { id: true, firstName: true, lastName: true } },
         evaluations: true,
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
@@ -59,7 +59,6 @@ exports.getThesis = async (req, res) => {
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        crossProgramRequestedBy: { select: { id: true, firstName: true, lastName: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
@@ -70,7 +69,7 @@ exports.getThesis = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -90,6 +89,12 @@ exports.createThesis = async (req, res) => {
     if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
       return res.status(400).json({ error: 'studentId must belong to a master student' });
     }
+    const engagement = await getEngagement(student.id);
+    if (engagement.engaged) {
+      return res.status(409).json({
+        error: `Student is already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". A student cannot be part of two projects.`,
+      });
+    }
 
     // Check if cross-program (student belongs to a different program than the requesting coordinator)
     let isCrossProgram = false;
@@ -100,13 +105,10 @@ exports.createThesis = async (req, res) => {
       requestingCoordinatorProgram = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
       if (requestingCoordinatorProgram && student.programId !== requestingCoordinatorProgram.id) {
         isCrossProgram = true;
-        // Find the student's program coordinator
+        // Find the student's program coordinator (for notification only)
         const studentProgram = await prisma.program.findUnique({ where: { id: student.programId } });
         if (studentProgram?.coordinatorId) {
           studentCoordinator = await prisma.user.findUnique({ where: { id: studentProgram.coordinatorId } });
-        } else {
-          // If student's program has no coordinator, treat as same-program (create directly)
-          isCrossProgram = false;
         }
       }
     }
@@ -117,7 +119,6 @@ exports.createThesis = async (req, res) => {
         projectType: 'MASTER',
         studentId: parseInt(studentId),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
-        crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         programId: requestingCoordinatorProgram?.id ?? student.programId ?? null,
         batch: student.batch || null,
         cluster: req.body.cluster || student.program?.cluster || null,
@@ -136,39 +137,15 @@ exports.createThesis = async (req, res) => {
       await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
     }
 
-    // If cross-program, send [URGENT] notification to the student's coordinator
+    // If cross-program, notify the student's coordinator (notification only — no approval)
     if (isCrossProgram && studentCoordinator) {
       const requester = await prisma.user.findUnique({ where: { id: req.user.id } });
-      const msg = `[URGENT] ${requester.firstName} ${requester.lastName} (${requestingCoordinatorProgram.code} coordinator) has created a thesis for your student ${student.firstName} ${student.lastName} — "${thesis.title}". Please approve or reject this cross-program thesis.`;
-      const notification = await notifSvc.notify(studentCoordinator.id, 'CROSS_PROGRAM_THESIS', msg, `/theses/${thesis.id}`);
+      const msg = `${requester.firstName} ${requester.lastName}${requestingCoordinatorProgram ? ` (${requestingCoordinatorProgram.code} coordinator)` : ''} has created a thesis for your student ${student.firstName} ${student.lastName} — "${thesis.title}".`;
+      await notifSvc.notify(studentCoordinator.id, 'CROSS_PROGRAM_THESIS_CREATED', msg, `/theses/${thesis.id}`);
 
-      // Also send email
-      try {
-        const emailService = require('../services/emailService');
-        if (studentCoordinator.email) {
-          await emailService.sendEmail({
-            to: studentCoordinator.email,
-            subject: `[URGENT] Cross-Program Thesis Request — ${thesis.title}`,
-            title: 'Cross-Program Thesis Request',
-            contentLines: [
-              `Dear ${studentCoordinator.firstName} ${studentCoordinator.lastName},`,
-              `A cross-program thesis has been created for your student:`,
-              `<strong>From:</strong> ${requester.designation ? requester.designation + ' ' : ''}${requester.firstName} ${requester.lastName} (${requestingCoordinatorProgram.code} coordinator)`,
-              `<strong>Student:</strong> ${student.firstName} ${student.lastName} (${student.program?.code || '—'})`,
-              `<strong>Thesis:</strong> "${thesis.title}"`,
-              `Please log in to approve or reject this request.`,
-            ],
-          });
-        }
-      } catch (e) { console.error('cross-program thesis email error:', e.message); }
+      audit.log({ action: 'CROSS_PROGRAM_THESIS', entity: 'Thesis', entityId: thesis.id, details: `Cross-program thesis created for student from ${student.program?.code || 'another program'} by ${requestingCoordinatorProgram?.code || 'another'} coordinator`, performedById: req.user.id });
 
-      audit.log({ action: 'CROSS_PROGRAM_THESIS', entity: 'Thesis', entityId: thesis.id, details: `Cross-program thesis created for student from ${student.program?.code || 'another program'} by ${requestingCoordinatorProgram.code} coordinator`, performedById: req.user.id });
-
-      return res.status(201).json({
-        ...thesis,
-        crossProgram: true,
-        message: 'Cross-program thesis created. The student\'s coordinator has been notified for approval.',
-      });
+      return res.status(201).json({ ...thesis, crossProgram: true });
     }
 
     audit.log({ action: 'CREATE', entity: 'Thesis', entityId: thesis.id, details: `Created thesis "${thesis.title}"`, performedById: req.user.id });
@@ -268,9 +245,6 @@ exports.bulkImportPreview = async (req, res) => {
         unmatchCount++;
       } else {
         matchCount++;
-        if (coordinatorProgram && studentMatch.user.programId && studentMatch.user.programId !== coordinatorProgram.id) {
-          warnings.push('Student belongs to another program and cannot be imported by this coordinator');
-        }
         if (importedProgram && studentMatch.user.programId !== importedProgram.id) {
           warnings.push('Program does not match the matched student');
         }
@@ -293,10 +267,7 @@ exports.bulkImportPreview = async (req, res) => {
       }
       // Student has no program assigned — e.g. auto-created without programId
       if (coordinatorProgram && studentMatch && !studentMatch.user.programId) {
-        const hasProgWarning = warnings.findIndex(w => w.includes('belongs to another program'));
-        if (hasProgWarning === -1) {
-          warnings.push('Student program not set — will be assigned during import');
-        }
+        warnings.push('Student program not set — will be assigned during import');
       }
 
       // Match supervisor — if not found, mark for auto-create
@@ -578,12 +549,22 @@ exports.bulkImportConfirm = async (req, res) => {
           }
         }
 
-        // Check for active thesis within the transaction
+        // Check for active engagement within the transaction (thesis or group project)
         const activeThesis = await tx.thesis.findFirst({
-          where: { studentId: effectiveStudentId, status: { in: ['PENDING', 'ACTIVE'] } },
+          where: { studentId: effectiveStudentId, status: { in: ['PENDING', 'ACTIVE', 'OVERDUE'] } },
         });
-        if (activeThesis) {
-          skipped.push({ row: row.row, studentId: effectiveStudentId, reason: `Already has active thesis: "${activeThesis.title}"` });
+        const activeMembership = await tx.groupMember.findFirst({
+          where: { studentId: effectiveStudentId, group: { status: { in: ['PENDING', 'ACTIVE', 'OVERDUE'] } } },
+          select: { group: { select: { id: true, projectTitle: true, status: true } } },
+        });
+        if (activeThesis || activeMembership) {
+          skipped.push({
+            row: row.row,
+            studentId: effectiveStudentId,
+            reason: activeThesis
+              ? `Already engaged in thesis: "${activeThesis.title}"`
+              : `Already engaged in project: "${activeMembership.group.projectTitle}"`,
+          });
           return null;
         }
 
@@ -746,7 +727,7 @@ exports.updateThesisStatus = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(existing, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(existing, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -777,13 +758,19 @@ exports.assignSupervisor = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(existing, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(existing, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
+    const supervisorId = parseInt(req.body.supervisorId);
+    const supUser = await prisma.user.findUnique({ where: { id: supervisorId }, select: { role: true } });
+    // A coordinator assigned as supervisor is treated as accepted (self/peer assignment is explicit)
+    const isCoordinatorSup = supUser?.role === 'COORDINATOR';
     const thesis = await prisma.thesis.update({
       where: { id },
-      data: { supervisorId: parseInt(req.body.supervisorId) },
+      data: isCoordinatorSup
+        ? { supervisorId, supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' }
+        : { supervisorId, supervisorAssignmentStatus: 'PENDING' },
       include: { student: true, supervisor: true },
     });
     const sup = thesis.supervisor;
@@ -804,7 +791,7 @@ exports.assignSupervisor = async (req, res) => {
         studentIds: thesis.studentId ? [thesis.studentId] : [],
       });
     } catch (e) { console.error('notifySupervisorAssignment:', e.message); }
-    audit.log({ action: 'ASSIGN_SUPERVISOR', entity: 'Thesis', entityId: thesis.id, details: `Assigned supervisor to "${thesis.title}"`, performedById: req.user.id });
+    audit.log({ action: 'ASSIGN_SUPERVISOR', entity: 'Thesis', entityId: thesis.id, details: `Assigned supervisor to "${thesis.title}" (pending acceptance)`, performedById: req.user.id });
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -855,7 +842,7 @@ exports.deleteThesis = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -885,7 +872,7 @@ exports.assignMidTermExternal = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -942,7 +929,7 @@ exports.assignFinalExternal = async (req, res) => {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(thesis, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -997,7 +984,7 @@ exports.updateThesis = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Thesis not found' });
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
-      if (!isThesisVisibleToCoordinator(existing, scope, req.user)) {
+      if (!await isThesisVisibleToCoordinator(existing, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
@@ -1014,89 +1001,6 @@ exports.updateThesis = async (req, res) => {
     audit.log({ action: 'UPDATE', entity: 'Thesis', entityId: id, details: `Updated thesis "${thesis.title}"`, performedById: req.user.id });
     res.json({ message: 'Thesis updated', thesis });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-exports.approveCrossProgramThesis = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const thesis = await prisma.thesis.findUnique({
-      where: { id },
-      include: { student: { include: { program: true } } },
-    });
-    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
-    if (!thesis.crossProgramRequestedById) {
-      return res.status(400).json({ error: 'This thesis is not a cross-program request' });
-    }
-
-    // Verify that the current user is the student's program coordinator
-    const studentProgram = await prisma.program.findUnique({ where: { id: thesis.student.programId } });
-    if (!studentProgram || studentProgram.coordinatorId !== req.user.id) {
-      return res.status(403).json({ error: 'Only the student\'s coordinator can approve this request' });
-    }
-
-    const requester = await prisma.user.findUnique({ where: { id: thesis.crossProgramRequestedById } });
-
-    // Clear the cross-program flag — thesis is now approved
-    await prisma.thesis.update({
-      where: { id },
-      data: { crossProgramRequestedById: null },
-    });
-
-    // Notify the requesting coordinator
-    const approver = await prisma.user.findUnique({ where: { id: req.user.id } });
-    const msg = `Your cross-program thesis request for "${thesis.title}" has been APPROVED by ${approver.firstName} ${approver.lastName}.`;
-    if (requester) await notifSvc.notify(requester.id, 'CROSS_PROGRAM_THESIS_APPROVED', msg);
-
-    audit.log({ action: 'CROSS_PROGRAM_THESIS_APPROVED', entity: 'Thesis', entityId: id, details: `Cross-program thesis approved`, performedById: req.user.id });
-
-    res.json({ message: 'Cross-program thesis approved.' });
-  } catch (error) {
-    console.error('approveCrossProgramThesis error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-exports.rejectCrossProgramThesis = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const thesis = await prisma.thesis.findUnique({
-      where: { id },
-      include: { student: { include: { program: true } } },
-    });
-    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
-    if (!thesis.crossProgramRequestedById) {
-      return res.status(400).json({ error: 'This thesis is not a cross-program request' });
-    }
-
-    // Verify that the current user is the student's program coordinator
-    const studentProgram = await prisma.program.findUnique({ where: { id: thesis.student.programId } });
-    if (!studentProgram || studentProgram.coordinatorId !== req.user.id) {
-      return res.status(403).json({ error: 'Only the student\'s coordinator can reject this request' });
-    }
-
-    const requester = await prisma.user.findUnique({ where: { id: thesis.crossProgramRequestedById } });
-
-    // Notify the requesting coordinator before deleting
-    const rejecter = await prisma.user.findUnique({ where: { id: req.user.id } });
-    const msg = `Your cross-program thesis request for "${thesis.title}" has been REJECTED by ${rejecter.firstName} ${rejecter.lastName}. The thesis has been removed.`;
-    if (requester) await notifSvc.notify(requester.id, 'CROSS_PROGRAM_THESIS_REJECTED', msg);
-
-    // Delete the thesis and its related records
-    await prisma.$transaction([
-      prisma.evaluation.deleteMany({ where: { thesisId: id } }),
-      prisma.evaluationComponent.deleteMany({ where: { thesisId: id } }),
-      prisma.proposal.deleteMany({ where: { thesisId: id } }),
-      prisma.examinerAssignment.deleteMany({ where: { thesisId: id } }),
-      prisma.thesis.delete({ where: { id } }),
-    ]);
-
-    audit.log({ action: 'CROSS_PROGRAM_THESIS_REJECTED', entity: 'Thesis', entityId: id, details: `Cross-program thesis rejected and deleted`, performedById: req.user.id });
-
-    res.json({ message: 'Cross-program thesis rejected and removed.' });
-  } catch (error) {
-    console.error('rejectCrossProgramThesis error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

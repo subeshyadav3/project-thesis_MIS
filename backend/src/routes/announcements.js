@@ -6,6 +6,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 router.use(authenticate);
 
 router.get('/eligible', ctrl.listEligible);
+router.get('/:id/form-responses', authorize('COORDINATOR', 'MAINTAINER'), ctrl.getFormResponses);
 router.get('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.list);
 router.get('/:id', authorize('COORDINATOR', 'MAINTAINER', 'STUDENT'), ctrl.get);
 router.post('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.create);

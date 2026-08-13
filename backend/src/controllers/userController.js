@@ -281,9 +281,31 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-exports.getUsersByRole = async (req, res) => {
+exports.getSupervisorScope = async (req, res) => {
   try {
-    const where = { role: req.params.role.toUpperCase() };
+    const [ownProgram, theses, groups] = await Promise.all([
+      prisma.program.findFirst({ where: { coordinatorId: req.user.id }, select: { id: true } }),
+      prisma.thesis.findMany({ where: { supervisorId: req.user.id }, select: { programId: true } }),
+      prisma.projectGroup.findMany({ where: { supervisorId: req.user.id }, select: { programId: true } }),
+    ]);
+    const ownProgramId = req.user.programId ?? ownProgram?.id ?? null;
+    const assignments = [...theses, ...groups];
+    res.json({
+      ownProgramId,
+      hasSupervisorAssignments: assignments.length > 0,
+      hasOtherProgramAssignments: assignments.some(t => t.programId && t.programId !== ownProgramId),
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.getUsersByRole = async (req, res) => {  try {
+    const role = req.params.role.toUpperCase();
+    // Supervisor lookups also include coordinators (they can supervise too)
+    const where = role === 'SUPERVISOR'
+      ? { role: { in: ['SUPERVISOR', 'COORDINATOR'] } }
+      : { role };
     if (req.query.all !== 'true') {
       where.active = true;
     }
@@ -296,7 +318,7 @@ exports.getUsersByRole = async (req, res) => {
     if (req.user.role === 'COORDINATOR') {
       where.departmentId = req.user.departmentId;
       // Coordinators can only fetch SUPERVISOR, EXTERNAL_EXAMINER, STUDENT roles
-      if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(req.params.role.toUpperCase())) {
+      if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role)) {
         return res.json([]);
       }
     }

@@ -11,6 +11,7 @@ router.post('/', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userContr
 router.put('/:id', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.updateUser);
 router.delete('/:id', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.deleteUser);
 router.get('/role/:role', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getUsersByRole);
+router.get('/supervisor-scope', authenticate, authorize('COORDINATOR'), userController.getSupervisorScope);
 router.put('/:id/toggle-active', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.toggleActive);
 router.get('/audit-logs', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getAuditLogs);
 router.post('/bulk', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.bulkCreateUsers);

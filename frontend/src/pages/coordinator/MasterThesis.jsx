@@ -65,7 +65,6 @@ function MasterThesis() {
   const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
-  const [pendingRequests, setPendingRequests] = useState([]);
   const [selectedTheses, setSelectedTheses] = useState([]);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const selectAllRef = useRef(null);
@@ -81,7 +80,6 @@ function MasterThesis() {
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
-      api.get('/assignment-requests', { signal }).then(({ data }) => setPendingRequests(data.filter(r => r.status === 'PENDING'))).catch(() => setPendingRequests([])),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -210,29 +208,6 @@ const handleComplete = async (id) => {
     });
   };
 
-  const confirmRejectCrossProgram = (id) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Reject cross-program thesis',
-      message: 'Reject this cross-program thesis? It will be removed.',
-      onConfirm: () => {
-        setConfirmDialog(prev => ({ ...prev, open: false }));
-        handleRejectCrossProgram(id);
-      },
-      danger: true,
-    });
-  };
-
-  const handleRejectCrossProgram = async (id) => {
-    try {
-      await api.put(`/theses/${id}/reject-cross-program`);
-      toast.success('Cross-program thesis rejected');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Reject failed');
-    }
-  };
-
   const handleDeleteThesis = async (id) => {
     try {
       await api.delete(`/theses/${id}`);
@@ -272,7 +247,7 @@ const handleComplete = async (id) => {
     try {
       const res = await api.post('/theses', createForm);
       if (res.data?.crossProgram) {
-        toast.info('Cross-program thesis created. The student\'s coordinator has been notified for approval.');
+        toast.info('Thesis created. The student\'s coordinator has been notified.');
       } else {
         toast.success('Thesis created successfully');
       }
@@ -298,15 +273,7 @@ const handleComplete = async (id) => {
           if (!editSupId) {
             promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: null }));
           } else {
-            promises.push(
-              api.post('/assignment-requests', { thesisId, supervisorId: parseInt(editSupId) })
-                .then(res => {
-                  if (res.data?.crossProgram) {
-                    setPendingRequests(prev => [...prev, res.data.request]);
-                  }
-                  return res;
-                })
-            );
+            promises.push(api.post('/assignment-requests', { thesisId, supervisorId: parseInt(editSupId) }));
           }
         }
       }
@@ -340,7 +307,7 @@ const handleComplete = async (id) => {
       const results = await Promise.all(promises);
       const hasCrossProgram = results.some(r => r?.data?.crossProgram);
       if (hasCrossProgram) {
-        toast.info('Cross-program supervisor request sent for approval.');
+        toast.info('Supervisor assigned. The student\'s coordinator has been notified.');
       } else {
         toast.success('Changes saved successfully');
       }
@@ -513,18 +480,7 @@ return (
                   <span className="detail-label">Supervisor</span>
                   <span>
                     {showDetail.supervisor ? (
-                      <>
-                        {showDetail.supervisor.firstName} {showDetail.supervisor.lastName}
-                        {pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') && (
-                          <span className="badge badge-warning" style={{ marginLeft: 8, fontSize: 10 }}>
-                            <span className="dot" />Pending Approval
-                          </span>
-                        )}
-                      </>
-                    ) : pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') ? (
-                      <span className="badge badge-warning" style={{ fontSize: 10 }}>
-                        <span className="dot" />Pending Approval
-                      </span>
+                      <>{showDetail.supervisor.firstName} {showDetail.supervisor.lastName}</>
                     ) : (
                       <span className="badge badge-pending" style={{ fontSize: 10 }}>
                         <span className="dot" />Unassigned
@@ -982,11 +938,6 @@ return (
                         <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
                           {t.supervisor.firstName} {t.supervisor.lastName}
                         </span>
-                      ) : pendingRequests.some(r => r.thesisId === t.id && r.status === 'PENDING') ? (
-                        <span className="badge badge-warning" style={{ fontSize: 10 }}>
-                          <span className="dot" />
-                          Pending
-                        </span>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
                           <span className="dot" />
@@ -1007,37 +958,6 @@ return (
                           <option value="OVERDUE">OVERDUE</option>
                           <option value="COMPLETED">COMPLETED</option>
                         </select>
-                        {t.crossProgramRequestedBy && (
-                          <>
-                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
-                              <Icon name="swap_horiz" className="material-symbols-outlined" style={{ fontSize: 9, verticalAlign: 'middle' }} />
-                              Cross-Program
-                            </span>
-                            {t.crossProgramRequestedBy.id === user.id && (
-                              <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
-                                <span className="dot" />Awaiting Approval
-                              </span>
-                            )}
-                            {t.crossProgramRequestedBy.id !== user.id && (
-                              <div style={{ display: 'flex', gap: 4 }}>
-                                <button
-                                  className="icon-btn-sm success"
-                                  title="Approve cross-program thesis"
-                                  onClick={async (e) => { e.stopPropagation(); try { await api.put(`/theses/${t.id}/approve-cross-program`); toast.success('Cross-program thesis approved'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Approve failed'); } }}
-                                >
-                                  <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                                </button>
-                                <button
-                                  className="icon-btn-sm danger"
-                                  title="Reject cross-program thesis"
-                                  onClick={(e) => { e.stopPropagation(); confirmRejectCrossProgram(t.id); }}
-                                >
-                                  <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        )}
                       </div>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>

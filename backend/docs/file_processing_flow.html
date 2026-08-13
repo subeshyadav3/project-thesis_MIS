@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete File Processing Architecture & Code Flow Guide</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #182234;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #4ade80;
+      --accent-yellow: #facc15;
+      --accent-purple: #c084fc;
+      --accent-red: #f87171;
+      --border-color: #334155;
+      --code-bg: #090d16;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      color: var(--accent-blue);
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+
+    .nav-toc {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.2rem 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .nav-toc h3 {
+      color: var(--accent-yellow);
+      margin-bottom: 0.8rem;
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-toc ul {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.5rem 1.5rem;
+      list-style-type: none;
+    }
+
+    .nav-toc a {
+      color: var(--accent-blue);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-toc a:hover {
+      color: var(--accent-green);
+      text-decoration: underline;
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      color: var(--accent-green);
+      margin-bottom: 1rem;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 0.4rem;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      color: var(--accent-purple);
+      margin: 1.5rem 0 0.8rem;
+    }
+
+    p, li {
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+
+    li { margin-bottom: 0.4rem; }
+
+    strong { color: var(--text-primary); }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.2rem 0;
+    }
+
+    .card-title {
+      font-weight: bold;
+      color: var(--accent-blue);
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-right: 0.4rem;
+      text-transform: uppercase;
+    }
+
+    .badge-get { background: #0284c7; color: white; }
+    .badge-post { background: #16a34a; color: white; }
+    .badge-middleware { background: #9333ea; color: white; }
+    .badge-controller { background: #ca8a04; color: white; }
+
+    /* Code Blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1.2rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: #e2e8f0;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.08);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      color: var(--accent-blue);
+      font-size: 0.9em;
+    }
+
+    .kw { color: #f472b6; font-weight: bold; }
+    .fn { color: #38bdf8; }
+    .str { color: #4ade80; }
+    .cm { color: #64748b; font-style: italic; }
+    .num { color: #facc15; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      background: var(--bg-card);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    th, td {
+      padding: 0.8rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    /* Flow Diagrams */
+    .flow-diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .step-num {
+      background: var(--accent-blue);
+      color: var(--bg-primary);
+      font-weight: bold;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.9rem;
+    }
+
+    .step-content {
+      flex-grow: 1;
+    }
+
+    .step-header {
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 0.2rem;
+    }
+
+    .step-desc {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .arrow-down {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 1.2rem;
+      margin: -0.4rem 0 -0.4rem 0.8rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 1.5rem;
+      margin-top: 3rem;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Complete File Processing Architecture & Code Flow Guide</h1>
+      <div class="subtitle">Comprehensive End-to-End Developer Documentation for <code>thesis-management-backend</code></div>
+    </header>
+
+    <nav class="nav-toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#section1">1. High-Level Architecture & Core Concepts</a></li>
+        <li><a href="#section2">2. Multer & In-Memory Binary Stream Theory</a></li>
+        <li><a href="#section3">3. Flow 1: Excel Bulk Import (`.xlsx`)</a></li>
+        <li><a href="#section4">4. Flow 2: Proposal Document Upload & Magic Bytes</a></li>
+        <li><a href="#section5">5. Flow 3: PDF Generation & Streaming (Puppeteer)</a></li>
+        <li><a href="#section6">6. Flow 4: Background AI Extraction (`pdf-parse`)</a></li>
+        <li><a href="#section7">7. Codebase Directory & File Line Registry</a></li>
+      </ul>
+    </nav>
+
+    <!-- SECTION 1 -->
+    <section id="section1">
+      <h2>1. High-Level Architecture & Core Concepts</h2>
+      <p>
+        In modern web applications built on Node.js and Express, dealing with files involves three major operational pillars:
+      </p>
+      <div class="card">
+        <div class="card-title">Pillar 1: File Ingestion (HTTP Multipart Ingestion)</div>
+        <p>Receiving binary data from clients via standard HTML forms or AJAX requests using <code>multipart/form-data</code> format, handled by <strong>Multer middleware</strong> in memory without polluting disk with temporary files.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Pillar 2: File Parsing & Data Extraction</div>
+        <p>Converting unstructured or tabular binary formats (such as Excel <code>.xlsx</code> sheets or PDF/Word documents) into structured JS objects using dedicated libraries like <strong>SheetJS (`xlsx`)</strong>, <strong>`pdf-parse`</strong>, or <strong>`mammoth`</strong>.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Pillar 3: File Generation & Rendering</div>
+        <p>Dynamically assembling data from database queries (via <strong>Prisma ORM</strong>) into custom HTML/CSS templates, rendering them using a headless browser engine (<strong>Puppeteer</strong>), and streaming the resulting PDF binary directly back to the HTTP client with appropriate headers.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section id="section2">
+      <h2>2. Multer & In-Memory Binary Stream Theory</h2>
+      <p>
+        Standard JSON endpoints accept <code>application/json</code> text payloads. However, when uploading files, browsers wrap payload parts in boundary strings under <code>multipart/form-data</code>.
+      </p>
+      <p>
+        Express by default does not parse multipart body streams. <strong>Multer</strong> is a Node.js middleware for handling <code>multipart/form-data</code>.
+      </p>
+
+      <h3>Disk Storage vs. Memory Storage</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Disk Storage (<code>multer.diskStorage</code>)</th>
+            <th>Memory Storage (<code>multer.memoryStorage</code>) — <em>Used Here</em></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Data Location</strong></td>
+            <td>Saves uploaded file to disk at <code>/tmp/upload_1234</code>.</td>
+            <td>Holds file in RAM as a JavaScript <code>Buffer</code> object.</td>
+          </tr>
+          <tr>
+            <td><strong>Performance</strong></td>
+            <td>Slower (involves disk I/O write then read).</td>
+            <td>Lightning fast (direct RAM access via <code>req.file.buffer</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Cleanup</strong></td>
+            <td>Requires manual garbage cleanup of temp files.</td>
+            <td>Automatically garbage-collected when request ends.</td>
+          </tr>
+          <tr>
+            <td><strong>Usage in Project</strong></td>
+            <td>Not used for initial parsing.</td>
+            <td>Used across all Excel import routes & upload controllers.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>How Multer Attaches File Metadata to <code>req.file</code></h3>
+      <pre><span class="cm">// When multer({ storage: multer.memoryStorage() }).single('file') finishes, it produces:</span>
+req.file = {
+  fieldname: <span class="str">'file'</span>,
+  originalname: <span class="str">'students_batch_080.xlsx'</span>,
+  mimetype: <span class="str">'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'</span>,
+  size: <span class="num">45210</span>, <span class="cm">// bytes</span>
+  buffer: &lt;Buffer 50 4b 03 04 14 00 06 00 ... &gt; <span class="cm">// Raw binary buffer in memory</span>
+};</pre>
+    </section>
+
+    <!-- SECTION 3 -->
+    <section id="section3">
+      <h2>3. Flow 1: Excel Bulk Import (`.xlsx`)</h2>
+      <p>
+        This flow explains how uploading an Excel sheet creates hundreds of student user records in the Prisma database cleanly.
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-header">Frontend HTTP Request</div>
+            <div class="step-desc">Client submits <code>POST /api/users/bulk-import</code> with <code>FormData</code> containing <code>file: student_list.xlsx</code> and Bearer token.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-header">Authentication & Authorization Middleware</div>
+            <div class="step-desc"><code>authenticate</code> checks JWT token, sets <code>req.user</code>. <code>authorize('MAINTAINER', 'COORDINATOR')</code> verifies permissions in <a href="file:///home/subeshyadav3/Projects/se/backend/src/routes/users.js#L17"><code>routes/users.js</code></a>.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-header">Multer Memory Stream Interception</div>
+            <div class="step-desc"><code>upload.single('file')</code> parses incoming multipart stream and assigns <code>req.file.buffer</code>.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-header">SheetJS (XLSX) Binary Parsing</div>
+            <div class="step-desc">In <a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/userController.js#L466"><code>userController.js</code></a>, <code>XLSX.read(req.file.buffer, { type: 'buffer' })</code> parses binary buffer into a workbook instance.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-header">Sheet to JSON Conversion</div>
+            <div class="step-desc"><code>XLSX.utils.sheet_to_json(sheet)</code> extracts rows into array of JavaScript objects using Row 1 headers.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">6</div>
+          <div class="step-content">
+            <div class="step-header">Row Iteration, Validation & Auto-Derivations</div>
+            <div class="step-desc">Loop runs over each row: derives auto-email (<code>roll + '@pcampus.edu.np'</code>), extracts batch (e.g. <code>080</code>), hashes password via <code>bcrypt</code>.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">7</div>
+          <div class="step-content">
+            <div class="step-header">Prisma DB Insert, Audit & Notification</div>
+            <div class="step-desc"><code>prisma.user.create()</code> stores record. <code>audit.log()</code> writes log. <code>emailService</code> notifies user. Returns JSON summary.</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Exact Code Implementation (<a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/userController.js#L466-L470"><code>userController.js</code></a>)</h3>
+      <pre><span class="kw">exports</span>.<span class="fn">bulkImportUsersExcel</span> = <span class="kw">async</span> (req, res) => {
+  <span class="kw">try</span> {
+    <span class="kw">if</span> (!req.file) <span class="kw">return</span> res.status(<span class="num">400</span>).json({ error: <span class="str">'No file uploaded'</span> });
+
+    <span class="kw">const</span> XLSX = require(<span class="str">'xlsx'</span>);
+    
+    <span class="cm">// 1. Parse raw binary buffer directly from RAM</span>
+    <span class="kw">const</span> workbook = XLSX.read(req.file.buffer, { type: <span class="str">'buffer'</span> });
+    
+    <span class="cm">// 2. Target the first worksheet</span>
+    <span class="kw">const</span> sheet = workbook.Sheets[workbook.SheetNames[<span class="num">0</span>]];
+    
+    <span class="cm">// 3. Convert tabular cells into array of objects [{ rollNumber: '080BCT001', firstName: 'Ram' }]</span>
+    <span class="kw">const</span> rows = XLSX.utils.sheet_to_json(sheet);
+
+    <span class="cm">// 4. Iterate and insert records</span>
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; rows.length; i++) {
+      <span class="kw">const</span> row = rows[i];
+      <span class="kw">const</span> rollNumber = row.rollNumber || row.RollNumber;
+      <span class="kw">const</span> email = rollNumber.toLowerCase() + <span class="str">'@pcampus.edu.np'</span>;
+      <span class="kw">const</span> hash = <span class="kw">await</span> bcrypt.hash(row.password || <span class="str">'default123'</span>, <span class="num">10</span>);
+
+      <span class="kw">await</span> prisma.user.create({
+        data: { email, password: hash, firstName: row.firstName, lastName: row.lastName, rollNumber, role: <span class="str">'STUDENT'</span> }
+      });
+    }
+    
+    res.status(<span class="num">201</span>).json({ success: <span class="kw">true</span>, created: rows.length });
+  } <span class="kw">catch</span> (err) {
+    res.status(<span class="num">500</span>).json({ error: err.message });
+  }
+};</pre>
+    </section>
+
+    <!-- SECTION 4 -->
+    <section id="section4">
+      <h2>4. Flow 2: Proposal Document Upload & Magic Bytes</h2>
+      <p>
+        File extensions can be forged by renaming malicious files (e.g. <code>exe</code> to <code>.pdf</code>). To prevent security vulnerabilities, <a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/uploadController.js#L8"><code>uploadController.js</code></a> inspects binary magic bytes at the buffer level.
+      </p>
+
+      <h3>Magic Byte Signature Map</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Header Hex Bytes</th>
+            <th>ASCII Equivalent</th>
+            <th>Validation Logic</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>PDF</strong></td>
+            <td><code>0x25, 0x50, 0x44, 0x46</code></td>
+            <td><code>%PDF</code></td>
+            <td>Matches first 4 bytes of buffer</td>
+          </tr>
+          <tr>
+            <td><strong>DOCX / XLSX</strong></td>
+            <td><code>0x50, 0x4B, 0x03, 0x04</code></td>
+            <td><code>PK\x03\x04</code> (Zip archive header)</td>
+            <td>Matches first 4 bytes of buffer</td>
+          </tr>
+          <tr>
+            <td><strong>DOC</strong></td>
+            <td><code>0xD0, 0xCF, 0x11, 0xE0</code></td>
+            <td>Compound File Binary</td>
+            <td>Matches legacy OLE header</td>
+          </tr>
+          <tr>
+            <td><strong>PNG</strong></td>
+            <td><code>0x89, 0x50, 0x4E, 0x47</code></td>
+            <td><code>\x89PNG</code></td>
+            <td>Matches PNG header</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Signature Checking Code</h3>
+      <pre><span class="kw">function</span> <span class="fn">detectMimeFromBuffer</span>(buffer) {
+  <span class="kw">for</span> (<span class="kw">const</span> [type, signatures] <span class="kw">of</span> Object.entries(MAGIC_SIGNATURES)) {
+    <span class="kw">for</span> (<span class="kw">const</span> sig <span class="kw">of</span> signatures) {
+      <span class="kw">const</span> matches = sig.bytes.every((byte, i) => buffer[sig.offset + i] === byte);
+      <span class="kw">if</span> (matches) <span class="kw">return</span> type;
+    }
+  }
+  <span class="kw">return</span> <span class="kw">null</span>;
+}</pre>
+    </section>
+
+    <!-- SECTION 5 -->
+    <section id="section5">
+      <h2>5. Flow 3: PDF Generation & Streaming (Puppeteer)</h2>
+      <p>
+        Instead of manually placing text on PDF pages using coordinates, the backend generates dynamic HTML templates with CSS styling and uses headless Chrome (via <code>puppeteer-core</code>) to render pixel-perfect PDF documents.
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-header">HTTP Download Trigger</div>
+            <div class="step-desc">User requests <code>GET /api/print/thesis/12?scope=both</code> in browser or frontend link.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-header">Data Retrieval & Program Access Check</div>
+            <div class="step-desc">In <a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/printController.js#L556"><code>printController.js</code></a>, <code>checkPrintAccess()</code> verifies user permissions. Prisma fetches thesis, student, supervisor, and evaluation scores.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-header">Dynamic HTML Template Assembly</div>
+            <div class="step-desc"><code>buildMasterFormat(data, scope)</code> generates an HTML string with clean CSS tables, page breaks (<code>page-break-after: always</code>), escaping text via <code>esc()</code>, and numbers converted to words via <code>numberToWords()</code>.</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-header">Headless Chromium Singleton Re-use</div>
+            <div class="step-desc"><code>getBrowser()</code> reuses a running background Chromium browser process instead of launching a new process every time (saving ~2 seconds & 200MB RAM per print).</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-header">Page Render & PDF Binary Buffer Synthesis</div>
+            <div class="step-desc"><code>page = await browser.newPage(); await page.setContent(html); const pdfBuffer = await page.pdf({ format: 'A4' });</code></div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <div class="flow-step">
+          <div class="step-num">6</div>
+          <div class="step-content">
+            <div class="step-header">HTTP Headers & Binary Transmission</div>
+            <div class="step-desc"><code>res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', 'attachment; filename="..."'); res.send(pdfBuffer);</code></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Puppeteer Service Implementation (<a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/printController.js#L72-L86"><code>printController.js</code></a>)</h3>
+      <pre><span class="kw">async</span> <span class="kw">function</span> <span class="fn">generatePdf</span>(html) {
+  <span class="kw">const</span> browser = <span class="kw">await</span> getBrowser(); <span class="cm">// Shared Chromium process</span>
+  <span class="kw">const</span> page = <span class="kw">await</span> browser.newPage();
+  <span class="kw">try</span> {
+    <span class="cm">// Load HTML string into headless DOM</span>
+    <span class="kw">await</span> page.setContent(html, { waitUntil: <span class="str">'networkidle0'</span> });
+    
+    <span class="cm">// Print virtual page to A4 PDF Buffer</span>
+    <span class="kw">const</span> pdf = <span class="kw">await</span> page.pdf({
+      format: <span class="str">'A4'</span>,
+      printBackground: <span class="kw">true</span>,
+      margin: { top: <span class="str">'20mm'</span>, bottom: <span class="str">'20mm'</span>, left: <span class="str">'15mm'</span>, right: <span class="str">'15mm'</span> },
+    });
+    <span class="kw">return</span> Buffer.from(pdf);
+  } <span class="kw">finally</span> {
+    <span class="kw">await</span> page.close(); <span class="cm">// Tab cleanup</span>
+  }
+}</pre>
+    </section>
+
+    <!-- SECTION 6 -->
+    <section id="section6">
+      <h2>6. Flow 4: Background AI Extraction (`pdf-parse`)</h2>
+      <p>
+        When a proposal PDF is uploaded, the main HTTP request must return immediately without keeping the user waiting. The project uses non-blocking asynchronous execution via <code>setImmediate()</code> to trigger background AI parsing.
+      </p>
+
+      <h3>Asynchronous Non-Blocking Pattern (<a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/uploadController.js#L36-L59"><code>uploadController.js</code></a>)</h3>
+      <pre><span class="kw">function</span> <span class="fn">triggerAIChatbot</span>({ proposalId, documentUrl, documentType, authToken }) {
+  <span class="kw">const</span> fetchAndLog = <span class="kw">async</span> () => {
+    <span class="kw">try</span> {
+      <span class="cm">// Calls background AI service endpoint</span>
+      <span class="kw">await</span> fetch(<span class="str">'http://localhost:8001/api/ai/analyze'</span>, {
+        method: <span class="str">'POST'</span>,
+        headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>, Authorization: authToken },
+        body: JSON.stringify({ proposal_id: proposalId, document_url: documentUrl, document_type: documentType }),
+      });
+    } <span class="kw">catch</span> (e) {
+      console.warn(<span class="str">'AI service offline:'</span>, e.message);
+    }
+  };
+
+  <span class="cm">// Queue function to run on next event loop tick without blocking current HTTP response</span>
+  setImmediate(fetchAndLog);
+}</pre>
+
+      <p>
+        In the AI microservice, <code>pdf-parse</code> receives the file path from <code>documentUrl</code>, reads the raw text contents out of the PDF page objects, converts text into vector embeddings, and enables similarity queries for proposal evaluation.
+      </p>
+    </section>
+
+    <!-- SECTION 7 -->
+    <section id="section7">
+      <h2>7. Codebase Directory & File Line Registry</h2>
+      <p>
+        Quick lookup map linking components, routes, and controllers involved in file processing across your project:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Module Name</th>
+            <th>File Path</th>
+            <th>Primary Functionality / Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>User Routes</strong></td>
+            <td><a href="file:///home/subeshyadav3/Projects/se/backend/src/routes/users.js"><code>src/routes/users.js</code></a></td>
+            <td>Configures Multer memory storage middleware and registers <code>/bulk-import</code> route.</td>
+          </tr>
+          <tr>
+            <td><strong>User Controller</strong></td>
+            <td><a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/userController.js"><code>src/controllers/userController.js</code></a></td>
+            <td>Contains <code>bulkImportUsersExcel</code> logic using <code>XLSX.read()</code> & <code>sheet_to_json()</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>Upload Controller</strong></td>
+            <td><a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/uploadController.js"><code>src/controllers/uploadController.js</code></a></td>
+            <td>Magic byte MIME detection (<code>detectMimeFromBuffer</code>), proposal file saving, and async AI triggers.</td>
+          </tr>
+          <tr>
+            <td><strong>Print Controller</strong></td>
+            <td><a href="file:///home/subeshyadav3/Projects/se/backend/src/controllers/printController.js"><code>src/controllers/printController.js</code></a></td>
+            <td>Puppeteer Chrome browser management, HTML template string generation, and PDF binary HTTP streaming.</td>
+          </tr>
+          <tr>
+            <td><strong>Print Routes</strong></td>
+            <td><a href="file:///home/subeshyadav3/Projects/se/backend/src/routes/print.js"><code>src/routes/print.js</code></a></td>
+            <td>Registers PDF print endpoints for group evaluation and thesis evaluation forms.</td>
+          </tr>
+          <tr>
+            <td><strong>Prisma Utility</strong></td>
+            <td><a href="file:///home/subeshyadav3/Projects/se/backend/src/utils/prisma.js"><code>src/utils/prisma.js</code></a></td>
+            <td>Database client instance used for querying and saving records across all flows.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>Thesis Management System Backend Architecture Documentation • Generated automatically</p>
+    </footer>
+  </div>
+</body>
+</html>

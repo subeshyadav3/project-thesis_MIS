@@ -2,7 +2,7 @@
 const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
-const { resolveAudience, listEligibleAnnouncementsForStudent, isStudentAlreadyInAGroupAnnouncement } = require('../services/announcementService');
+const { resolveAudience, listEligibleAnnouncementsForStudent, isStudentAlreadyInAGroupAnnouncement, isStudentSubmittedForm } = require('../services/announcementService');
 const { markOverdueForAnnouncement } = require('../utils/checkOverdue');
 const { RULES } = require('../config/yearSemesterRules');
 
@@ -20,7 +20,7 @@ function asCleanAudience(body) {
 exports.create = async (req, res) => {
   try {
     const body = asCleanAudience(req.body);
-    const { title, message, type, audience, degreeType, programIds, studentIds, academicYearId, allowGroupFormation, groupSizeMin, groupSizeMax, startDate, expirationDate, expiresAt, batch } = body;
+    const { title, message, type, audience, degreeType, programIds, studentIds, academicYearId, allowGroupFormation, groupSizeMin, groupSizeMax, startDate, expirationDate, expiresAt, batch, formEnabled, formFields } = body;
 
     if (!title?.trim() || !message?.trim()) {
       return res.status(400).json({ error: 'title and message are required' });
@@ -35,6 +35,9 @@ exports.create = async (req, res) => {
       if (!['MINOR', 'MAJOR', 'THESIS'].includes(type)) {
         return res.status(400).json({ error: 'allowGroupFormation requires type MINOR/MAJOR/THESIS' });
       }
+    }
+    if (formEnabled && type !== 'THESIS') {
+      return res.status(400).json({ error: 'formEnabled requires type THESIS' });
     }
 
     const computedMax = groupSizeMax ?? (type === 'THESIS' ? 1 : 4);
@@ -83,13 +86,15 @@ exports.create = async (req, res) => {
         startDate: startDate ? new Date(startDate) : new Date(),
         expirationDate: expirationDate ? new Date(expirationDate) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
+        formEnabled: !!formEnabled,
+        formFields: formEnabled ? (formFields || []) : undefined,
         createdById: req.user.id,
       },
     });
 
     if (recipients.length) {
       const notifType = allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
-      const msgSuffix = allowGroupFormation ? ' You can now form/join a group.' : '';
+      const msgSuffix = allowGroupFormation ? ' You can now form/join a group.' : (announcement.formEnabled ? ' You can now submit the thesis form.' : '');
       await notifSvc.notifyMany(
         recipients.map(r => r.id),
         notifType,
@@ -146,8 +151,8 @@ async function notifyForAnnouncement(announcement, departmentId) {
   });
 
   if (recipients.length) {
-    const notifType = announcement.allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
-    const msgSuffix = announcement.allowGroupFormation ? ' You can now form/join a group.' : '';
+      const notifType = announcement.allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
+    const msgSuffix = announcement.allowGroupFormation ? ' You can now form/join a group.' : (announcement.formEnabled ? ' You can now submit the thesis form.' : '');
     await notifSvc.notifyMany(
       recipients.map(r => r.id),
       notifType,
@@ -187,7 +192,7 @@ exports.update = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const body = asCleanAudience(req.body);
-    const { title, message, type, audience, degreeType, programIds, studentIds, batch, academicYearId, allowGroupFormation, startDate, expirationDate, expiresAt } = body;
+    const { title, message, type, audience, degreeType, programIds, studentIds, batch, academicYearId, allowGroupFormation, startDate, expirationDate, expiresAt, formEnabled, formFields } = body;
 
     const existing = await prisma.announcement.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Not found' });
@@ -203,11 +208,13 @@ exports.update = async (req, res) => {
         type: type ?? existing.type,
         audience: audience ?? existing.audience,
         degreeType: degreeType ?? existing.degreeType,
-        programIds: programIds?.length ? programIds.map(Number) : existing.programIds,
-        studentIds: studentIds?.length ? studentIds.map(Number) : existing.studentIds,
+        programIds: programIds !== undefined ? programIds.map(Number) : existing.programIds,
+        studentIds: studentIds !== undefined ? studentIds.map(Number) : existing.studentIds,
         batch: batch?.trim() ?? existing.batch,
         academicYearId: academicYearId ? Number(academicYearId) : existing.academicYearId,
         allowGroupFormation: allowGroupFormation !== undefined ? !!allowGroupFormation : existing.allowGroupFormation,
+        formEnabled: formEnabled !== undefined ? !!formEnabled : existing.formEnabled,
+        formFields: formFields !== undefined ? (formFields || []) : existing.formFields,
         startDate: startDate ? new Date(startDate) : existing.startDate,
         expirationDate: expirationDate ? new Date(expirationDate) : existing.expirationDate,
         expiresAt: expiresAt ? new Date(expiresAt) : existing.expiresAt,
@@ -248,15 +255,13 @@ exports.delete = async (req, res) => {
 exports.list = async (req, res) => {
   try {
     const where = {};
+    let coordProgramId = null;
     if (req.user.role === 'COORDINATOR') {
       where.departmentId = req.user.departmentId;
-      // Resolve coordinator's degree type from their own field or their program
-      let coordDegreeType = req.user.degreeType;
-      if (!coordDegreeType) {
-        // Coordinators are linked via Program.coordinatorId, not User.programId
-        const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id }, select: { degreeType: true } });
-        coordDegreeType = prog?.degreeType;
-      }
+      // Resolve coordinator's program/degree type from their own field or their program
+      const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id }, select: { id: true, degreeType: true } });
+      coordProgramId = req.user.programId ?? prog?.id ?? null;
+      const coordDegreeType = req.user.degreeType ?? prog?.degreeType;
       if (coordDegreeType) {
         where.OR = [
           { degreeType: coordDegreeType },
@@ -264,11 +269,18 @@ exports.list = async (req, res) => {
         ];
       }
     }
-    const items = await prisma.announcement.findMany({
+    let items = await prisma.announcement.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { academicYear: { select: { id: true, year: true } } },
+      include: {
+        academicYear: { select: { id: true, year: true } },
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+      },
     });
+    // Coordinators only see "All" announcements or ones targeting their own program
+    if (req.user.role === 'COORDINATOR' && coordProgramId) {
+      items = items.filter(a => !a.programIds?.length || a.programIds.includes(coordProgramId));
+    }
     res.json(items);
   } catch (e) {
     res.status(500).json({ error: 'Internal server error' });
@@ -282,7 +294,8 @@ exports.listEligible = async (req, res) => {
     const flagged = [];
     for (const a of items) {
       const alreadyIn = await isStudentAlreadyInAGroupAnnouncement(req.user, a);
-      flagged.push({ ...a, alreadyInAGroup: alreadyIn });
+      const formStatus = a.formEnabled ? await isStudentSubmittedForm(req.user, a.id) : null;
+      flagged.push({ ...a, alreadyInAGroup: alreadyIn, formSubmitted: formStatus });
     }
     res.json(flagged);
   } catch (e) {
@@ -306,6 +319,53 @@ exports.get = async (req, res) => {
     }
     res.json(ann);
   } catch (e) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.getFormResponses = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ann = await prisma.announcement.findUnique({ where: { id } });
+    if (!ann) return res.status(404).json({ error: 'Not found' });
+    if (req.user.role === 'COORDINATOR' && ann.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const audience = await resolveAudience({
+      type: ann.type,
+      degreeType: ann.degreeType,
+      programIds: ann.programIds,
+      studentIds: ann.studentIds,
+      departmentId: ann.departmentId,
+      academicYearId: ann.academicYearId,
+      batch: ann.batch,
+    });
+
+    const students = await prisma.user.findMany({
+      where: { id: { in: audience.map(s => s.id) } },
+      select: {
+        id: true, firstName: true, lastName: true, email: true, rollNumber: true, batch: true,
+        program: { select: { id: true, code: true, name: true } },
+      },
+    });
+
+    const responses = await prisma.formResponse.findMany({
+      where: { announcementId: id },
+      include: {
+        thesis: { select: { id: true, title: true, status: true } },
+      },
+    });
+    const responseByStudent = new Map(responses.map(r => [r.studentId, r]));
+
+    const filled = students
+      .filter(s => responseByStudent.has(s.id))
+      .map(s => ({ student: s, response: responseByStudent.get(s.id) }));
+    const remaining = students.filter(s => !responseByStudent.has(s.id));
+
+    res.json({ announcement: ann, total: students.length, filled, remaining });
+  } catch (e) {
+    console.error('getFormResponses error:', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

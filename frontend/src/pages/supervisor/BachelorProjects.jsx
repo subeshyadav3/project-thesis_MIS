@@ -9,6 +9,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
+import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
@@ -265,7 +266,10 @@ function SupervisorBachelorProjects() {
                       {g.batch || '—'}
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {g.supervisorAssignmentStatus === 'PENDING' && (
+                          <SupervisionActions item={g} type="group" onDone={loadData} />
+                        )}
                         <button className="btn btn-sm btn-outline" onClick={() => setShowDetail(g)}>
                           <Icon name="visibility" className="material-symbols-outlined" />
                           View

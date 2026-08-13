@@ -174,18 +174,6 @@ function ExaminerList() {
 
   const actions = (
     <>
-      {isMasterCoordinator ? (
-        <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-          <Icon name="upload_file" className="material-symbols-outlined" />
-          Upload Examiner Assignments
-        </button>
-      ) : (
-        <button className="btn btn-secondary btn-sm" onClick={() => setShowGroupUpload(true)}>
-          <Icon name="upload_file" className="material-symbols-outlined" />
-          Upload Examiner Assignments
-        </button>
-      )}
-      
       <button className="btn btn-secondary btn-sm" onClick={() => setShowExaminerUpload(true)}>
         <Icon name="upload_file" className="material-symbols-outlined" />
         Bulk Add

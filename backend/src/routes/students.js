@@ -51,5 +51,6 @@ router.post('/upload', authenticate, authorize('STUDENT'), (req, res, next) => {
     next();
   });
 }, studentController.uploadDocument);
+router.post('/form-responses', authenticate, authorize('STUDENT'), studentController.submitFormResponse);
 
 module.exports = router;

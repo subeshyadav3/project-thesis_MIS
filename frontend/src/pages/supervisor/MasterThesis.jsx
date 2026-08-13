@@ -9,6 +9,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
+import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
@@ -274,7 +275,10 @@ function SupervisorMasterThesis() {
                       {t.batch ? `Batch ${t.batch}` : '—'}
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {t.supervisorAssignmentStatus === 'PENDING' && (
+                          <SupervisionActions item={t} type="thesis" onDone={loadData} />
+                        )}
                         <button className="btn btn-sm btn-outline" onClick={() => setShowDetail(t)}>
                           <Icon name="visibility" className="material-symbols-outlined" />
                           View

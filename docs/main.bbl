@@ -1,0 +1,74 @@
+\begin{thebibliography}{10}
+
+\bibitem{pressman2014software}
+Roger~S. Pressman and Bruce~R. Maxim.
+\newblock {\em Software Engineering: A Practitioner's Approach}.
+\newblock McGraw-Hill Education, New York, NY, USA, 8th edition, 2014.
+
+\bibitem{moodle2024}
+{Moodle HQ}.
+\newblock Moodle learning management system.
+\newblock \url{https://moodle.org}, 2024.
+\newblock Accessed: August 2026.
+
+\bibitem{instructure2024}
+{Instructure Inc.}
+\newblock Canvas by instructure --- learning management platform.
+\newblock \url{https://www.instructure.com/canvas}, 2024.
+\newblock Accessed: August 2026.
+
+\bibitem{tansley2003dspace}
+Robert Tansley, Mick Bass, and MacKenzie Smith.
+\newblock Dspace as an open archival information system: Current status and
+  future directions.
+\newblock In {\em Proceedings of the 7th European Conference on Research and
+  Advanced Technology for Digital Libraries (ECDL)}, pages 446--460, Berlin,
+  Germany, 2003. Springer.
+
+\bibitem{giri2019transfer}
+Raj~Kumar Giri and Mahesh~Kumar Pokhrel.
+\newblock Technology transfer and digital workflow adoption in nepali technical
+  education institutions.
+\newblock {\em Journal of Engineering Issues and Solutions}, 1(1):12--24, 2019.
+
+\bibitem{react2024}
+{Meta Open Source}.
+\newblock React --- a javascript library for building user interfaces.
+\newblock \url{https://react.dev}, 2024.
+\newblock Accessed: August 2026.
+
+\bibitem{fielding2000architectural}
+Roy~T. Fielding.
+\newblock Architectural styles and the design of network-based software
+  architectures.
+\newblock Doctoral Dissertation, University of California, Irvine, 2000.
+\newblock Accessed: August 2026.
+
+\bibitem{prisma2024}
+{Prisma Data Inc.}
+\newblock Prisma orm --- next-generation node.js and typescript orm.
+\newblock \url{https://www.prisma.io}, 2024.
+\newblock Accessed: August 2026.
+
+\bibitem{puppeteer2024}
+{Google LLC}.
+\newblock Puppeteer --- headless chrome node.js api.
+\newblock \url{https://pptr.dev}, 2024.
+\newblock Accessed: August 2026.
+
+\bibitem{lewis2020retrieval}
+Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir
+  Karpukhin, Naman Goyal, Heinrich K{\"u}ttler, Mike Lewis, Wen-tau Yih, Tim
+  Rockt{\"a}schel, et~al.
+\newblock Retrieval-augmented generation for knowledge-intensive nlp tasks.
+\newblock {\em Advances in Neural Information Processing Systems (NeurIPS)},
+  33:9459--9474, 2020.
+
+\bibitem{schwaber2020scrum}
+Ken Schwaber and Jeff Sutherland.
+\newblock {\em The Scrum Guide: The Definitive Guide to Scrum --- The Rules of
+  the Game}.
+\newblock Scrum.org, 2020.
+\newblock Accessed: August 2026.
+
+\end{thebibliography}

@@ -4,6 +4,7 @@ import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import SupervisionActions from '../../components/SupervisionActions';
 
 function statusColor(s) {
   if (s === 'COMPLETED') return 'var(--color-success)';
@@ -18,7 +19,7 @@ function SupervisorDashboard() {
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  useEffect(() => {
+  const loadAll = () => {
     setLoading(true);
     Promise.all([
       api.get('/supervisors/groups').then(({ data }) => setGroups(data)).catch(() => []),
@@ -26,12 +27,15 @@ function SupervisorDashboard() {
     ]).catch((err) => {
       toast.error(err.response?.data?.error || 'Failed to load assignments');
     }).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadAll(); }, []);
 
   const allItems = [...groups, ...theses];
   const totalAssigned = allItems.length;
   const completedCount = allItems.filter((i) => i.status === 'COMPLETED').length;
   const pendingCount = allItems.filter((i) => i.status === 'ACTIVE' || i.status === 'PENDING').length;
+  const pendingSupervision = allItems.filter((i) => i.supervisorAssignmentStatus === 'PENDING');
 
   // Items that likely need supervisor attention
   const actionItems = allItems
@@ -61,6 +65,40 @@ function SupervisorDashboard() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, alignItems: 'start' }}>
+        {/* Pending supervision acceptance */}
+        {pendingSupervision.length > 0 && (
+          <div className="card">
+            <div className="card-header">
+              <h3>Pending Assignments</h3>
+              <span className="badge badge-warning">{pendingSupervision.length} awaiting response</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px 16px' }}>
+              {pendingSupervision.map((item) => {
+                const isThesis = !!item.studentId;
+                const itemTitle = isThesis ? item.title : (item.projectTitle || item.name);
+                const studentName = isThesis
+                  ? (item.student ? `${item.student.firstName} ${item.student.lastName}` : 'A student')
+                  : (item.members?.[0]?.student ? `${item.members[0].student.firstName} ${item.members[0].student.lastName}` : 'A student');
+                return (
+                  <div key={`${isThesis ? 't' : 'g'}-${item.id}`} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                    padding: '11px 14px', border: '1px solid var(--color-outline-variant)', borderRadius: 'var(--border-radius-md)',
+                    background: 'var(--color-surface-container-lowest)',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{itemTitle}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                        {isThesis ? 'Master Thesis' : 'Bachelor Project'} · Student: {studentName}
+                      </div>
+                    </div>
+                    <SupervisionActions item={item} type={isThesis ? 'thesis' : 'group'} onDone={loadAll} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Action required */}
         <div className="card">
           <div className="card-header">

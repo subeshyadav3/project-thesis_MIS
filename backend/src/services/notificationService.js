@@ -177,7 +177,19 @@ async function notifyExaminerAssignment({ examinerId, itemTitle, type, assignerN
 async function notifySupervisorAssignment({ supervisorId, itemTitle, type, assignerName, studentIds }) {
   const typeLabel = type === 'group' ? 'bachelor project' : 'master thesis';
   const recs = [supervisorId, ...studentIds].filter(Boolean);
-  return notifyMany(recs, 'SUPERVISOR_ASSIGNMENT', `${assignerName} assigned a supervisor for "${itemTitle}" (${typeLabel})`);
+  return notifyMany(recs, 'SUPERVISOR_ASSIGNMENT', `${assignerName} assigned a supervisor for "${itemTitle}" (${typeLabel}) — pending your acceptance.`);
+}
+
+async function notifySupervisorAccepted({ supervisorName, itemTitle, type, studentIds, coordinatorIds }) {
+  const typeLabel = type === 'group' ? 'bachelor project' : 'master thesis';
+  await notifyMany([...studentIds].filter(Boolean), 'SUPERVISOR_ACCEPTED', `${supervisorName} accepted supervision of your ${typeLabel} "${itemTitle}".`);
+  return notifyMany([...(coordinatorIds || [])].filter(Boolean), 'SUPERVISOR_ACCEPTED', `${supervisorName} accepted supervision of the ${typeLabel} "${itemTitle}".`);
+}
+
+async function notifySupervisorRejected({ supervisorName, itemTitle, type, reason, studentIds, coordinatorIds }) {
+  const typeLabel = type === 'group' ? 'bachelor project' : 'master thesis';
+  await notifyMany([...studentIds].filter(Boolean), 'SUPERVISOR_REJECTED', `${supervisorName} declined to supervise your ${typeLabel} "${itemTitle}".`, `/theses`);
+  return notifyMany([...(coordinatorIds || [])].filter(Boolean), 'SUPERVISOR_REJECTED', `${supervisorName} declined to supervise the ${typeLabel} "${itemTitle}". Reason: ${reason || 'No reason provided.'}`, `/theses`);
 }
 
 /**
@@ -203,5 +215,7 @@ module.exports = {
   notifyMarksSubmitted,
   notifyExaminerAssignment,
   notifySupervisorAssignment,
+  notifySupervisorAccepted,
+  notifySupervisorRejected,
   notifyStatusChange,
 };

@@ -721,9 +721,14 @@ exports.assignSupervisor = async (req, res) => {
   try {
     const { id } = req.params;
     const { supervisorId } = req.body;
+    const supId = parseInt(supervisorId);
+    const supUser = await prisma.user.findUnique({ where: { id: supId }, select: { role: true } });
+    const isCoordinatorSup = supUser?.role === 'COORDINATOR';
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(id) },
-      data: { supervisorId: parseInt(supervisorId) },
+      data: isCoordinatorSup
+        ? { supervisorId: supId, supervisorAssignmentStatus: 'ACCEPTED' }
+        : { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
       include: {
         members: { include: { student: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -850,7 +855,9 @@ exports.bulkAssignSupervisor = async (req, res) => {
 
     const result = await prisma.projectGroup.updateMany({
       where: { id: { in: ids } },
-      data: { supervisorId: supId },
+      data: supervisor.role === 'COORDINATOR'
+        ? { supervisorId: supId, supervisorAssignmentStatus: 'ACCEPTED' }
+        : { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
     });
 
     // Notifications per group
@@ -864,9 +871,9 @@ exports.bulkAssignSupervisor = async (req, res) => {
 
       // In-app
       notifSvc.notifyMany(studentIds, 'SUPERVISOR_ASSIGNMENT',
-        `${assignerName} assigned supervisor "${supervisor.firstName} ${supervisor.lastName}" to group "${group.name}".`);
+        `${assignerName} assigned supervisor "${supervisor.firstName} ${supervisor.lastName}" to group "${group.name}" (pending acceptance).`);
       notifSvc.notify(supId, 'SUPERVISOR_ASSIGNMENT',
-        `${assignerName} assigned you as supervisor for group "${group.name}". Members: ${memberDetails}`);
+        `${assignerName} assigned you as supervisor for group "${group.name}" — pending your acceptance. Members: ${memberDetails}`);
 
       // Emails
       emailService.notifySupervisorAssigned(

@@ -307,6 +307,13 @@ ctrl.joinOpenGroup = async (req, res) => {
     const alreadyMember = await prisma.groupMember.findFirst({ where: { studentId: req.user.id, groupId } });
     if (alreadyMember) return res.status(400).json({ error: 'Already a member' });
 
+    const engagement = await getEngagement(req.user.id);
+    if (engagement.engaged) {
+      return res.status(409).json({
+        error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". A student cannot be part of two projects.`,
+      });
+    }
+
     await prisma.groupMember.create({
       data: { studentId: req.user.id, groupId, rollNumber: req.user.rollNumber || `R${req.user.id}` },
     });

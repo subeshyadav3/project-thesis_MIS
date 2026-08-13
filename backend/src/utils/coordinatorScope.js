@@ -54,14 +54,11 @@ async function resolveCoordinatorScope(user) {
 /**
  * Build a Prisma `where` clause fragment for Thesis lookups that respects:
  *   - bachelor programs: only own program (no cross-program)
- *   - master programs:  own program + theses cross-requested BY this user
- *   - department coordinators: only theses in the department (degree-type
- *     mixed).
+ *   - master programs:  every MASTER program in the same department
+ *     (any coordinator can see/assign across master programs)
+ *   - department coordinators: all theses in the department.
  *
  * Returns { where, allowCrossProgram }.
- *   `allowCrossProgram` lets callers know whether to honour
- *   `crossProgramRequestedById` matching; the helper has already encoded
- *   that into `where` so callers don't need it again.
  */
 async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
   const scope = await resolveCoordinatorScope(user);
@@ -70,10 +67,14 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
   if (scope.kind === 'program') {
     const isMaster = scope.degreeType === 'MASTER';
     if (isMaster) {
+      // Whole department: all master programs under the same department
+      const deptPrograms = await prisma.program.findMany({
+        where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
+      });
+      const programIds = deptPrograms.map(p => p.id);
       where.OR = [
-        { student: { programId: scope.program.id } },
-        { crossProgramRequestedById: user.id },
-        { programId: scope.program.id },
+        { student: { programId: { in: programIds } } },
+        { programId: { in: programIds } },
       ];
     } else {
       // BACHELOR (or anything non-master) — strictly own program.
@@ -121,13 +122,17 @@ async function buildGroupWhereForCoordinator(user, baseWhere = {}) {
  * Mirrors the WHERE produced by buildThesisWhereForCoordinator() so we
  * don't have to construct the same predicate twice.
  */
-function isThesisVisibleToCoordinator(thesis, scope, user) {
+async function isThesisVisibleToCoordinator(thesis, scope, user) {
   if (!scope || scope.kind === 'none') return false;
   if (scope.kind === 'program') {
     if (scope.degreeType === 'MASTER') {
-      return thesis.student?.programId === scope.program.id ||
-        thesis.crossProgramRequestedById === user.id ||
-        thesis.programId === scope.program.id ||
+      // Whole department: all master programs under the same department
+      const deptPrograms = await prisma.program.findMany({
+        where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
+      });
+      const programIds = deptPrograms.map(p => p.id);
+      return programIds.includes(thesis.student?.programId) ||
+        programIds.includes(thesis.programId) ||
         (thesis.student && !thesis.student.programId);
     }
     return thesis.student?.programId === scope.program.id ||

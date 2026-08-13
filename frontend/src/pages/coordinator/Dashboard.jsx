@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
+import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 
 const STATUS_COLORS = { pending: '#f97316', active: '#4f46e5', completed: '#16a34a' };
@@ -10,13 +11,62 @@ const STATUS_COLORS = { pending: '#f97316', active: '#4f46e5', completed: '#16a3
 function CoordinatorDashboard() {
   const [stats, setStats] = useState(null);
   const [program, setProgram] = useState(null);
+  const [lateProposals, setLateProposals] = useState([]);
+  const [rejecting, setRejecting] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isMaster = program?.degreeType === 'MASTER';
+
+  const loadLate = () => {
+    if (isMaster) {
+      api.get('/proposals/pending').then(({ data }) => setLateProposals(data)).catch(() => setLateProposals([]));
+    } else {
+      setLateProposals([]);
+    }
+  };
 
   useEffect(() => {
     api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     api.get('/auth/me').then(({ data }) => setProgram(data.program || null)).catch(() => {});
   }, []);
+
+  useEffect(() => { loadLate(); }, [isMaster]);
+
+  const approveLate = async (proposal) => {
+    setBusyId(proposal.id);
+    try {
+      await api.put(`/proposals/${proposal.id}/approve`);
+      toast.success('Late proposal approved — now visible to evaluators');
+      loadLate();
+      api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to approve');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const rejectLate = async (proposal) => {
+    if (!rejectReason.trim()) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
+    setBusyId(proposal.id);
+    try {
+      await api.put(`/proposals/${proposal.id}/reject`, { reason: rejectReason.trim() });
+      toast.success('Proposal rejected — student notified');
+      setRejecting(null);
+      setRejectReason('');
+      loadLate();
+      api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reject');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const degreeLabel = isMaster ? "Master's" : 'Bachelor';
 
@@ -34,6 +84,13 @@ function CoordinatorDashboard() {
         { icon: 'done_all', value: stats?.completedGroups || 0, label: 'Completed' },
       ];
 
+  if (isMaster) {
+    statCards.push(
+      { icon: 'supervisor_account', value: stats?.supervisorAssignmentPending || 0, label: 'Supervisor Pending', warning: (stats?.supervisorAssignmentPending || 0) > 0 },
+      { icon: 'fact_check', value: stats?.pendingLateProposals || 0, label: 'Late Proposals', warning: (stats?.pendingLateProposals || 0) > 0 },
+    );
+  }
+
   const pending = isMaster ? (stats?.pendingTheses || 0) : (stats?.pendingGroups || 0);
   const active = isMaster ? (stats?.activeTheses || 0) : (stats?.activeGroups || 0);
   const completed = isMaster ? (stats?.completedTheses || 0) : (stats?.completedGroups || 0);
@@ -44,12 +101,20 @@ function CoordinatorDashboard() {
     { name: 'Completed', value: completed, color: STATUS_COLORS.completed },
   ].filter((d) => d.value > 0);
 
+  const assignmentChartData = isMaster
+    ? [
+        { name: 'Accepted', value: stats?.supervisorAssignmentAccepted || 0, color: '#16a34a' },
+        { name: 'Pending', value: stats?.supervisorAssignmentPending || 0, color: '#f97316' },
+        { name: 'Declined', value: stats?.supervisorAssignmentRejected || 0, color: '#dc2626' },
+      ].filter((d) => d.value > 0)
+    : [];
+
   const actions = isMaster
     ? [
         { icon: 'library_books', title: 'Review Pending Theses', desc: pending + ' awaiting approval', to: '/coordinator/master' },
         { icon: 'grading', title: 'Manage Evaluations', desc: 'Assign & review defenses', to: '/coordinator/evaluations' },
         { icon: 'person', title: 'Assign Examiners', desc: 'Allocate examiners for defenses', to: '/coordinator/examiners' },
-        { icon: 'campaign', title: 'Post Announcement', desc: 'Notify students & staff', to: '/coordinator/announcements' },
+        { icon: 'campaign', title: 'Post Announcement', desc: 'Notify students & open thesis forms', to: '/coordinator/announcements' },
       ]
     : [
         { icon: 'groups', title: 'Review Pending Groups', desc: pending + ' awaiting approval', to: '/coordinator/bachelor' },
@@ -79,7 +144,7 @@ function CoordinatorDashboard() {
       <div className="stats-grid">
         {statCards.map((card, i) => (
           <div key={i} className="stat-card bento-card">
-            <div className="stat-icon">
+            <div className="stat-icon" style={card.warning ? { background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)' } : undefined}>
               <Icon name={card.icon} className="material-symbols-outlined" />
             </div>
             <div className="stat-number">{card.value}</div>
@@ -115,6 +180,30 @@ function CoordinatorDashboard() {
           </div>
         </div>
 
+        {isMaster && assignmentChartData.length > 0 && (
+          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="card-header"><h3>Supervisor Assignments</h3></div>
+            <div style={{ flex: 1, minHeight: 180 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={assignmentChartData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={42} outerRadius={72} paddingAngle={2} strokeWidth={0}>
+                    {assignmentChartData.map((d) => <Cell key={d.name} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)', borderRadius: 8, color: 'var(--color-on-surface)', fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 14, flexWrap: 'wrap', padding: '6px 0 4px' }}>
+              {assignmentChartData.map((d) => (
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color }} />
+                  {d.name} <b>{d.value}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="card">
           <div className="card-header"><h3>Action Required</h3></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -144,6 +233,80 @@ function CoordinatorDashboard() {
           </div>
         </div>
       </div>
+
+      {isMaster && lateProposals.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header">
+            <h3>Late Proposals Awaiting Approval ({lateProposals.length})</h3>
+            <span className="badge badge-warning">Submitted after the form deadline</span>
+          </div>
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr><th>Student</th><th>Thesis Title</th><th>Submitted</th><th>PDF</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
+              </thead>
+              <tbody>
+                {lateProposals.map(p => (
+                  <tr key={p.id}>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{p.submittedBy?.firstName} {p.submittedBy?.lastName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{p.submittedBy?.rollNumber || ''} {p.submittedBy?.program?.code ? `· ${p.submittedBy.program.code}` : ''}</div>
+                    </td>
+                    <td style={{ fontSize: 13 }}>{p.thesis?.title || '—'}</td>
+                    <td style={{ fontSize: 13 }}>{new Date(p.createdAt).toLocaleString()}</td>
+                    <td>
+                      {p.documentUrl ? (
+                        <a href={p.documentUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline">
+                          <Icon name="picture_as_pdf" className="material-symbols-outlined" /> View
+                        </a>
+                      ) : '—'}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-sm btn-primary" disabled={busyId === p.id} onClick={() => approveLate(p)}>
+                          <Icon name="check_circle" className="material-symbols-outlined" /> Approve
+                        </button>
+                        <button className="btn btn-sm btn-outline" disabled={busyId === p.id} onClick={() => { setRejecting(p); setRejectReason(''); }}>
+                          <Icon name="close" className="material-symbols-outlined" /> Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {rejecting && (
+        <div className="modal-overlay" onClick={() => setRejecting(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <div className="modal-header-icon danger"><Icon name="block" className="material-symbols-outlined" /></div>
+              <div className="modal-header-text">
+                <h2>Reject Late Proposal</h2>
+                <p>{rejecting.thesis?.title || 'Thesis'} — the student will be notified with your reason.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setRejecting(null)} aria-label="Close">
+                <Icon name="close" className="material-symbols-outlined" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Reason <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                <textarea className="form-input" rows={4} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Explain why the late proposal cannot be accepted..." />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setRejecting(null)} disabled={busyId === rejecting.id}>Cancel</button>
+              <button className="btn btn-danger" onClick={() => rejectLate(rejecting)} disabled={busyId === rejecting.id}>
+                <Icon name="block" className="material-symbols-outlined" /> {busyId === rejecting.id ? 'Rejecting...' : 'Reject Proposal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 }

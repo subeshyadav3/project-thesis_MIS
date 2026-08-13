@@ -22,13 +22,17 @@ function CoordinatorAnnouncements() {
   const [showCreate, setShowCreate] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [form, setForm] = useState({
     title: '', message: '', type: 'GENERAL',
+    program: '',
     degreeType: user.program?.degreeType || '',
-    programIds: user.program?.id ? [user.program.id] : [],
+    programIds: [],
     studentIds: [],
     batch: '',
     academicYearId: '', allowGroupFormation: false,
+    formEnabled: false,
+    formFields: [],
     startDate: '', expirationDate: '',
     expiresAt: '',
   });
@@ -37,6 +41,9 @@ function CoordinatorAnnouncements() {
   const [studentOpen, setStudentOpen] = useState(false);
   const [editAnnouncement, setEditAnnouncement] = useState(null);
   const [viewAnnouncement, setViewAnnouncement] = useState(null);
+  const [viewResponses, setViewResponses] = useState(null);
+  const [responses, setResponses] = useState(null);
+  const [responsesLoading, setResponsesLoading] = useState(false);
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -49,6 +56,7 @@ function CoordinatorAnnouncements() {
       api.get('/announcements').then(({ data }) => setAnnouncements(data)),
       api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data)),
+      api.get('/departments/programs').then(({ data }) => setPrograms(data.filter(p => p.coordinatorId === user.id))),
     ]).catch(e => toast.error('Failed to load data')).finally(() => setLoading(false));
   }, []);
 
@@ -85,12 +93,24 @@ function CoordinatorAnnouncements() {
       toast.warning('Title, message, and batch are required');
       return;
     }
+    if (!form.program) {
+      toast.warning('Program is required — select All or your program');
+      return;
+    }
     const isEdit = !!editAnnouncement;
+    const isAllPrograms = form.program === 'all';
+    const programIds = isAllPrograms ? [] : [Number(form.program)];
+    const normalizedFields = (form.formFields || [])
+      .filter(f => f.label?.trim() && f.key?.trim())
+      .map(f => ({ key: f.key.trim(), label: f.label.trim(), type: f.type || 'text', required: !!f.required, placeholder: f.placeholder || '' }));
     const payload = {
       ...form,
+      audience: isAllPrograms ? 'ALL' : 'PROGRAMS',
+      programIds,
       degreeType: user.program?.degreeType || '',
-      programIds: user.program?.id ? [user.program.id] : [],
       studentIds: selectedStudents,
+      formEnabled: form.type === 'THESIS' && form.formEnabled,
+      formFields: normalizedFields,
       startDate: form.startDate || undefined,
       expirationDate: form.expirationDate || undefined,
     };
@@ -104,7 +124,7 @@ function CoordinatorAnnouncements() {
       }
       setShowCreate(false);
       setEditAnnouncement(null);
-      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, startDate: '', expirationDate: '', expiresAt: '' });
+      setForm({ title: '', message: '', type: 'GENERAL', program: '', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, formEnabled: false, formFields: [], startDate: '', expirationDate: '', expiresAt: '' });
       setSelectedStudents([]);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to save'); }
@@ -116,12 +136,15 @@ function CoordinatorAnnouncements() {
       title: a.title || '',
       message: a.message || '',
       type: a.type || 'GENERAL',
+      program: a.programIds?.length ? String(a.programIds[0]) : 'all',
       degreeType: a.degreeType || user.program?.degreeType || '',
-      programIds: a.programIds?.length ? a.programIds : (user.program?.id ? [user.program.id] : []),
+      programIds: a.programIds || [],
       studentIds: a.studentIds || [],
       batch: a.batch || '',
       academicYearId: a.academicYearId ? String(a.academicYearId) : '',
       allowGroupFormation: a.allowGroupFormation || false,
+      formEnabled: a.formEnabled || false,
+      formFields: Array.isArray(a.formFields) ? a.formFields : [],
       startDate: a.startDate ? a.startDate.split('T')[0] : '',
       expirationDate: a.expirationDate ? a.expirationDate.split('T')[0] : '',
       expiresAt: a.expiresAt ? a.expiresAt.slice(0, 16) : '',
@@ -180,6 +203,20 @@ function CoordinatorAnnouncements() {
     }
   };
 
+  const loadResponses = async (ann) => {
+    setResponsesLoading(true);
+    setViewResponses(ann);
+    try {
+      const { data } = await api.get(`/announcements/${ann.id}/form-responses`);
+      setResponses(data);
+    } catch (err) {
+      toast.error('Failed to load form responses');
+      setResponses(null);
+    } finally {
+      setResponsesLoading(false);
+    }
+  };
+
   const actions = (
     <button className="btn btn-primary btn-sm" onClick={() => { setEditAnnouncement(null); setShowCreate(true); }}>
       <Icon name="campaign" className="material-symbols-outlined" /> New Announcement
@@ -205,6 +242,11 @@ function CoordinatorAnnouncements() {
             <div className="stat-number">{announcements.filter(a => a.allowGroupFormation).length}</div>
             <div className="stat-label">Group Formation</div>
           </div>
+          <div className="stat-card bento-card">
+            <div className="stat-icon"><Icon name="description" className="material-symbols-outlined" /></div>
+            <div className="stat-number">{announcements.filter(a => a.formEnabled).length}</div>
+            <div className="stat-label">Thesis Forms</div>
+          </div>
         </div>
 
         <div className="card">
@@ -221,6 +263,7 @@ function CoordinatorAnnouncements() {
                     <th>Type</th>
                     <th>Audience</th>
                     <th>Form Groups?</th>
+                    <th>Form?</th>
                     <th>Period</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
@@ -233,12 +276,20 @@ function CoordinatorAnnouncements() {
                     return (
                       <tr key={a.id}>
                         <td>
-                          <div style={{ fontWeight: 500 }}>{a.title}</div>
+                          <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {a.title}
+                            {a.createdById !== user.id && (
+                              <span className="badge badge-info" style={{ fontSize: 10, fontWeight: 600 }}>
+                                by {a.createdBy?.firstName} {a.createdBy?.lastName}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.message}</div>
                         </td>
                         <td><span className={`badge badge-${a.type === 'THESIS' ? 'warning' : a.type === 'MINOR' ? 'info' : a.type === 'MAJOR' ? 'warning' : 'default'}`}>{TYPE_LABELS[a.type] || a.type}</span></td>
                         <td style={{ fontSize: 13 }}>{AUDIENCE_LABELS[a.audience]}</td>
                         <td>{hasGF ? <span className="badge badge-active"><span className="dot" /> Yes (max {a.groupSizeMax})</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
+                        <td>{a.formEnabled ? <span className="badge badge-warning"><span className="dot" /> Form {(a.formFields?.length || 0) > 0 ? `(+${a.formFields.length})` : ''}</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
                         <td style={{ fontSize: 12 }}>
                           {a.startDate ? new Date(a.startDate).toLocaleDateString() : '—'} ~ {a.expirationDate ? new Date(a.expirationDate).toLocaleDateString() : '—'}
                         </td>
@@ -263,6 +314,11 @@ function CoordinatorAnnouncements() {
                           {hasGF && (
                             <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
                               <Icon name="visibility" className="material-symbols-outlined" /> View Submissions
+                            </button>
+                          )}
+                          {a.formEnabled && (
+                            <button className="btn btn-sm btn-outline" onClick={() => loadResponses(a)}>
+                              <Icon name="fact_check" className="material-symbols-outlined" /> Responses
                             </button>
                           )}
                           {active && (
@@ -308,6 +364,17 @@ function CoordinatorAnnouncements() {
                     </select>
                     <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
                       Only students in this batch will receive the notification
+                    </p>
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Program *</label>
+                    <select value={form.program} onChange={e => setForm({...form, program: e.target.value})} required>
+                      <option value="">Select program...</option>
+                      <option value="all">All</option>
+                      {programs.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+                    </select>
+                    <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
+                      Send to all programs or only {`${programs.map(p => p.code).join(', ')}`} students
                     </p>
                   </div>
                 </div>
@@ -418,6 +485,133 @@ function CoordinatorAnnouncements() {
                 </div>
                 )}
 
+                {form.type === 'THESIS' && (
+                  <div className="form-group" style={{
+                    background: 'var(--color-surface-container-low)',
+                    borderRadius: 'var(--border-radius-md)',
+                    padding: '16px',
+                    border: form.formEnabled ? '2px solid var(--color-primary)' : '2px solid var(--color-outline-variant)',
+                    transition: 'all 0.2s',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: form.formEnabled ? 16 : 0 }}>
+                      <div
+                        onClick={() => {
+                          const on = !form.formEnabled;
+                          const today = new Date().toISOString().split('T')[0];
+                          setForm({ ...form, formEnabled: on, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
+                        }}
+                        style={{
+                          width: 44, height: 24, borderRadius: 12,
+                          background: form.formEnabled ? 'var(--color-primary)' : 'var(--color-outline)',
+                          position: 'relative', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                        }}
+                      >
+                        <div style={{
+                          width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                          position: 'absolute', top: 2,
+                          left: form.formEnabled ? 22 : 2,
+                          transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }} />
+                      </div>
+                      <div>
+                        <label
+                          style={{ margin: 0, fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => {
+                            const on = !form.formEnabled;
+                            const today = new Date().toISOString().split('T')[0];
+                            setForm({ ...form, formEnabled: on, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
+                          }}
+                        >
+                          Enable Thesis Registration Form
+                        </label>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                          Students fill a form; submitting creates their thesis + auto-generated proposal (PDF).
+                          Submissions after the deadline require your approval.
+                        </p>
+                      </div>
+                    </div>
+
+                    {form.formEnabled || editAnnouncement ? (
+                      <>
+                        <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                            <label style={{ fontSize: 12 }}>Start Date (optional)</label>
+                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                          </div>
+                          <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                            <label style={{ fontSize: 12 }}>Form Deadline (optional)</label>
+                            <input type="date" value={form.expirationDate} onChange={e => setForm({ ...form, expirationDate: e.target.value })} />
+                            <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
+                              Submissions after this date are marked late
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Extra Form Fields</label>
+                            <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...form.formFields, { key: '', label: '', type: 'text', required: false, placeholder: '' }] })}>
+                              <Icon name="add" className="material-symbols-outlined" /> Add Field
+                            </button>
+                          </div>
+                          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                            These are all the fields students will see on the registration form.
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Thesis Title <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="short_text" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text input
+                              </div>
+                            </div>
+                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                  Abstract / Description <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                                <Icon name="subject" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Paragraph input
+                              </div>
+                            </div>
+                            {form.formFields.map((f, idx) => (
+                              <div key={idx} style={{ border: f.required ? '1px solid var(--color-primary)' : '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                  <input style={{ flex: 1, fontWeight: 600 }} value={f.label} onChange={e => {
+                                    const arr = [...form.formFields]; arr[idx] = { ...arr[idx], label: e.target.value, key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') }; setForm({ ...form, formFields: arr });
+                                  }} placeholder="Field label (e.g. Research Area)" />
+                                  {f.required && <span style={{ color: 'var(--color-error)', fontSize: 18, fontWeight: 700 }}>*</span>}
+                                  <button type="button" className="icon-btn danger" title="Remove field" onClick={() => setForm({ ...form, formFields: form.formFields.filter((_, i) => i !== idx) })}>
+                                    <Icon name="delete" className="material-symbols-outlined" />
+                                  </button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <select style={{ flex: '0 1 140px' }} value={f.type} onChange={e => { const arr = [...form.formFields]; arr[idx] = { ...arr[idx], type: e.target.value }; setForm({ ...form, formFields: arr }); }}>
+                                    <option value="text">Text</option>
+                                    <option value="textarea">Paragraph</option>
+                                    <option value="number">Number</option>
+                                    <option value="date">Date</option>
+                                    <option value="email">Email</option>
+                                  </select>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={f.required} onChange={e => { const arr = [...form.formFields]; arr[idx] = { ...arr[idx], required: e.target.checked }; setForm({ ...form, formFields: arr }); }} /> Required
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+
                 <div className="modal-actions">
                   <button type="button" className="btn btn-outline" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}><Icon name="close" className="material-symbols-outlined" /> Cancel</button>
                   <button type="submit" className="btn btn-primary"><Icon name="send" className="material-symbols-outlined" /> {editAnnouncement ? 'Update & Re-send' : 'Send'}</button>
@@ -486,6 +680,100 @@ function CoordinatorAnnouncements() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setViewAnnouncement(null)}><Icon name="close" className="material-symbols-outlined" /> Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {viewResponses && (
+          <div className="modal-overlay" onClick={() => { setViewResponses(null); setResponses(null); }}>
+            <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header">
+                <div className="modal-header-icon warning"><Icon name="fact_check" className="material-symbols-outlined" /></div>
+                <div className="modal-header-text"><h2>Form Responses: {viewResponses.title}</h2><p>{TYPE_LABELS[viewResponses.type] || viewResponses.type}</p></div>
+              </div>
+              <div className="modal-body">
+                {responsesLoading ? (
+                  <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading responses...</p></div>
+                ) : responses ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div className="stats-grid" style={{ marginBottom: 0 }}>
+                      <div className="stat-card bento-card">
+                        <div className="stat-icon"><Icon name="groups" className="material-symbols-outlined" /></div>
+                        <div className="stat-number">{responses.total}</div>
+                        <div className="stat-label">Eligible Students</div>
+                      </div>
+                      <div className="stat-card bento-card">
+                        <div className="stat-icon" style={{ background: 'var(--color-success-container)', color: 'var(--color-on-success-container)' }}><Icon name="check_circle" className="material-symbols-outlined" /></div>
+                        <div className="stat-number">{responses.filled.length}</div>
+                        <div className="stat-label">Filled</div>
+                      </div>
+                      <div className="stat-card bento-card">
+                        <div className="stat-icon" style={{ background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)' }}><Icon name="pending" className="material-symbols-outlined" /></div>
+                        <div className="stat-number">{responses.remaining.length}</div>
+                        <div className="stat-label">Remaining</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="card-header"><h3 style={{ margin: 0 }}>Filled ({responses.filled.length})</h3></div>
+                      <div className="table-container">
+                        <table className="table">
+                          <thead><tr><th>Student</th><th>Roll</th><th>Status</th><th>Submitted</th><th>Thesis</th></tr></thead>
+                          <tbody>
+                            {responses.filled.length === 0 ? (
+                              <tr><td colSpan={5} className="empty-cell">No responses yet</td></tr>
+                            ) : responses.filled.map(({ student, response }) => (
+                              <tr key={student.id}>
+                                <td style={{ fontWeight: 500 }}>{student.firstName} {student.lastName}</td>
+                                <td style={{ fontSize: 13 }}>{student.rollNumber || '—'}</td>
+                                <td>
+                                  {response.status === 'LATE_SUBMITTED' ? (
+                                    <span className="badge badge-warning"><span className="dot" />Late — proposal pending approval</span>
+                                  ) : (
+                                    <span className="badge badge-completed"><span className="dot" />Submitted</span>
+                                  )}
+                                </td>
+                                <td style={{ fontSize: 13 }}>{new Date(response.createdAt).toLocaleString()}</td>
+                                <td>
+                                  {response.thesis ? (
+                                    <a href={`/coordinator/project/thesis/${response.thesis.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+                                      {response.thesis.title} <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} />
+                                    </a>
+                                  ) : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="card-header"><h3 style={{ margin: 0 }}>Remaining ({responses.remaining.length})</h3></div>
+                      <div className="table-container">
+                        <table className="table">
+                          <thead><tr><th>Student</th><th>Roll</th><th>Program</th><th>Email</th></tr></thead>
+                          <tbody>
+                            {responses.remaining.length === 0 ? (
+                              <tr><td colSpan={4} className="empty-cell">All eligible students have responded</td></tr>
+                            ) : responses.remaining.map(s => (
+                              <tr key={s.id}>
+                                <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
+                                <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
+                                <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
+                                <td style={{ fontSize: 13 }}>{s.email}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => { setViewResponses(null); setResponses(null); }}><Icon name="close" className="material-symbols-outlined" /> Close</button>
               </div>
             </div>
           </div>
