@@ -788,14 +788,9 @@ exports.assignSupervisor = async (req, res) => {
     }
 
     const supervisorId = parseInt(rawSupId);
-    const supUser = await prisma.user.findUnique({ where: { id: supervisorId }, select: { role: true } });
-    // A coordinator assigned as supervisor is treated as accepted (self/peer assignment is explicit)
-    const isCoordinatorSup = supUser?.role === 'COORDINATOR';
     const thesis = await prisma.thesis.update({
       where: { id },
-      data: isCoordinatorSup
-        ? { supervisorId, supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' }
-        : { supervisorId, supervisorAssignmentStatus: 'PENDING' },
+      data: { supervisorId, supervisorAssignmentStatus: 'PENDING' },
       include: { student: true, supervisor: true },
     });
 

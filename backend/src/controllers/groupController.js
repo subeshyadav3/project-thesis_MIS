@@ -749,13 +749,9 @@ exports.assignSupervisor = async (req, res) => {
     }
 
     const supId = parseInt(supervisorId);
-    const supUser = await prisma.user.findUnique({ where: { id: supId }, select: { role: true } });
-    const isCoordinatorSup = supUser?.role === 'COORDINATOR';
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(id) },
-      data: isCoordinatorSup
-        ? { supervisorId: supId, supervisorAssignmentStatus: 'ACCEPTED' }
-        : { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
+      data: { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
       include: {
         members: { include: { student: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -892,9 +888,7 @@ exports.bulkAssignSupervisor = async (req, res) => {
 
     const result = await prisma.projectGroup.updateMany({
       where: { id: { in: ids } },
-      data: supervisor.role === 'COORDINATOR'
-        ? { supervisorId: supId, supervisorAssignmentStatus: 'ACCEPTED' }
-        : { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
+      data: { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
     });
 
     // Notifications per group

@@ -499,7 +499,24 @@ return (
                   <span className="detail-label">Supervisor</span>
                   <span>
                     {showDetail.supervisor ? (
-                      <>{showDetail.supervisor.firstName} {showDetail.supervisor.lastName}</>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span>{showDetail.supervisor.firstName} {showDetail.supervisor.lastName}</span>
+                        {showDetail.supervisorAssignmentStatus === 'PENDING' && (
+                          <span className="badge badge-warning" style={{ fontSize: 10 }}>
+                            <span className="dot" />Awaiting Response
+                          </span>
+                        )}
+                        {showDetail.supervisorAssignmentStatus === 'ACCEPTED' && (
+                          <span className="badge badge-completed" style={{ fontSize: 10 }}>
+                            <span className="dot" />Accepted
+                          </span>
+                        )}
+                        {showDetail.supervisorAssignmentStatus === 'REJECTED' && (
+                          <span className="badge badge-error" style={{ fontSize: 10 }}>
+                            Declined
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="badge badge-pending" style={{ fontSize: 10 }}>
                         <span className="dot" />Unassigned

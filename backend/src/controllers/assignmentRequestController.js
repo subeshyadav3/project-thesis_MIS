@@ -45,12 +45,10 @@ exports.createRequest = async (req, res) => {
     const supId = parseInt(supervisorId);
     const supUser = await prisma.user.findUnique({ where: { id: supId }, select: { role: true } });
     const isCoordinatorSup = supUser?.role === 'COORDINATOR';
-    // Assign — pending the supervisor's acceptance (coordinators are accepted immediately)
+    // Assign — pending the supervisor's acceptance
     const updated = await prisma.thesis.update({
       where: { id: thesis.id },
-      data: isCoordinatorSup
-        ? { supervisorId: supId, supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' }
-        : { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
+      data: { supervisorId: supId, supervisorAssignmentStatus: 'PENDING' },
     });
 
     // Notify old supervisor if changed
