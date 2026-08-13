@@ -13,6 +13,11 @@ function CoordinatorDashboard() {
   const [program, setProgram] = useState(null);
   const [lateProposals, setLateProposals] = useState([]);
   const [mySupervisedTheses, setMySupervisedTheses] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [allTheses, setAllTheses] = useState([]);
+  const [selectedBatch, setSelectedBatch] = useState('ALL');
+  const [showAssignedModal, setShowAssignedModal] = useState(false);
+  const [showUnassignedModal, setShowUnassignedModal] = useState(false);
   const [rejecting, setRejecting] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -32,9 +37,50 @@ function CoordinatorDashboard() {
     api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     api.get('/auth/me').then(({ data }) => setProgram(data.program || null)).catch(() => {});
     api.get('/supervisors/theses').then(({ data }) => setMySupervisedTheses(data)).catch(() => setMySupervisedTheses([]));
+    api.get('/users/role/STUDENT?all=true&degreeType=MASTER').then(({ data }) => setAllStudents(data)).catch(() => {});
+    api.get('/theses').then(({ data }) => setAllTheses(data)).catch(() => {});
   }, []);
 
   useEffect(() => { loadLate(); }, [isMaster]);
+
+  const normalizeBatch = (v) => {
+    if (!v) return '';
+    if (/^\d{3}$/.test(v)) return `2${v}`;
+    return String(v);
+  };
+
+  const batchOptions = React.useMemo(() => {
+    const set = new Set();
+    allStudents.forEach(s => {
+      if (s.batch) set.add(normalizeBatch(s.batch));
+      else if (s.rollNumber && /^\d{3}/.test(s.rollNumber)) set.add(normalizeBatch(s.rollNumber.slice(0, 3)));
+    });
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [allStudents]);
+
+  const filteredStudents = React.useMemo(() => {
+    if (selectedBatch === 'ALL') return allStudents;
+    return allStudents.filter(s => {
+      const b = s.batch || (s.rollNumber && /^\d{3}/.test(s.rollNumber) ? s.rollNumber.slice(0, 3) : '');
+      return normalizeBatch(b) === selectedBatch;
+    });
+  }, [allStudents, selectedBatch]);
+
+  const thesisByStudentId = React.useMemo(() => {
+    const map = new Map();
+    allTheses.forEach(t => {
+      if (t.studentId) map.set(t.studentId, t);
+    });
+    return map;
+  }, [allTheses]);
+
+  const assignedStudents = React.useMemo(() => {
+    return filteredStudents.filter(s => thesisByStudentId.has(s.id));
+  }, [filteredStudents, thesisByStudentId]);
+
+  const unassignedStudents = React.useMemo(() => {
+    return filteredStudents.filter(s => !thesisByStudentId.has(s.id));
+  }, [filteredStudents, thesisByStudentId]);
 
   const approveLate = async (proposal) => {
     setBusyId(proposal.id);
@@ -75,7 +121,9 @@ function CoordinatorDashboard() {
   const statCards = isMaster
     ? [
         { icon: 'library_books', value: stats?.totalTheses || 0, label: "Master's Theses" },
-        { icon: 'pending_actions', value: stats?.pendingTheses || 0, label: 'Pending' },
+        { icon: 'assignment_turned_in', value: assignedStudents.length, label: 'Assigned Students', onClick: () => setShowAssignedModal(true), clickable: true, badge: 'Click for details' },
+        { icon: 'person_off', value: unassignedStudents.length, label: 'Unassigned Students', warning: unassignedStudents.length > 0, onClick: () => setShowUnassignedModal(true), clickable: true, badge: 'Missing thesis' },
+        { icon: 'pending_actions', value: stats?.pendingTheses || 0, label: 'Pending Approval' },
         { icon: 'check_circle', value: stats?.activeTheses || 0, label: 'Active' },
         { icon: 'done_all', value: stats?.completedTheses || 0, label: 'Completed' },
       ]
@@ -142,15 +190,47 @@ function CoordinatorDashboard() {
   }
 
   return (
-    <PageLayout title="Dashboard" subtitle={degreeLabel + ' Program Overview'} user={user}>
+    <PageLayout
+      title="Dashboard"
+      subtitle={degreeLabel + ' Program Overview'}
+      user={user}
+      actions={
+        isMaster && batchOptions.length > 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-on-surface-variant)', margin: 0, whiteSpace: 'nowrap' }}>
+              Filter Batch:
+            </label>
+            <select
+              className="form-input"
+              style={{ padding: '5px 10px', fontSize: 13, borderRadius: 8, fontWeight: 600, minWidth: 130, cursor: 'pointer' }}
+              value={selectedBatch}
+              onChange={e => setSelectedBatch(e.target.value)}
+            >
+              <option value="ALL">All Batches ({allStudents.length})</option>
+              {batchOptions.map(b => (
+                <option key={b} value={b}>Batch {b}</option>
+              ))}
+            </select>
+          </div>
+        ) : null
+      }
+    >
       <div className="stats-grid">
         {statCards.map((card, i) => (
-          <div key={i} className="stat-card bento-card">
+          <div
+            key={i}
+            className="stat-card bento-card"
+            onClick={card.onClick}
+            style={card.clickable ? { cursor: 'pointer' } : undefined}
+          >
             <div className="stat-icon" style={card.warning ? { background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)' } : undefined}>
               <Icon name={card.icon} className="material-symbols-outlined" />
             </div>
             <div className="stat-number">{card.value}</div>
-            <div className="stat-label">{card.label}</div>
+            <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+              <span>{card.label}</span>
+              {card.clickable && <Icon name="arrow_forward" className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.7 }} />}
+            </div>
           </div>
         ))}
       </div>
@@ -308,6 +388,133 @@ function CoordinatorDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Popup Modal for Assigned Students */}
+      {showAssignedModal && (
+        <div className="modal-overlay" onClick={() => setShowAssignedModal(false)}>
+          <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <div className="modal-header-icon success">
+                <Icon name="assignment_turned_in" className="material-symbols-outlined" />
+              </div>
+              <div className="modal-header-text">
+                <h2>Assigned Students ({assignedStudents.length})</h2>
+                <p>{selectedBatch === 'ALL' ? 'All Batches' : `Batch ${selectedBatch}`} — Students assigned a Master Thesis record</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowAssignedModal(false)}>
+                <Icon name="close" className="material-symbols-outlined" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Roll Number</th>
+                      <th>Thesis Title</th>
+                      <th>Supervisor</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assignedStudents.length === 0 ? (
+                      <tr><td colSpan={6} className="empty-cell">No assigned students found for this batch</td></tr>
+                    ) : (
+                      assignedStudents.map(s => {
+                        const t = thesisByStudentId.get(s.id);
+                        return (
+                          <tr key={s.id}>
+                            <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
+                            <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
+                            <td style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-on-surface)' }}>{t?.title || '—'}</td>
+                            <td style={{ fontSize: 13 }}>
+                              {t?.supervisor ? `${t.supervisor.firstName} ${t.supervisor.lastName}` : <span style={{ color: 'var(--color-outline)' }}>Unassigned</span>}
+                            </td>
+                            <td>
+                              <span className={`badge badge-${t?.status?.toLowerCase() || 'pending'}`}>{t?.status || 'PENDING'}</span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              {t && (
+                                <Link to={`/coordinator/master`} className="btn btn-sm btn-outline" style={{ textDecoration: 'none' }}>
+                                  Manage →
+                                </Link>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setShowAssignedModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup Modal for Unassigned Students */}
+      {showUnassignedModal && (
+        <div className="modal-overlay" onClick={() => setShowUnassignedModal(false)}>
+          <div className="modal modal-wide" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <div className="modal-header-icon warning">
+                <Icon name="person_off" className="material-symbols-outlined" />
+              </div>
+              <div className="modal-header-text">
+                <h2>Unassigned Students ({unassignedStudents.length})</h2>
+                <p>{selectedBatch === 'ALL' ? 'All Batches' : `Batch ${selectedBatch}`} — Students missing a Master Thesis record</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowUnassignedModal(false)}>
+                <Icon name="close" className="material-symbols-outlined" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Roll Number</th>
+                      <th>Program</th>
+                      <th>Email</th>
+                      <th>Batch</th>
+                      <th style={{ textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unassignedStudents.length === 0 ? (
+                      <tr><td colSpan={6} className="empty-cell">Great news! All students in this batch have assigned theses.</td></tr>
+                    ) : (
+                      unassignedStudents.map(s => (
+                        <tr key={s.id}>
+                          <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
+                          <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
+                          <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
+                          <td style={{ fontSize: 13 }}>{s.email}</td>
+                          <td style={{ fontSize: 13 }}>{normalizeBatch(s.batch || (s.rollNumber && /^\d{3}/.test(s.rollNumber) ? s.rollNumber.slice(0, 3) : '')) || '—'}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <Link to="/coordinator/master" className="btn btn-sm btn-primary" style={{ textDecoration: 'none' }}>
+                              <Icon name="add" className="material-symbols-outlined" /> Assign Thesis
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setShowUnassignedModal(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}
