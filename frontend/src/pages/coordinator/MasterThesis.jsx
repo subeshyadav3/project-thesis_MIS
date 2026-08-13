@@ -37,6 +37,8 @@ function MasterThesis() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
+  const [coordinatorProgram, setCoordinatorProgram] = useState(null);
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
@@ -80,6 +82,7 @@ function MasterThesis() {
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
+      api.get('/auth/me', { signal }).then(({ data }) => setCoordinatorProgram(data.program || null)),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -319,6 +322,7 @@ const handleComplete = async (id) => {
   };
 
   const filteredTheses = useMemo(() => {
+    const coordProgId = coordinatorProgram?.id;
     return theses.filter(t => {
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -330,9 +334,15 @@ const handleComplete = async (id) => {
         : supervisorFilter === 'NONE'
           ? !t.supervisor
           : t.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesSupervisor;
+
+      const isCrossProgram = coordProgId && t.student?.programId && t.student.programId !== coordProgId;
+      const matchesScope = programScopeFilter === 'ALL' ? true :
+        programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
+        !isCrossProgram;
+
+      return matchesSearch && matchesStatus && matchesSupervisor && matchesScope;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -454,6 +464,15 @@ return (
                 <p>{showDetail.title}</p>
               </div>
             </div>
+
+            {showDetail.student?.programId && coordinatorProgram?.id && showDetail.student.programId !== coordinatorProgram.id && (
+              <div className="alert alert-info" style={{ margin: '0 24px 16px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, background: 'var(--color-surface-container-high)', borderLeft: '4px solid var(--color-primary)' }}>
+                <Icon name="info" className="material-symbols-outlined" style={{ color: 'var(--color-primary)' }} />
+                <span>
+                  <strong>Cross-Program Thesis ({showDetail.student?.program?.code || 'Other Program'}):</strong> You can assign supervisors, assign external examiners, and view/download documents. Evaluations and recommendations are managed by the student's home program coordinator.
+                </span>
+              </div>
+            )}
 
             <div className="detail-section">
               <div className="detail-grid">
@@ -879,6 +898,16 @@ return (
         </div>
 
         <div className="filter-bar">
+          <FilterDropdown
+            label="Scope"
+            value={programScopeFilter}
+            onChange={setProgramScopeFilter}
+            options={[
+              { value: 'MY_PROGRAM', label: 'My Program Theses' },
+              { value: 'OTHER_PROGRAMS', label: 'Assigned for Other Programs' },
+            ]}
+            allLabel="All Department Theses"
+          />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>

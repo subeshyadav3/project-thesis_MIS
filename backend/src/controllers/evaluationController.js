@@ -26,12 +26,20 @@ exports.submitComponentMarks = async (req, res) => {
     });
     if (!component) return res.status(404).json({ error: 'Evaluation component not found' });
 
-    // Coordinators can correct any mark; evaluators remain limited to their own role.
-    const canManageAll = ['COORDINATOR', 'MAINTAINER'].includes(req.user.role);
-    if (!canManageAll && req.user.role !== component.evaluatorRole) {
-      return res.status(403).json({
-        error: `${req.user.role} cannot evaluate the "${component.name}" component (evaluator: ${component.evaluatorRole}).`,
+    // Coordinators can evaluate theses in their home program, but NOT cross-program theses
+    if (req.user.role === 'COORDINATOR' && thesisId) {
+      const thesis = await prisma.thesis.findUnique({
+        where: { id: parseInt(thesisId) },
+        include: { student: true },
       });
+      if (thesis) {
+        const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+        if (prog && thesis.student?.programId && thesis.student.programId !== prog.id) {
+          return res.status(403).json({
+            error: 'Only the home program coordinator can record evaluations and recommendations for this student.',
+          });
+        }
+      }
     }
 
     // Verify assignment: supervisors can only mark their own groups/theses

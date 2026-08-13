@@ -300,7 +300,8 @@ exports.getSupervisorScope = async (req, res) => {
   }
 };
 
-exports.getUsersByRole = async (req, res) => {  try {
+exports.getUsersByRole = async (req, res) => {
+  try {
     const role = req.params.role.toUpperCase();
     // Supervisor lookups also include coordinators (they can supervise too)
     const where = role === 'SUPERVISOR'
@@ -315,12 +316,8 @@ exports.getUsersByRole = async (req, res) => {  try {
     if (req.query.programId) {
       where.programId = parseInt(req.query.programId);
     }
-    if (req.user.role === 'COORDINATOR') {
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
       where.departmentId = req.user.departmentId;
-      // Coordinators can only fetch SUPERVISOR, EXTERNAL_EXAMINER, STUDENT roles
-      if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role)) {
-        return res.json([]);
-      }
     }
     const users = await prisma.user.findMany({
       where,

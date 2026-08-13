@@ -12,6 +12,7 @@ function CoordinatorDashboard() {
   const [stats, setStats] = useState(null);
   const [program, setProgram] = useState(null);
   const [lateProposals, setLateProposals] = useState([]);
+  const [mySupervisedTheses, setMySupervisedTheses] = useState([]);
   const [rejecting, setRejecting] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -30,6 +31,7 @@ function CoordinatorDashboard() {
   useEffect(() => {
     api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     api.get('/auth/me').then(({ data }) => setProgram(data.program || null)).catch(() => {});
+    api.get('/supervisors/theses').then(({ data }) => setMySupervisedTheses(data)).catch(() => setMySupervisedTheses([]));
   }, []);
 
   useEffect(() => { loadLate(); }, [isMaster]);
@@ -233,6 +235,37 @@ function CoordinatorDashboard() {
           </div>
         </div>
       </div>
+
+      {mySupervisedTheses.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3>My Supervised Thesis Assignments ({mySupervisedTheses.length})</h3>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>Theses where you are assigned as supervisor</p>
+            </div>
+            <Link to="/supervisor/thesis" className="btn btn-sm btn-outline">Go to Supervisor Portal →</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, padding: '0 16px 16px' }}>
+            {mySupervisedTheses.slice(0, 4).map(t => (
+              <div key={t.id} style={{
+                padding: '14px 16px', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-outline-variant)',
+                background: 'var(--color-surface-container-lowest)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-on-surface)' }}>{t.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
+                    Student: <strong>{t.student?.firstName} {t.student?.lastName}</strong> ({t.student?.rollNumber || '—'})
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11 }}>{t.status}</span>
+                  <Link to={`/supervisor/project/thesis/${t.id}`} style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Manage Thesis →</Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isMaster && lateProposals.length > 0 && (
         <div className="card" style={{ marginTop: 24 }}>

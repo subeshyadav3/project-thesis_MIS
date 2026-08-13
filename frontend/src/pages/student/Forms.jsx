@@ -72,24 +72,52 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
             <textarea className="form-input" rows={6} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe the research problem, objectives and methodology..." />
           </div>
 
-          {fields.map(f => (
-            <div className="form-group" key={f.key} style={{ margin: 0 }}>
-              <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {f.label} {f.required ? <span style={{ color: 'var(--color-error)' }}>*</span> : <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>(optional)</span>}
-              </label>
-              {f.type === 'textarea' ? (
-                <textarea className="form-input" rows={3} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} placeholder={f.placeholder || ''} />
-              ) : (
-                <input
-                  className="form-input"
-                  type={FIELD_TYPES[f.type] || 'text'}
-                  value={form[f.key] || ''}
-                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                  placeholder={f.placeholder || ''}
-                />
-              )}
-            </div>
-          ))}
+          {fields.map(f => {
+            const isCluster = f.key?.toLowerCase().includes('cluster') || f.label?.toLowerCase().includes('cluster');
+            const isProgram = f.key?.toLowerCase().includes('program') || f.label?.toLowerCase().includes('program');
+            const isGuided = f.key?.toLowerCase().includes('guided') || f.label?.toLowerCase().includes('guided');
+
+            return (
+              <div className="form-group" key={f.key} style={{ margin: 0 }}>
+                <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {f.label} {f.required ? <span style={{ color: 'var(--color-error)' }}>*</span> : <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>(optional)</span>}
+                </label>
+                {isCluster ? (
+                  <select className="form-input" value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}>
+                    <option value="">Select Research Cluster...</option>
+                    <option value="AI/ML and image processing">AI/ML and image processing</option>
+                    <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                    <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                    <option value="Computer networks and security">Computer networks and security</option>
+                  </select>
+                ) : isProgram ? (
+                  <select className="form-input" value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}>
+                    <option value="">Select Program...</option>
+                    <option value="MSDSA">MSDSA</option>
+                    <option value="MSCSK">MSCSK</option>
+                    <option value="MSICE">MSICE</option>
+                    <option value="MSNCS">MSNCS</option>
+                  </select>
+                ) : isGuided ? (
+                  <select className="form-input" value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}>
+                    <option value="">Select Option...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                ) : f.type === 'textarea' ? (
+                  <textarea className="form-input" rows={3} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} placeholder={f.placeholder || ''} />
+                ) : (
+                  <input
+                    className="form-input"
+                    type={FIELD_TYPES[f.type] || 'text'}
+                    value={form[f.key] || ''}
+                    onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    placeholder={f.placeholder || ''}
+                  />
+                )}
+              </div>
+            );
+          })}
 
           <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', display: 'flex', gap: 6, alignItems: 'center' }}>
             <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 16 }} />
