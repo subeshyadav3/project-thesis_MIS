@@ -506,11 +506,6 @@ return (
                             <span className="dot" />Awaiting Response
                           </span>
                         )}
-                        {showDetail.supervisorAssignmentStatus === 'ACCEPTED' && (
-                          <span className="badge badge-completed" style={{ fontSize: 10 }}>
-                            <span className="dot" />Accepted
-                          </span>
-                        )}
                         {showDetail.supervisorAssignmentStatus === 'REJECTED' && (
                           <span className="badge badge-error" style={{ fontSize: 10 }}>
                             Declined
@@ -988,11 +983,6 @@ return (
                           {t.supervisorAssignmentStatus === 'PENDING' && (
                             <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
                               <span className="dot" />Awaiting Response
-                            </span>
-                          )}
-                          {t.supervisorAssignmentStatus === 'ACCEPTED' && (
-                            <span className="badge badge-completed" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
-                              <span className="dot" />Accepted
                             </span>
                           )}
                           {t.supervisorAssignmentStatus === 'REJECTED' && (

@@ -141,19 +141,9 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, supervisorAs
                 <span className="dot" />Awaiting Response
               </span>
             )}
-            {supervisorAssignmentStatus === 'ACCEPTED' && (
-              <span className="badge badge-completed" style={{ fontSize: 11, padding: '2px 8px' }}>
-                <span className="dot" />Accepted
-              </span>
-            )}
             {supervisorAssignmentStatus === 'REJECTED' && (
               <span className="badge badge-error" style={{ fontSize: 11, padding: '2px 8px' }}>
                 Declined
-              </span>
-            )}
-            {!supervisorAssignmentStatus && currentSupervisor && (
-              <span className="badge badge-completed" style={{ fontSize: 11, padding: '2px 8px' }}>
-                <span className="dot" />Assigned
               </span>
             )}
             {!disabled && (
