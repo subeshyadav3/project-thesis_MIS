@@ -10,6 +10,17 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
 
+const DEFAULT_FORM_FIELDS = [
+  { key: 'program', label: 'Program', type: 'select', required: true },
+  { key: 'cluster', label: 'Research Project Cluster / Area', type: 'select', required: true },
+  { key: 'title', label: 'Project / Thesis Concept Title', type: 'text', required: true },
+  { key: 'pdf_document', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
+  { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
+  { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
+];
+
 function CoordinatorAnnouncements() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const degreeType = user.program?.degreeType || '';
@@ -549,144 +560,83 @@ function CoordinatorAnnouncements() {
 
                         <div style={{ marginTop: 16 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <label style={{ fontSize: 12, fontWeight: 600 }}>Extra Form Fields</label>
-                            <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...form.formFields, { key: '', label: '', type: 'text', required: false, placeholder: '' }] })}>
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Form Fields (Google Forms Style Editor)</label>
+                            <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : DEFAULT_FORM_FIELDS), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
                               <Icon name="add" className="material-symbols-outlined" /> Add Field
                             </button>
                           </div>
                           <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                            These are all the fields students will see on the registration form.
+                            Customize field labels, select field types, or toggle Required / Optional for each question.
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {/* MSc Concept Note Standard Form Fields Preview */}
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                            {/* Fixed Student Profile Metadata info */}
+                            <div style={{ border: '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Email, Name, Roll Number <span style={{ color: 'var(--color-error)' }}>*</span>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                                  Student Profile (Email, Name, Roll Number)
                                 </span>
                                 <span className="badge badge-active" style={{ fontSize: 10 }}>Auto-Linked</span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="account_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Auto-populated from student profile
-                              </div>
                             </div>
 
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Program <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="school" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Dropdown (MSDSA, MSCSK, MSICE, MSNCS)
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Research Project Cluster / Area <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="category" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Dropdown (4 Fixed Department Clusters)
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Project / Thesis Concept Title <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="short_text" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text input
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Concept Note Proposal Document (PDF, max 10MB) <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="upload_file" className="material-symbols-outlined" style={{ fontSize: 16 }} /> PDF File Upload (Named with Roll e.g., 080MSDSA010.pdf)
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Is it a guided proposal? <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="flaky" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Radio Choice (Yes / No)
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Primary Faculty Member Consulted / Preferred Supervisor <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="person" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text / Faculty Selection
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Secondary Faculty Member(s) Consulted / Preferred Supervisor <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </span>
-                                <span className="badge badge-active" style={{ fontSize: 10 }}>Required</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="group" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text / Faculty Selection
-                              </div>
-                            </div>
-
-                            <div style={{ border: '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                  Remarks (if any)
-                                </span>
-                                <span className="badge badge-info" style={{ fontSize: 10 }}>Optional</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                                <Icon name="notes" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Text input
-                              </div>
-                            </div>
-                            {form.formFields.map((f, idx) => (
+                            {/* Dynamic Editable Fields */}
+                            {(form.formFields && form.formFields.length > 0 ? form.formFields : DEFAULT_FORM_FIELDS).map((f, idx) => (
                               <div key={idx} style={{ border: f.required ? '1px solid var(--color-primary)' : '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                  <input style={{ flex: 1, fontWeight: 600 }} value={f.label} onChange={e => {
-                                    const arr = [...form.formFields]; arr[idx] = { ...arr[idx], label: e.target.value, key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') }; setForm({ ...form, formFields: arr });
-                                  }} placeholder="Field label (e.g. Research Area)" />
-                                  {f.required && <span style={{ color: 'var(--color-error)', fontSize: 18, fontWeight: 700 }}>*</span>}
-                                  <button type="button" className="icon-btn danger" title="Remove field" onClick={() => setForm({ ...form, formFields: form.formFields.filter((_, i) => i !== idx) })}>
+                                  <input
+                                    className="form-input"
+                                    style={{ flex: 1, fontWeight: 600, fontSize: 14 }}
+                                    value={f.label}
+                                    onChange={e => {
+                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                      currentFields[idx] = { ...currentFields[idx], label: e.target.value, key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') };
+                                      setForm({ ...form, formFields: currentFields });
+                                    }}
+                                    placeholder="Question / Field Title"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="icon-btn danger"
+                                    title="Remove field"
+                                    onClick={() => {
+                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                      setForm({ ...form, formFields: currentFields.filter((_, i) => i !== idx) });
+                                    }}
+                                  >
                                     <Icon name="delete" className="material-symbols-outlined" />
                                   </button>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                  <select style={{ flex: '0 1 140px' }} value={f.type} onChange={e => { const arr = [...form.formFields]; arr[idx] = { ...arr[idx], type: e.target.value }; setForm({ ...form, formFields: arr }); }}>
-                                    <option value="text">Text</option>
-                                    <option value="textarea">Paragraph</option>
-                                    <option value="number">Number</option>
-                                    <option value="date">Date</option>
-                                    <option value="email">Email</option>
-                                  </select>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, whiteSpace: 'nowrap', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={f.required} onChange={e => { const arr = [...form.formFields]; arr[idx] = { ...arr[idx], required: e.target.checked }; setForm({ ...form, formFields: arr }); }} /> Required
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 1 180px' }}>
+                                    <label style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', margin: 0 }}>Type:</label>
+                                    <select
+                                      className="form-input"
+                                      style={{ padding: '2px 6px', fontSize: 12 }}
+                                      value={f.type || 'text'}
+                                      onChange={e => {
+                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                        currentFields[idx] = { ...currentFields[idx], type: e.target.value };
+                                        setForm({ ...form, formFields: currentFields });
+                                      }}
+                                    >
+                                      <option value="text">Short Text</option>
+                                      <option value="textarea">Paragraph</option>
+                                      <option value="select">Dropdown</option>
+                                      <option value="radio">Radio Choice</option>
+                                      <option value="file">PDF File Upload</option>
+                                    </select>
+                                  </div>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!f.required}
+                                      onChange={e => {
+                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                        currentFields[idx] = { ...currentFields[idx], required: e.target.checked };
+                                        setForm({ ...form, formFields: currentFields });
+                                      }}
+                                    />
+                                    {f.required ? <span style={{ color: 'var(--color-error)' }}>Required *</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>Optional</span>}
                                   </label>
                                 </div>
                               </div>
