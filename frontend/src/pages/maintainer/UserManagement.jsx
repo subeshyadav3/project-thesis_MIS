@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -34,15 +34,15 @@ function UserManagement() {
 
   const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
 
-  const loadUsers = () => {
+  const loadUsers = useCallback(() => {
     setLoading(true);
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {}).finally(() => setLoading(false));
-  };
+    api.get('/users').then(({ data }) => setUsers(data)).catch(() => toast.error('Failed to load users')).finally(() => setLoading(false));
+  }, []);
   useEffect(() => {
     loadUsers();
-    api.get('/departments/programs').then(({ data }) => setPrograms(data)).catch(() => {});
-    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => {});
-  }, []);
+    api.get('/departments/programs').then(({ data }) => setPrograms(data)).catch(() => toast.error('Failed to load programs'));
+    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => toast.error('Failed to load departments'));
+  }, [loadUsers]);
 
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filters]);

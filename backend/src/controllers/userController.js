@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 
 const prisma = require('../utils/prisma');
+const { GROUP_STATUS, THESIS_STATUS } = require('../config/statusConstants');
+const { toId, parseId } = require('../utils/params');
+const logger = require('../utils/logger');
 const audit = require('../services/auditService');
 const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
@@ -174,7 +177,7 @@ exports.createUser = async (req, res) => {
       select: USER_SELECT,
     });
   audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Created ${role} ${resolvedEmail}`, performedById: req.user.id });
-  try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
+  try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { logger.error(e.message); }
   res.status(201).json(user);
   } catch (error) {
     if (error.code === 'P2002') {
@@ -186,8 +189,8 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { id } = req.params;
-    const userId = parseInt(id);
+    const userId = parseId(req, res);
+    if (userId === null) return;
 
     const existing = await prisma.user.findUnique({ where: { id: userId } });
     if (!existing) return res.status(404).json({ error: 'User not found' });
@@ -285,11 +288,11 @@ exports.updateUser = async (req, res) => {
           where: { studentId: user.id },
           data: { programId: data.programId },
         });
-      } catch (e) { console.error('sync thesis programId error:', e.message); }
+      } catch (e) { logger.error('sync thesis programId error:', e.message); }
     }
     const changedFields = Object.keys(data).join(', ');
   audit.log({ action: 'UPDATE', entity: 'User', entityId: user.id, details: `Updated fields: ${changedFields}`, performedById: req.user.id });
-  try { notifSvc.notify(user.id, 'USER_UPDATED', 'Your profile has been updated'); } catch (e) { console.error(e.message); }
+  try { notifSvc.notify(user.id, 'USER_UPDATED', 'Your profile has been updated'); } catch (e) { logger.error(e.message); }
   res.json(user);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -298,7 +301,8 @@ exports.updateUser = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseId(req, res);
+    if (userId === null) return;
     const existing = await prisma.user.findUnique({ where: { id: userId } });
     if (!existing) return res.status(404).json({ error: 'User not found' });
     // Coordinator can only delete users in their department
@@ -357,7 +361,7 @@ exports.deleteUser = async (req, res) => {
     ]);
     res.json({ message: 'User deleted' });
   } catch (error) {
-    console.error('deleteUser error:', error);
+    logger.error('deleteUser error:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
@@ -436,7 +440,7 @@ exports.bulkDeleteUsers = async (req, res) => {
 
     res.json({ deleted, errors });
   } catch (error) {
-    console.error('bulkDeleteUsers error:', error);
+    logger.error('bulkDeleteUsers error:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
@@ -505,7 +509,8 @@ exports.getUsersByRole = async (req, res) => {
 
 exports.toggleActive = async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseId(req, res);
+    if (userId === null) return;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -524,21 +529,21 @@ exports.toggleActive = async (req, res) => {
       const activeGroups = await prisma.projectGroup.count({
         where: {
           supervisorId: userId,
-          status: { in: ['PENDING', 'ACTIVE'] },
+          status: { in: [GROUP_STATUS.PENDING, GROUP_STATUS.ACTIVE] },
         },
       });
       const activeTheses = await prisma.thesis.count({
         where: {
           supervisorId: userId,
-          status: { in: ['PENDING', 'ACTIVE'] },
+          status: { in: [THESIS_STATUS.PENDING, THESIS_STATUS.ACTIVE] },
         },
       });
       const examinerActiveAssignments = await prisma.examinerAssignment.count({
         where: {
           externalExaminerId: userId,
           OR: [
-            { group: { status: { in: ['PENDING', 'ACTIVE'] } } },
-            { thesis: { status: { in: ['PENDING', 'ACTIVE'] } } },
+            { group: { status: { in: [GROUP_STATUS.PENDING, GROUP_STATUS.ACTIVE] } } },
+            { thesis: { status: { in: [THESIS_STATUS.PENDING, THESIS_STATUS.ACTIVE] } } },
           ],
         },
       });
@@ -558,7 +563,7 @@ exports.toggleActive = async (req, res) => {
 
     const action = activating ? 'ACTIVATE' : 'DEACTIVATE';
   audit.log({ action: 'DEACTIVATE', entity: 'User', entityId: user.id, details: `${action}d user ${user.email}`, performedById: req.user.id });
-  try { notifSvc.notify(user.id, 'USER_STATUS_CHANGED', `Your account has been ${action.toLowerCase()}d`); } catch (e) { console.error(e.message); }
+  try { notifSvc.notify(user.id, 'USER_STATUS_CHANGED', `Your account has been ${action.toLowerCase()}d`); } catch (e) { logger.error(e.message); }
   res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -665,8 +670,8 @@ exports.bulkCreateUsers = async (req, res) => {
         });
         created.push(user);
         audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Bulk created ${role} ${email}`, performedById: req.user.id });
-        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
-        try { emailService.notifyUserCreated(email, firstName, role, email, password); } catch (e) { console.error(e.message); }
+        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { logger.error(e.message); }
+        try { emailService.notifyUserCreated(email, firstName, role, email, password); } catch (e) { logger.error(e.message); }
       } catch (err) {
         errors.push({ email, error: err.message });
       }
@@ -855,8 +860,8 @@ exports.bulkImportUsersExcel = async (req, res) => {
         });
         created.push(user);
         audit.log({ action: 'CREATE', entity: 'User', entityId: user.id, details: `Excel bulk created ${role} ${email}`, performedById: req.user.id });
-        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { console.error(e.message); }
-        try { emailService.notifyUserCreated(email, firstName, role, email, password); } catch (e) { console.error(e.message); }
+        try { notifSvc.notify(user.id, 'USER_CREATED', `Your account has been created with role ${role}`); } catch (e) { logger.error(e.message); }
+        try { emailService.notifyUserCreated(email, firstName, role, email, password); } catch (e) { logger.error(e.message); }
       } catch (err) {
         errors.push({ row: rowNum, email, error: err.message });
       }
@@ -869,7 +874,7 @@ exports.bulkImportUsersExcel = async (req, res) => {
       errors,
     });
   } catch (error) {
-    console.error('bulkImportUsersExcel error:', error);
+    logger.error('bulkImportUsersExcel error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -878,7 +883,7 @@ exports.getAuditLogs = async (req, res) => {
   try {
     const where = {};
     if (req.query.entity) where.entity = req.query.entity;
-    if (req.query.entityId) where.entityId = parseInt(req.query.entityId);
+    if (req.query.entityId) where.entityId = toId(req.query.entityId);
     if (req.query.action) where.action = req.query.action;
 
     // Scope audit logs to the coordinator's own program/department

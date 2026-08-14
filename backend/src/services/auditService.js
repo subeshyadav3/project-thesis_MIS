@@ -1,5 +1,6 @@
 
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 
 /**
  * Resolve which program an audit entry belongs to, based on its subject:
@@ -137,7 +138,7 @@ async function resolvePerformerProgram(performedById) {
     }
     return null;
   } catch (e) {
-    console.error('resolvePerformerProgram error:', e.message);
+    logger.error('resolvePerformerProgram error:', e.message);
     return null;
   }
 }
@@ -155,7 +156,7 @@ const log = async ({ action, entity, entityId, details, performedById }) => {
       },
     });
   } catch (e) {
-    console.error('Audit log error:', e.message);
+    logger.error('Audit log error:', e.message);
   }
 };
 
@@ -186,7 +187,7 @@ const logMarks = async ({ groupId, thesisId, title, performedById, isUpdate }) =
     existing.isUpdate = existing.isUpdate || isUpdate;
     existing.actionLabel = existing.isUpdate ? 'Updated marks' : 'Submitted marks';
     clearTimeout(existing.timer);
-    existing.timer = setTimeout(() => flush(existing), 800);
+    existing.timer = setTimeout(() => flush(existing), 800); existing.timer.unref?.();
   } else {
     const entry = {
       count: 1,
@@ -195,7 +196,7 @@ const logMarks = async ({ groupId, thesisId, title, performedById, isUpdate }) =
       actionLabel: isUpdate ? 'Updated marks' : 'Submitted marks',
       timer: null,
     };
-    entry.timer = setTimeout(() => flush(entry), 800);
+    entry.timer = setTimeout(() => flush(entry), 800); entry.timer.unref?.();
     pendingMarksBatches.set(batchKey, entry);
   }
 };

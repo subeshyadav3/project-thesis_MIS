@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const logger = require('./utils/logger');
 const rateLimit = require('express-rate-limit');
 const { authenticate } = require('./middleware/auth');
 
@@ -128,6 +129,7 @@ async function logDocumentView(req, type, filename) {
     if (req.user.role === 'STUDENT') return;
     const audit = require('./services/auditService');
     const prisma = require('./utils/prisma');
+const logger = require('./utils/logger');
     const url = `/api/files/${type}/${filename}`;
     const proposal = await prisma.proposal.findFirst({
       where: { documentUrl: url },
@@ -142,7 +144,7 @@ async function logDocumentView(req, type, filename) {
       performedById: req.user.id,
     });
   } catch (e) {
-    console.error('document view audit error:', e.message);
+    logger.error('document view audit error:', e.message);
   }
 }
 
@@ -238,5 +240,5 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });

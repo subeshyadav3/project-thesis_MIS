@@ -1,5 +1,6 @@
 
 const prisma = require('./prisma');
+const { GROUP_STATUS, THESIS_STATUS } = require('../config/statusConstants');
 
 /**
  * Check all announcements that have an expirationDate that has passed,
@@ -26,7 +27,7 @@ async function markOverdueItems() {
   const groupResult = await prisma.projectGroup.updateMany({
     where: {
       announcementId: { in: expiredIds },
-      status: { in: ['PENDING', 'ACTIVE'] },
+      status: { in: [GROUP_STATUS.PENDING, GROUP_STATUS.ACTIVE] },
     },
     data: { status: 'OVERDUE' },
   });
@@ -35,7 +36,7 @@ async function markOverdueItems() {
   const thesisResult = await prisma.thesis.updateMany({
     where: {
       announcementId: { in: expiredIds },
-      status: { in: ['PENDING', 'ACTIVE'] },
+      status: { in: [THESIS_STATUS.PENDING, THESIS_STATUS.ACTIVE] },
     },
     data: { status: 'OVERDUE' },
   });
@@ -53,7 +54,7 @@ async function markOverdueForAnnouncement(announcementId) {
   const groupResult = await prisma.projectGroup.updateMany({
     where: {
       announcementId,
-      status: { in: ['PENDING', 'ACTIVE'] },
+      status: { in: [GROUP_STATUS.PENDING, GROUP_STATUS.ACTIVE] },
     },
     data: { status: 'OVERDUE' },
   });
@@ -61,7 +62,7 @@ async function markOverdueForAnnouncement(announcementId) {
   const thesisResult = await prisma.thesis.updateMany({
     where: {
       announcementId,
-      status: { in: ['PENDING', 'ACTIVE'] },
+      status: { in: [THESIS_STATUS.PENDING, THESIS_STATUS.ACTIVE] },
     },
     data: { status: 'OVERDUE' },
   });

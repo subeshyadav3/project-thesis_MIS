@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 const { authenticate, authorize } = require('../middleware/auth');
 
 /**
@@ -50,7 +51,7 @@ router.get('/', authenticate, authorize('MAINTAINER'), async (req, res) => {
 
     res.json(rows);
   } catch (error) {
-    console.error('files-audit error:', error.message);
+    logger.error('files-audit error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

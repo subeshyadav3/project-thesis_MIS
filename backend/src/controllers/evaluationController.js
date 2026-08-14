@@ -1,6 +1,9 @@
 
 const prisma = require('../utils/prisma');
 const { validateMarks, computeSummary } = require('../config/evaluationScheme');
+const { parseId } = require('../utils/params');
+const { GROUP_STATUS, THESIS_STATUS, SUPERVISOR_ASSIGNMENT_STATUS } = require('../config/statusConstants');
+const logger = require('../utils/logger');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
 const { resolveCoordinatorScope, isGroupVisibleToCoordinator, isThesisVisibleToCoordinator, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
@@ -143,7 +146,7 @@ exports.submitComponentMarks = async (req, res) => {
         performedById: req.user.id,
         isUpdate,
       });
-    } catch (e) { console.error('audit marks error:', e.message); }
+    } catch (e) { logger.error('audit marks error:', e.message); }
 
     // Build the new summary so the caller doesn't have to refetch
     const components = await prisma.evaluationComponent.findMany({
@@ -184,11 +187,11 @@ exports.submitComponentMarks = async (req, res) => {
         itemTitle: itemTitle || 'project',
         submitterId: req.user.id,
       });
-    } catch (e) { console.error('notifyMarksSubmitted:', e.message); }
+    } catch (e) { logger.error('notifyMarksSubmitted:', e.message); }
 
     res.status(existing ? 200 : 201).json({ evaluation, summary });
   } catch (error) {
-    console.error('submitComponentMarks error:', error);
+    logger.error('submitComponentMarks error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -252,14 +255,15 @@ exports.submitFeedback = async (req, res) => {
     audit.log({ action: 'SUBMIT_FEEDBACK', entity: 'Evaluation', details: `Supervisor provided feedback for ${stage} stage`, performedById: req.user.id });
     res.status(201).json(evaluation);
   } catch (error) {
-    console.error('submitFeedback error:', error);
+    logger.error('submitFeedback error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 exports.getGroupEvaluations = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseId(req, res);
+    if (id === null) return;
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
       const group = await prisma.projectGroup.findUnique({
@@ -286,14 +290,15 @@ exports.getGroupEvaluations = async (req, res) => {
   const summary = computeSummary(evaluations, components, projectType);
   res.json({ evaluations, components, summary });
   } catch (error) {
-    console.error('getGroupEvaluations error:', error);
+    logger.error('getGroupEvaluations error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 exports.getThesisEvaluations = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseId(req, res);
+    if (id === null) return;
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
       const thesis = await prisma.thesis.findUnique({
@@ -322,7 +327,7 @@ exports.getThesisEvaluations = async (req, res) => {
     const summary = computeSummary(evaluations, components, 'MASTER');
     res.json({ evaluations, components, summary });
   } catch (error) {
-    console.error('getThesisEvaluations error:', error);
+    logger.error('getThesisEvaluations error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -331,7 +336,8 @@ exports.getThesisEvaluations = async (req, res) => {
 // Mark an evaluation (component) as COMPLETED — evaluator cannot edit after
 exports.completeEvaluation = async (req, res) => {
   try {
-    const componentId = parseInt(req.params.id);
+    const componentId = parseId(req, res);
+    if (componentId === null) return;
     const { groupId, thesisId } = req.body;
 
     if (!groupId && !thesisId) {
@@ -370,7 +376,7 @@ exports.completeEvaluation = async (req, res) => {
     }
 
     // Prevent re-completing an already completed evaluation
-    if (evaluation.status === 'COMPLETED' && !['COORDINATOR', 'MAINTAINER'].includes(req.user.role)) {
+    if (evaluation.status === GROUP_STATUS.COMPLETED && !['COORDINATOR', 'MAINTAINER'].includes(req.user.role)) {
       return res.status(400).json({ error: 'Evaluation already completed.' });
     }
     if (!['COORDINATOR', 'MAINTAINER'].includes(req.user.role) && req.user.role !== evaluation.component.evaluatorRole) {
@@ -425,7 +431,7 @@ exports.completeEvaluation = async (req, res) => {
 
     res.json({ message: 'Evaluation completed successfully' });
   } catch (error) {
-    console.error('completeEvaluation error:', error);
+    logger.error('completeEvaluation error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

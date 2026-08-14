@@ -33,12 +33,14 @@ function SupervisorMasterThesis() {
     setLoading(true);
     Promise.all([
       api.get('/supervisors/theses', { signal }).then(({ data }) => setTheses(data)),
-
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
-    return () => controller.abort();
+    return controller;
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    const controller = loadData();
+    return () => controller.abort();
+  }, [loadData]);
 
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {

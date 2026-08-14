@@ -1,5 +1,6 @@
 
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 const { computeSummary } = require('../config/evaluationScheme');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
@@ -63,7 +64,7 @@ exports.getAssignedTheses = async (req, res) => {
       return { ...t, externalRole };
     }));
   } catch (error) {
-    console.error('getAssignedTheses error:', error);
+    logger.error('getAssignedTheses error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

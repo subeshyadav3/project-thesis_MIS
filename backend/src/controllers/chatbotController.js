@@ -1,5 +1,6 @@
 
 const prisma = require('../utils/prisma');
+const { toId } = require('../utils/params');
 
 const AI_CHATBOT_URL = (process.env.AI_CHATBOT_URL || 'http://localhost:8001').replace(/\/$/, '');
 
@@ -37,7 +38,7 @@ function opts_timeout(options) {
 
 function getProposalDocumentOr403(req) {
   return prisma.proposal.findUnique({
-    where: { id: parseInt(req.params.id) },
+    where: { id: toId(req.params.id) },
     select: { id: true, documentUrl: true, documentType: true, groupId: true, thesisId: true },
   });
 }
@@ -53,7 +54,7 @@ function userMaySeeProposal(req, proposal) {
  */
 exports.reanalyze = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = toId(req.params.id);
     const proposal = await getProposalDocumentOr403({ params: { id } });
     if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
     if (!proposal.documentUrl) return res.status(400).json({ error: 'Proposal has no document' });
