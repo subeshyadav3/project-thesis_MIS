@@ -24,10 +24,16 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
     ? announcement.formFields
     : DEFAULT_STUDENT_FORM_FIELDS;
 
+  const initialData = announcement.formSubmitted?.formData || {};
+
   const [form, setForm] = useState(() => {
-    const init = { title: '', description: '', program: user.program?.code || '' };
+    const init = {
+      title: initialData.title || '',
+      description: initialData.description || '',
+      program: initialData.program || user.program?.code || '',
+    };
     fields.forEach(f => {
-      if (f.key && !(f.key in init)) init[f.key] = '';
+      if (f.key) init[f.key] = initialData[f.key] !== undefined ? initialData[f.key] : '';
     });
     return init;
   });
@@ -62,7 +68,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
             <Icon name="description" className="material-symbols-outlined" />
           </div>
           <div className="modal-header-text">
-            <h2>MSc Concept Note Proposal Form</h2>
+            <h2>{announcement.formSubmitted?.submitted ? 'Edit Thesis Concept Form' : 'MSc Concept Note Proposal Form'}</h2>
             <p>{announcement.title}</p>
           </div>
           <button className="modal-close-btn" onClick={onClose} aria-label="Close">
@@ -178,8 +184,8 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
         <div className="modal-actions">
           <button className="btn btn-outline" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-            <Icon name={submitting ? 'sync' : 'send'} className="material-symbols-outlined" />
-            {submitting ? 'Submitting...' : 'Submit Form'}
+            <Icon name={submitting ? 'sync' : 'send'} className={`material-symbols-outlined ${submitting ? 'spin' : ''}`} />
+            {submitting ? 'Saving...' : announcement.formSubmitted?.submitted ? 'Update Form' : 'Submit Form'}
           </button>
         </div>
       </div>
@@ -239,6 +245,7 @@ function StudentForms() {
 
             {eligible.map(a => {
               const submitted = a.formSubmitted?.submitted;
+              const isFinalized = submitted && (a.formSubmitted?.status === 'FINALIZED' || Boolean(a.formSubmitted?.thesisId));
               return (
                 <div key={a.id} className="card">
                   <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
@@ -260,14 +267,16 @@ function StudentForms() {
                         {(a.formFields?.length || 0) > 0 && <span>{a.formFields.length} additional field(s)</span>}
                       </div>
                       {submitted && (
-                        <div style={{ marginTop: 8 }}>
-                          {a.formSubmitted.status === 'LATE_SUBMITTED' ? (
+                        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          {isFinalized ? (
+                            <span className="badge badge-completed"><Icon name="lock" className="material-symbols-outlined" style={{ fontSize: 12 }} /> Finalized by Coordinator</span>
+                          ) : a.formSubmitted.status === 'LATE_SUBMITTED' ? (
                             <span className="badge badge-warning"><span className="dot" />Submitted late — awaiting approval</span>
                           ) : (
-                            <span className="badge badge-completed"><span className="dot" />Submitted</span>
+                            <span className="badge badge-completed"><span className="dot" />Submitted (Editable)</span>
                           )}
                           {a.formSubmitted.thesisId && (
-                            <Link to={`/student/theses/${a.formSubmitted.thesisId}`} style={{ marginLeft: 8, fontSize: 13 }}>
+                            <Link to={`/student/theses/${a.formSubmitted.thesisId}`} style={{ fontSize: 13 }}>
                               View thesis <Icon name="arrow_forward" className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle' }} />
                             </Link>
                           )}
@@ -279,9 +288,13 @@ function StudentForms() {
                         <button className="btn btn-primary" onClick={() => setSelected(a)}>
                           <Icon name="description" className="material-symbols-outlined" /> Fill Form
                         </button>
+                      ) : !isFinalized ? (
+                        <button className="btn btn-outline" onClick={() => setSelected(a)}>
+                          <Icon name="edit" className="material-symbols-outlined" /> Edit Submission
+                        </button>
                       ) : (
                         <button className="btn btn-outline" disabled>
-                          <Icon name="check_circle" className="material-symbols-outlined" /> Already Submitted
+                          <Icon name="lock" className="material-symbols-outlined" /> Finalized
                         </button>
                       )}
                     </div>
