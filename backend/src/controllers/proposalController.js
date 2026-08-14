@@ -3,35 +3,6 @@ const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 const notifSvc = require('../services/notificationService');
 
-exports.updateComment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { comment } = req.body;
-
-    if (!comment || !comment.trim()) {
-      return res.status(400).json({ success: false, error: 'Comment is required' });
-    }
-
-    const proposal = await prisma.proposal.findUnique({ where: { id: parseInt(id) } });
-    if (!proposal) return res.status(404).json({ success: false, error: 'Document not found' });
-
-    const updated = await prisma.proposal.update({
-      where: { id: parseInt(id) },
-      data: {
-        supervisorComment: comment.trim(),
-        commentedById: req.user.id,
-      },
-    });
-
-    const roleLabel = req.user.role === 'SUPERVISOR' ? 'Supervisor' : req.user.role === 'COORDINATOR' ? 'Coordinator' : 'External';
-    audit.log({ action: 'COMMENT', entity: 'Proposal', entityId: proposal.id, details: `${roleLabel} comment added to proposal ${proposal.id}`, performedById: req.user.id });
-
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error('Update comment error:', error.message);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-};
 
 exports.getProposal = async (req, res) => {
   try {
@@ -59,13 +30,22 @@ exports.listPendingLateProposals = async (req, res) => {
       const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
       const progId = req.user.programId ?? program?.id ?? null;
       if (progId) {
-        where.submittedBy = { programId: progId };
+        where.OR = [
+          { thesis: { student: { programId: progId } } },
+          { thesis: { programId: progId } },
+          { group: { programId: progId } },
+        ];
       } else {
-        const deptUsers = await prisma.user.findMany({
+        const deptPrograms = await prisma.program.findMany({
           where: { departmentId: req.user.departmentId },
           select: { id: true },
         });
-        where.submittedById = { in: deptUsers.map(u => u.id) };
+        const deptProgIds = deptPrograms.map(p => p.id);
+        where.OR = [
+          { thesis: { student: { programId: { in: deptProgIds } } } },
+          { thesis: { programId: { in: deptProgIds } } },
+          { group: { programId: { in: deptProgIds } } },
+        ];
       }
     }
     const proposals = await prisma.proposal.findMany({
@@ -74,6 +54,7 @@ exports.listPendingLateProposals = async (req, res) => {
       include: {
         submittedBy: { select: { id: true, firstName: true, lastName: true, rollNumber: true, program: { select: { code: true } } } },
         thesis: { select: { id: true, title: true, status: true } },
+        group: { select: { id: true, name: true, projectTitle: true, status: true } },
       },
     });
     res.json(proposals);
@@ -87,11 +68,25 @@ exports.approveLateProposal = async (req, res) => {
   try {
     const proposal = await prisma.proposal.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { thesis: { select: { id: true, title: true, studentId: true } } },
+      include: {
+        thesis: { select: { id: true, title: true, studentId: true, programId: true, student: { select: { programId: true } } } },
+        group: { select: { id: true, projectTitle: true, programId: true, members: { select: { studentId: true } } } },
+      },
     });
     if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
     if (proposal.status !== 'PENDING_APPROVAL') {
       return res.status(400).json({ error: 'Only late proposals awaiting approval can be approved' });
+    }
+    if (req.user.role === 'COORDINATOR') {
+      const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
+      const scope = await resolveCoordinatorScope(req.user);
+      if (proposal.groupId) {
+        if (!await canManageGroupAsCoordinator(proposal.group, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied. Proposal belongs to another program.' });
+        }
+      } else if (!await canManageThesisAsCoordinator(proposal.thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Proposal belongs to another program.' });
+      }
     }
 
     const updated = await prisma.proposal.update({
@@ -107,15 +102,15 @@ exports.approveLateProposal = async (req, res) => {
 
     try {
       const coordinatorName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
-      await notifSvc.notify(
-        proposal.thesis?.studentId,
-        'PROPOSAL_APPROVED',
-        `${coordinatorName} approved your late thesis proposal "${proposal.thesis?.title || 'Untitled'}".`,
-        `/theses/${proposal.thesisId}`
-      );
+      const itemTitle = proposal.thesis?.title || proposal.group?.projectTitle || 'Untitled';
+      const studentIds = proposal.groupId
+        ? proposal.group.members.map(m => m.studentId)
+        : [proposal.thesis?.studentId];
+      await notifSvc.notifyMany(studentIds.filter(Boolean), 'PROPOSAL_APPROVED',
+        `${coordinatorName} approved your late proposal "${itemTitle}".`);
     } catch (e) { console.error('notify error:', e.message); }
 
-    audit.log({ action: 'APPROVE', entity: 'Proposal', entityId: proposal.id, details: `Late proposal for thesis "${proposal.thesis?.title || ''}" approved`, performedById: req.user.id });
+    audit.log({ action: 'APPROVE', entity: 'Proposal', entityId: proposal.id, details: `Late proposal for "${proposal.thesis?.title || proposal.group?.projectTitle || ''}" approved`, performedById: req.user.id });
     res.json({ success: true, data: updated });
   } catch (error) {
     console.error('approveLateProposal error:', error);
@@ -127,9 +122,23 @@ exports.rejectLateProposal = async (req, res) => {
   try {
     const proposal = await prisma.proposal.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { thesis: { select: { id: true, title: true, studentId: true } } },
+      include: {
+        thesis: { select: { id: true, title: true, studentId: true, programId: true, student: { select: { programId: true } } } },
+        group: { select: { id: true, projectTitle: true, programId: true, members: { select: { studentId: true } } } },
+      },
     });
     if (!proposal) return res.status(404).json({ error: 'Proposal not found' });
+    if (req.user.role === 'COORDINATOR') {
+      const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
+      const scope = await resolveCoordinatorScope(req.user);
+      if (proposal.groupId) {
+        if (!await canManageGroupAsCoordinator(proposal.group, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied. Proposal belongs to another program.' });
+        }
+      } else if (!await canManageThesisAsCoordinator(proposal.thesis, scope, req.user)) {
+        return res.status(403).json({ error: 'Access denied. Proposal belongs to another program.' });
+      }
+    }
     const reason = String(req.body?.reason || '').trim() || 'Proposal rejected by coordinator.';
 
     const updated = await prisma.proposal.update({
@@ -142,15 +151,15 @@ exports.rejectLateProposal = async (req, res) => {
     });
 
     try {
-      await notifSvc.notify(
-        proposal.thesis?.studentId,
-        'PROPOSAL_REJECTED',
-        `Your late thesis proposal "${proposal.thesis?.title || 'Untitled'}" was rejected. Reason: ${reason}`,
-        `/theses/${proposal.thesisId}`
-      );
+      const itemTitle = proposal.thesis?.title || proposal.group?.projectTitle || 'Untitled';
+      const studentIds = proposal.groupId
+        ? proposal.group.members.map(m => m.studentId)
+        : [proposal.thesis?.studentId];
+      await notifSvc.notifyMany(studentIds.filter(Boolean), 'PROPOSAL_REJECTED',
+        `Your late proposal "${itemTitle}" was rejected. Reason: ${reason}`);
     } catch (e) { console.error('notify error:', e.message); }
 
-    audit.log({ action: 'REJECT', entity: 'Proposal', entityId: proposal.id, details: `Late proposal for thesis "${proposal.thesis?.title || ''}" rejected: ${reason}`, performedById: req.user.id });
+    audit.log({ action: 'REJECT', entity: 'Proposal', entityId: proposal.id, details: `Late proposal for "${proposal.thesis?.title || proposal.group?.projectTitle || ''}" rejected: ${reason}`, performedById: req.user.id });
     res.json({ success: true, data: updated });
   } catch (error) {
     console.error('rejectLateProposal error:', error);

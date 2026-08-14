@@ -31,11 +31,9 @@ router.post('/chatbot/chat/:id/stream', nonStudentOnly, chatbotController.chatSt
 
 // ──Embeddings / summarize / evaluate (delegated to ai_chatbot service) ───────
 // Kept here so the existing AiAssistantModal keeps working without changes.
-router.post('/embed/:id', nonStudentOnly, aiController.embed);
 router.post('/summarize/:id', nonStudentOnly, aiController.summarize);
 router.post('/evaluate/:id', nonStudentOnly, aiController.evaluate);
 router.post('/ask/:id', nonStudentOnly, aiController.ask);
-router.get('/candidates/:id', nonStudentOnly, aiController.listCandidates);
 router.post('/similarity/:id', nonStudentOnly, aiController.similarity);
 
 module.exports = router;

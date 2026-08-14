@@ -25,48 +25,7 @@ function SupervisorMasterThesis() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
-  const [showUpload, setShowUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkPreview, setBulkPreview] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-  const handleFileUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) { toast.warning('Select a file'); return; }
-    setBulkLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setBulkPreview(data);
-    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
-    finally { setBulkLoading(false); }
-  };
-
-  const handleBulkConfirm = async () => {
-    if (!bulkPreview?.preview) return;
-    setBulkLoading(true);
-    try {
-      const rows = bulkPreview.preview.map(p => ({
-        row: p.row, name: p.name, roll: p.roll, title: p.title,
-        batch: p.batch, cluster: p.cluster, programId: p.programId,
-        studentMatch: p.studentMatch, supervisorMatch: p.supervisorMatch, supervisorWillCreate: p.supervisorWillCreate,
-        externalMidTermMatch: p.externalMidTermMatch, externalMidTermWillCreate: p.externalMidTermWillCreate,
-        externalFinalMatch: p.externalFinalMatch, externalFinalWillCreate: p.externalFinalWillCreate,
-      }));
-      const res = await api.post('/theses/bulk-import/confirm', { rows });
-      const created = res.data?.created ?? bulkPreview.stats.matched;
-      const skipInfo = res.data?.skipped?.length ? ` (${res.data.skipped.length} skipped: ${res.data.skipped.map(s => s.reason).join('; ')})` : '';
-      toast.success(`${created} theses imported${skipInfo}`);
-      setShowUpload(false);
-      setBulkPreview(null);
-      setSelectedFile(null);
-      setBulkYearId('');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Import failed'); }
-    finally { setBulkLoading(false); }
-  };
 
   const loadData = useCallback(() => {
     const controller = new AbortController();

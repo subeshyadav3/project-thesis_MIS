@@ -327,57 +327,6 @@ exports.getThesisEvaluations = async (req, res) => {
   }
 };
 
-exports.getMarksSummary = async (req, res) => {
-  try {
-    const { groupId, thesisId } = req.query;
-    if (!groupId && !thesisId) {
-      return res.status(400).json({ error: 'groupId or thesisId required' });
-    }
-    if (req.user.role === 'COORDINATOR') {
-      const scope = await resolveCoordinatorScope(req.user);
-      if (groupId) {
-        const group = await prisma.projectGroup.findUnique({
-          where: { id: parseInt(groupId) },
-          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
-        });
-        if (!await isGroupVisibleToCoordinator(group, scope, req.user)) {
-          return res.status(403).json({ error: 'Access denied' });
-        }
-      } else {
-        const thesis = await prisma.thesis.findUnique({
-          where: { id: parseInt(thesisId) },
-          select: {
-            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
-            student: { select: { programId: true } },
-            examinerAssignments: { select: { externalExaminerId: true } },
-          },
-        });
-        if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
-          return res.status(403).json({ error: 'Access denied' });
-        }
-      }
-    }
-    const where = groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) };
-    const [evaluations, components] = await Promise.all([
-      prisma.evaluation.findMany({
-        where,
-        include: { submittedBy: { select: { firstName: true, lastName: true } } },
-      }),
-      prisma.evaluationComponent.findMany({ where }),
-    ]);
-    let projectType = 'MINOR';
-    if (groupId) {
-      const grp = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectType: true } });
-      if (grp) projectType = grp.projectType;
-    } else {
-      projectType = 'MASTER';
-    }
-    const summary = computeSummary(evaluations, components, projectType);
-    res.json({ evaluations, summary });
-  } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
 
 // Mark an evaluation (component) as COMPLETED — evaluator cannot edit after
 exports.completeEvaluation = async (req, res) => {
@@ -398,6 +347,26 @@ exports.completeEvaluation = async (req, res) => {
     });
     if (!evaluation) {
       return res.status(404).json({ error: 'Evaluation not found. Submit marks first.' });
+    }
+
+    if (evaluation.marks === null || evaluation.marks === undefined) {
+      return res.status(400).json({ error: 'Submit marks before completing this evaluation.' });
+    }
+
+    // Reject if the project's total marks would exceed the scheme maximum
+    const where = groupId ? { groupId: parseInt(groupId) } : { thesisId: parseInt(thesisId) };
+    const [components, allEvals] = await Promise.all([
+      prisma.evaluationComponent.findMany({ where }),
+      prisma.evaluation.findMany({ where }),
+    ]);
+    const projectType = groupId
+      ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectType: true } }))?.projectType
+      : 'MASTER';
+    const summary = computeSummary(allEvals, components, projectType);
+    if (summary.total > summary.maxTotal) {
+      return res.status(400).json({
+        error: `Total marks (${summary.total}) exceed the maximum allowed (${summary.maxTotal}).`,
+      });
     }
 
     // Prevent re-completing an already completed evaluation

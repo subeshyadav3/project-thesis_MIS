@@ -7,7 +7,6 @@ const { authenticate, authorize } = require('../middleware/auth');
 router.post('/marks', authenticate, authorize('SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'), evaluationController.submitComponentMarks);
 router.put('/:id/complete', authenticate, authorize('SUPERVISOR', 'COORDINATOR', 'EXTERNAL_EXAMINER'), evaluationController.completeEvaluation);
 router.post('/feedback', authenticate, authorize('SUPERVISOR'), evaluationController.submitFeedback);
-router.get('/summary', authenticate, evaluationController.getMarksSummary);
 router.get('/group/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'), evaluationController.getGroupEvaluations);
 router.get('/thesis/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'), evaluationController.getThesisEvaluations);
 

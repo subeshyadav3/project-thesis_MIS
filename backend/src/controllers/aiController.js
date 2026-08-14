@@ -247,72 +247,7 @@ exports.ask = async (req, res) => {
   }
 };
 
-exports.embed = async (req, res) => {
-  try {
-    const proposalId = parseInt(req.params.id);
-    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
-    if (!proposal) return res.status(404).json({ error: 'Document not found' });
 
-    const filePath = getStoragePath(proposal.documentUrl);
-    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Document file not found' });
-
-    await prisma.documentEmbedding.upsert({
-      where: { proposalId },
-      update: { status: 'PENDING', error: null },
-      create: { proposalId, status: 'PENDING', model: 'ai-service', documentType: proposal.documentType || 'PROPOSAL' },
-    });
-
-    let data;
-    try {
-      const text = await extractText(filePath);
-      data = await callAI('/api/ai/embed', {
-        proposal_id: proposalId,
-        document_text: text,
-        document_type: proposal.documentType || 'PROPOSAL',
-      });
-    } catch (e) {
-      await prisma.documentEmbedding.update({
-        where: { proposalId },
-        data: { status: 'FAILED', error: String(e.message || e).slice(0, 250) },
-      });
-      throw e;
-    }
-
-    const stored = await prisma.documentEmbedding.update({
-      where: { proposalId },
-      data: {
-        status: 'OK',
-        vector: data.vector || [],
-        model: 'ai-service',
-        charCount: data.char_count || 0,
-        documentType: proposal.documentType || 'PROPOSAL',
-        error: null,
-      },
-    });
-
-    res.json({
-      vector_dim: data.vector_dim,
-      char_count: stored.charCount,
-      embedding_id: stored.id,
-      status: stored.status,
-    });
-  } catch (e) {
-    console.error('AI embed error:', e.message);
-    res.status(500).json({ error: e.message || 'AI service unavailable' });
-  }
-};
-
-exports.listCandidates = async (req, res) => {
-  try {
-    const proposalId = parseInt(req.params.id);
-    const scope = (req.query.scope || 'all').toString();
-    const result = await loadCandidates(req, proposalId, scope);
-    res.json(result);
-  } catch (e) {
-    console.error('listCandidates error:', e.message);
-    res.status(500).json({ error: e.message || 'Failed to list candidates' });
-  }
-};
 
 exports.similarity = async (req, res) => {
   try {
