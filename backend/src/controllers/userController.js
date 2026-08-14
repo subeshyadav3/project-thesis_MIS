@@ -516,8 +516,8 @@ exports.bulkImportUsersExcel = async (req, res) => {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2; // header is row 1
-      const email = (row.email || row.Email || '').toString().trim().toLowerCase();
-      const password = (row.password || row.Password || '').toString().trim();
+      let email = (row.email || row.Email || '').toString().trim().toLowerCase();
+      let password = (row.password || row.Password || '').toString().trim();
       const firstName = (row.firstName || row.FirstName || row['First Name'] || '').toString().trim();
       const lastName = (row.lastName || row.LastName || row['Last Name'] || '').toString().trim();
       const designation = (row.designation || row.Designation || '').toString().trim() || null;
@@ -525,6 +525,10 @@ exports.bulkImportUsersExcel = async (req, res) => {
       const programRaw = (row.programCode || row.ProgramCode || row.Program || row.program || '').toString().trim();
       let degreeType = (row.degreeType || row.DegreeType || row.Degree || '').toString().trim().toUpperCase() || null;
       let programId = row.programId ? parseInt(row.programId) : null;
+
+      if (role === 'STUDENT') {
+        if (!password) password = 'Test@123';
+      }
 
       if (!email || !password || !firstName || !lastName) {
         if (role !== 'STUDENT' || !firstName || !lastName) {
