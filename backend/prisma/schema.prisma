@@ -93,6 +93,8 @@ model Announcement {
   allowGroupFormation Boolean          @default(false)
   groupSizeMin    Int                 @default(1)
   groupSizeMax    Int                 @default(4)
+  formEnabled     Boolean             @default(false)
+  formFields      Json?
   expiresAt       DateTime?
   createdById     Int
   createdBy       User                @relation("AnnouncementCreator", fields: [createdById], references: [id])
@@ -102,6 +104,7 @@ model Announcement {
   groups          ProjectGroup[]
   theses          Thesis[]
   invitations     GroupInvitation[]
+  formResponses   FormResponse[]
 
   @@index([type])
   @@index([audience])
@@ -184,6 +187,7 @@ model User {
   invitationsSent             GroupInvitation[]        @relation("GroupInviter")
   invitationsReceived         GroupInvitation[]        @relation("GroupInvitee")
   groupsFormed                ProjectGroup[]           @relation("GroupFormer")
+  formResponses               FormResponse[]
 
   @@index([role])
   @@index([departmentId])
@@ -244,8 +248,10 @@ model ProjectGroup {
   projectTitle   String
   description    String             @default("")
   projectType    BachelorProjectType @default(MINOR)
+  cluster        String?
   batch          String?
   status         GroupStatus         @default(PENDING)
+  supervisorAssignmentStatus String?
   supervisorId   Int?
   supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])
   programId      Int?
@@ -269,6 +275,7 @@ model ProjectGroup {
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
   invitations          GroupInvitation[]
+  formResponses        FormResponse[]
 
   @@index([status])
   @@index([programId])
@@ -295,6 +302,8 @@ model Thesis {
   studentId      Int
   student        User         @relation("StudentTheses", fields: [studentId], references: [id])
   status         ThesisStatus @default(PENDING)
+  createdVia     String       @default("MANUAL")
+  supervisorAssignmentStatus String?
   supervisorId   Int?
   supervisor     User?        @relation("SupervisedTheses", fields: [supervisorId], references: [id])
   externalMidTermId Int?
@@ -320,6 +329,7 @@ model Thesis {
   recommendations      Recommendation[]
   examinerAssignments  ExaminerAssignment[]
   assignmentRequests   AssignmentRequest[]
+  formResponses        FormResponse[]
 
   @@index([status])
   @@index([studentId])
@@ -393,6 +403,7 @@ model Proposal {
   stage             EvaluationStage
   documentUrl       String?
   documentType      String        @default("PROPOSAL")
+  status            String        @default("VISIBLE")
   supervisorComment String?
   studentFeedback   String?
   groupId           Int?
@@ -519,4 +530,24 @@ model AuditLog {
   @@index([entityId])
   @@index([performedById])
   @@index([createdAt])
+}
+
+model FormResponse {
+  id          Int        @id @default(autoincrement())
+  announcementId Int
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  studentId   Int
+  student     User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  groupId     Int?
+  group       ProjectGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  thesisId    Int?
+  thesis      Thesis?    @relation(fields: [thesisId], references: [id], onDelete: SetNull)
+  formData    Json
+  status      String     @default("SUBMITTED")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([announcementId, studentId])
+  @@index([announcementId])
+  @@index([studentId])
 }

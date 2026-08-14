@@ -8,9 +8,7 @@ import Pagination from '../../components/Pagination';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
-import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
-import GroupBulkUploadModal from '../../components/GroupBulkUploadModal';
 
 const PAGE_SIZE = 10;
 
@@ -25,9 +23,7 @@ function SupervisorList() {
   const [showDetail, setShowDetail] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
-  const [showUpload, setShowUpload] = useState(false);
   const [showSupervisorUpload, setShowSupervisorUpload] = useState(false);
-  const [showGroupUpload, setShowGroupUpload] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', password: '', designation: '' });
@@ -141,18 +137,6 @@ function SupervisorList() {
 
   const actions = (
     <>
-      {isMasterCoordinator ? (
-        <button className="btn btn-secondary btn-sm" onClick={() => setShowUpload(true)}>
-          <Icon name="upload_file" className="material-symbols-outlined" />
-          Upload Supervisor Assignments
-        </button>
-      ) : (
-        <button className="btn btn-secondary btn-sm" onClick={() => setShowGroupUpload(true)}>
-          <Icon name="upload_file" className="material-symbols-outlined" />
-          Upload Supervisor Assignments
-        </button>
-      )}
-      
       <button className="btn btn-secondary btn-sm" onClick={() => setShowSupervisorUpload(true)}>
         <Icon name="upload_file" className="material-symbols-outlined" />
         Bulk Add
@@ -168,25 +152,12 @@ function SupervisorList() {
   return (
     <ErrorBoundary>
     <PageLayout title="Supervisors" user={user} actions={actions}>
-       <MasterThesisBulkUploadModal
-         open={showUpload}
-         onClose={() => setShowUpload(false)}
-         onSuccess={loadData}
-         title="Bulk Upload Theses (Supervisors)"
-       />
-
        <UsersBulkUploadModal
          open={showSupervisorUpload}
          onClose={() => setShowSupervisorUpload(false)}
          onSuccess={loadData}
          fixedRole="SUPERVISOR"
          title="Bulk Upload Supervisors"
-       />
-
-       <GroupBulkUploadModal
-         open={showGroupUpload}
-         onClose={() => setShowGroupUpload(false)}
-         onSuccess={loadData}
        />
       
       {/* ── CREATE MODAL ── */}

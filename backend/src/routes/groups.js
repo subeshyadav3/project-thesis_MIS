@@ -17,6 +17,8 @@ router.put('/:id/status', authenticate, authorize('COORDINATOR'), groupControlle
 router.put('/components/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR'), groupController.updateEvaluationComponent);
 router.post('/export', authenticate, authorize('COORDINATOR', 'MAINTAINER'), groupController.exportGroups);
 router.post('/bulk-assign-supervisor', authenticate, authorize('COORDINATOR'), groupController.bulkAssignSupervisor);
+router.post('/:id/members', authenticate, authorize('COORDINATOR'), groupController.addMemberToGroup);
+router.delete('/:id/members/:studentId', authenticate, authorize('COORDINATOR'), groupController.removeMemberFromGroup);
 router.delete('/:id', authenticate, authorize('COORDINATOR'), groupController.deleteGroup);
 
 module.exports = router;

@@ -31,7 +31,7 @@ for (const f of OLD_FILES) {
 // ── Helper: generate Nepali-style roll numbers ──
 // Bachelor uses 3-digit suffix (e.g. 080BCT001), master uses 2-digit (e.g. 080MSNCS01)
 function roll(code, i, batch = '078') {
-  const isMaster = ['MSNCS','MSICE','MSDSA','MSCSKE','MSCS'].some(c => code.startsWith(c));
+  const isMaster = ['MSNCS','MSICE','MSDSA','MSCSK','MSCS'].some(c => code.startsWith(c));
   const digits = isMaster ? 2 : 3;
   return `${batch}${code}${String(i).padStart(digits, '0')}`;
 }
@@ -54,7 +54,7 @@ const sampleExaminers = [
 const bachelorTemplate = [
   {
     'Group Name': '', 'Project Title': '', 'Members': '',
-    'Roll Numbers': '', 'Batch': '', 'Supervisor': '', 'External Examiner': '',
+    'Roll Numbers': '', 'Batch': '', 'Cluster': '', 'Supervisor': '', 'External Examiner': '',
   },
   {
     'Group Name': 'TeamAlpha',
@@ -62,6 +62,7 @@ const bachelorTemplate = [
     'Members': 'Aarav Khadka, Binita Shrestha, Chandra Thapa',
     'Roll Numbers': `${roll('BCT', 1)}, ${roll('BCT', 2)}, ${roll('BCT', 3)}`,
     'Batch': '078',
+    'Cluster': 'AIML',
     'Supervisor': sampleSupervisors[0],
     'External Examiner': sampleExaminers[0],
   },
@@ -71,6 +72,7 @@ const bachelorTemplate = [
     'Members': 'Dipesh Poudel, Ekta Rai, Firoj Khan',
     'Roll Numbers': `${roll('BCT', 4)}, ${roll('BCT', 5)}, ${roll('BCT', 6)}`,
     'Batch': '078',
+    'Cluster': 'EDMES',
     'Supervisor': sampleSupervisors[1],
     'External Examiner': sampleExaminers[1],
   },
@@ -154,7 +156,7 @@ const masterPrograms = [
   { code: 'MSNCS', name: 'MSc in Network and Cyber Security', cluster: 'Cluster 1' },
   { code: 'MSICE', name: 'MSc in Information and Communication Engineering', cluster: 'Cluster 2' },
   { code: 'MSDSA', name: 'MSc in Data Science and Analytics', cluster: 'Cluster 3' },
-  { code: 'MSCSKE', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Cluster 4' },
+  { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Cluster 4' },
 ];
 const supervisorNames = [
   'Prof. Dr. Rajan Sharma', 'Dr. Pramod Acharya', 'Assoc. Prof. Sita Dahal',

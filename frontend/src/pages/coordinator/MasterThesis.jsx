@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../../components/ui';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
@@ -14,9 +14,17 @@ import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
 
+const CLUSTERS = [
+  'AI/ML and image processing',
+  'Audio, NLP and data/text analytics',
+  'Electronic devices, circuits and communication',
+  'Computer networks and security',
+];
+
 function MasterThesis() {
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [theses, setTheses] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allSupervisors, setAllSupervisors] = useState([]);
@@ -27,7 +35,7 @@ function MasterThesis() {
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
   const todayStr = new Date().toISOString().split('T')[0];
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
   const [creating, setCreating] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [editStartDate, setEditStartDate] = useState('');
@@ -37,6 +45,24 @@ function MasterThesis() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
+  const [batchFilter, setBatchFilter] = useState('ALL');
+  const [coordinatorProgram, setCoordinatorProgram] = useState(null);
+
+  const normalizeBatch = (v) => {
+    if (!v) return '';
+    if (/^\d{3}$/.test(v)) return `2${v}`;
+    return String(v);
+  };
+
+  const batchOptions = useMemo(() => {
+    const set = new Set();
+    theses.forEach(t => {
+      const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
+      if (b) set.add(normalizeBatch(b));
+    });
+    return [...set].sort((a, b) => b.localeCompare(a)).map(b => ({ value: b, label: `Batch ${b}` }));
+  }, [theses]);
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
@@ -52,6 +78,7 @@ function MasterThesis() {
   const [editFinalExamOpen, setEditFinalExamOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editCluster, setEditCluster] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const editSupRef = useRef(null);
   const editMidTermExamRef = useRef(null);
@@ -65,7 +92,6 @@ function MasterThesis() {
   const createStudentRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
-  const [pendingRequests, setPendingRequests] = useState([]);
   const [selectedTheses, setSelectedTheses] = useState([]);
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const selectAllRef = useRef(null);
@@ -81,12 +107,21 @@ function MasterThesis() {
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
-      api.get('/assignment-requests', { signal }).then(({ data }) => setPendingRequests(data.filter(r => r.status === 'PENDING'))).catch(() => setPendingRequests([])),
+      api.get('/auth/me', { signal }).then(({ data }) => setCoordinatorProgram(data.program || null)),
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (location.state?.openCreate) {
+      setShowCreate(true);
+      if (location.state?.studentId) {
+        setCreateForm(prev => ({ ...prev, studentId: Number(location.state.studentId) }));
+      }
+    }
+  }, [location.state]);
 
   const downloadEvalPdf = async (thesis) => {
     try {
@@ -210,29 +245,6 @@ const handleComplete = async (id) => {
     });
   };
 
-  const confirmRejectCrossProgram = (id) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Reject cross-program thesis',
-      message: 'Reject this cross-program thesis? It will be removed.',
-      onConfirm: () => {
-        setConfirmDialog(prev => ({ ...prev, open: false }));
-        handleRejectCrossProgram(id);
-      },
-      danger: true,
-    });
-  };
-
-  const handleRejectCrossProgram = async (id) => {
-    try {
-      await api.put(`/theses/${id}/reject-cross-program`);
-      toast.success('Cross-program thesis rejected');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Reject failed');
-    }
-  };
-
   const handleDeleteThesis = async (id) => {
     try {
       await api.delete(`/theses/${id}`);
@@ -272,7 +284,7 @@ const handleComplete = async (id) => {
     try {
       const res = await api.post('/theses', createForm);
       if (res.data?.crossProgram) {
-        toast.info('Cross-program thesis created. The student\'s coordinator has been notified for approval.');
+        toast.info('Thesis created. The student\'s coordinator has been notified.');
       } else {
         toast.success('Thesis created successfully');
       }
@@ -298,15 +310,7 @@ const handleComplete = async (id) => {
           if (!editSupId) {
             promises.push(api.put(`/theses/${thesisId}/supervisor`, { supervisorId: null }));
           } else {
-            promises.push(
-              api.post('/assignment-requests', { thesisId, supervisorId: parseInt(editSupId) })
-                .then(res => {
-                  if (res.data?.crossProgram) {
-                    setPendingRequests(prev => [...prev, res.data.request]);
-                  }
-                  return res;
-                })
-            );
+            promises.push(api.post('/assignment-requests', { thesisId, supervisorId: parseInt(editSupId) }));
           }
         }
       }
@@ -337,10 +341,13 @@ const handleComplete = async (id) => {
           promises.push(api.put(`/theses/${thesisId}`, { endDate: editEndDate || null }));
         }
       }
+      if (editCluster !== undefined && editCluster !== showDetail.cluster) {
+        promises.push(api.put(`/theses/${thesisId}`, { cluster: editCluster }));
+      }
       const results = await Promise.all(promises);
       const hasCrossProgram = results.some(r => r?.data?.crossProgram);
       if (hasCrossProgram) {
-        toast.info('Cross-program supervisor request sent for approval.');
+        toast.info('Supervisor assigned. The student\'s coordinator has been notified.');
       } else {
         toast.success('Changes saved successfully');
       }
@@ -352,6 +359,7 @@ const handleComplete = async (id) => {
   };
 
   const filteredTheses = useMemo(() => {
+    const coordProgId = coordinatorProgram?.id;
     return theses.filter(t => {
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -363,9 +371,20 @@ const handleComplete = async (id) => {
         : supervisorFilter === 'NONE'
           ? !t.supervisor
           : t.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesSupervisor;
+
+      const isCrossProgram = coordProgId && t.student?.programId && t.student.programId !== coordProgId;
+      const matchesScope = programScopeFilter === 'ALL' ? true :
+        programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
+        !isCrossProgram;
+
+      const matchesBatch = batchFilter === 'ALL' || (() => {
+        const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
+        return normalizeBatch(b) === batchFilter;
+      })();
+
+      return matchesSearch && matchesStatus && matchesSupervisor && matchesScope && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -399,6 +418,7 @@ const handleComplete = async (id) => {
     if (mode === 'edit') {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
+      setEditCluster(t.cluster || '');
       setEditStatus(t.status || '');
       setEditStartDate(t.startDate ? new Date(t.startDate).toISOString().split('T')[0] : '');
       setEditEndDate(t.endDate ? new Date(t.endDate).toISOString().split('T')[0] : '');
@@ -488,6 +508,15 @@ return (
               </div>
             </div>
 
+            {showDetail.student?.programId && coordinatorProgram?.id && showDetail.student.programId !== coordinatorProgram.id && (
+              <div className="alert alert-info" style={{ margin: '0 24px 16px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, background: 'var(--color-surface-container-high)', borderLeft: '4px solid var(--color-primary)' }}>
+                <Icon name="info" className="material-symbols-outlined" style={{ color: 'var(--color-primary)' }} />
+                <span>
+                  <strong>Cross-Program Thesis ({showDetail.student?.program?.code || 'Other Program'}):</strong> You can assign supervisors, assign external examiners, and view/download documents. Evaluations and recommendations are managed by the student's home program coordinator.
+                </span>
+              </div>
+            )}
+
             <div className="detail-section">
               <div className="detail-grid">
                 <div className="detail-item">
@@ -495,6 +524,12 @@ return (
                   <span className="badge badge-info">
                     <span className="dot" />
                     Thesis
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Research Cluster</span>
+                  <span className="badge badge-info">
+                    {showDetail.cluster || 'Unassigned'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -513,18 +548,19 @@ return (
                   <span className="detail-label">Supervisor</span>
                   <span>
                     {showDetail.supervisor ? (
-                      <>
-                        {showDetail.supervisor.firstName} {showDetail.supervisor.lastName}
-                        {pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') && (
-                          <span className="badge badge-warning" style={{ marginLeft: 8, fontSize: 10 }}>
-                            <span className="dot" />Pending Approval
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span>{showDetail.supervisor.firstName} {showDetail.supervisor.lastName}</span>
+                        {showDetail.supervisorAssignmentStatus === 'PENDING' && (
+                          <span className="badge badge-warning" style={{ fontSize: 10 }}>
+                            <span className="dot" />Awaiting Response
                           </span>
                         )}
-                      </>
-                    ) : pendingRequests.some(r => r.thesisId === showDetail.id && r.status === 'PENDING') ? (
-                      <span className="badge badge-warning" style={{ fontSize: 10 }}>
-                        <span className="dot" />Pending Approval
-                      </span>
+                        {showDetail.supervisorAssignmentStatus === 'REJECTED' && (
+                          <span className="badge badge-error" style={{ fontSize: 10 }}>
+                            Declined
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="badge badge-pending" style={{ fontSize: 10 }}>
                         <span className="dot" />Unassigned
@@ -614,6 +650,16 @@ return (
                       <option value="COMPLETED">Completed</option>
                     </select>
                   </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 220 }}>
+                    <label>Research Cluster</label>
+                    <select className="form-input" value={editCluster} onChange={e => setEditCluster(e.target.value)}>
+                      <option value="">Select Cluster...</option>
+                      <option value="AI/ML and image processing">AI/ML and image processing</option>
+                      <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                      <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                      <option value="Computer networks and security">Computer networks and security</option>
+                    </select>
+                  </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>Start Date</label>
                     <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
@@ -692,10 +738,10 @@ return (
                       </div>
                       {editMidTermExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
                               const selected = editMidTermExamId === e.id.toString();
                               return (
                                 <div
@@ -740,10 +786,10 @@ return (
                       </div>
                       {editFinalExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).map(e => {
                               const selected = editFinalExamId === e.id.toString();
                               return (
                                 <div
@@ -923,6 +969,17 @@ return (
         </div>
 
         <div className="filter-bar">
+          <FilterDropdown
+            label="Scope"
+            value={programScopeFilter}
+            onChange={setProgramScopeFilter}
+            options={[
+              { value: 'MY_PROGRAM', label: 'My Program Theses' },
+              { value: 'OTHER_PROGRAMS', label: 'Assigned for Other Programs' },
+            ]}
+            allLabel="All Department Theses"
+          />
+          <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
@@ -979,14 +1036,21 @@ return (
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.title}</td>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
                       {t.supervisor ? (
-                        <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
-                          {t.supervisor.firstName} {t.supervisor.lastName}
-                        </span>
-                      ) : pendingRequests.some(r => r.thesisId === t.id && r.status === 'PENDING') ? (
-                        <span className="badge badge-warning" style={{ fontSize: 10 }}>
-                          <span className="dot" />
-                          Pending
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
+                            {t.supervisor.firstName} {t.supervisor.lastName}
+                          </span>
+                          {t.supervisorAssignmentStatus === 'PENDING' && (
+                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                              <span className="dot" />Awaiting Response
+                            </span>
+                          )}
+                          {t.supervisorAssignmentStatus === 'REJECTED' && (
+                            <span className="badge badge-error" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                              Declined
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
                           <span className="dot" />
@@ -1007,37 +1071,6 @@ return (
                           <option value="OVERDUE">OVERDUE</option>
                           <option value="COMPLETED">COMPLETED</option>
                         </select>
-                        {t.crossProgramRequestedBy && (
-                          <>
-                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
-                              <Icon name="swap_horiz" className="material-symbols-outlined" style={{ fontSize: 9, verticalAlign: 'middle' }} />
-                              Cross-Program
-                            </span>
-                            {t.crossProgramRequestedBy.id === user.id && (
-                              <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', whiteSpace: 'nowrap' }}>
-                                <span className="dot" />Awaiting Approval
-                              </span>
-                            )}
-                            {t.crossProgramRequestedBy.id !== user.id && (
-                              <div style={{ display: 'flex', gap: 4 }}>
-                                <button
-                                  className="icon-btn-sm success"
-                                  title="Approve cross-program thesis"
-                                  onClick={async (e) => { e.stopPropagation(); try { await api.put(`/theses/${t.id}/approve-cross-program`); toast.success('Cross-program thesis approved'); loadData(); } catch (err) { toast.error(err.response?.data?.error || 'Approve failed'); } }}
-                                >
-                                  <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                                </button>
-                                <button
-                                  className="icon-btn-sm danger"
-                                  title="Reject cross-program thesis"
-                                  onClick={(e) => { e.stopPropagation(); confirmRejectCrossProgram(t.id); }}
-                                >
-                                  <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        )}
                       </div>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
@@ -1120,6 +1153,15 @@ return (
               <div className="form-group">
                 <label>Thesis Title</label>
                 <input value={createForm.title} onChange={e => setCreateForm({...createForm, title: e.target.value})} required placeholder="Enter thesis title" />
+              </div>
+              <div className="form-group">
+                <label>Research Project Cluster / Area <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                <select value={createForm.cluster || ''} onChange={e => setCreateForm({...createForm, cluster: e.target.value})}>
+                  <option value="">Select cluster...</option>
+                  {CLUSTERS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
                 <label>Student</label>

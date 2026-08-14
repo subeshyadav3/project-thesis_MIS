@@ -14,6 +14,16 @@ import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
 
 const PAGE_SIZE = 10;
 
+const BACHELOR_CLUSTERS = [
+  { value: 'AIML', label: 'AIML (AI & Machine Learning)' },
+  { value: 'IPCV', label: 'IPCV (Image Processing & Computer Vision)' },
+  { value: 'ANLP', label: 'ANLP (Audio & Natural Language Processing)' },
+  { value: 'NTS', label: 'NTS (Networks & Telecom Systems)' },
+  { value: 'EDMES', label: 'EDMES (Embedded & Digital Systems)' },
+  { value: 'ACOM', label: 'ACOM (Advanced Communication)' },
+  { value: 'EII', label: 'EII (Electrical & Industrial Instrumentation)' },
+];
+
 function BachelorProjects() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -30,7 +40,7 @@ function BachelorProjects() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
-  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+  const [createForm, setCreateForm] = useState({ name: '', projectTitle: '', projectType: 'MINOR', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
   const [examiners, setExaminers] = useState([]);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
@@ -38,6 +48,9 @@ function BachelorProjects() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [batchFilter, setBatchFilter] = useState('ALL');
+  const [clusterFilter, setClusterFilter] = useState('ALL');
+  const [editCluster, setEditCluster] = useState('');
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
@@ -70,6 +83,9 @@ function BachelorProjects() {
   }, [bulkPreview]);
   const editSupRef = useRef(null);
   const editExamRef = useRef(null);
+  const editStudentRef = useRef(null);
+  const [editStudentSearch, setEditStudentSearch] = useState('');
+  const [editStudentOpen, setEditStudentOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingStudentIdx, setEditingStudentIdx] = useState(null);
   const [newStudentSearch, setNewStudentSearch] = useState('');
@@ -80,6 +96,30 @@ function BachelorProjects() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
   const selectAllRef = useRef(null);
+
+  const handleAddMember = async (groupId, studentId) => {
+    try {
+      const res = await api.post(`/groups/${groupId}/members`, { studentId });
+      toast.success('Member added');
+      setShowDetail(prev => ({ ...prev, members: res.data.members }));
+      setEditStudentSearch('');
+      setEditStudentOpen(false);
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to add member');
+    }
+  };
+
+  const handleRemoveMember = async (groupId, studentId) => {
+    try {
+      const res = await api.delete(`/groups/${groupId}/members/${studentId}`);
+      toast.success('Member removed');
+      setShowDetail(prev => ({ ...prev, members: res.data.members }));
+      loadData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to remove member');
+    }
+  };
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
@@ -93,7 +133,7 @@ function BachelorProjects() {
       api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => { setSupervisors(data); setAllSupervisors(data); }),
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
-      api.get(`/users/role/STUDENT?all=true&degreeType=BACHELOR${user.program?.id ? '&programId=' + user.program.id : ''}`, { signal }).then(({ data }) => setAllStudents(data)),
+      api.get('/users/role/STUDENT?all=true&degreeType=BACHELOR', { signal }).then(({ data }) => setAllStudents(data)),
     ]).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -119,6 +159,16 @@ useEffect(() => {
     if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
     return () => document.removeEventListener('mousedown', handleEditSupOutside);
   }, [editSupOpen]);
+
+  useEffect(() => {
+    const handleEditStudentOutside = (e) => {
+      if (editStudentRef.current && !editStudentRef.current.contains(e.target)) {
+        setEditStudentOpen(false);
+      }
+    };
+    if (editStudentOpen) document.addEventListener('mousedown', handleEditStudentOutside);
+    return () => document.removeEventListener('mousedown', handleEditStudentOutside);
+  }, [editStudentOpen]);
 
   useEffect(() => {
     const handleEditExamOutside = (e) => {
@@ -371,6 +421,9 @@ useEffect(() => {
           promises.push(api.put(`/groups/${groupId}`, { endDate: editEndDate || null }));
         }
       }
+      if (editCluster !== undefined && editCluster !== showDetail.cluster) {
+        promises.push(api.put(`/groups/${groupId}`, { cluster: editCluster }));
+      }
       await Promise.all(promises);
       toast.success('Changes saved successfully');
       setShowDetail(null);
@@ -382,8 +435,8 @@ useEffect(() => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!createForm.name.trim() || !createForm.projectTitle.trim()) {
-      toast.warning('Group name and project title are required');
+    if (!createForm.name.trim() || !createForm.projectTitle.trim() || !createForm.cluster) {
+      toast.warning('Group name, project title, and cluster are required');
       return;
     }
     const students = createForm.students.filter(s => s.studentId);
@@ -392,6 +445,7 @@ useEffect(() => {
         name: createForm.name,
         projectTitle: createForm.projectTitle,
         projectType: createForm.projectType,
+        cluster: createForm.cluster,
         status: createForm.status,
         startDate: createForm.startDate || null,
         batch: createForm.batch,
@@ -405,7 +459,7 @@ useEffect(() => {
       }
       toast.success('Group created successfully');
       setShowCreate(false);
-      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
+      setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
@@ -466,6 +520,25 @@ const filteredGroups = useMemo(() => {
     });
   }, [groups, searchQuery]);
 
+  const normalizeBatch = useCallback((b) => {
+    if (!b) return '';
+    const str = String(b).trim();
+    if (/^0\d{2}$/.test(str)) return '2' + str;
+    return str;
+  }, []);
+
+  const batchOptions = useMemo(() => {
+    const set = new Set();
+    groups.forEach(g => {
+      const b = g.batch || (g.members?.[0]?.student?.batch ? g.members[0].student.batch : (g.members?.[0]?.rollNumber && /^\d{3}/.test(g.members[0].rollNumber) ? g.members[0].rollNumber.slice(0, 3) : null));
+      if (b) {
+        const norm = normalizeBatch(b);
+        if (norm) set.add(norm);
+      }
+    });
+    return Array.from(set).sort().reverse().map(b => ({ value: b, label: `Batch ${b}` }));
+  }, [groups, normalizeBatch]);
+
   const filteredByAdvanced = useMemo(() => {
     return filteredGroups.filter(g => {
       const searchStr = (
@@ -482,9 +555,17 @@ const filteredGroups = useMemo(() => {
         : supervisorFilter === 'NONE'
           ? !g.supervisor
           : g.supervisor?.id?.toString() === supervisorFilter;
-      return matchesSearch && matchesStatus && matchesType && matchesSupervisor;
+
+      const matchesBatch = batchFilter === 'ALL' || (() => {
+        const b = g.batch || (g.members?.[0]?.student?.batch ? g.members[0].student.batch : (g.members?.[0]?.rollNumber && /^\d{3}/.test(g.members[0].rollNumber) ? g.members[0].rollNumber.slice(0, 3) : ''));
+        return normalizeBatch(b) === batchFilter;
+      })();
+
+      const matchesCluster = clusterFilter === 'ALL' || g.cluster === clusterFilter;
+
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesBatch && matchesCluster;
     });
-  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter, batchFilter, clusterFilter, normalizeBatch]);
 
   const sortedGroups = useMemo(() => {
     return [...filteredByAdvanced].sort((a, b) => {
@@ -531,6 +612,7 @@ const filteredGroups = useMemo(() => {
     if (mode === 'edit') {
       setEditTitle(g.projectTitle || '');
       setEditDescription(g.description || '');
+      setEditCluster(g.cluster || '');
       setEditStatus(g.status || '');
       setEditStartDate(g.startDate ? new Date(g.startDate).toISOString().split('T')[0] : '');
       setEditEndDate(g.endDate ? new Date(g.endDate).toISOString().split('T')[0] : '');
@@ -631,6 +713,12 @@ const filteredGroups = useMemo(() => {
                   </span>
                 </div>
                 <div className="detail-item">
+                  <span className="detail-label">Cluster</span>
+                  <span className="badge" style={{ background: 'var(--color-primary-container)', color: 'var(--color-on-primary-container)', border: 'none' }}>
+                    {showDetail.cluster || 'Unassigned'}
+                  </span>
+                </div>
+                <div className="detail-item">
                   <span className="detail-label">Batch</span>
                   <span>{showDetail.batch || '—'}</span>
                 </div>
@@ -660,18 +748,26 @@ const filteredGroups = useMemo(() => {
             </div>
 
             <div className="detail-section">
-              <h4 className="detail-section-title">Members</h4>
+              <h4 className="detail-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Members
+                {detailMode === 'edit' && (
+                  <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>
+                    Add or remove group members
+                  </span>
+                )}
+              </h4>
               <table className="detail-table">
                 <thead>
                   <tr>
                     <th>Student</th>
                     <th>Roll Number</th>
                     <th>Email</th>
+                    {detailMode === 'edit' && <th style={{ textAlign: 'right' }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {safeMembers(showDetail).length === 0 ? (
-                    <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--color-on-surface-variant)', padding: 16 }}>No members</td></tr>
+                    <tr><td colSpan={detailMode === 'edit' ? 4 : 3} style={{ textAlign: 'center', color: 'var(--color-on-surface-variant)', padding: 16 }}>No members</td></tr>
                   ) : (
                     safeMembers(showDetail).map((m, i) => (
                       <tr key={i}>
@@ -685,11 +781,155 @@ const filteredGroups = useMemo(() => {
                         </td>
                         <td>{m.rollNumber || '—'}</td>
                         <td>{m.student?.email || '—'}</td>
+                        {detailMode === 'edit' && (
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-outline"
+                              style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                              title="Remove member"
+                              disabled={safeMembers(showDetail).length <= 1}
+                              onClick={() => handleRemoveMember(showDetail.id, m.studentId || m.student?.id)}
+                            >
+                              <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 13 }} /> Remove
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
+
+              {detailMode === 'edit' && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--color-outline-variant)' }}>
+                  {safeMembers(showDetail).length >= 4 ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--color-surface-container-high)', borderRadius: 6, fontSize: 12, color: 'var(--color-on-surface-variant)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-primary)' }} />
+                      Maximum group limit reached (4 members max). Remove a member to add another.
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-on-surface)' }}>
+                        <Icon name="person_add" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-primary)' }} />
+                        Add Member to Group (Max 4)
+                      </label>
+                      <div ref={editStudentRef} style={{ position: 'relative', maxWidth: 450 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            background: 'var(--color-surface-container-low, #f8f9fa)',
+                            border: '1px solid var(--color-outline, #ccc)',
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            cursor: 'text'
+                          }}
+                          onClick={() => setEditStudentOpen(true)}
+                        >
+                          <Icon name="search" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }} />
+                          <input
+                            type="text"
+                            style={{
+                              border: 'none',
+                              outline: 'none',
+                              background: 'transparent',
+                              width: '100%',
+                              fontSize: 13,
+                              color: 'var(--color-on-surface)'
+                            }}
+                            placeholder="Search student by name, roll number, or email..."
+                            value={editStudentSearch}
+                            onChange={e => { setEditStudentSearch(e.target.value); setEditStudentOpen(true); }}
+                            onFocus={() => setEditStudentOpen(true)}
+                          />
+                          {editStudentSearch && (
+                            <button
+                              type="button"
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                              onClick={(e) => { e.stopPropagation(); setEditStudentSearch(''); }}
+                            >
+                              <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }} />
+                            </button>
+                          )}
+                        </div>
+
+                        {editStudentOpen && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              marginTop: 4,
+                              background: 'var(--color-surface-container-highest, #ffffff)',
+                              border: '1px solid var(--color-outline-variant, #e0e0e0)',
+                              borderRadius: 8,
+                              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                              maxHeight: 220,
+                              overflowY: 'auto',
+                              zIndex: 9999,
+                              padding: '4px 0'
+                            }}
+                          >
+                            {(() => {
+                              const currentMemberIds = new Set(safeMembers(showDetail).map(m => m.studentId || m.student?.id));
+                              const query = editStudentSearch.toLowerCase().trim();
+                              const matches = (allStudents || []).filter(s => {
+                                if (currentMemberIds.has(s.id)) return false;
+                                if (!query) return true;
+                                const full = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
+                                const roll = (s.rollNumber || '').toLowerCase();
+                                const email = (s.email || '').toLowerCase();
+                                return full.includes(query) || roll.includes(query) || email.includes(query);
+                              });
+
+                              if (matches.length === 0) {
+                                return (
+                                  <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--color-on-surface-variant)', textAlign: 'center' }}>
+                                    {editStudentSearch ? `No student matching "${editStudentSearch}"` : 'No eligible students found'}
+                                  </div>
+                                );
+                              }
+
+                              return matches.slice(0, 15).map(s => (
+                                <div
+                                  key={s.id}
+                                  style={{
+                                    padding: '8px 14px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    borderBottom: '1px solid var(--color-surface-container)',
+                                    transition: 'background 0.15s ease'
+                                  }}
+                                  className="dropdown-hover-item"
+                                  onClick={() => handleAddMember(showDetail.id, s.id)}
+                                >
+                                  <div>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface)' }}>
+                                      {s.firstName} {s.lastName}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                                      {s.rollNumber ? s.rollNumber : s.email}
+                                      {s.program?.code ? ` · ${s.program.code}` : ''}
+                                    </div>
+                                  </div>
+                                  <span className="badge badge-primary" style={{ fontSize: 10, padding: '2px 8px' }}>
+                                    + Add
+                                  </span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
 
@@ -713,6 +953,19 @@ const filteredGroups = useMemo(() => {
                       <option value="ACTIVE">Active</option>
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+                    <label>Research Cluster</label>
+                    <select className="form-input" value={editCluster} onChange={e => setEditCluster(e.target.value)}>
+                      <option value="">Select Cluster...</option>
+                      <option value="AIML">AIML (AI & Machine Learning)</option>
+                      <option value="IPCV">IPCV (Image Processing & Computer Vision)</option>
+                      <option value="ANLP">ANLP (Audio & Natural Language Processing)</option>
+                      <option value="NTS">NTS (Networks & Telecom Systems)</option>
+                      <option value="EDMES">EDMES (Embedded & Digital Systems)</option>
+                      <option value="ACOM">ACOM (Advanced Communication)</option>
+                      <option value="EII">EII (Electrical & Industrial Instrumentation)</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
@@ -793,10 +1046,10 @@ const filteredGroups = useMemo(() => {
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
                               const selected = editExamId === e.id.toString();
                               return (
                                 <div
@@ -984,6 +1237,8 @@ const filteredGroups = useMemo(() => {
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={typeOptions} allLabel="All Types" />
+          <FilterDropdown label="Cluster" value={clusterFilter} onChange={setClusterFilter} options={BACHELOR_CLUSTERS} allLabel="All Clusters" />
+          <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
         </div>
 
@@ -1456,6 +1711,15 @@ const filteredGroups = useMemo(() => {
                 <select value={createForm.projectType} onChange={e => setCreateForm({...createForm, projectType: e.target.value})}>
                   <option value="MINOR">Minor Project</option>
                   <option value="MAJOR">Major Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Cluster <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                <select value={createForm.cluster} onChange={e => setCreateForm({...createForm, cluster: e.target.value})} required>
+                  <option value="">Select Cluster...</option>
+                  {BACHELOR_CLUSTERS.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">

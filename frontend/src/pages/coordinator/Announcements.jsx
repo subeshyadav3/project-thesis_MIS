@@ -10,6 +10,158 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
 
+const DEFAULT_FORM_FIELDS = [
+  { key: 'program', label: 'Program', type: 'select', required: true },
+  { key: 'cluster', label: 'Research Project Cluster / Area', type: 'select', required: true },
+  { key: 'title', label: 'Project / Thesis Concept Title', type: 'text', required: true },
+  { key: 'pdf_document', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
+  { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
+  { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
+];
+
+const BACHELOR_DEFAULT_FORM_FIELDS = [
+  { key: 'program', label: 'Program', type: 'select', required: true },
+  { key: 'projectType', label: 'Project Type (Minor / Major)', type: 'select', required: true },
+  { key: 'cluster', label: 'Project Cluster / Area (AIML, IPCV, ANLP, NTS, EDMES, ACOM, EII)', type: 'select', required: true },
+  { key: 'title', label: 'Project Concept Title', type: 'text', required: true },
+  { key: 'pdf_document', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
+  { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
+  { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
+];
+
+function MatrixSupervisorSelect({ value, onChange, supervisors }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const ref = useRef(null);
+
+  const selectedSup = supervisors.find(s => String(s.id) === String(value));
+
+  const updateCoords = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 220 && rect.top > 220) {
+        setCoords({ top: rect.top - 204, left: rect.left });
+      } else {
+        setCoords({ top: rect.bottom + 4, left: rect.left });
+      }
+    }
+  };
+
+  const handleOpen = () => {
+    updateCoords();
+    setOpen(!open);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target) && !e.target.closest('.matrix-sup-portal')) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = supervisors.filter(s => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    return `${s.designation || ''} ${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div ref={ref} className="sup-dropdown-trigger" style={{ width: 175, position: 'relative' }}>
+      <div
+        className="sup-search-wrapper form-input"
+        style={{ padding: '2px 6px', height: 32, fontSize: 12, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+        onClick={() => { updateCoords(); setOpen(!open); }}
+      >
+        <Icon name="search" className="material-symbols-outlined" style={{ fontSize: 15, marginRight: 4 }} />
+        <input
+          type="text"
+          style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, width: '100%', padding: 0 }}
+          placeholder={selectedSup ? `${selectedSup.designation ? selectedSup.designation + ' ' : ''}${selectedSup.firstName} ${selectedSup.lastName}` : 'Search supervisor...'}
+          value={search}
+          onChange={e => { setSearch(e.target.value); updateCoords(); setOpen(true); }}
+          onFocus={(e) => { e.stopPropagation(); updateCoords(); setOpen(true); }}
+          onClick={(e) => e.stopPropagation()}
+        />
+        {value && (
+          <button
+            type="button"
+            className="sup-clear"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, display: 'flex', marginRight: 2 }}
+            onClick={e => { e.stopPropagation(); onChange(''); setSearch(''); setOpen(false); }}
+          >
+            <Icon name="close" className="material-symbols-outlined" style={{ fontSize: 14 }} />
+          </button>
+        )}
+        <Icon name={open ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" style={{ fontSize: 16, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); updateCoords(); setOpen(!open); }} />
+      </div>
+
+      {open && (
+        <div
+          className="matrix-sup-portal"
+          style={{
+            position: 'fixed',
+            top: coords.top,
+            left: coords.left,
+            width: 220,
+            maxHeight: 200,
+            zIndex: 99999,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            background: 'var(--color-surface-container-lowest)',
+            borderRadius: 8,
+            border: '1px solid var(--color-outline)',
+            overflowY: 'auto',
+          }}
+        >
+          <div
+            className="sup-dropdown-item"
+            style={{ padding: '6px 10px', cursor: 'pointer' }}
+            onClick={() => { onChange(''); setSearch(''); setOpen(false); }}
+          >
+            <div className="sup-dropdown-item-info">
+              <div className="sup-dropdown-item-name" style={{ fontStyle: 'italic', color: 'var(--color-outline)' }}>Unassigned (No supervisor)</div>
+            </div>
+          </div>
+          {filtered.length === 0 ? (
+            <div className="sup-dropdown-empty">No supervisors found</div>
+          ) : (
+            filtered.map(s => {
+              const isSelected = String(value) === String(s.id);
+              return (
+                <div
+                  key={s.id}
+                  className={`sup-dropdown-item ${isSelected ? 'sup-dropdown-item-selected' : ''}`}
+                  style={{ padding: '6px 10px' }}
+                  onClick={() => {
+                    onChange(s.id.toString());
+                    setSearch('');
+                    setOpen(false);
+                  }}
+                >
+                  <div className="sup-dropdown-item-avatar" style={{ width: 24, height: 24, fontSize: 11 }}>{s.firstName?.[0]}{s.lastName?.[0]}</div>
+                  <div className="sup-dropdown-item-info">
+                    <div className="sup-dropdown-item-name" style={{ fontSize: 12 }}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
+                    <div className="sup-dropdown-item-email" style={{ fontSize: 10 }}>{s.email || ''}</div>
+                  </div>
+                  {isSelected && (
+                    <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" style={{ fontSize: 15 }} />
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CoordinatorAnnouncements() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const degreeType = user.program?.degreeType || '';
@@ -22,13 +174,17 @@ function CoordinatorAnnouncements() {
   const [showCreate, setShowCreate] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [form, setForm] = useState({
     title: '', message: '', type: 'GENERAL',
+    program: user?.program?.id ? String(user.program.id) : '',
     degreeType: user.program?.degreeType || '',
-    programIds: user.program?.id ? [user.program.id] : [],
+    programIds: [],
     studentIds: [],
     batch: '',
     academicYearId: '', allowGroupFormation: false,
+    formEnabled: false,
+    formFields: [],
     startDate: '', expirationDate: '',
     expiresAt: '',
   });
@@ -37,6 +193,20 @@ function CoordinatorAnnouncements() {
   const [studentOpen, setStudentOpen] = useState(false);
   const [editAnnouncement, setEditAnnouncement] = useState(null);
   const [viewAnnouncement, setViewAnnouncement] = useState(null);
+  const [viewResponses, setViewResponses] = useState(null);
+  const [responses, setResponses] = useState(null);
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const [matrixEdits, setMatrixEdits] = useState({});
+  const [selectedResponseIds, setSelectedResponseIds] = useState([]);
+  const [showRemainingStudents, setShowRemainingStudents] = useState(false);
+  const [editingResponse, setEditingResponse] = useState(null);
+  const [editResponseForm, setEditResponseForm] = useState({});
+  const [savingResponse, setSavingResponse] = useState(false);
+  const [finalizingResponse, setFinalizingResponse] = useState(null);
+  const [finalizeSupervisorId, setFinalizeSupervisorId] = useState('');
+  const [finalizeTitle, setFinalizeTitle] = useState('');
+  const [finalizeCluster, setFinalizeCluster] = useState('');
+  const [supervisors, setSupervisors] = useState([]);
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -49,6 +219,8 @@ function CoordinatorAnnouncements() {
       api.get('/announcements').then(({ data }) => setAnnouncements(data)),
       api.get('/departments/academic-years').then(({ data }) => setAcademicYears(data)),
       api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data)),
+      api.get('/users/role/supervisor?all=true').then(({ data }) => setSupervisors(data)),
+      api.get('/departments/programs').then(({ data }) => setPrograms(data.filter(p => p.coordinatorId === user.id))),
     ]).catch(e => toast.error('Failed to load data')).finally(() => setLoading(false));
   }, []);
 
@@ -85,12 +257,24 @@ function CoordinatorAnnouncements() {
       toast.warning('Title, message, and batch are required');
       return;
     }
+    if (!form.program) {
+      toast.warning('Program is required — select All or your program');
+      return;
+    }
     const isEdit = !!editAnnouncement;
+    const isAllPrograms = form.program === 'all';
+    const programIds = isAllPrograms ? [] : [Number(form.program)];
+    const normalizedFields = (form.formFields || [])
+      .filter(f => f.label?.trim() && f.key?.trim())
+      .map(f => ({ key: f.key.trim(), label: f.label.trim(), type: f.type || 'text', required: !!f.required, placeholder: f.placeholder || '' }));
     const payload = {
       ...form,
+      audience: isAllPrograms ? 'ALL' : 'PROGRAMS',
+      programIds,
       degreeType: user.program?.degreeType || '',
-      programIds: user.program?.id ? [user.program.id] : [],
       studentIds: selectedStudents,
+      formEnabled: form.type === 'THESIS' && form.formEnabled,
+      formFields: normalizedFields,
       startDate: form.startDate || undefined,
       expirationDate: form.expirationDate || undefined,
     };
@@ -104,7 +288,7 @@ function CoordinatorAnnouncements() {
       }
       setShowCreate(false);
       setEditAnnouncement(null);
-      setForm({ title: '', message: '', type: 'GENERAL', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, startDate: '', expirationDate: '', expiresAt: '' });
+      setForm({ title: '', message: '', type: 'GENERAL', program: user?.program?.id ? String(user.program.id) : '', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, formEnabled: false, formFields: [], startDate: '', expirationDate: '', expiresAt: '' });
       setSelectedStudents([]);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to save'); }
@@ -116,12 +300,15 @@ function CoordinatorAnnouncements() {
       title: a.title || '',
       message: a.message || '',
       type: a.type || 'GENERAL',
+      program: a.programIds?.length ? String(a.programIds[0]) : 'all',
       degreeType: a.degreeType || user.program?.degreeType || '',
-      programIds: a.programIds?.length ? a.programIds : (user.program?.id ? [user.program.id] : []),
+      programIds: a.programIds || [],
       studentIds: a.studentIds || [],
       batch: a.batch || '',
       academicYearId: a.academicYearId ? String(a.academicYearId) : '',
       allowGroupFormation: a.allowGroupFormation || false,
+      formEnabled: a.formEnabled || false,
+      formFields: Array.isArray(a.formFields) ? a.formFields : [],
       startDate: a.startDate ? a.startDate.split('T')[0] : '',
       expirationDate: a.expirationDate ? a.expirationDate.split('T')[0] : '',
       expiresAt: a.expiresAt ? a.expiresAt.slice(0, 16) : '',
@@ -180,6 +367,36 @@ function CoordinatorAnnouncements() {
     }
   };
 
+  const loadResponses = async (ann) => {
+    setResponsesLoading(true);
+    setViewResponses(ann);
+    try {
+      const { data } = await api.get(`/announcements/${ann.id}/form-responses`);
+      setResponses(data);
+      const edits = {};
+      (data.filled || []).forEach(({ response }) => {
+        const d = response.formData || {};
+        edits[response.id] = {
+          title: d.title || '',
+          cluster: d.cluster || '',
+          is_guided: d.is_guided || 'No',
+          primary_supervisor: d.primary_supervisor || '',
+          secondary_supervisor: d.secondary_supervisor || '',
+          finalSupervisorId: response.thesis?.supervisorId ? response.thesis.supervisorId.toString() : '',
+          pdfUrl: d.pdfUrl || d.pdf_document || '',
+          remarks: d.remarks || d.description || d.feedback || '',
+        };
+      });
+      setMatrixEdits(edits);
+      setSelectedResponseIds([]);
+    } catch (err) {
+      toast.error('Failed to load form responses');
+      setResponses(null);
+    } finally {
+      setResponsesLoading(false);
+    }
+  };
+
   const actions = (
     <button className="btn btn-primary btn-sm" onClick={() => { setEditAnnouncement(null); setShowCreate(true); }}>
       <Icon name="campaign" className="material-symbols-outlined" /> New Announcement
@@ -205,6 +422,11 @@ function CoordinatorAnnouncements() {
             <div className="stat-number">{announcements.filter(a => a.allowGroupFormation).length}</div>
             <div className="stat-label">Group Formation</div>
           </div>
+          <div className="stat-card bento-card">
+            <div className="stat-icon"><Icon name="description" className="material-symbols-outlined" /></div>
+            <div className="stat-number">{announcements.filter(a => a.formEnabled).length}</div>
+            <div className="stat-label">Thesis Forms</div>
+          </div>
         </div>
 
         <div className="card">
@@ -221,6 +443,7 @@ function CoordinatorAnnouncements() {
                     <th>Type</th>
                     <th>Audience</th>
                     <th>Form Groups?</th>
+                    {user.program?.degreeType !== 'BACHELOR' && <th>Form?</th>}
                     <th>Period</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
@@ -233,12 +456,22 @@ function CoordinatorAnnouncements() {
                     return (
                       <tr key={a.id}>
                         <td>
-                          <div style={{ fontWeight: 500 }}>{a.title}</div>
+                          <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {a.title}
+                            {a.createdById !== user.id && (
+                              <span className="badge badge-info" style={{ fontSize: 10, fontWeight: 600 }}>
+                                by {a.createdBy?.firstName} {a.createdBy?.lastName}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.message}</div>
                         </td>
                         <td><span className={`badge badge-${a.type === 'THESIS' ? 'warning' : a.type === 'MINOR' ? 'info' : a.type === 'MAJOR' ? 'warning' : 'default'}`}>{TYPE_LABELS[a.type] || a.type}</span></td>
                         <td style={{ fontSize: 13 }}>{AUDIENCE_LABELS[a.audience]}</td>
                         <td>{hasGF ? <span className="badge badge-active"><span className="dot" /> Yes (max {a.groupSizeMax})</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
+                        {user.program?.degreeType !== 'BACHELOR' && (
+                          <td>{a.formEnabled ? <span className="badge badge-warning"><span className="dot" /> Form {(a.formFields?.length || 0) > 0 ? `(+${a.formFields.length})` : ''}</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
+                        )}
                         <td style={{ fontSize: 12 }}>
                           {a.startDate ? new Date(a.startDate).toLocaleDateString() : '—'} ~ {a.expirationDate ? new Date(a.expirationDate).toLocaleDateString() : '—'}
                         </td>
@@ -260,9 +493,9 @@ function CoordinatorAnnouncements() {
                           <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
                             <Icon name="delete" className="material-symbols-outlined" />
                           </button>
-                          {hasGF && (
-                            <button className="btn btn-sm btn-outline" onClick={() => { setViewAnnouncement(a); loadSubmissions(a); }}>
-                              <Icon name="visibility" className="material-symbols-outlined" /> View Submissions
+                          {(a.formEnabled || a.allowGroupFormation) && (
+                            <button className="btn btn-sm btn-outline" onClick={() => loadResponses(a)}>
+                              <Icon name="fact_check" className="material-symbols-outlined" /> Responses
                             </button>
                           )}
                           {active && (
@@ -308,6 +541,19 @@ function CoordinatorAnnouncements() {
                     </select>
                     <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
                       Only students in this batch will receive the notification
+                    </p>
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Program *</label>
+                    <select value={form.program} onChange={e => setForm({...form, program: e.target.value})} required>
+                      <option value="">Select program...</option>
+                      {user.program?.degreeType !== 'BACHELOR' && <option value="all">All</option>}
+                      {programs.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
+                    </select>
+                    <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
+                      {user.program?.degreeType === 'BACHELOR'
+                        ? `Send to ${programs.map(p => p.code).join(', ')} students`
+                        : `Send to all programs or only ${programs.map(p => p.code).join(', ')} students`}
                     </p>
                   </div>
                 </div>
@@ -381,41 +627,243 @@ function CoordinatorAnnouncements() {
                     </div>
                   </div>
                   {form.allowGroupFormation && (
-                    <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Max Members</label>
-                        <div style={{
-                          padding: '10px 14px',
-                          borderRadius: 'var(--border-radius-md)',
-                          background: 'var(--color-surface-container-lowest)',
-                          border: '1px solid var(--color-outline)',
-                          fontSize: 14,
-                          color: 'var(--color-on-surface)',
-                          opacity: 0.7,
-                        }}>
-                          {form.type === 'THESIS' ? 1 : 4}
-                          <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginLeft: 8 }}>
-                            (Thesis=1, Bachelor=4)
-                          </span>
+                    <>
+                      <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Max Members</label>
+                          <div style={{
+                            padding: '10px 14px',
+                            borderRadius: 'var(--border-radius-md)',
+                            background: 'var(--color-surface-container-lowest)',
+                            border: '1px solid var(--color-outline)',
+                            fontSize: 14,
+                            color: 'var(--color-on-surface)',
+                            opacity: 0.7,
+                          }}>
+                            {form.type === 'THESIS' ? 1 : 4}
+                            <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginLeft: 8 }}>
+                              (Thesis=1, Bachelor=4)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Start Date (optional)</label>
+                          <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
+                          <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
+                        </div>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
+                          <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
+                          <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
+                        </div>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Expires At (optional)</label>
+                          <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
                         </div>
                       </div>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Start Date (optional)</label>
-                        <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
-                        <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
-                      </div>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
-                        <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
-                        <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
-                      </div>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Expires At (optional)</label>
-                        <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
-                      </div>
-                    </div>
+
+                      {(form.type === 'MINOR' || form.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                        <div style={{ marginTop: 14, padding: 14, background: 'var(--color-surface-container-low)', borderRadius: 'var(--border-radius-md)', border: '1px dashed var(--color-outline-variant)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color: 'var(--color-primary)' }}>
+                            <Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                            Student Group Registration Form Fields
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginBottom: 10 }}>
+                            Students will complete these required fields when forming their project group:
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>1. Group Name *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Custom or default group name</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>2. Project Title *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Proposed project title</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>3. Proposal PDF *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Compulsory proposal document</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>4. Group Members *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Search & invite up to 4 members</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
+                )}
+
+                {form.type === 'THESIS' && (
+                  <div className="form-group" style={{
+                    background: 'var(--color-surface-container-low)',
+                    borderRadius: 'var(--border-radius-md)',
+                    padding: '16px',
+                    border: form.formEnabled ? '2px solid var(--color-primary)' : '2px solid var(--color-outline-variant)',
+                    transition: 'all 0.2s',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: form.formEnabled ? 16 : 0 }}>
+                      <div
+                        onClick={() => {
+                          const on = !form.formEnabled;
+                          const today = new Date().toISOString().split('T')[0];
+                          setForm({ ...form, formEnabled: on, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
+                        }}
+                        style={{
+                          width: 44, height: 24, borderRadius: 12,
+                          background: form.formEnabled ? 'var(--color-primary)' : 'var(--color-outline)',
+                          position: 'relative', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                        }}
+                      >
+                        <div style={{
+                          width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                          position: 'absolute', top: 2,
+                          left: form.formEnabled ? 22 : 2,
+                          transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }} />
+                      </div>
+                      <div>
+                        <label
+                          style={{ margin: 0, fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => {
+                            const on = !form.formEnabled;
+                            const today = new Date().toISOString().split('T')[0];
+                            const defaultFields = user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS;
+                            setForm({ ...form, formEnabled: on, formFields: on && !form.formFields?.length ? defaultFields : form.formFields, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
+                          }}
+                        >
+                          {user.program?.degreeType === 'BACHELOR' ? 'Enable Project Registration Form' : 'Enable Thesis Registration Form'}
+                        </label>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                          {user.program?.degreeType === 'BACHELOR'
+                            ? 'Students fill out a project registration form; submitting creates their bachelor project proposal (PDF). Submissions after the deadline require approval.'
+                            : 'Students fill out a thesis registration form; submitting creates their master thesis proposal (PDF). Submissions after the deadline require approval.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {form.formEnabled || editAnnouncement ? (
+                      <>
+                        <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                            <label style={{ fontSize: 12 }}>Start Date (optional)</label>
+                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                          </div>
+                          <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                            <label style={{ fontSize: 12 }}>Form Deadline (optional)</label>
+                            <input type="date" value={form.expirationDate} onChange={e => setForm({ ...form, expirationDate: e.target.value })} />
+                            <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
+                              Submissions after this date are marked late
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Form Fields (Google Forms Style Editor)</label>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {user.program?.degreeType !== 'BACHELOR' && (
+                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: DEFAULT_FORM_FIELDS })}>
+                                  Load Master Template
+                                </button>
+                              )}
+                              {user.program?.degreeType === 'BACHELOR' ? (
+                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
+                                  Reset Bachelor Template
+                                </button>
+                              ) : (
+                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
+                                  Load Bachelor Template
+                                </button>
+                              )}
+                              <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
+                                <Icon name="add" className="material-symbols-outlined" /> Add Field
+                              </button>
+                            </div>
+                          </div>
+                          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                            Customize field labels, select field types, or toggle Required / Optional for each question.
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {/* Fixed Student Profile Metadata info */}
+                            <div style={{ border: '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                                  Student Profile (Email, Name, Roll Number)
+                                </span>
+                                <span className="badge badge-active" style={{ fontSize: 10 }}>Auto-Linked</span>
+                              </div>
+                            </div>
+
+                            {/* Dynamic Editable Fields */}
+                            {(form.formFields && form.formFields.length > 0 ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)).map((f, idx) => (
+                              <div key={idx} style={{ border: f.required ? '1px solid var(--color-primary)' : '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                  <input
+                                    className="form-input"
+                                    style={{ flex: 1, fontWeight: 600, fontSize: 14 }}
+                                    value={f.label}
+                                    onChange={e => {
+                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                      currentFields[idx] = { ...currentFields[idx], label: e.target.value, key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') };
+                                      setForm({ ...form, formFields: currentFields });
+                                    }}
+                                    placeholder="Question / Field Title"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="icon-btn danger"
+                                    title="Remove field"
+                                    onClick={() => {
+                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                      setForm({ ...form, formFields: currentFields.filter((_, i) => i !== idx) });
+                                    }}
+                                  >
+                                    <Icon name="delete" className="material-symbols-outlined" />
+                                  </button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 1 180px' }}>
+                                    <label style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', margin: 0 }}>Type:</label>
+                                    <select
+                                      className="form-input"
+                                      style={{ padding: '2px 6px', fontSize: 12 }}
+                                      value={f.type || 'text'}
+                                      onChange={e => {
+                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                        currentFields[idx] = { ...currentFields[idx], type: e.target.value };
+                                        setForm({ ...form, formFields: currentFields });
+                                      }}
+                                    >
+                                      <option value="text">Short Text</option>
+                                      <option value="textarea">Paragraph</option>
+                                      <option value="select">Dropdown</option>
+                                      <option value="radio">Radio Choice</option>
+                                      <option value="file">PDF File Upload</option>
+                                    </select>
+                                  </div>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!f.required}
+                                      onChange={e => {
+                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                        currentFields[idx] = { ...currentFields[idx], required: e.target.checked };
+                                        setForm({ ...form, formFields: currentFields });
+                                      }}
+                                    />
+                                    {f.required ? <span style={{ color: 'var(--color-error)' }}>Required *</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>Optional</span>}
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
                 )}
 
                 <div className="modal-actions">
@@ -486,6 +934,637 @@ function CoordinatorAnnouncements() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setViewAnnouncement(null)}><Icon name="close" className="material-symbols-outlined" /> Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {viewResponses && (
+          <div className="modal-overlay" onClick={() => { setViewResponses(null); setResponses(null); }}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ width: '96vw', maxWidth: '96vw', height: '92vh', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="modal-header">
+                <div className="modal-header-icon warning"><Icon name="fact_check" className="material-symbols-outlined" /></div>
+                <div className="modal-header-text">
+                  <h2>Form Responses Matrix: {viewResponses.title}</h2>
+                  <p>Interactive Spreadsheet — Edit fields inline, tick supervisor preferences, & batch finalize theses</p>
+                </div>
+              </div>
+
+              <div className="modal-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {responsesLoading ? (
+                  <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading responses matrix...</p></div>
+                ) : responses ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-surface-container-high)', fontSize: 12, fontWeight: 600 }}>
+                        <Icon name="groups" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Eligible: {responses.total}
+                      </div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-success-container)', color: 'var(--color-on-success-container)', fontSize: 12, fontWeight: 600 }}>
+                        <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Filled: {responses.filled.length}
+                      </div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)', fontSize: 12, fontWeight: 600 }}>
+                        <Icon name="pending" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Remaining: {responses.remaining.length}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0 }}>Submitted Form Responses ({responses.filled.length})</h3>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={async () => {
+                              try {
+                                const res = await api.get(`/announcements/${viewResponses.id}/export-responses`, { responseType: 'blob' });
+                                const url = window.URL.createObjectURL(new Blob([res.data]));
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `Form_Responses_${viewResponses.title.replace(/\s+/g, '_')}.xlsx`;
+                                a.click();
+                                toast.success('Downloaded Form Responses Excel sheet!');
+                              } catch (err) {
+                                toast.error('Failed to download Excel sheet');
+                              }
+                            }}
+                          >
+                            <Icon name="download" className="material-symbols-outlined" /> Export Excel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            disabled={!selectedResponseIds.length || savingResponse}
+                            onClick={async () => {
+                              if (!selectedResponseIds.length) return toast.warning('Select at least one response to finalize');
+                              setSavingResponse(true);
+                              try {
+                                let count = 0;
+                                for (const id of selectedResponseIds) {
+                                  const edit = matrixEdits[id] || {};
+                                  const resp = responses.filled.find(r => r.response.id === id)?.response;
+                                  if (resp && resp.status !== 'APPROVED') {
+                                    await api.put(`/announcements/responses/${id}`, { formData: edit });
+                                    await api.post(`/announcements/responses/${id}/finalize`, {
+                                      title: edit.title || resp.formData?.title || 'Master Thesis',
+                                      cluster: edit.cluster || resp.formData?.cluster || undefined,
+                                      supervisorId: edit.finalSupervisorId ? parseInt(edit.finalSupervisorId) : undefined,
+                                    });
+                                    count++;
+                                  }
+                                }
+                                toast.success(`Finalized & created ${count} thesis record(s)!`);
+                                setSelectedResponseIds([]);
+                                loadResponses(viewResponses);
+                              } catch (err) {
+                                toast.error(err.response?.data?.error || 'Failed to batch finalize');
+                              } finally {
+                                setSavingResponse(false);
+                              }
+                            }}
+                          >
+                            <Icon name="check_circle" className="material-symbols-outlined" /> Finalize Selected ({selectedResponseIds.length})
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="table-container" style={{ overflowX: 'auto' }}>
+                        <table className="table" style={{ fontSize: 13, minWidth: 1400, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ width: 36, textAlign: 'center', verticalAlign: 'middle' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={responses.filled.length > 0 && selectedResponseIds.length === responses.filled.filter(r => r.response.status !== 'APPROVED').length}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSelectedResponseIds(responses.filled.filter(r => r.response.status !== 'APPROVED').map(r => r.response.id));
+                                    } else {
+                                      setSelectedResponseIds([]);
+                                    }
+                                  }}
+                                />
+                              </th>
+                              <th style={{ width: 180, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Group Name & Members' : 'Student & Roll'}</th>
+                              <th style={{ width: 200, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Project Title' : 'Concept Thesis Title'}</th>
+                              <th style={{ width: 160, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Cluster' : 'Research Cluster'}</th>
+                              {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                <th style={{ width: 75, verticalAlign: 'middle' }}>Guided?</th>
+                              )}
+                              {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                <>
+                                  <th style={{ width: 150, verticalAlign: 'middle' }}>Primary Supervisor Pref</th>
+                                  <th style={{ width: 150, verticalAlign: 'middle' }}>Secondary Supervisor Pref</th>
+                                </>
+                              )}
+                              <th style={{ width: 160, verticalAlign: 'middle' }}>Remarks / Feedback</th>
+                              <th style={{ width: 170, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Supervisor' : 'Final Supervisor'}</th>
+                              <th style={{ width: 65, textAlign: 'center', verticalAlign: 'middle' }}>Proposal</th>
+                              <th style={{ width: 80, verticalAlign: 'middle' }}>Status</th>
+                              <th style={{ width: 120, textAlign: 'right', verticalAlign: 'middle' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {responses.filled.length === 0 ? (
+                              <tr><td colSpan={12} className="empty-cell">No student responses submitted yet</td></tr>
+                            ) : responses.filled.map(({ student, response }) => {
+                              const edit = matrixEdits[response.id] || {};
+                              const isSelected = selectedResponseIds.includes(response.id);
+                              const isBach = (viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR');
+                              return (
+                                <tr key={response.id || student.id} style={{ background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : undefined }}>
+                                  <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                    {response.status !== 'APPROVED' && (
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={e => {
+                                          if (e.target.checked) setSelectedResponseIds(prev => [...prev, response.id]);
+                                          else setSelectedResponseIds(prev => prev.filter(id => id !== response.id));
+                                        }}
+                                      />
+                                    )}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    {isBach && response.formData?.groupName ? (
+                                      <>
+                                        <div style={{ fontWeight: 600 }}>{response.formData.groupName}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>{response.formData.members}</div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{student.firstName} {student.lastName}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', whiteSpace: 'nowrap' }}>{student.rollNumber || '—'} ({student.program?.code || 'MSc'})</div>
+                                      </>
+                                    )}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <input
+                                      className="form-input"
+                                      style={{ padding: '4px 8px', fontSize: 12, width: '100%' }}
+                                      value={edit.title ?? ''}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), title: e.target.value } }))}
+                                      placeholder="Thesis title"
+                                    />
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <select
+                                      className="form-input"
+                                      style={{ padding: '4px 6px', fontSize: 12, width: '100%' }}
+                                      value={edit.cluster ?? ''}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), cluster: e.target.value } }))}
+                                    >
+                                      <option value="">Select Cluster...</option>
+                                      {(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? (
+                                        <>
+                                          <option value="AIML">AIML (AI & Machine Learning)</option>
+                                          <option value="IPCV">IPCV (Image Processing & Computer Vision)</option>
+                                          <option value="ANLP">ANLP (Audio & Natural Language Processing)</option>
+                                          <option value="NTS">NTS (Networks & Telecom Systems)</option>
+                                          <option value="EDMES">EDMES (Embedded & Digital Systems)</option>
+                                          <option value="ACOM">ACOM (Advanced Communication)</option>
+                                          <option value="EII">EII (Electrical & Industrial Instrumentation)</option>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <option value="AI/ML and image processing">AI/ML and image processing</option>
+                                          <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                                          <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                                          <option value="Computer networks and security">Computer networks and security</option>
+                                        </>
+                                      )}
+                                    </select>
+                                  </td>
+                                  {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                    <td style={{ verticalAlign: 'middle' }}>
+                                      <select
+                                        className="form-input"
+                                        style={{ padding: '4px 4px', fontSize: 12, width: '100%' }}
+                                        value={edit.is_guided ?? 'No'}
+                                        onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), is_guided: e.target.value } }))}
+                                      >
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                      </select>
+                                    </td>
+                                  )}
+                                  {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                    <>
+                                      <td style={{ verticalAlign: 'middle' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.primary_supervisor || 'None'}</div>
+                                        {edit.primary_supervisor && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-xs btn-outline"
+                                            style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
+                                            onClick={() => {
+                                              const pref = edit.primary_supervisor;
+                                              const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
+                                              const input = norm(pref);
+                                              let matched = supervisors.find(s => {
+                                                const fn = norm(`${s.firstName} ${s.lastName}`);
+                                                return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                              });
+                                              if (matched) {
+                                                setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
+                                                toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                              } else {
+                                                toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                              }
+                                            }}
+                                          >
+                                            <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                          </button>
+                                        )}
+                                      </td>
+                                      <td style={{ verticalAlign: 'middle' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.secondary_supervisor || 'None'}</div>
+                                        {edit.secondary_supervisor && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-xs btn-outline"
+                                            style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
+                                            onClick={() => {
+                                              const pref = edit.secondary_supervisor;
+                                              const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
+                                              const input = norm(pref);
+                                              let matched = supervisors.find(s => {
+                                                const fn = norm(`${s.firstName} ${s.lastName}`);
+                                                return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                              });
+                                              if (matched) {
+                                                setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
+                                                toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                              } else {
+                                                toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                              }
+                                            }}
+                                          >
+                                            <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                          </button>
+                                        )}
+                                      </td>
+                                    </>
+                                  )}
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <input
+                                      className="form-input"
+                                      style={{ padding: '4px 8px', fontSize: 12, width: '100%' }}
+                                      value={edit.remarks ?? ''}
+                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), remarks: e.target.value } }))}
+                                      placeholder="Remarks / Feedback"
+                                    />
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <MatrixSupervisorSelect
+                                      value={edit.finalSupervisorId ?? ''}
+                                      onChange={val => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: val } }))}
+                                      supervisors={supervisors}
+                                    />
+                                  </td>
+                                  <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                    {edit.pdfUrl || response.formData?.pdfUrl ? (
+                                      <a href={edit.pdfUrl || response.formData?.pdfUrl} target="_blank" rel="noreferrer" title="View Proposal PDF">
+                                        <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 18 }} />
+                                      </a>
+                                    ) : '—'}
+                                  </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    {response.status === 'APPROVED' ? (
+                                      <a
+                                        href={
+                                          (isBach || response.groupId)
+                                            ? `/coordinator/project/group/${response.groupId}`
+                                            : `/coordinator/project/thesis/${response.thesis?.id || response.id}`
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ fontSize: 12 }}
+                                      >
+                                        Finalized <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 11 }} />
+                                      </a>
+                                    ) : response.status === 'LATE_SUBMITTED' ? (
+                                      <span className="badge badge-warning" style={{ fontSize: 10 }}>Late</span>
+                                    ) : (
+                                      <span className="badge badge-completed" style={{ fontSize: 10 }}>Submitted</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline"
+                                        disabled={savingResponse}
+                                        onClick={async () => {
+                                          setSavingResponse(true);
+                                          try {
+                                            await api.put(`/announcements/responses/${response.id}`, { formData: edit });
+                                            toast.success('Row saved');
+                                          } catch (err) {
+                                            toast.error(err.response?.data?.error || 'Failed to save');
+                                          } finally {
+                                            setSavingResponse(false);
+                                          }
+                                        }}
+                                      >
+                                        Save
+                                      </button>
+                                      {response.status !== 'APPROVED' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-success"
+                                          disabled={savingResponse}
+                                          onClick={async () => {
+                                            setSavingResponse(true);
+                                            try {
+                                              await api.put(`/announcements/responses/${response.id}`, { formData: edit });
+                                              await api.post(`/announcements/responses/${response.id}/finalize`, {
+                                                title: edit.title || response.formData?.title || 'Master Thesis',
+                                                cluster: edit.cluster || response.formData?.cluster || undefined,
+                                                supervisorId: edit.finalSupervisorId ? parseInt(edit.finalSupervisorId) : undefined,
+                                              });
+                                              toast.success('Thesis finalized & created!');
+                                              loadResponses(viewResponses);
+                                            } catch (err) {
+                                              toast.error(err.response?.data?.error || 'Failed to finalize');
+                                            } finally {
+                                              setSavingResponse(false);
+                                            }
+                                          }}
+                                        >
+                                          Finalize
+                                        </button>
+                                      )}
+                                      {response.status !== 'APPROVED' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-outline"
+                                          style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                                          disabled={savingResponse}
+                                          title="Delete submission"
+                                          onClick={async () => {
+                                            if (!window.confirm('Are you sure you want to delete this submission? It will be removed from students, supervisors, and project records everywhere.')) return;
+                                            setSavingResponse(true);
+                                            try {
+                                              await api.delete(`/announcements/responses/${response.id}`);
+                                              toast.success('Submission deleted');
+                                              loadResponses(viewResponses);
+                                            } catch (err) {
+                                              toast.error(err.response?.data?.error || 'Failed to delete');
+                                            } finally {
+                                              setSavingResponse(false);
+                                            }
+                                          }}
+                                        >
+                                          <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 13 }} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => setShowRemainingStudents(!showRemainingStudents)}
+                      >
+                        <Icon name={showRemainingStudents ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" />
+                        {showRemainingStudents ? 'Hide' : 'Show'} Remaining Eligible Students ({responses.remaining.length})
+                      </button>
+
+                      {showRemainingStudents && (
+                        <div className="table-container" style={{ marginTop: 10 }}>
+                          <table className="table" style={{ fontSize: 13 }}>
+                            <thead><tr><th>Student Name</th><th>Roll Number</th><th>Program</th><th>Email Address</th></tr></thead>
+                            <tbody>
+                              {responses.remaining.length === 0 ? (
+                                <tr><td colSpan={4} className="empty-cell">All eligible students have filled and submitted the form</td></tr>
+                              ) : responses.remaining.map(s => (
+                                <tr key={s.id}>
+                                  <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
+                                  <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
+                                  <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
+                                  <td style={{ fontSize: 13 }}>{s.email}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => { setViewResponses(null); setResponses(null); }}><Icon name="close" className="material-symbols-outlined" /> Close Matrix</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal for Editing Student Form Response */}
+        {editingResponse && (
+          <div className="modal-overlay" onClick={() => setEditingResponse(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header">
+                <div className="modal-header-icon primary"><Icon name="edit_note" className="material-symbols-outlined" /></div>
+                <div className="modal-header-text">
+                  <h2>Edit Student Form Submission</h2>
+                  <p>{editingResponse.student?.firstName} {editingResponse.student?.lastName} ({editingResponse.student?.rollNumber || 'No Roll'})</p>
+                </div>
+                <button className="modal-close-btn" onClick={() => setEditingResponse(null)}><Icon name="close" className="material-symbols-outlined" /></button>
+              </div>
+
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Concept Title</label>
+                  <input className="form-input" value={editResponseForm.title || ''} onChange={e => setEditResponseForm({ ...editResponseForm, title: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Research Cluster / Area</label>
+                  <select className="form-input" value={editResponseForm.cluster || ''} onChange={e => setEditResponseForm({ ...editResponseForm, cluster: e.target.value })}>
+                    <option value="">Select Cluster...</option>
+                    <option value="AI/ML and image processing">AI/ML and image processing</option>
+                    <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                    <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                    <option value="Computer networks and security">Computer networks and security</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Guided Proposal?</label>
+                  <select className="form-input" value={editResponseForm.is_guided || ''} onChange={e => setEditResponseForm({ ...editResponseForm, is_guided: e.target.value })}>
+                    <option value="">Select option...</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Primary Supervisor Preference</label>
+                  <input className="form-input" value={editResponseForm.primary_supervisor || ''} onChange={e => setEditResponseForm({ ...editResponseForm, primary_supervisor: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Secondary Supervisor Preference</label>
+                  <input className="form-input" value={editResponseForm.secondary_supervisor || ''} onChange={e => setEditResponseForm({ ...editResponseForm, secondary_supervisor: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>PDF Proposal URL</label>
+                  <input className="form-input" value={editResponseForm.pdfUrl || editResponseForm.pdf_document || ''} onChange={e => setEditResponseForm({ ...editResponseForm, pdfUrl: e.target.value })} />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Remarks / Description</label>
+                  <textarea className="form-input" rows={3} value={editResponseForm.description || editResponseForm.remarks || ''} onChange={e => setEditResponseForm({ ...editResponseForm, description: e.target.value, remarks: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setEditingResponse(null)}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  disabled={savingResponse}
+                  onClick={async () => {
+                    setSavingResponse(true);
+                    try {
+                      await api.put(`/announcements/responses/${editingResponse.id}`, { formData: editResponseForm });
+                      toast.success('Form response updated!');
+                      setEditingResponse(null);
+                      if (viewResponses) loadResponses(viewResponses);
+                    } catch (err) {
+                      toast.error(err.response?.data?.error || 'Failed to update response');
+                    } finally {
+                      setSavingResponse(false);
+                    }
+                  }}
+                >
+                  <Icon name={savingResponse ? 'sync' : 'save'} className="material-symbols-outlined" /> Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal for Finalizing Form Response to Thesis */}
+        {finalizingResponse && (
+          <div className="modal-overlay" onClick={() => setFinalizingResponse(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+              <div className="modal-header">
+                <div className="modal-header-icon success"><Icon name="task_alt" className="material-symbols-outlined" /></div>
+                <div className="modal-header-text">
+                  <h2>Finalize Response & Create Thesis</h2>
+                  <p>Student: {finalizingResponse.student?.firstName} {finalizingResponse.student?.lastName}</p>
+                </div>
+                <button className="modal-close-btn" onClick={() => setFinalizingResponse(null)}><Icon name="close" className="material-symbols-outlined" /></button>
+              </div>
+
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Thesis Title</label>
+                  <input className="form-input" value={finalizeTitle} onChange={e => setFinalizeTitle(e.target.value)} placeholder="Enter finalized thesis title" />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Research Cluster / Area</label>
+                  <select className="form-input" value={finalizeCluster} onChange={e => setFinalizeCluster(e.target.value)}>
+                    <option value="">Select Cluster...</option>
+                    <option value="AI/ML and image processing">AI/ML and image processing</option>
+                    <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                    <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                    <option value="Computer networks and security">Computer networks and security</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Student Supervisor Preferences</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--color-surface-container-lowest)', padding: 10, borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                      <span>Primary: <strong>{finalizingResponse.formData?.primary_supervisor || 'None specified'}</strong></span>
+                      {finalizingResponse.formData?.primary_supervisor && (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-outline"
+                          onClick={() => {
+                            const pref = finalizingResponse.formData?.primary_supervisor;
+                            const matched = supervisors.find(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(pref.toLowerCase()) || pref.toLowerCase().includes(s.lastName.toLowerCase()));
+                            if (matched) {
+                              setFinalizeSupervisorId(matched.id.toString());
+                              toast.success(`Selected ${matched.firstName} ${matched.lastName}`);
+                            } else {
+                              toast.info(`Could not auto-match "${pref}". Please choose from the dropdown below.`);
+                            }
+                          }}
+                        >
+                          <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 13 }} /> Tick to Select
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                      <span>Secondary: <strong>{finalizingResponse.formData?.secondary_supervisor || 'None specified'}</strong></span>
+                      {finalizingResponse.formData?.secondary_supervisor && (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-outline"
+                          onClick={() => {
+                            const pref = finalizingResponse.formData?.secondary_supervisor;
+                            const matched = supervisors.find(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(pref.toLowerCase()) || pref.toLowerCase().includes(s.lastName.toLowerCase()));
+                            if (matched) {
+                              setFinalizeSupervisorId(matched.id.toString());
+                              toast.success(`Selected ${matched.firstName} ${matched.lastName}`);
+                            } else {
+                              toast.info(`Could not auto-match "${pref}". Please choose from the dropdown below.`);
+                            }
+                          }}
+                        >
+                          <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 13 }} /> Tick to Select
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Assigned Supervisor (Optional)</label>
+                  <select className="form-input" value={finalizeSupervisorId} onChange={e => setFinalizeSupervisorId(e.target.value)}>
+                    <option value="">Select Supervisor (or leave empty to assign later)...</option>
+                    {supervisors.map(s => (
+                      <option key={s.id} value={s.id}>{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setFinalizingResponse(null)}>Cancel</button>
+                <button
+                  className="btn btn-success"
+                  onClick={async () => {
+                    try {
+                      await api.post(`/announcements/responses/${finalizingResponse.id}/finalize`, {
+                        title: finalizeTitle,
+                        cluster: finalizeCluster,
+                        supervisorId: finalizeSupervisorId ? parseInt(finalizeSupervisorId) : undefined,
+                      });
+                      toast.success('Thesis record finalized & created!');
+                      setFinalizingResponse(null);
+                      if (viewResponses) loadResponses(viewResponses);
+                    } catch (err) {
+                      toast.error(err.response?.data?.error || 'Failed to finalize response');
+                    }
+                  }}
+                >
+                  <Icon name="check_circle" className="material-symbols-outlined" /> Finalize Thesis
+                </button>
               </div>
             </div>
           </div>

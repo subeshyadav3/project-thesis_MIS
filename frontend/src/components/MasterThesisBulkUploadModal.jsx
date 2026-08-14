@@ -135,13 +135,6 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
     return <span key={a.type + (a.studentId || a.existingId || '')} style={style} title={a.message}>{labels[a.type] || 'Conflict'}</span>;
   };
 
-  const crossProgramWarning = (p) => {
-    if (!p.warnings) return null;
-    const cp = p.warnings.find(w => w.toLowerCase().includes('does not match selected program'));
-    if (!cp) return null;
-    return <span style={{ background: 'var(--color-error-container)', color: 'var(--color-on-error-container)', padding: '1px 6px', borderRadius: 8, fontSize: 10, marginRight: 4, whiteSpace: 'nowrap' }} title={cp}>Cross-program</span>;
-  };
-
   const setStudentEdit = (field, value) => {
     setRowEdits(prev => {
       const row = prev[expandedRow] || {};
@@ -267,7 +260,6 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                               {hasAnomaly && p.anomalies.map(anomalyBadge)}
-                              {crossProgramWarning(p)}
                               <span style={{ textDecoration: isSkipped ? 'line-through' : 'none' }}>
                                 {edits.roll || p.roll}
                               </span>

@@ -36,7 +36,7 @@ const MASTER_PROGRAMS = [
   { code: 'MSNCS', name: 'MSc in Network and Cyber Security', cluster: 'Cluster 1', maxStudents: 24 },
   { code: 'MSICE', name: 'MSc in Information and Communication Engineering', cluster: 'Cluster 2', maxStudents: 20 },
   { code: 'MSDSA', name: 'MSc in Data Science and Analytics', cluster: 'Cluster 3', maxStudents: 24 },
-  { code: 'MSCSKE', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Cluster 4', maxStudents: 20 },
+  { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Cluster 4', maxStudents: 20 },
 ];
 
 // ── Name pools ─────────────────────────────────────────────────────────
@@ -83,22 +83,22 @@ const BATCH_DEFS = [
   {
     batch: '079',
     bsYear: 2079,
-    counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSKE: 5 },
+    counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 },
   },
   {
     batch: '080',
     bsYear: 2080,
-    counts: { BCT: 30, BEI: 16, MSNCS: 8, MSICE: 6, MSDSA: 8, MSCSKE: 6 },
+    counts: { BCT: 30, BEI: 16, MSNCS: 8, MSICE: 6, MSDSA: 8, MSCSK: 6 },
   },
   {
     batch: '081',
     bsYear: 2081,
-    counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSKE: 5 },
+    counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 },
   },
   {
     batch: '082',
     bsYear: 2082,
-    counts: { BCT: 18, BEI: 8, MSNCS: 4, MSICE: 3, MSDSA: 4, MSCSKE: 3 },
+    counts: { BCT: 18, BEI: 8, MSNCS: 4, MSICE: 3, MSDSA: 4, MSCSK: 3 },
   },
 ];
 
@@ -174,7 +174,7 @@ async function main() {
     { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', cluster: 'Cluster 1', departmentId: eceDept.id },
     { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', cluster: 'Cluster 2', departmentId: eceDept.id },
     { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', cluster: 'Cluster 3', departmentId: eceDept.id },
-    { code: 'MSCSKE', name: 'MSc in Computer Science and Knowledge Engineering', degreeType: 'MASTER', cluster: 'Cluster 4', departmentId: eceDept.id },
+    { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', degreeType: 'MASTER', cluster: 'Cluster 4', departmentId: eceDept.id },
   ];
   for (const p of progDefs) {
     programs[p.code] = await prisma.program.create({ data: p });
@@ -212,7 +212,7 @@ async function main() {
     { code: 'MSNCS', fn: 'Anil', ln: 'Thapa', email: 'msncs.coordinator@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
     { code: 'MSICE', fn: 'Pooja', ln: 'Sharma', email: 'msice.coordinator@pcampus.edu.np', designation: 'Assoc. Prof.' },
     { code: 'MSDSA', fn: 'Gopal', ln: 'Adhikari', email: 'msdsa.coordinator@pcampus.edu.np', designation: 'Asst. Prof. Dr.' },
-    { code: 'MSCSKE', fn: 'Meera', ln: 'Joshi', email: 'mscske.coordinator@pcampus.edu.np', designation: 'Prof. Dr.' },
+    { code: 'MSCSK', fn: 'Meera', ln: 'Joshi', email: 'mscsk.coordinator@pcampus.edu.np', designation: 'Prof. Dr.' },
   ];
   const coordinators = {};
   for (const cd of coordDefs) {
@@ -532,6 +532,126 @@ async function main() {
         data: { componentId: compByType.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 16.0, comment: 'Good presentation and defense.', comments: 'The student demonstrated good understanding of the subject.', suggestions: 'Improve the literature review.', status: 'COMPLETED', submittedById: examiner.id, thesisId: t.id },
       });
     }
+  }
+
+  // ── Thesis registration form announcements ──
+  const msncs = programs.MSNCS;
+  const formAnn = await prisma.announcement.create({
+    data: {
+      title: 'Master Thesis Registration 2081 (Batch 2080)',
+      message: 'All Master students of batch 2080 must submit the thesis registration form with their proposed thesis title and abstract by 30 June 2081.',
+      type: 'THESIS',
+      audience: 'PROGRAMS',
+      degreeType: 'MASTER',
+      programIds: [msncs.id],
+      batch: '2080',
+      academicYearId: ayMap['080'].id,
+      departmentId: eceDept.id,
+      formEnabled: true,
+      formFields: [
+        { key: 'research_area', label: 'Research Area', type: 'text', required: false, placeholder: 'e.g. Machine Learning, Security, Networking' },
+        { key: 'expected_mentor', label: 'Preferred Supervisor (optional)', type: 'text', required: false, placeholder: 'Leave blank if unsure' },
+      ],
+      startDate: new Date('2026-01-01'),
+      expirationDate: new Date('2027-06-30'),
+      expiresAt: null,
+      createdById: coordinators.MSNCS.id,
+    },
+  });
+  console.log(`Created thesis form announcement (id=${formAnn.id})`);
+
+  // A second form announcement whose deadline has already passed (for testing late submissions)
+  const lateFormAnn = await prisma.announcement.create({
+    data: {
+      title: 'Thesis Re-Registration (Late Window)',
+      message: 'Late thesis registration for students who missed the first window.',
+      type: 'THESIS',
+      audience: 'PROGRAMS',
+      degreeType: 'MASTER',
+      programIds: [msncs.id],
+      batch: '2080',
+      academicYearId: ayMap['080'].id,
+      departmentId: eceDept.id,
+      formEnabled: true,
+      formFields: [],
+      startDate: new Date('2025-01-01'),
+      expirationDate: new Date('2025-06-30'),
+      createdById: coordinators.MSNCS.id,
+    },
+  });
+  console.log(`Created late-window thesis form announcement (id=${lateFormAnn.id})`);
+
+  // Form-created theses: one on-time, one late
+  const formStudents = findStudents(2080, 'MSNCS').slice(0, 2);
+  if (formStudents[0]) {
+    const s = formStudents[0];
+    const t = await prisma.thesis.create({
+      data: {
+        title: 'On-Time Form Thesis: Secure Federated Learning for Healthcare',
+        description: 'Submitted through the thesis registration form.',
+        projectType: 'MASTER',
+        studentId: s.id,
+        status: 'PENDING',
+        createdVia: 'FORM',
+        supervisorAssignmentStatus: 'PENDING',
+        programId: msncs.id,
+        cluster: msncs.cluster,
+        batch: s.batch,
+        startDate: new Date(),
+        announcementId: formAnn.id,
+      },
+    });
+    await attachComponents({ thesisId: t.id, projectType: 'MASTER' });
+    await prisma.proposal.create({
+      data: {
+        stage: 'PROPOSAL', documentType: 'PROPOSAL', status: 'VISIBLE',
+        documentUrl: '/api/files/theses/form_proposal_sample.pdf',
+        thesisId: t.id, submittedById: s.id,
+      },
+    });
+    await prisma.formResponse.create({
+      data: {
+        announcementId: formAnn.id, studentId: s.id, thesisId: t.id,
+        formData: { title: t.title, description: t.description, research_area: 'Federated Learning', expected_mentor: '' },
+        status: 'SUBMITTED',
+      },
+    });
+    console.log(`Created on-time form thesis (id=${t.id})`);
+  }
+  if (formStudents[1]) {
+    const s = formStudents[1];
+    const t = await prisma.thesis.create({
+      data: {
+        title: 'Late Form Thesis: NLP for Nepali Legal Documents',
+        description: 'Submitted after the deadline — proposal requires coordinator approval.',
+        projectType: 'MASTER',
+        studentId: s.id,
+        status: 'PENDING',
+        createdVia: 'FORM',
+        supervisorAssignmentStatus: 'PENDING',
+        programId: msncs.id,
+        cluster: msncs.cluster,
+        batch: s.batch,
+        startDate: new Date(),
+        announcementId: lateFormAnn.id,
+      },
+    });
+    await attachComponents({ thesisId: t.id, projectType: 'MASTER' });
+    await prisma.proposal.create({
+      data: {
+        stage: 'PROPOSAL', documentType: 'PROPOSAL', status: 'PENDING_APPROVAL',
+        documentUrl: '/api/files/theses/form_proposal_sample.pdf',
+        thesisId: t.id, submittedById: s.id,
+      },
+    });
+    await prisma.formResponse.create({
+      data: {
+        announcementId: lateFormAnn.id, studentId: s.id, thesisId: t.id,
+        formData: { title: t.title, description: t.description },
+        status: 'LATE_SUBMITTED',
+      },
+    });
+    console.log(`Created late form thesis (id=${t.id})`);
   }
 
   // ── Test users for login ──

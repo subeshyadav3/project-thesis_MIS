@@ -41,6 +41,7 @@ const SupervisorList = lazy(() => import('./pages/coordinator/SupervisorList'));
 const ExaminerList = lazy(() => import('./pages/coordinator/ExaminerList'));
 const AuditLog = lazy(() => import('./pages/coordinator/AuditLog'));
 const CoordinatorAnnouncements = lazy(() => import('./pages/coordinator/Announcements'));
+const SupervisorAssignments = lazy(() => import('./pages/coordinator/SupervisorAssignments'));
 const SupervisorDashboard = lazy(() => import('./pages/supervisor/Dashboard'));
 const SupervisorBachelorProjects = lazy(() => import('./pages/supervisor/BachelorProjects'));
 const SupervisorMasterThesis = lazy(() => import('./pages/supervisor/MasterThesis'));
@@ -51,6 +52,7 @@ const StudentTheses = lazy(() => import('./pages/student/Theses'));
 const StudentGroups = lazy(() => import('./pages/student/Groups'));
 const StudentProjectDetail = lazy(() => import('./pages/student/Assignment'));
 const StudentSubmissions = lazy(() => import('./pages/student/Submissions'));
+const StudentForms = lazy(() => import('./pages/student/Forms'));
 const StudentNotifications = lazy(() => import('./pages/student/Notifications'));
 const ExternalDashboard = lazy(() => import('./pages/external/Dashboard'));
 const ExternalEvaluationsList = lazy(() => import('./pages/external/EvaluationsList'));
@@ -83,24 +85,25 @@ function App() {
             <Route path="/coordinator/users" element={<PrivateRoute role="COORDINATOR"><UserManagement /></PrivateRoute>} />
             <Route path="/coordinator/notifications" element={<PrivateRoute role="COORDINATOR"><StudentNotifications /></PrivateRoute>} />
             <Route path="/coordinator/*" element={<PrivateRoute role="COORDINATOR"><CoordinatorDashboard /></PrivateRoute>} />
-            <Route path="/supervisor/bachelor" element={<PrivateRoute role="SUPERVISOR"><SupervisorBachelorProjects /></PrivateRoute>} />
-            <Route path="/supervisor/master" element={<PrivateRoute role="SUPERVISOR"><SupervisorMasterThesis /></PrivateRoute>} />
-            <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role="SUPERVISOR"><ProjectDetail /></PrivateRoute>} />
-            <Route path="/supervisor/notifications" element={<PrivateRoute role="SUPERVISOR"><StudentNotifications /></PrivateRoute>} />
-            <Route path="/supervisor/*" element={<PrivateRoute role="SUPERVISOR"><SupervisorDashboard /></PrivateRoute>} />
+            <Route path="/supervisor/bachelor" element={<PrivateRoute role={['SUPERVISOR', 'COORDINATOR']}><SupervisorBachelorProjects /></PrivateRoute>} />
+            <Route path="/supervisor/master" element={<PrivateRoute role={['SUPERVISOR', 'COORDINATOR']}><SupervisorMasterThesis /></PrivateRoute>} />
+            <Route path="/supervisor/project/:type/:id" element={<PrivateRoute role={['SUPERVISOR', 'COORDINATOR']}><ProjectDetail /></PrivateRoute>} />
+            <Route path="/supervisor/notifications" element={<PrivateRoute role={['SUPERVISOR', 'COORDINATOR']}><StudentNotifications /></PrivateRoute>} />
+            <Route path="/supervisor/*" element={<PrivateRoute role={['SUPERVISOR', 'COORDINATOR']}><SupervisorDashboard /></PrivateRoute>} />
             <Route path="/student/projects" element={<PrivateRoute role="STUDENT"><StudentProjects /></PrivateRoute>} />
             <Route path="/student/theses" element={<PrivateRoute role="STUDENT"><StudentTheses /></PrivateRoute>} />
             <Route path="/student/groups" element={<PrivateRoute role="STUDENT"><StudentGroups /></PrivateRoute>} />
             <Route path="/student/:type/:id" element={<PrivateRoute role="STUDENT"><StudentProjectDetail /></PrivateRoute>} />
             <Route path="/student/submissions" element={<PrivateRoute role="STUDENT"><StudentSubmissions /></PrivateRoute>} />
+            <Route path="/student/forms" element={<PrivateRoute role="STUDENT"><StudentForms /></PrivateRoute>} />
             <Route path="/student/notifications" element={<PrivateRoute role="STUDENT"><StudentNotifications /></PrivateRoute>} />
             <Route path="/student/*" element={<PrivateRoute role="STUDENT"><StudentDashboard /></PrivateRoute>} />
-            <Route path="/external/groups" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-            <Route path="/external/theses" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-            <Route path="/external/evaluations" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-            <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationPage /></PrivateRoute>} />
-            <Route path="/external/notifications" element={<PrivateRoute role="EXTERNAL_EXAMINER"><StudentNotifications /></PrivateRoute>} />
-            <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
+            <Route path="/external/groups" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/theses" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/evaluations" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationPage /></PrivateRoute>} />
+            <Route path="/external/notifications" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><StudentNotifications /></PrivateRoute>} />
+            <Route path="/external/*" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalDashboard /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           </Route>
         </Routes>

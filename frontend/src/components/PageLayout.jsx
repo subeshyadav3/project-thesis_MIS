@@ -30,7 +30,7 @@ function buildCrumbs(pathname, pageTitle) {
   return crumbs;
 }
 
-function PageLayout({ children, title, subtitle, actions }) {
+function PageLayout({ children, title, subtitle, actions, headerActions }) {
   const { pathname } = useLocation();
   const { setActions } = useLayout();
 
@@ -69,13 +69,16 @@ function PageLayout({ children, title, subtitle, actions }) {
           ))}
         </nav>
       )}
-      {(title || subtitle) && (
-        <div className="page-header">
-          <h1>
-            <Icon name={title === 'Dashboard' ? 'dashboard' : 'folder'} className="material-symbols-outlined" />
-            {title}
-          </h1>
-          {subtitle && <p>{subtitle}</p>}
+      {(title || subtitle || headerActions) && (
+        <div className="page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+          <div className="page-header" style={{ marginBottom: 0 }}>
+            <h1>
+              <Icon name={title === 'Dashboard' ? 'dashboard' : 'folder'} className="material-symbols-outlined" />
+              {title}
+            </h1>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          {headerActions && <div>{headerActions}</div>}
         </div>
       )}
       {children}

@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 
 function CreateGroupForm({ announcement, user, createForm, setCreateForm, selectedMembers, setSelectedMembers, availableStudents, loadAvailableStudents, inviteLoading, onCreate, onCancel }) {
+  const { toast } = useToast();
   const [memberSearch, setMemberSearch] = useState('');
   const [memberOpen, setMemberOpen] = useState(false);
   const memberRef = useRef(null);
@@ -63,9 +64,49 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
       {!isThesis && (
         <div className="form-group" style={{ margin: 0 }}>
           <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: 11, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-          <textarea className="form-input" rows={3} value={createForm.description || ''} onChange={e => setCreateForm({...createForm, description: e.target.value})} placeholder="Brief description of your project..." />
+          <textarea className="form-input" rows={2} value={createForm.description || ''} onChange={e => setCreateForm({...createForm, description: e.target.value})} placeholder="Brief description of your project..." />
         </div>
       )}
+
+      <div className="form-group" style={{ margin: 0 }}>
+        <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Project Proposal PDF *
+        </label>
+        <input
+          type="file"
+          accept=".pdf"
+          className="form-input"
+          style={{ padding: '6px' }}
+          onChange={async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.type !== 'application/pdf') {
+              toast.error('Only PDF documents are allowed');
+              return;
+            }
+            try {
+              const fd = new FormData();
+              fd.append('document', file);
+              fd.append('isStandalone', 'true');
+              const res = await api.post('/students/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+              const url = res.data.documentUrl || res.data.fileUrl || res.data.url;
+              if (!url) {
+                toast.error('File upload failed to return document URL');
+                return;
+              }
+              setCreateForm(prev => ({ ...prev, pdfUrl: url }));
+              toast.success('Proposal PDF attached!');
+            } catch (err) {
+              toast.error(err.response?.data?.error || 'Failed to upload PDF');
+            }
+          }}
+        />
+        {createForm.pdfUrl && (
+          <div style={{ fontSize: 11, color: 'var(--color-success)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 14 }} /> Proposal PDF Attached
+          </div>
+        )}
+      </div>
 
       {!isThesis && (
         <div style={{ borderTop: '1px solid var(--color-outline-variant)', paddingTop: 16 }}>
@@ -195,18 +236,23 @@ function StudentGroups() {
 
   const handleCreate = async () => {
     if (!selectedAnn) return;
+    if (!createForm.pdfUrl) {
+      toast.warning('Project Proposal PDF document is required');
+      return;
+    }
     try {
       await api.post('/student-groups', {
         announcementId: selectedAnn.id,
         name: createForm.name.trim() || undefined,
         projectTitle: createForm.projectTitle.trim() || undefined,
         description: createForm.description?.trim() || undefined,
+        pdfUrl: createForm.pdfUrl || undefined,
         programId: user.programId,
         memberIds: selectedMembers,
       });
       toast.success('Group created!');
       setSelectedAnn(null);
-      setCreateForm({ name: '', projectTitle: '', description: '' });
+      setCreateForm({ name: '', projectTitle: '', description: '', pdfUrl: '' });
       setSelectedMembers([]);
       loadAll();
     } catch (err) {
@@ -334,9 +380,14 @@ function StudentGroups() {
                         onCreate={handleCreate}
                         onCancel={() => { setSelectedAnn(null); setCreateForm({ name: '', projectTitle: '' }); setSelectedMembers([]); }}
                       />
-                    ) : (                        <button className={`btn btn-sm ${a.type === 'THESIS' ? 'btn-warning' : 'btn-primary'}`} onClick={() => { setSelectedAnn(a); setCreateForm({ name: a.type === 'THESIS' ? '' : `Group of ${user.firstName}`, projectTitle: a.title }); }}>
-                          <Icon name={a.type === 'THESIS' ? 'description' : 'group_add'} className="material-symbols-outlined" /> {a.type === 'THESIS' ? 'Submit Thesis' : 'Create Group'}
-                        </button>
+                    ) : a.type === 'THESIS' ? (
+                      <Link to="/student/forms" className="btn btn-sm btn-warning" style={{ textDecoration: 'none' }}>
+                        <Icon name="description" className="material-symbols-outlined" /> Submit Thesis Form
+                      </Link>
+                    ) : (
+                      <button className="btn btn-sm btn-primary" onClick={() => { setSelectedAnn(a); setCreateForm({ name: `Group of ${user.firstName}`, projectTitle: a.title }); }}>
+                        <Icon name="group_add" className="material-symbols-outlined" /> Create Group
+                      </button>
                     )}
                   </div>
                 ))}

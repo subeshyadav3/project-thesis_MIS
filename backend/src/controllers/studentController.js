@@ -1,8 +1,10 @@
 
 const prisma = require('../utils/prisma');
 const path = require('path');
+const fs = require('fs');
 const notifSvc = require('../services/notificationService');
 const audit = require('../services/auditService');
+const { getEngagement } = require('../services/engagementGuard');
 
 /**
  * Fire the unified ai_chatbot pipeline in the background.
@@ -38,11 +40,18 @@ function triggerAIPipeline({ proposalId, documentUrl, documentType, authToken })
 exports.uploadDocument = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const { stage, type } = req.body;
-    const allowedStages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
-    if (!allowedStages.includes(stage)) return res.status(400).json({ error: 'Invalid stage' });
+    // Build the URL from the folder multer actually stored the file in, so the link
+    // always resolves (multer uses: type === 'thesis' ? 'theses' : 'groups').
+    const storageType = req.body.type === 'thesis' ? 'theses' : 'groups';
+    const documentUrl = `/api/files/${storageType}/${req.file.filename}`;
 
-    const documentUrl = `/api/files/${type === 'thesis' ? 'theses' : 'groups'}/${req.file.filename}`;
+    const { stage, type, thesisId, groupId, isStandalone } = req.body;
+    const allowedStages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
+
+    // Standalone file upload for form responses / registration before thesis creation
+    if (!stage || !allowedStages.includes(stage) || isStandalone === 'true' || isStandalone === true || (!type && !thesisId && !groupId)) {
+      return res.json({ documentUrl, url: documentUrl, filename: req.file.filename });
+    }
 
     let whereClause = {};
     if (type === 'group') {
@@ -75,21 +84,18 @@ exports.uploadDocument = async (req, res) => {
         if (isNaN(thesisId)) return res.status(400).json({ error: 'Invalid thesis ID' });
         thesis = await prisma.thesis.findFirst({
           where: { id: thesisId, studentId: req.user.id },
-          select: { id: true, status: true, crossProgramRequestedById: true },
+          select: { id: true, status: true },
         });
         if (!thesis) return res.status(403).json({ error: 'This thesis does not belong to you' });
       } else {
         thesis = await prisma.thesis.findFirst({
           where: { studentId: req.user.id },
-          select: { id: true, status: true, crossProgramRequestedById: true },
+          select: { id: true, status: true },
         });
         if (!thesis) return res.status(404).json({ error: 'You have no thesis' });
       }
       if (thesis.status === 'COMPLETED') {
         return res.status(403).json({ error: 'This thesis has been completed and is no longer accepting document uploads' });
-      }
-      if (thesis.crossProgramRequestedById) {
-        return res.status(403).json({ error: 'This thesis is awaiting cross-program coordinator approval. You can submit documents once it is approved.' });
       }
       whereClause = { thesisId: thesis.id, stage };
     }
@@ -142,6 +148,135 @@ exports.uploadDocument = async (req, res) => {
   }
 };
 
+exports.submitFormResponse = async (req, res) => {
+  try {
+    const announcementId = parseInt(req.body.announcementId);
+    const formData = (req.body.formData && typeof req.body.formData === 'object') ? req.body.formData : {};
+    if (!announcementId) return res.status(400).json({ error: 'announcementId is required' });
+
+    const announcement = await prisma.announcement.findUnique({ where: { id: announcementId } });
+    if (!announcement) return res.status(404).json({ error: 'Announcement not found' });
+    if (!announcement.formEnabled) return res.status(400).json({ error: 'This announcement does not accept form submissions' });
+    if (announcement.type !== 'THESIS') return res.status(400).json({ error: 'Only thesis announcements accept form submissions' });
+    if (announcement.expiresAt && new Date() > announcement.expiresAt) {
+      return res.status(403).json({ error: 'This form is no longer accepting submissions' });
+    }
+
+    // Eligibility checks — mirrors listEligibleAnnouncementsForStudent
+    if (announcement.departmentId !== req.user.departmentId) return res.status(403).json({ error: 'You are not eligible for this announcement' });
+    if (announcement.degreeType && announcement.degreeType !== req.user.degreeType) return res.status(403).json({ error: 'You are not eligible for this announcement' });
+    if (announcement.programIds?.length && (!req.user.programId || !announcement.programIds.includes(req.user.programId))) {
+      return res.status(403).json({ error: 'You are not eligible for this announcement' });
+    }
+    if (announcement.studentIds?.length && !announcement.studentIds.includes(req.user.id)) {
+      return res.status(403).json({ error: 'You are not eligible for this announcement' });
+    }
+
+    const existing = await prisma.formResponse.findUnique({
+      where: { announcementId_studentId: { announcementId, studentId: req.user.id } },
+    });
+    if (existing) return res.status(409).json({ error: 'You have already submitted this form' });
+
+    const engagement = await getEngagement(req.user.id);
+    if (engagement.engaged) {
+      return res.status(409).json({
+        error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". A student cannot be part of two projects.`,
+      });
+    }
+
+    const title = String(formData.title || '').trim();
+    const description = String(formData.description || '').trim();
+
+    // Validate required fields dynamically from the announcement's field definitions
+    const fieldDefs = (Array.isArray(announcement.formFields) ? announcement.formFields : []).filter(f => f && f.key);
+    const coreDefs = { title: { label: 'Thesis Title', required: true }, description: { label: 'Abstract / Description', required: true } };
+    const defByKey = {};
+    fieldDefs.forEach(f => { defByKey[f.key] = f; });
+    const requiredByKey = (key) => (defByKey[key] ? !!defByKey[key].required : (coreDefs[key] ? coreDefs[key].required : false));
+    const missing = [];
+    for (const key of ['title', 'description']) {
+      if (requiredByKey(key) && !String(formData[key] || '').trim()) {
+        missing.push(defByKey[key]?.label || coreDefs[key].label);
+      }
+    }
+    for (const f of fieldDefs) {
+      if (f.key === 'title' || f.key === 'description') continue;
+      if (f.required && !String(formData[f.key] || '').trim()) missing.push(f.label || f.key);
+    }
+    if (missing.length) {
+      return res.status(400).json({ error: `Missing required field(s): ${missing.join(', ')}` });
+    }
+
+    const late = !!(announcement.expirationDate && new Date() > announcement.expirationDate);
+
+    const student = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: { program: { select: { id: true, code: true, name: true, cluster: true } } },
+    });
+
+    // Auto-generate a fallback proposal PDF from the submitted form data. This is used only when
+    // the student did not upload their own document. The actual thesis + proposal are created by
+    // the coordinator when the response is finalized.
+    let documentUrl = null;
+    try {
+      const { generateFormProposalPDF } = require('../services/pdfService');
+      const pdfBuffer = await generateFormProposalPDF({
+        title,
+        description,
+        studentName: student ? `${student.firstName} ${student.lastName}` : '',
+        rollNumber: student?.rollNumber,
+        programName: student?.program ? (student.program.name || student.program.code) : undefined,
+        batch: student?.batch,
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      });
+      const storageDir = path.join(__dirname, '..', '..', 'storage', 'theses');
+      if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+      const filename = `form_proposal_${Date.now()}.pdf`;
+      fs.writeFileSync(path.join(storageDir, filename), pdfBuffer);
+      documentUrl = `/api/files/theses/${filename}`;
+    } catch (e) { console.error('generate form proposal pdf error:', e.message); }
+
+    // Preserve any student-uploaded document; otherwise use the auto-generated fallback.
+    const savedFormData = { ...formData };
+    if (!savedFormData.pdfUrl && documentUrl) savedFormData.pdfUrl = documentUrl;
+
+    // Only create the form response here — do NOT create the thesis/proposal yet.
+    // The coordinator reviews the submission and creates the thesis on finalize.
+    const formResponse = await prisma.formResponse.create({
+      data: {
+        announcementId,
+        studentId: req.user.id,
+        formData: savedFormData,
+        status: late ? 'LATE_SUBMITTED' : 'SUBMITTED',
+      },
+    });
+
+    // Notify program + department coordinators
+    try {
+      const coordinatorIds = [];
+      const prog = await prisma.program.findUnique({ where: { id: student?.programId }, select: { coordinatorId: true } });
+      const dept = await prisma.department.findUnique({ where: { id: req.user.departmentId }, select: { coordinatorId: true } });
+      if (prog?.coordinatorId) coordinatorIds.push(prog.coordinatorId);
+      if (dept?.coordinatorId && !coordinatorIds.includes(dept.coordinatorId)) coordinatorIds.push(dept.coordinatorId);
+      if (coordinatorIds.length) {
+        const studentName = student ? `${student.firstName} ${student.lastName}` : 'A student';
+        await notifSvc.notifyMany(
+          coordinatorIds,
+          'THESIS_FORM_SUBMITTED',
+          `${studentName} submitted the thesis form "${title}"${late ? ' (late submission — proposal requires approval)' : ''}. Report: ${description.slice(0, 120)}${description.length > 120 ? '…' : ''}`
+        );
+      }
+    } catch (e) { console.error('notify coordinators error:', e.message); }
+
+    audit.log({ action: 'CREATE', entity: 'FormResponse', entityId: formResponse.id, details: `Concept note submitted for "${title}"${late ? ' (late)' : ''}`, performedById: req.user.id });
+
+    res.status(201).json({ message: 'Form submitted successfully. It is now pending coordinator review.', formResponse, thesis: null, proposal: null, late });
+  } catch (e) {
+    console.error('submitFormResponse error:', e);
+    res.status(500).json({ error: 'Internal server error', details: e.message });
+  }
+};
+
 exports.getMyGroups = async (req, res) => {
   try {
     const members = await prisma.groupMember.findMany({
@@ -175,7 +310,7 @@ exports.getMyGroups = async (req, res) => {
 exports.getMyTheses = async (req, res) => {
   try {
     const theses = await prisma.thesis.findMany({
-      where: { studentId: req.user.id, crossProgramRequestedById: null },
+      where: { studentId: req.user.id },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, program: { include: { department: { select: { id: true, name: true } } } } } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -254,9 +389,6 @@ exports.getThesisById = async (req, res) => {
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
     if (thesis.studentId !== req.user.id) return res.status(403).json({ error: 'This thesis does not belong to you' });
-    if (thesis.crossProgramRequestedById) {
-      return res.status(403).json({ error: 'This thesis is awaiting cross-program coordinator approval' });
-    }
     res.json(thesis);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });

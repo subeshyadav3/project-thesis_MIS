@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastery & Viva Preparation Guide: Tech Stack Deep Dive</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --accent-blue: #38bdf8;
+            --accent-indigo: #818cf8;
+            --accent-purple: #c084fc;
+            --accent-green: #4ade80;
+            --accent-amber: #fbbf24;
+            --accent-rose: #f43f5e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --border-color: #334155;
+            --code-bg: #090d16;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Sidebar Styling */
+        #sidebar {
+            width: var(--sidebar-width);
+            background-color: #0b1120;
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(129, 140, 248, 0.1));
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.2rem;
+            color: var(--accent-blue);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 15px 10px;
+        }
+
+        .nav-item {
+            margin-bottom: 4px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: var(--bg-card-hover);
+            color: var(--accent-blue);
+            transform: translateX(4px);
+        }
+
+        .nav-link .badge {
+            margin-left: auto;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Main Content Styling */
+        #main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 40px;
+            max-width: 1200px;
+        }
+
+        .top-bar {
+            margin-bottom: 35px;
+            background-color: var(--bg-secondary);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .top-bar h1 {
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .top-bar p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .search-box {
+            margin-top: 18px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 18px;
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        /* Tech Section Card */
+        .tech-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transition: border-color 0.2s ease;
+        }
+
+        .tech-card:hover {
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .tech-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+
+        .tech-title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .tech-title h2 {
+            font-size: 1.6rem;
+            color: var(--text-main);
+        }
+
+        .num-badge {
+            background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+            color: white;
+            font-weight: 700;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .mental-model-pill {
+            background-color: rgba(56, 189, 248, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .section-block {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            color: var(--accent-indigo);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-title::before {
+            content: "";
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background-color: var(--accent-indigo);
+            border-radius: 2px;
+        }
+
+        p, ul, ol {
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+
+        ul, ol {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        strong {
+            color: var(--text-main);
+        }
+
+        /* Deep Theory Grid */
+        .theory-box {
+            background-color: rgba(15, 23, 42, 0.6);
+            border-left: 4px solid var(--accent-purple);
+            padding: 16px 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 14px 0;
+        }
+
+        .theory-box h4 {
+            color: var(--accent-purple);
+            font-size: 0.95rem;
+            margin-bottom: 6px;
+        }
+
+        /* Code Block Styling */
+        .code-container {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin: 16px 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background-color: #161f30;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        pre {
+            padding: 16px;
+            overflow-x: auto;
+            font-family: "Fira Code", Consolas, Monaco, "Courier New", monospace;
+            font-size: 0.88rem;
+            color: #e2e8f0;
+            line-height: 1.5;
+        }
+
+        .keyword { color: #f472b6; }
+        .function { color: #38bdf8; }
+        .string { color: #4ade80; }
+        .comment { color: #64748b; font-style: italic; }
+        .number { color: #fbbf24; }
+
+        /* Viva Accordion */
+        .viva-section {
+            margin-top: 24px;
+            background-color: rgba(30, 41, 59, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+        }
+
+        .viva-title {
+            color: var(--accent-amber);
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .viva-qa {
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 0;
+        }
+
+        .viva-qa:last-child {
+            border-bottom: none;
+        }
+
+        .viva-q {
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .viva-q::after {
+            content: "+";
+            font-size: 1.2rem;
+            color: var(--accent-amber);
+        }
+
+        .viva-qa.active .viva-q::after {
+            content: "−";
+        }
+
+        .viva-a {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 8px;
+            display: none;
+            padding-left: 10px;
+            border-left: 2px solid var(--accent-amber);
+        }
+
+        .viva-qa.active .viva-a {
+            display: block;
+        }
+
+        /* Comparison Table */
+        .comp-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 0.9rem;
+        }
+
+        .comp-table th, .comp-table td {
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .comp-table th {
+            background-color: #162032;
+            color: var(--accent-blue);
+        }
+
+        /* Print Styling */
+        @media print {
+            #sidebar { display: none; }
+            #main-content { margin-left: 0; padding: 0; }
+            .tech-card { break-inside: avoid; border: 1px solid #ccc; color: #000; background: #fff; }
+            .viva-a { display: block !important; }
+        }
+
+        @media (max-width: 900px) {
+            #sidebar { display: none; }
+            #main-content { margin-left: 0; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar">
+        <div class="sidebar-header">
+            <h2>Viva & Theory Guide</h2>
+            <p>10 Essential Web Technologies</p>
+        </div>
+        <ul class="nav-list">
+            <li class="nav-item"><a href="#axios" class="nav-link"><span class="badge">1</span> ⚡ Axios</a></li>
+            <li class="nav-item"><a href="#recharts" class="nav-link"><span class="badge">2</span> 📊 Recharts</a></li>
+            <li class="nav-item"><a href="#multer" class="nav-link"><span class="badge">3</span> 📁 Multer</a></li>
+            <li class="nav-item"><a href="#xlsx" class="nav-link"><span class="badge">4</span> 📈 XLSX (SheetJS)</a></li>
+            <li class="nav-item"><a href="#mammoth" class="nav-link"><span class="badge">5</span> 📝 Mammoth</a></li>
+            <li class="nav-item"><a href="#pdfparse" class="nav-link"><span class="badge">6</span> 📄 PDF-Parse</a></li>
+            <li class="nav-item"><a href="#pdfkit" class="nav-link"><span class="badge">7</span> ✏️ PDFKit</a></li>
+            <li class="nav-item"><a href="#puppeteer" class="nav-link"><span class="badge">8</span> 🌐 Puppeteer-Core</a></li>
+            <li class="nav-item"><a href="#nodemailer" class="nav-link"><span class="badge">9</span> 📧 Nodemailer</a></li>
+            <li class="nav-item"><a href="#ratelimit" class="nav-link"><span class="badge">10</span> 🛡️ Express-Rate-Limit</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main id="main-content">
+        <div class="top-bar">
+            <h1>Theory-First & Defense Study Guide</h1>
+            <p>Comprehensive architectural breakdown, under-the-hood mechanics, concise code examples, and professor-level Viva Q&A for your project's technology stack.</p>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search any keyword, method, or viva question (e.g. 'interceptors', 'memoryStorage', 'Blink', 'MIME')...">
+            </div>
+        </div>
+
+        <!-- 1. AXIOS -->
+        <article id="axios" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">1</span>
+                    <h2>AXIOS</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Talk to APIs</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Axios is a Promise-based HTTP client for the browser and Node.js. It acts as an isomorphic abstraction layer over low-level network APIs.</p>
+                <p><strong>Why use Axios over native Fetch API?</strong></p>
+                <ul>
+                    <li><strong>Automatic JSON Transformation:</strong> Axios automatically serializes outgoing JavaScript objects into JSON strings and parses incoming JSON responses into objects. Fetch requires explicit <code>res.json()</code> calls.</li>
+                    <li><strong>Error Handling Model:</strong> Native <code>fetch</code> only rejects a promise on network failures (e.g., DNS lookup failure, offline). It considers HTTP <code>404 Not Found</code> or <code>500 Internal Server Error</code> as successful promises. Axios automatically throws errors for HTTP status codes outside the <code>2xx</code> range.</li>
+                    <li><strong>Interceptors:</strong> Provides pre-request and post-response middleware hooks globally or per instance (essential for JWT token injection and centralized error handling).</li>
+                    <li><strong>Request Cancellation:</strong> Native support for <code>AbortController</code> and legacy <code>CancelToken</code>.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>Adapter Pattern & Promise Interceptor Chain</h4>
+                    <p>Axios relies on the <strong>Adapter Design Pattern</strong> to achieve environment polyfill capability. In browser environments, it invokes <code>XMLHttpRequest</code> (or <code>fetch</code> via custom adapters); in Node.js runtime, it uses native <code>http</code> and <code>https</code> modules.</p>
+                    <p><strong>Interceptor Execution Stack:</strong> Axios manages two arrays: <code>requestInterceptors</code> and <code>responseInterceptors</code>. When <code>axios.request()</code> is called, it constructs a Promise execution chain:</p>
+                    <code>[...requestInterceptors, dispatchRequest, ...responseInterceptors]</code>
+                    <p>Request interceptors are executed in reverse order of registration (UNSHIFT), mutating the config object before sending. Response interceptors run sequentially (PUSH) processing the resolved <code>AxiosResponse</code> object.</p>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>axios_example.js</span><span>JavaScript</span></div>
+                    <pre><code><span class="keyword">import</span> axios <span class="keyword">from</span> <span class="string">'axios'</span>;
+
+<span class="comment">// Create custom configured instance</span>
+<span class="keyword">const</span> api = axios.<span class="function">create</span>({
+    baseURL: <span class="string">'https://api.university.edu/v1'</span>,
+    timeout: <span class="number">5000</span>,
+    withCredentials: <span class="keyword">true</span> <span class="comment">// Send HTTP-only cookies across origins</span>
+});
+
+<span class="comment">// Global Request Interceptor (Inject Auth Header)</span>
+api.interceptors.request.<span class="function">use</span>((config) => {
+    <span class="keyword">const</span> token = localStorage.<span class="function">getItem</span>(<span class="string">'authToken'</span>);
+    <span class="keyword">if</span> (token) config.headers.Authorization = <span class="string">`Bearer ${token}`</span>;
+    <span class="keyword">return</span> config;
+});
+
+<span class="comment">// Execute API Call</span>
+<span class="keyword">const</span> loginUser = <span class="keyword">async</span> (credentials) => {
+    <span class="keyword">const</span> { data } = <span class="keyword">await</span> api.<span class="function">post</span>(<span class="string">'/auth/login'</span>, credentials);
+    <span class="keyword">return</span> data; <span class="comment">// Auto-parsed JSON body</span>
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How does Axios handle HTTP 404 or 500 errors differently from native fetch()?</div>
+                    <div class="viva-a">A: Axios checks the response HTTP status against the <code>validateStatus</code> config rule (default: status >= 200 and < 300). If outside this range, Axios rejects the Promise and throws an <code>AxiosError</code> containing <code>error.response</code>. Native <code>fetch()</code> resolves successfully on HTTP 404/500 and requires manual checks on <code>res.ok</code>.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What design pattern enables Axios to run in both Node.js and Browser?</div>
+                    <div class="viva-a">A: The Adapter Pattern. Axios defines a unified API interface, but delegates the actual execution to environment-specific adapters (<code>adapters/xhr.js</code> for browser XHR and <code>adapters/http.js</code> for Node.js native HTTP streams).</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 2. RECHARTS -->
+        <article id="recharts" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">2</span>
+                    <h2>RECHARTS</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Draw charts in React</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Recharts is a declarative charting library built specifically for React apps, combining D3 scale primitives with SVG rendering.</p>
+                <p><strong>Why use Recharts over raw D3 or Canvas Charting (Chart.js)?</strong></p>
+                <ul>
+                    <li><strong>Declarative Composition:</strong> Chart layouts are constructed using pure React sub-components (<code>&lt;XAxis /&gt;</code>, <code>&lt;Tooltip /&gt;</code>, <code>&lt;Bar /&gt;</code>), enabling standard React state/prop updates.</li>
+                    <li><strong>Direct DOM / SVG React Harmony:</strong> Traditional D3 directly mutates the browser DOM, conflicting with React's Virtual DOM reconciliation mechanism. Recharts uses D3 only for underlying math/scale algorithms while letting React manage the DOM SVG nodes.</li>
+                    <li><strong>Scalable Vector Graphics (SVG):</strong> Crisp rendering across all pixel densities (Retina displays) and seamless styling via standard CSS.</li>
+                </ul>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>Coordinate Mapping & Responsive Container Math</h4>
+                    <p><strong>1. Data Key Mapping:</strong> Recharts takes an array of JavaScript objects. The <code>dataKey</code> prop extracts numeric fields from objects and passes them through D3 scale modules (e.g., <code>d3-scale-linear</code>, <code>d3-scale-band</code>) to calculate exact pixel coordinates within the SVG viewport.</p>
+                    <p><strong>2. ResponsiveContainer Mechanics:</strong> <code>&lt;ResponsiveContainer /&gt;</code> wraps child charts inside an HTML container div and listens to element dimension shifts via <code>ResizeObserver</code>. Upon resize, it recalculates width/height state and triggers a React render pass to recalculate SVG viewBox dimensions dynamically.</p>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>StudentPerformanceChart.jsx</span><span>React Component</span></div>
+                    <pre><code><span class="keyword">import</span> { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } <span class="keyword">from</span> <span class="string">'recharts'</span>;
+
+<span class="keyword">const</span> data = [
+    { batch: <span class="string">'2022'</span>, thesesPassed: <span class="number">42</span> },
+    { batch: <span class="string">'2023'</span>, thesesPassed: <span class="number">58</span> },
+    { batch: <span class="string">'2024'</span>, thesesPassed: <span class="number">75</span> }
+];
+
+<span class="keyword">export const</span> PerformanceChart = () => (
+    <span class="keyword">&lt;</span><span class="function">ResponsiveContainer</span> width=<span class="string">"100%"</span> height={<span class="number">300</span>}<span class="keyword">&gt;</span>
+        <span class="keyword">&lt;</span><span class="function">BarChart</span> data={data}<span class="keyword">&gt;</span>
+            <span class="keyword">&lt;</span><span class="function">CartesianGrid</span> strokeDasharray=<span class="string">"3 3"</span> /<span class="keyword">&gt;</span>
+            <span class="keyword">&lt;</span><span class="function">XAxis</span> dataKey=<span class="string">"batch"</span> /<span class="keyword">&gt;</span>
+            <span class="keyword">&lt;</span><span class="function">YAxis</span> /<span class="keyword">&gt;</span>
+            <span class="keyword">&lt;</span><span class="function">Tooltip</span> /<span class="keyword">&gt;</span>
+            <span class="keyword">&lt;</span><span class="function">Bar</span> dataKey=<span class="string">"thesesPassed"</span> fill=<span class="string">"#38bdf8"</span> radius={[<span class="number">4</span>, <span class="number">4</span>, <span class="number">0</span>, <span class="number">0</span>]} /<span class="keyword">&gt;</span>
+        <span class="keyword">&lt;/</span><span class="function">BarChart</span><span class="keyword">&gt;</span>
+    <span class="keyword">&lt;/</span><span class="function">ResponsiveContainer</span><span class="keyword">&gt;</span>
+);</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What is the main rendering difference between SVG-based Recharts and Canvas-based Chart.js?</div>
+                    <div class="viva-a">A: Recharts renders SVG DOM nodes for every element (bars, axis ticks, tooltips), which makes elements individually inspectable, CSS-styleable, and interactive. Canvas (Chart.js) draws pixels directly on a single bitmap buffer; Canvas is faster for massive datasets (100,000+ points), but SVG (Recharts) integrates superiorly with React UI components and state.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How does ResponsiveContainer calculate dynamic dimensions without triggering endless re-render loops?</div>
+                    <div class="viva-a">A: It uses the browser's native <code>ResizeObserver</code> API on the parent container element, updating internal state only when bounding box client dimensions actually change.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 3. MULTER -->
+        <article id="multer" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">3</span>
+                    <h2>MULTER</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Accept uploaded files</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Multer is Node.js middleware for Express that parses incoming HTTP <code>multipart/form-data</code> requests (file uploads).</p>
+                <p><strong>Why:</strong> Standard Express body parsers (<code>express.json()</code> and <code>express.urlencoded()</code>) are strictly designed for URL-encoded forms or raw text/JSON payloads. Binary file uploads require boundary-separated multipart streams, which Express cannot parse natively.</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>Busboy Stream Parsing & Storage Engine Trade-offs</h4>
+                    <p>Multer wraps <code>busboy</code>, a high-performance streaming parser for Node.js. When an HTTP POST request hits a Multer endpoint, Multer inspects the <code>Content-Type</code> header for a boundary string (e.g., <code>multipart/form-data; boundary=---------------------------12345</code>).</p>
+                    <p>It reads incoming TCP data chunks directly from Node's <code>req</code> stream, splitting binary data at boundary markers into text fields (populated in <code>req.body</code>) and file streams (attached to <code>req.file</code> or <code>req.files</code>).</p>
+                    <table class="comp-table">
+                        <thead>
+                            <tr>
+                                <th>Storage Strategy</th>
+                                <th>Mechanism</th>
+                                <th>Pros / Cons</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>diskStorage</strong></td>
+                                <td>Pipes incoming stream directly to disk write streams (<code>fs.createWriteStream</code>).</td>
+                                <td>✅ Low RAM footprint.<br>❌ Slower I/O latency; leaves temporary disk state.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>memoryStorage</strong></td>
+                                <td>Buffers entire binary chunk array into RAM heap (<code>Buffer.concat()</code>).</td>
+                                <td>✅ Ultra-fast in-memory parsing (e.g., immediate PDF/Excel processing).<br>⚠️ High risk of V8 Heap Out-Of-Memory (OOM) crashes under concurrent uploads.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>uploadRouter.js</span><span>Express Middleware</span></div>
+                    <pre><code><span class="keyword">import</span> express <span class="keyword">from</span> <span class="string">'express'</span>;
+<span class="keyword">import</span> multer <span class="keyword">from</span> <span class="string">'multer'</span>;
+
+<span class="keyword">const</span> router = express.<span class="function">Router</span>();
+
+<span class="comment">// Configure Memory Storage strategy with file size guardrails</span>
+<span class="keyword">const</span> upload = <span class="function">multer</span>({
+    storage: multer.<span class="function">memoryStorage</span>(),
+    limits: { fileSize: <span class="number">10</span> * <span class="number">1024</span> * <span class="number">1024</span> }, <span class="comment">// 10 MB limit</span>
+    fileFilter: (req, file, cb) => {
+        <span class="keyword">if</span> (file.mimetype === <span class="string">'application/pdf'</span> || file.mimetype.includes(<span class="string">'wordprocessingml'</span>)) {
+            <span class="function">cb</span>(<span class="keyword">null</span>, <span class="keyword">true</span>);
+        } <span class="keyword">else</span> {
+            <span class="function">cb</span>(<span class="keyword">new</span> <span class="function">Error</span>(<span class="string">'Invalid file type. Only PDF and DOCX allowed.'</span>), <span class="keyword">false</span>);
+        }
+    }
+});
+
+<span class="comment">// Route definition accepting single file field named "proposal"</span>
+router.<span class="function">post</span>(<span class="string">'/upload-proposal'</span>, upload.<span class="function">single</span>(<span class="string">'proposal'</span>), (req, res) => {
+    <span class="comment">// File buffer accessible in memory: req.file.buffer</span>
+    res.<span class="function">json</span>({ status: <span class="string">'success'</span>, filename: req.file.originalname, size: req.file.size });
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What security vulnerability exists if you use memoryStorage for file uploads without size limits?</div>
+                    <div class="viva-a">A: Denial of Service (DoS) via V8 memory exhaustion. If malicious actors upload multiple multi-gigabyte files concurrently, Node.js allocates RAM buffers until the V8 heap crashes with an Out-Of-Memory (OOM) error.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How does Multer split text form fields from binary files in a single HTTP request?</div>
+                    <div class="viva-a">A: It scans the raw incoming TCP request stream for the multipart <code>boundary</code> token specified in the HTTP <code>Content-Type</code> header. Anything delimited before a field header is assigned to <code>req.body</code>, while binary data between boundaries is routed to file streams.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 4. XLSX (SheetJS) -->
+        <article id="xlsx" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">4</span>
+                    <h2>XLSX (SheetJS)</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Parse & Produce Excel Files</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> SheetJS (<code>xlsx</code> package) is a JavaScript library for parsing, manipulating, and generating OpenXML spreadsheet files (.xlsx, .xls, .csv).</p>
+                <p><strong>Why:</strong> Universities and enterprise systems rely heavily on Excel for bulk data entry (e.g., student batch lists, supervisor assignments, marksheets). Manual parsing of raw compressed OpenXML structures is impossible without a specialized binary/XML AST parser.</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>OpenXML Unzipping & Shared String Table Resolution</h4>
+                    <p>An <code>.xlsx</code> file is fundamentally a compressed <strong>ZIP archive</strong> containing a tree of XML documents (e.g., <code>[Content_Types].xml</code>, <code>xl/workbook.xml</code>, <code>xl/worksheets/sheet1.xml</code>, <code>xl/sharedStrings.xml</code>).</p>
+                    <p><strong>Parsing Pipeline:</strong></p>
+                    <ol>
+                        <li><strong>Decompression:</strong> SheetJS decompresses the input binary buffer (using internal JSZip/CFB engines).</li>
+                        <li><strong>Shared Strings Table:</strong> Excel saves disk space by storing repeated text strings inside a shared XML lookup table (<code>xl/sharedStrings.xml</code>). Individual sheet cells store zero-based index pointers (e.g., <code>&lt;c t="s"&gt;&lt;v&gt;0&lt;/v&gt;&lt;/c&gt;</code>). SheetJS resolves these references back to actual strings.</li>
+                        <li><strong>In-Memory AST:</strong> Builds an abstract workbook tree object: <code>Workbook -> SheetNames -> Sheets -> Cell Reference Objects (A1, B1)</code>.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>excelService.js</span><span>JavaScript</span></div>
+                    <pre><code><span class="keyword">import</span> * <span class="keyword">as</span> XLSX <span class="keyword">from</span> <span class="string">'xlsx'</span>;
+
+<span class="comment">// 1. Parse uploaded binary buffer to JSON array</span>
+<span class="keyword">export const</span> parseStudentExcel = (fileBuffer) => {
+    <span class="keyword">const</span> workbook = XLSX.<span class="function">read</span>(fileBuffer, { type: <span class="string">'buffer'</span> });
+    <span class="keyword">const</span> sheetName = workbook.SheetNames[<span class="number">0</span>]; <span class="comment">// Target first tab</span>
+    <span class="keyword">const</span> worksheet = workbook.Sheets[sheetName];
+    
+    <span class="comment">// Convert tabular grid to Array of JavaScript Objects</span>
+    <span class="keyword">const</span> studentRecords = XLSX.utils.<span class="function">sheet_to_json</span>(worksheet);
+    <span class="keyword">return</span> studentRecords; <span class="comment">// [{ Roll: 1, Name: "Alice" }, ...]</span>
+};
+
+<span class="comment">// 2. Export JSON array back into downloadable Excel Buffer</span>
+<span class="keyword">export const</span> exportGradeReport = (reportData) => {
+    <span class="keyword">const</span> worksheet = XLSX.utils.<span class="function">json_to_sheet</span>(reportData);
+    <span class="keyword">const</span> workbook = XLSX.utils.<span class="function">book_new</span>();
+    XLSX.utils.<span class="function">book_append_sheet</span>(workbook, worksheet, <span class="string">"Marksheet"</span>);
+    
+    <span class="keyword">return</span> XLSX.<span class="function">write</span>(workbook, { type: <span class="string">'buffer'</span>, bookType: <span class="string">'xlsx'</span> });
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What is an .xlsx file actually comprised of under the hood?</div>
+                    <div class="viva-a">A: It is a ZIP container holding structured XML files adhering to the Open Packaging Conventions (OPC). Key files inside include <code>xl/workbook.xml</code> (structure), <code>xl/worksheets/sheet1.xml</code> (cell data), and <code>xl/sharedStrings.xml</code> (string cache table).</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: Why does Excel use a "Shared String Table"?</div>
+                    <div class="viva-a">A: Optimization of file size. Storing identical strings (e.g., "Pass/Fail" repeated 10,000 times) in a central XML table and referencing them via integer IDs prevents XML bloat.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 5. MAMMOTH -->
+        <article id="mammoth" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">5</span>
+                    <h2>MAMMOTH</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: .docx → Clean Text / HTML</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Mammoth is a specialized converter designed to extract text and convert Word document (.docx) files into HTML or plain text.</p>
+                <p><strong>Why:</strong> Standard file stream readers (<code>fs.readFile</code>) read Word documents as unreadable binary data. Mammoth strips heavy, non-standard Microsoft Word layout formatting (margins, fonts, XML metadata) and extracts clean, semantically structured text/HTML suitable for browser display, database indexing, or AI processing pipelines.</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>OpenXML Semantic Mapping Tree</h4>
+                    <p>Like XLSX, <code>.docx</code> files are compressed ZIP folders containing OpenXML files. Mammoth specifically extracts <code>word/document.xml</code> and <code>word/styles.xml</code>.</p>
+                    <p><strong>Transformation Pipeline:</strong></p>
+                    <ol>
+                        <li>Unzips file and parses Word XML tags: <code>&lt;w:p&gt;</code> (paragraph), <code>&lt;w:r&gt;</code> (run of text), <code>&lt;w:t&gt;</code> (text node), <code>&lt;w:tbl&gt;</code> (table).</li>
+                        <li><strong>Semantic Translation:</strong> Ignores visual attributes (e.g., "Font: Calibri 11pt, Margin: 1 inch") and maps semantic styles instead:
+                            <ul>
+                                <li>Word <code>Heading 1</code> style → HTML <code>&lt;h1&gt;</code> tag</li>
+                                <li>Word Paragraph with bullet style → HTML <code>&lt;li&gt;</code> element</li>
+                                <li>Embedded images in <code>word/media/</code> → Base64 HTML <code>&lt;img src="data:image/png;base64,..." /&gt;</code></li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>docxParser.js</span><span>JavaScript</span></div>
+                    <pre><code><span class="keyword">import</span> mammoth <span class="keyword">from</span> <span class="string">'mammoth'</span>;
+
+<span class="comment">// Extract raw text from Word document buffer for AI analysis</span>
+<span class="keyword">export const</span> extractProposalText = <span class="keyword">async</span> (fileBuffer) => {
+    <span class="comment">// Extracts plain unformatted text (strips all formatting)</span>
+    <span class="keyword">const</span> result = <span class="keyword">await</span> mammoth.<span class="function">extractRawText</span>({ buffer: fileBuffer });
+    <span class="keyword">return</span> result.value; <span class="comment">// Returns clean string</span>
+};
+
+<span class="comment">// Convert Word document to semantic HTML for UI Preview</span>
+<span class="keyword">export const</span> convertDocxToHtml = <span class="keyword">async</span> (fileBuffer) => {
+    <span class="keyword">const</span> result = <span class="keyword">await</span> mammoth.<span class="function">convertToHtml</span>({ buffer: fileBuffer });
+    <span class="keyword">return</span> result.value; <span class="comment">// Returns sanitized HTML string</span>
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: Why use Mammoth instead of converting .docx directly via LibreOffice/Word CLI?</div>
+                    <div class="viva-a">A: Mammoth is a zero-dependency, lightweight JavaScript library running natively inside Node.js memory. External converters (like LibreOffice CLI) require heavy headless OS binaries (~500MB+), spawn slow child processes, and preserve complex desktop layout styles rather than clean HTML/text.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: Can Mammoth parse legacy .doc (Word 97-2003) files?</div>
+                    <div class="viva-a">A: No. Legacy <code>.doc</code> files use a proprietary binary OLE Compound File Format, whereas Mammoth strictly targets OpenXML format (<code>.docx</code>).</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 6. PDF-PARSE -->
+        <article id="pdfparse" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">6</span>
+                    <h2>PDF-PARSE</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: PDF → Extract Raw Text</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> <code>pdf-parse</code> is a Node.js library for extracting raw unformatted text streams, page counts, and metadata from Portable Document Format (PDF) files.</p>
+                <p><strong>Why:</strong> Unlike DOCX or HTML, PDFs are strictly <em>visual print representation formats</em>. They do not store text in semantic paragraphs or DOM trees. <code>pdf-parse</code> parses internal PDF vector positioning commands to reconstruct readable text strings for backend text processing.</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>PDF Content Stream Parsing & Glyphs Coordinate Ordering</h4>
+                    <p>Built upon Mozilla's <code>pdf.js</code> rendering engine core. PDFs store text as absolute graphical draw operations: e.g., <code>BT /F1 12 Tf 72 712 Td (Hello World) Tj ET</code> (Begin Text, set Font F1 12pt, Move to Coordinate X:72 Y:712, Show String "Hello World").</p>
+                    <p><strong>Extraction Algorithm:</strong></p>
+                    <ol>
+                        <li>Reads the PDF <strong>XRef (Cross-Reference) Table</strong> at the end of the file to locate page object offset positions.</li>
+                        <li>Parses Page Content Streams and decodes font <strong>ToUnicode CMap</strong> tables (mapping internal glyph IDs back to UTF-8 characters).</li>
+                        <li>Calculates glyph coordinate matrices $(X, Y)$ on the page plane, ordering text fragments top-to-bottom, left-to-right to reconstruct human-readable paragraphs.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>pdfExtractor.js</span><span>JavaScript</span></div>
+                    <pre><code><span class="keyword">import</span> pdf <span class="keyword">from</span> <span class="string">'pdf-parse'</span>;
+
+<span class="keyword">export const</span> processThesisPDF = <span class="keyword">async</span> (pdfBuffer) => {
+    <span class="comment">// Execute text extraction pipeline</span>
+    <span class="keyword">const</span> data = <span class="keyword">await</span> <span class="function">pdf</span>(pdfBuffer);
+    
+    <span class="keyword">return</span> {
+        numpages: data.numpages,     <span class="comment">// Total page count</span>
+        info: data.info,             <span class="comment">// PDF Metadata (Title, Author, Creator)</span>
+        text: data.text              <span class="comment">// Extracted raw text string</span>
+    };
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: Why does text extracted from a PDF sometimes appear scrambled or missing spaces?</div>
+                    <div class="viva-a">A: Because PDFs store text fragments based on absolute visual coordinates rather than semantic sentences. If a PDF lacks a proper <code>ToUnicode CMap</code>, uses custom subset fonts, or uses loose kerning offsets, text ordering algorithms must estimate space characters heuristically.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: Can pdf-parse extract text from scanned PDF documents?</div>
+                    <div class="viva-a">A: No. Scanned PDFs store pages as bitmap raster images (JPEG/PNG streams) inside a PDF wrapper. Extracting text from scanned PDFs requires an Optical Character Recognition (OCR) engine like Tesseract.js.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 7. PDFKIT -->
+        <article id="pdfkit" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">7</span>
+                    <h2>PDFKIT</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Programmatic PDF Drawing Engine</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> PDFKit is an in-memory PDF generation library for Node.js that exposes a vector drawing API to construct PDF documents from code.</p>
+                <p><strong>Why:</strong> When generating standardized reports, certificates, or marksheets where exact layout positioning, low server memory overhead, and lightning speed are required. PDFKit requires zero external dependencies or browser runtimes (unlike Puppeteer).</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>Direct Binary PDF Byte Stream Construction</h4>
+                    <p>PDFKit implements the core PDF 1.7 specification natively in JS. A <code>PDFDocument</code> instance is an active <strong>Node.js Readable Stream</strong>.</p>
+                    <p>When you call imperative vector commands like <code>doc.fontSize(16).text('Evaluation Sheet', 100, 100)</code> or <code>doc.rect(50, 50, 200, 100).stroke()</code>, PDFKit converts these calls directly into raw low-level PDF stream operator codes (e.g. <code>/F1 16 Tf 1 0 0 1 100 742 Tm (Evaluation Sheet) Tj</code>).</p>
+                    <p>Calling <code>doc.end()</code> compiles the internal cross-reference (XRef) binary catalog table and closes the stream, allowing output to pipe directly into HTTP response objects without buffering the entire document in RAM.</p>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>generateMarksheet.js</span><span>Node.js Stream</span></div>
+                    <pre><code><span class="keyword">import</span> PDFDocument <span class="keyword">from</span> <span class="string">'pdfkit'</span>;
+
+<span class="keyword">export const</span> downloadMarksheet = (res, studentData) => {
+    <span class="keyword">const</span> doc = <span class="keyword">new</span> <span class="function">PDFDocument</span>({ size: <span class="string">'A4'</span>, margin: <span class="number">50</span> });
+
+    <span class="comment">// Direct pipe to Express HTTP Response (Chunked Stream)</span>
+    res.<span class="function">setHeader</span>(<span class="string">'Content-Type'</span>, <span class="string">'application/pdf'</span>);
+    res.<span class="function">setHeader</span>(<span class="string">'Content-Disposition'</span>, <span class="string">'attachment; filename="marksheet.pdf"'</span>);
+    doc.<span class="function">pipe</span>(res);
+
+    <span class="comment">// Vector Drawing & Text Layout</span>
+    doc.<span class="function">fillColor</span>(<span class="string">'#1e293b'</span>).<span class="function">fontSize</span>(<span class="number">20</span>).<span class="function">text</span>(<span class="string">'OFFICIAL MARKSHEET'</span>, { align: <span class="string">'center'</span> });
+    doc.<span class="function">moveDown</span>();
+    doc.<span class="function">fontSize</span>(<span class="number">12</span>).<span class="function">text</span>(<span class="string">`Student Name: ${studentData.name}`</span>);
+    doc.<span class="function">text</span>(<span class="string">`Final Thesis Score: ${studentData.score} / 100`</span>);
+    
+    <span class="comment">// Draw Divider Line (Vector path)</span>
+    doc.<span class="function">moveTo</span>(<span class="number">50</span>, <span class="number">150</span>).<span class="function">lineTo</span>(<span class="number">545</span>, <span class="number">150</span>).<span class="function">strokeColor</span>(<span class="string">'#38bdf8'</span>).<span class="function">stroke</span>();
+
+    <span class="comment">// Finalize document stream</span>
+    doc.<span class="function">end</span>();
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What is the primary memory advantage of piping a PDFKit instance directly to an HTTP response?</div>
+                    <div class="viva-a">A: Streams process data in small chunks. Piping <code>doc.pipe(res)</code> transfers PDF data to the client immediately as byte streams are generated, keeping server RAM consumption minimal regardless of document size.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: PDFKit vs Puppeteer: When should you prefer PDFKit?</div>
+                    <div class="viva-a">A: Prefer PDFKit for structured, high-volume programmatic generation (invoices, receipts, marksheets) where speed and low resource usage matter. Puppeteer consumes ~150MB+ RAM per render page; PDFKit consumes only a few megabytes.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 8. PUPPETEER-CORE -->
+        <article id="puppeteer" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">8</span>
+                    <h2>PUPPETEER-CORE</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Headless Chrome HTML → PDF Engine</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Puppeteer-Core is a Node.js library that provides a high-level API to automate Chrome/Chromium browsers via the Chrome DevTools Protocol (CDP).</p>
+                <p><strong>Why:</strong> When complex document layouts (e.g. styled multi-column evaluation reports, CSS grid charts, modern web fonts) need to be converted to pixel-perfect PDFs. Designing these in PDFKit via manual x,y drawing is extremely painful. Puppeteer lets you render HTML/CSS via Chromium's real Blink layout engine and save it as PDF.</p>
+                <p><strong>Why puppeteer-core instead of full puppeteer?</strong> Full <code>puppeteer</code> automatically downloads a ~300MB bundled Chromium binary on install. <code>puppeteer-core</code> skips the download, leveraging pre-installed host Chrome/Chromium (essential for lightweight Docker images).</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>Chrome DevTools Protocol (CDP) WebSocket Automation</h4>
+                    <p>Puppeteer-Core spawns an existing Chrome executable in <strong>headless mode</strong> (no GUI window) with remote debugging enabled over a WebSocket port.</p>
+                    <p><strong>PDF Generation Sequence:</strong></p>
+                    <ol>
+                        <li>Connects via WebSocket to CDP endpoint.</li>
+                        <li>Sends <code>Target.createTarget</code> command to open a blank tab (Page).</li>
+                        <li>Injects HTML string into DOM via <code>Page.setPageMarkup</code> and waits for network idle state (fonts & images loaded).</li>
+                        <li>Triggers Chrome's native print engine via CDP command <code>Page.printToPDF</code>, using Chromium's <strong>Blink layout engine</strong> and Skia graphics library to rasterize CSS to vector PDF page formats.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>htmlToPdfService.js</span><span>Puppeteer Automation</span></div>
+                    <pre><code><span class="keyword">import</span> puppeteer <span class="keyword">from</span> <span class="string">'puppeteer-core'</span>;
+
+<span class="keyword">export const</span> renderHtmlToPdf = <span class="keyword">async</span> (htmlContent) => {
+    <span class="comment">// Launch pre-installed Chromium instance</span>
+    <span class="keyword">const</span> browser = <span class="keyword">await</span> puppeteer.<span class="function">launch</span>({
+        executablePath: process.env.CHROME_PATH || <span class="string">'/usr/bin/chromium-browser'</span>,
+        args: [<span class="string">'--no-sandbox'</span>, <span class="string">'--disable-setuid-sandbox'</span>]
+    });
+
+    <span class="keyword">const</span> page = <span class="keyword">await</span> browser.<span class="function">newPage</span>();
+    
+    <span class="comment">// Inject HTML content and wait for asset loading</span>
+    <span class="keyword">await</span> page.<span class="function">setContent</span>(htmlContent, { waitUntil: <span class="string">'networkidle0'</span> });
+
+    <span class="comment">// Render Chromium print engine to PDF buffer</span>
+    <span class="keyword">const</span> pdfBuffer = <span class="keyword">await</span> page.<span class="function">pdf</span>({
+        format: <span class="string">'A4'</span>,
+        printBackground: <span class="keyword">true</span>, <span class="comment">// Preserve CSS background colors</span>
+        margin: { top: <span class="string">'20mm'</span>, bottom: <span class="string">'20mm'</span> }
+    });
+
+    <span class="keyword">await</span> browser.<span class="function">close</span>();
+    <span class="keyword">return</span> pdfBuffer;
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What is the main difference between 'puppeteer' and 'puppeteer-core'?</div>
+                    <div class="viva-a">A: <code>puppeteer</code> automatically downloads a specific Chromium binary during <code>npm install</code> (~300MB download). <code>puppeteer-core</code> does not download a browser and requires an explicit <code>executablePath</code> pointing to an existing browser installed on the host OS.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How do you prevent multi-page PDF tables from cutting text rows in half in Puppeteer?</div>
+                    <div class="viva-a">A: Using CSS page-break print styles: <code>tr, .card { break-inside: avoid; page-break-inside: avoid; }</code>.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 9. NODEMAILER -->
+        <article id="nodemailer" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">9</span>
+                    <h2>NODEMAILER</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: SMTP Email Dispatcher</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Nodemailer is a zero-dependency module for Node.js applications to send emails using Internet standards (SMTP, Sendmail, SES).</p>
+                <p><strong>Why:</strong> Automated transactional communication (sending password resets, defense date notifications, supervisor assignment emails). Nodemailer handles complex MIME encoding, multi-part body structures (plain text + HTML fallbacks), and attachment streams seamlessly over TLS socket connections.</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>SMTP RFC Protocol Handshake & Socket Connection Pooling</h4>
+                    <p>Nodemailer implements RFC 5321 (SMTP protocol) and RFC 5322 (Internet Message Format) over native Node.js <code>net</code> and <code>tls</code> sockets.</p>
+                    <p><strong>SMTP Transaction Lifecycle:</strong></p>
+                    <ol>
+                        <li><strong>Connection / EHLO:</strong> Establishes TCP/TLS connection with SMTP server (e.g. Gmail <code>smtp.gmail.com:587</code>) and exchanges <code>EHLO</code> capabilities.</li>
+                        <li><strong>TLS / Auth:</strong> Upgrades connection to secure TLS via <code>STARTTLS</code> and sends <code>AUTH LOGIN</code> or <code>AUTH PLAIN</code> base64 credentials.</li>
+                        <li><strong>Envelope Negotiation:</strong> Transmits <code>MAIL FROM:&lt;sender@univ.edu&gt;</code> and <code>RCPT TO:&lt;student@univ.edu&gt;</code>.</li>
+                        <li><strong>MIME Data Chunking:</strong> Formats HTML/text body and encodes binary attachments into Base64 boundary chunks inside the <code>DATA</code> stream command. Terminated by <code>\r\n.\r\n</code>.</li>
+                        <li><strong>Connection Pooling:</strong> Setting <code>pool: true</code> reuses open TCP/TLS socket connections across multiple email dispatches, avoiding repeated SSL handshake overhead.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>emailService.js</span><span>Nodemailer Transport</span></div>
+                    <pre><code><span class="keyword">import</span> nodemailer <span class="keyword">from</span> <span class="string">'nodemailer'</span>;
+
+<span class="comment">// Create reusable pooled SMTP connection transporter</span>
+<span class="keyword">const</span> transporter = nodemailer.<span class="function">createTransport</span>({
+    host: process.env.SMTP_HOST,
+    port: <span class="number">587</span>,
+    secure: <span class="keyword">false</span>, <span class="comment">// Upgrade via STARTTLS</span>
+    pool: <span class="keyword">true</span>,    <span class="comment">// Reuse TCP connection sockets</span>
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
+
+<span class="keyword">export const</span> sendEvaluationNotice = <span class="keyword">async</span> (recipientEmail, studentName) => {
+    <span class="keyword">const</span> mailOptions = {
+        from: <span class="string">'"Thesis Committee" &lt;no-reply@university.edu&gt;'</span>,
+        to: recipientEmail,
+        subject: <span class="string">'Thesis Proposal Evaluation Scheduled'</span>,
+        text: <span class="string">`Hello ${studentName}, your evaluation has been scheduled.`</span>,
+        html: <span class="string">`&lt;h3&gt;Hello ${studentName}&lt;/h3&gt;&lt;p&gt;Your thesis evaluation has been &lt;b&gt;scheduled&lt;/b&gt;.&lt;/p&gt;`</span>
+    };
+
+    <span class="keyword">const</span> info = <span class="keyword">await</span> transporter.<span class="function">sendMail</span>(mailOptions);
+    <span class="keyword">return</span> info.messageId;
+};</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What is the benefit of enabling 'pool: true' in Nodemailer transports?</div>
+                    <div class="viva-a">A: Instead of creating and tearing down a new TCP connection and performing a cryptographic TLS handshake for every single email, socket pooling keeps a persistent pool of open connections, drastically speeding up bulk notification dispatch.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How does Nodemailer support email clients that cannot display HTML?</div>
+                    <div class="viva-a">A: It formats the payload as a MIME <code>multipart/alternative</code> message containing both a <code>text/plain</code> version and a <code>text/html</code> version. The client software chooses the highest fidelity format it supports.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 10. EXPRESS-RATE-LIMIT -->
+        <article id="ratelimit" class="tech-card">
+            <header class="tech-header">
+                <div class="tech-title">
+                    <span class="num-badge">10</span>
+                    <h2>EXPRESS-RATE-LIMIT</h2>
+                </div>
+                <span class="mental-model-pill">Mental Model: Protect APIs from Abuse</span>
+            </header>
+
+            <div class="section-block">
+                <h3 class="section-title">What & Why</h3>
+                <p><strong>What:</strong> Express-Rate-Limit is request-throttling middleware for Express applications designed to limit repeated hits to API endpoints.</p>
+                <p><strong>Why:</strong> Essential security defensive layer against Brute-Force login attacks, API Denial of Service (DoS), and resource cost protection on CPU-intensive endpoints (e.g. Puppeteer PDF rendering or AI parsing routes).</p>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">How It Works Under the Hood (Deep Theory)</h3>
+                <div class="theory-box">
+                    <h4>Sliding Window Algorithm & Key Generation</h4>
+                    <p>Acts as an Express middleware pipeline gatekeeper: <code>(req, res, next)</code>.</p>
+                    <ol>
+                        <li><strong>Key Identification:</strong> Generates a client identification key (by default <code>req.ip</code>).</li>
+                        <li><strong>Counter Store Lookup:</strong> Fetches request hit counter from a Store engine (default: <code>MemoryStore</code> hash map).</li>
+                        <li><strong>Window Evaluation:</strong> Checks if request count within current timeframe window (<code>windowMs</code>) exceeds <code>max</code> threshold.
+                            <ul>
+                                <li><strong>If within limit:</strong> Increments hit counter, sets HTTP headers (<code>RateLimit-Limit</code>, <code>RateLimit-Remaining</code>), and invokes <code>next()</code>.</li>
+                                <li><strong>If exceeded:</strong> Short-circuits execution and immediately returns <strong>HTTP 429 Too Many Requests</strong> along with a <code>Retry-After</code> header.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-block">
+                <h3 class="section-title">Concise Code Example</h3>
+                <div class="code-container">
+                    <div class="code-header"><span>rateLimiter.js</span><span>Express Middleware</span></div>
+                    <pre><code><span class="keyword">import</span> rateLimit <span class="keyword">from</span> <span class="string">'express-rate-limit'</span>;
+
+<span class="comment">// 1. Strict Limiter for Auth Routes (Anti Brute-Force)</span>
+<span class="keyword">export const</span> authLimiter = <span class="function">rateLimit</span>({
+    windowMs: <span class="number">15</span> * <span class="number">60</span> * <span class="number">1000</span>, <span class="comment">// 15 minutes window</span>
+    max: <span class="number">5</span>,                  <span class="comment">// Max 5 login attempts per IP</span>
+    message: { error: <span class="string">'Too many login attempts. Please try again after 15 minutes.'</span> },
+    standardHeaders: <span class="keyword">true</span>,   <span class="comment">// Return RateLimit-* headers</span>
+    legacyHeaders: <span class="keyword">false</span>
+});
+
+<span class="comment">// 2. Moderate Limiter for Heavy PDF Generation</span>
+<span class="keyword">export const</span> pdfGenLimiter = <span class="function">rateLimit</span>({
+    windowMs: <span class="number">60</span> * <span class="number">1000</span>,      <span class="comment">// 1 minute window</span>
+    max: <span class="number">10</span>,                 <span class="comment">// Max 10 PDF generation calls</span>
+    message: { error: <span class="string">'PDF generation quota exceeded. Slow down requests.'</span> }
+});</code></pre>
+                </div>
+            </div>
+
+            <div class="viva-section">
+                <div class="viva-title">💡 Viva & Examination Questions</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: What major flaw occurs when using default MemoryStore rate limiting in a multi-instance or clustered Node app?</div>
+                    <div class="viva-a">A: <code>MemoryStore</code> maintains hit counters in local Node process RAM. In a clustered environment behind a load balancer (e.g. Nginx, PM2 cluster, Kubernetes), consecutive user requests land on different processes, allowing clients to bypass limits. Solution: Use a centralized store like <code>rate-limit-redis</code>.</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: Why must you configure 'app.set("trust proxy", 1)' when running Express behind Nginx or Cloudflare?</div>
+                    <div class="viva-a">A: Without <code>trust proxy</code>, Express sees the IP of the reverse proxy (Nginx) as <code>req.ip</code> for EVERY user request. This causes the rate-limiter to treat ALL system users as a single IP, blocking the entire site globally once the limit is reached.</div>
+                </div>
+            </div>
+        </article>
+
+    </main>
+
+    <script>
+        // Interactive Viva Accordion Toggle
+        document.querySelectorAll('.viva-q').forEach(item => {
+            item.addEventListener('click', () => {
+                const parent = item.parentElement;
+                parent.classList.toggle('active');
+            });
+        });
+
+        // Instant Live Filter Search
+        const searchInput = document.getElementById('searchInput');
+        const cards = document.querySelectorAll('.tech-card');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            
+            cards.forEach(card => {
+                const text = card.innerText.toLowerCase();
+                if (text.includes(query)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+
+        // Sidebar Navigation Highlight
+        window.addEventListener('scroll', () => {
+            let current = '';
+            cards.forEach(card => {
+                const cardTop = card.offsetTop;
+                const cardHeight = card.clientHeight;
+                if (pageYOffset >= (cardTop - 150)) {
+                    current = card.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

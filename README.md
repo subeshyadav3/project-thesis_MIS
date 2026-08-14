@@ -51,7 +51,7 @@ TPMS is a full-stack academic management system designed specifically for **Pulc
 - **Program Coordinators**: Manage users, assign supervisors/examiners, bulk-import students, forward results
 - **Maintainers**: System-wide administration
 
-The system supports **6 academic programs** across **Bachelor** (BCT, BEI) and **Master** (MSNCS, MSICE, MSDSA, MSCSKE) levels with built-in academic year and batch management.
+The system supports **6 academic programs** across **Bachelor** (BCT, BEI) and **Master** (MSNCS, MSICE, MSDSA, MSCSK) levels with built-in academic year and batch management.
 
 ---
 

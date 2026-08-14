@@ -9,6 +9,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
+import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
 
 const PAGE_SIZE = 10;
@@ -214,6 +215,47 @@ function SupervisorMasterThesis() {
         </div>
       </div>
 
+      {theses.filter(t => t.supervisorAssignmentStatus === 'PENDING').length > 0 && (
+        <div className="card" style={{ marginBottom: 24, border: '1px solid var(--color-warning-border, #f59e0b)', background: 'var(--color-warning-container-low, #fffbeb)', padding: 18, borderRadius: 'var(--border-radius-lg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="assignment_ind" className="material-symbols-outlined" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#92400e' }}>
+                  Pending Supervision Requests ({theses.filter(t => t.supervisorAssignmentStatus === 'PENDING').length})
+                </h3>
+                <p style={{ margin: 0, fontSize: 12, color: '#b45309' }}>
+                  A coordinator has assigned you as thesis supervisor for the following student(s). Please review and accept or decline.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {theses.filter(t => t.supervisorAssignmentStatus === 'PENDING').map(t => (
+              <div key={t.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+                padding: '14px 16px', background: '#ffffff', borderRadius: 'var(--border-radius-md)', border: '1px solid #fde68a',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#1e293b' }}>{t.title}</div>
+                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <span><strong>Student:</strong> {t.student?.firstName} {t.student?.lastName} ({t.student?.rollNumber || '—'})</span>
+                    {t.cluster && <span><strong>Cluster:</strong> {t.cluster}</span>}
+                    {t.batch && <span><strong>Batch:</strong> {t.batch}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <SupervisionActions item={t} type="thesis" onDone={loadData} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">
@@ -274,7 +316,10 @@ function SupervisorMasterThesis() {
                       {t.batch ? `Batch ${t.batch}` : '—'}
                     </td>
                     <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {t.supervisorAssignmentStatus === 'PENDING' && (
+                          <SupervisionActions item={t} type="thesis" onDone={loadData} />
+                        )}
                         <button className="btn btn-sm btn-outline" onClick={() => setShowDetail(t)}>
                           <Icon name="visibility" className="material-symbols-outlined" />
                           View

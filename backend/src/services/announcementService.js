@@ -38,9 +38,11 @@ async function listEligibleAnnouncementsForStudent(user) {
   const now = new Date();
   const all = await prisma.announcement.findMany({
     where: {
-      allowGroupFormation: true,
-      departmentId: user.departmentId,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      AND: [
+        { OR: [{ allowGroupFormation: true }, { formEnabled: true }] },
+        { departmentId: user.departmentId },
+        { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      ],
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -79,4 +81,13 @@ async function isStudentAlreadyInAGroupAnnouncement(user, announcement) {
   return !!thesis;
 }
 
-module.exports = { resolveAudience, listEligibleAnnouncementsForStudent, isStudentAlreadyInAGroupAnnouncement };
+async function isStudentSubmittedForm(user, announcementId) {
+  if (user.role !== 'STUDENT') return false;
+  const resp = await prisma.formResponse.findUnique({
+    where: { announcementId_studentId: { announcementId, studentId: user.id } },
+    select: { id: true, thesisId: true, status: true },
+  });
+  return resp ? { submitted: true, ...resp } : { submitted: false };
+}
+
+module.exports = { resolveAudience, listEligibleAnnouncementsForStudent, isStudentAlreadyInAGroupAnnouncement, isStudentSubmittedForm };

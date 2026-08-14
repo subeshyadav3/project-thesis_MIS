@@ -1,0 +1,18 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Functional Requirements of TPMS}}{8}{table.3.1}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Technology Stack and Selection Rationale}}{11}{table.caption.9}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces System Environment Configuration}}{20}{table.caption.18}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Puppeteer PDF Generation Performance Benchmarks (n=100 per type)}}{24}{table.caption.19}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces RBAC Security Enforcement Test Results}}{25}{table.caption.20}%
+\contentsline {table}{\numberline {6.3}{\ignorespaces RAG Chatbot Response Quality Evaluation (n=30 questions)}}{26}{table.caption.21}%
+\contentsline {table}{\numberline {6.4}{\ignorespaces Operational Comparison: Legacy Manual Process vs.\ TPMS Platform}}{26}{table.caption.22}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {B.1}{\ignorespaces TPMS REST API Endpoint Summary}}{34}{table.B.1}%

@@ -36,13 +36,17 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/users', label: 'Users', icon: 'groups' },
     { path: '/coordinator/announcements', label: 'Announcements', icon: 'campaign' },
     { path: '/coordinator/audit-log', label: 'Audit Log', icon: 'history' },
+    { path: '/supervisor/master', label: 'Supervised Theses', icon: 'task_alt' },
+    { path: '/supervisor/bachelor', label: 'Supervised Projects', icon: 'task_alt' },
+    { path: '/external/evaluations', label: 'Examinations', icon: 'rate_review' },
     { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
   const supervisorLinks = [
     { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' },
-    { path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' },
+    ...(!isMaster ? [{ path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' }] : []),
+    ...(!isBachelor ? [{ path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' }] : []),
+    { path: '/external/evaluations', label: 'Examinations', icon: 'rate_review' },
     { path: '/supervisor/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
@@ -52,15 +56,22 @@ function Sidebar({ user, isOpen, onClose }) {
   const studentLinks = [
     { path: '/student', label: 'Dashboard', icon: 'dashboard' },
     ...(sType === 'bachelor'
-      ? [{ path: '/student/projects', label: 'Projects', icon: 'school' }]
+      ? [
+          { path: '/student/projects', label: 'Projects', icon: 'school' },
+          { path: '/student/groups', label: 'Groups', icon: 'group_add' },
+        ]
       : sType === 'master'
-        ? [{ path: '/student/theses', label: 'Theses', icon: 'library_books' }]
+        ? [
+            { path: '/student/theses', label: 'Theses', icon: 'library_books' },
+            { path: '/student/forms', label: 'Thesis Forms', icon: 'description' },
+          ]
         : [
             { path: '/student/projects', label: 'Projects', icon: 'school' },
             { path: '/student/theses', label: 'Theses', icon: 'library_books' },
+            { path: '/student/groups', label: 'Groups', icon: 'group_add' },
+            { path: '/student/forms', label: 'Forms', icon: 'description' },
           ]
     ),
-    { path: '/student/groups', label: sType === 'master' ? 'Thesis Formation' : 'Groups', icon: 'group_add' },
     { path: '/student/submissions', label: 'Project Submission', icon: 'upload_file' },
     { path: '/student/notifications', label: 'Notifications', icon: 'notifications' },
   ];

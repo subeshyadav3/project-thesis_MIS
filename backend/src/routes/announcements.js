@@ -6,6 +6,11 @@ const { authenticate, authorize } = require('../middleware/auth');
 router.use(authenticate);
 
 router.get('/eligible', ctrl.listEligible);
+router.get('/:id/form-responses', authorize('COORDINATOR', 'MAINTAINER'), ctrl.getFormResponses);
+router.get('/:id/export-responses', authorize('COORDINATOR', 'MAINTAINER'), ctrl.exportFormResponses);
+router.put('/responses/:responseId', authorize('COORDINATOR', 'MAINTAINER'), ctrl.updateFormResponse);
+router.post('/responses/:responseId/finalize', authorize('COORDINATOR', 'MAINTAINER'), ctrl.finalizeFormResponse);
+router.delete('/responses/:responseId', authorize('COORDINATOR', 'MAINTAINER'), ctrl.deleteFormResponse);
 router.get('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.list);
 router.get('/:id', authorize('COORDINATOR', 'MAINTAINER', 'STUDENT'), ctrl.get);
 router.post('/', authorize('COORDINATOR', 'MAINTAINER'), ctrl.create);

@@ -281,9 +281,34 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+exports.getSupervisorScope = async (req, res) => {
+  try {
+    const [ownProgram, theses, groups] = await Promise.all([
+      prisma.program.findFirst({ where: { coordinatorId: req.user.id }, select: { id: true } }),
+      prisma.thesis.findMany({ where: { supervisorId: req.user.id }, select: { programId: true } }),
+      prisma.projectGroup.findMany({ where: { supervisorId: req.user.id }, select: { programId: true } }),
+    ]);
+    const ownProgramId = req.user.programId ?? ownProgram?.id ?? null;
+    const assignments = [...theses, ...groups];
+    res.json({
+      ownProgramId,
+      hasSupervisorAssignments: assignments.length > 0,
+      hasOtherProgramAssignments: assignments.some(t => t.programId && t.programId !== ownProgramId),
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.getUsersByRole = async (req, res) => {
   try {
-    const where = { role: req.params.role.toUpperCase() };
+    // Supervisor lookups include coordinators (they can supervise too)
+    // Examiner lookups include supervisors and coordinators (faculty can examine other projects)
+    const where = role === 'SUPERVISOR'
+      ? { role: { in: ['SUPERVISOR', 'COORDINATOR'] } }
+      : role === 'EXTERNAL_EXAMINER'
+        ? { role: { in: ['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR'] } }
+        : { role };
     if (req.query.all !== 'true') {
       where.active = true;
     }
@@ -293,12 +318,8 @@ exports.getUsersByRole = async (req, res) => {
     if (req.query.programId) {
       where.programId = parseInt(req.query.programId);
     }
-    if (req.user.role === 'COORDINATOR') {
+    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
       where.departmentId = req.user.departmentId;
-      // Coordinators can only fetch SUPERVISOR, EXTERNAL_EXAMINER, STUDENT roles
-      if (!['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(req.params.role.toUpperCase())) {
-        return res.json([]);
-      }
     }
     const users = await prisma.user.findMany({
       where,

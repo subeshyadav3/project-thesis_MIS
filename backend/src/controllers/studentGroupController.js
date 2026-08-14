@@ -48,8 +48,13 @@ ctrl.create = async (req, res) => {
     const eligible = await listEligibleAnnouncementsForStudent(req.user);
     if (!eligible.find(a => a.id === ann.id)) return res.status(403).json({ error: 'You are not eligible for this announcement' });
 
-    const alreadyIn = await isStudentAlreadyInAGroupAnnouncement(req.user, ann);
-    if (alreadyIn) return res.status(400).json({ error: 'You are already in a group/thesis for this announcement type' });
+    const { getEngagement } = require('../services/engagementGuard');
+    const submitterEngagement = await getEngagement(req.user.id);
+    if (submitterEngagement.engaged) {
+      return res.status(400).json({
+        error: `You are already engaged in a ${submitterEngagement.type === 'thesis' ? 'thesis' : 'project'} (${submitterEngagement.status}): "${submitterEngagement.title}". A student cannot be part of multiple projects.`,
+      });
+    }
 
     const isThesisAnnouncement = ann.type === 'THESIS';
     const projectType = ann.type === 'MAJOR' ? 'MAJOR' : 'MINOR';
@@ -61,6 +66,19 @@ ctrl.create = async (req, res) => {
     const invitedIds = Array.isArray(memberIds) ? memberIds : [];
     if (!isThesisAnnouncement && invitedIds.length > maxMembers - 1) {
       return res.status(400).json({ error: `Maximum ${maxMembers} members allowed for this announcement` });
+    }
+
+    if (!isThesisAnnouncement && invitedIds.length > 0) {
+      for (const sid of invitedIds) {
+        const eng = await getEngagement(Number(sid));
+        if (eng.engaged) {
+          const u = await prisma.user.findUnique({ where: { id: Number(sid) }, select: { firstName: true, lastName: true } });
+          const uName = u ? `${u.firstName} ${u.lastName}` : `Student (ID: ${sid})`;
+          return res.status(400).json({
+            error: `${uName} is already assigned to a active ${eng.type === 'thesis' ? 'thesis' : 'project'} (${eng.status}): "${eng.title}". Cannot add to another group.`,
+          });
+        }
+      }
     }
 
     if (isThesisAnnouncement) {
@@ -115,6 +133,19 @@ ctrl.create = async (req, res) => {
         joinPolicy: 'INVITE_ONLY',
       },
     });
+
+    const pdfUrl = req.body.pdfUrl || req.body.fileUrl;
+    if (pdfUrl) {
+      await prisma.proposal.create({
+        data: {
+          stage: 'PROPOSAL',
+          documentUrl: pdfUrl,
+          groupId: group.id,
+          submittedById: req.user.id,
+          status: 'PENDING',
+        },
+      });
+    }
 
     await prisma.groupMember.create({
       data: { studentId: req.user.id, groupId: group.id, rollNumber: req.user.rollNumber || `R${req.user.id}` },
@@ -264,6 +295,14 @@ ctrl.invite = async (req, res) => {
     });
     if (existingMember) return res.status(400).json({ error: 'Already a member' });
 
+    const { getEngagement } = require('../services/engagementGuard');
+    const engagement = await getEngagement(Number(inviteeId));
+    if (engagement.engaged) {
+      return res.status(409).json({
+        error: `Student is already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}".`,
+      });
+    }
+
     const invitation = await prisma.groupInvitation.create({
       data: {
         groupId,
@@ -307,6 +346,14 @@ ctrl.joinOpenGroup = async (req, res) => {
     const alreadyMember = await prisma.groupMember.findFirst({ where: { studentId: req.user.id, groupId } });
     if (alreadyMember) return res.status(400).json({ error: 'Already a member' });
 
+    const { getEngagement } = require('../services/engagementGuard');
+    const engagement = await getEngagement(req.user.id);
+    if (engagement.engaged) {
+      return res.status(409).json({
+        error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". A student cannot be part of two projects.`,
+      });
+    }
+
     await prisma.groupMember.create({
       data: { studentId: req.user.id, groupId, rollNumber: req.user.rollNumber || `R${req.user.id}` },
     });
@@ -339,6 +386,14 @@ ctrl.respondToInvitation = async (req, res) => {
     if (invitation.status !== 'PENDING') return res.status(400).json({ error: 'Already responded' });
 
     if (action === 'ACCEPT') {
+      const { getEngagement } = require('../services/engagementGuard');
+      const engagement = await getEngagement(req.user.id);
+      if (engagement.engaged) {
+        return res.status(409).json({
+          error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". Cannot join another group.`,
+        });
+      }
+
       const ann = invitation.group.announcement;
       if (ann && invitation.group.members.length >= ann.groupSizeMax) return res.status(400).json({ error: 'Group is full' });
       if (!ann && invitation.group.members.length >= 4) return res.status(400).json({ error: 'Group is full' });

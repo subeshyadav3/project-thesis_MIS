@@ -2,13 +2,156 @@
 const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
 const pdfService = require('../services/pdfService');
+const notifSvc = require('../services/notificationService');
+const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
+
+async function findCoordinatorIdsForStudent(studentId, programId, departmentId, thesisId) {
+  const ids = [];
+  try {
+    if (studentId) {
+      const student = await prisma.user.findUnique({ where: { id: studentId }, select: { programId: true, departmentId: true } });
+      if (student?.programId) {
+        const prog = await prisma.program.findUnique({ where: { id: student.programId }, select: { coordinatorId: true, departmentId: true } });
+        if (prog?.coordinatorId && !ids.includes(prog.coordinatorId)) ids.push(prog.coordinatorId);
+        if (prog?.departmentId && !departmentId) departmentId = prog.departmentId;
+      }
+      if (student?.departmentId && !departmentId) departmentId = student.departmentId;
+    }
+    if (programId) {
+      const prog = await prisma.program.findUnique({ where: { id: programId }, select: { coordinatorId: true, departmentId: true } });
+      if (prog?.coordinatorId && !ids.includes(prog.coordinatorId)) ids.push(prog.coordinatorId);
+      if (prog?.departmentId && !departmentId) departmentId = prog.departmentId;
+    }
+    if (thesisId) {
+      const thesis = await prisma.thesis.findUnique({ where: { id: thesisId }, select: { crossProgramRequestedById: true } });
+      if (thesis?.crossProgramRequestedById && !ids.includes(thesis.crossProgramRequestedById)) {
+        ids.push(thesis.crossProgramRequestedById);
+      }
+    }
+    if (departmentId) {
+      const dept = await prisma.department.findUnique({ where: { id: departmentId }, select: { coordinatorId: true } });
+      if (dept?.coordinatorId && !ids.includes(dept.coordinatorId)) ids.push(dept.coordinatorId);
+    }
+    // Fallback: Notify all active coordinators if no specific program coordinator found
+    if (ids.length === 0) {
+      const allCoords = await prisma.user.findMany({ where: { role: 'COORDINATOR', active: true }, select: { id: true } });
+      allCoords.forEach(c => { if (!ids.includes(c.id)) ids.push(c.id); });
+    }
+  } catch (e) { console.error('findCoordinatorIdsForStudent error:', e.message); }
+  return ids;
+}
+
+async function acceptAssignment({ type, id, user }) {
+  const data = { supervisorAssignmentStatus: 'ACCEPTED', status: 'ACTIVE' };
+  if (type === 'thesis') {
+    const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(id) }, include: { student: true } });
+    if (!thesis) return { error: 'Thesis not found', code: 404 };
+    if (thesis.supervisorId !== user.id) return { error: 'This thesis is not assigned to you', code: 403 };
+    if (thesis.supervisorAssignmentStatus === 'ACCEPTED') return { error: 'Assignment already accepted', code: 400 };
+    const updated = await prisma.thesis.update({ where: { id: thesis.id }, data });
+    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId, thesis.id);
+    const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
+    await notifSvc.notifySupervisorAccepted({ supervisorName, itemTitle: thesis.title, type: 'thesis', studentIds: [thesis.studentId], coordinatorIds: coordIds });
+    audit.log({ action: 'SUPERVISOR_ACCEPT', entity: 'Thesis', entityId: thesis.id, details: `Supervisor accepted "${thesis.title}"`, performedById: user.id });
+    return { data: updated };
+  }
+  const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) }, include: { members: { include: { student: true } } } });
+  if (!group) return { error: 'Group not found', code: 404 };
+  if (group.supervisorId !== user.id) return { error: 'This group is not assigned to you', code: 403 };
+  if (group.supervisorAssignmentStatus === 'ACCEPTED') return { error: 'Assignment already accepted', code: 400 };
+  const updated = await prisma.projectGroup.update({ where: { id: group.id }, data });
+  const memberStudentIds = group.members?.map(m => m.studentId) || [];
+  const firstStudent = group.members?.[0]?.student;
+  const coordIds = await findCoordinatorIdsForStudent(memberStudentIds[0], group.programId, firstStudent?.departmentId);
+  const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
+  await notifSvc.notifySupervisorAccepted({ supervisorName, itemTitle: group.projectTitle || group.name, type: 'group', studentIds: memberStudentIds, coordinatorIds: coordIds });
+  audit.log({ action: 'SUPERVISOR_ACCEPT', entity: 'ProjectGroup', entityId: group.id, details: `Supervisor accepted "${group.projectTitle || group.name}"`, performedById: user.id });
+  return { data: updated };
+}
+
+async function rejectAssignment({ type, id, user, reason }) {
+  if (type === 'thesis') {
+    const thesis = await prisma.thesis.findUnique({ where: { id: parseInt(id) }, include: { student: true } });
+    if (!thesis) return { error: 'Thesis not found', code: 404 };
+    if (thesis.supervisorId !== user.id) return { error: 'This thesis is not assigned to you', code: 403 };
+    const coordIds = await findCoordinatorIdsForStudent(thesis.studentId, thesis.programId, thesis.student?.departmentId, thesis.id);
+    const updated = await prisma.thesis.update({
+      where: { id: thesis.id },
+      data: { supervisorId: null, supervisorAssignmentStatus: 'REJECTED' },
+    });
+    const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
+    await notifSvc.notifySupervisorRejected({ supervisorName, itemTitle: thesis.title, type: 'thesis', reason, studentIds: [thesis.studentId], coordinatorIds: coordIds });
+    audit.log({ action: 'SUPERVISOR_REJECT', entity: 'Thesis', entityId: thesis.id, details: `Supervisor rejected "${thesis.title}" — ${reason || 'no reason'}`, performedById: user.id });
+    return { data: updated };
+  }
+  const group = await prisma.projectGroup.findUnique({ where: { id: parseInt(id) }, include: { members: { include: { student: true } } } });
+  if (!group) return { error: 'Group not found', code: 404 };
+  if (group.supervisorId !== user.id) return { error: 'This group is not assigned to you', code: 403 };
+  const memberStudentIds = group.members?.map(m => m.studentId) || [];
+  const firstStudent = group.members?.[0]?.student;
+  const coordIds = await findCoordinatorIdsForStudent(memberStudentIds[0], group.programId, firstStudent?.departmentId);
+  const updated = await prisma.projectGroup.update({
+    where: { id: group.id },
+    data: { supervisorId: null, supervisorAssignmentStatus: 'REJECTED' },
+  });
+  const supervisorName = `${user.firstName} ${user.lastName}`.trim() || 'A supervisor';
+  await notifSvc.notifySupervisorRejected({ supervisorName, itemTitle: group.projectTitle || group.name, type: 'group', reason, studentIds: memberStudentIds, coordinatorIds: coordIds });
+  audit.log({ action: 'SUPERVISOR_REJECT', entity: 'ProjectGroup', entityId: group.id, details: `Supervisor rejected "${group.projectTitle || group.name}" — ${reason || 'no reason'}`, performedById: user.id });
+  return { data: updated };
+}
+
+exports.acceptThesisSupervision = async (req, res) => {
+  try {
+    const result = await acceptAssignment({ type: 'thesis', id: req.params.id, user: req.user });
+    if (result.error) return res.status(result.code || 400).json({ error: result.error });
+    res.json({ message: 'Supervision accepted', data: result.data });
+  } catch (e) {
+    console.error('acceptThesisSupervision error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.rejectThesisSupervision = async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    const result = await rejectAssignment({ type: 'thesis', id: req.params.id, user: req.user, reason });
+    if (result.error) return res.status(result.code || 400).json({ error: result.error });
+    res.json({ message: 'Supervision declined', data: result.data });
+  } catch (e) {
+    console.error('rejectThesisSupervision error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.acceptGroupSupervision = async (req, res) => {
+  try {
+    const result = await acceptAssignment({ type: 'group', id: req.params.id, user: req.user });
+    if (result.error) return res.status(result.code || 400).json({ error: result.error });
+    res.json({ message: 'Supervision accepted', data: result.data });
+  } catch (e) {
+    console.error('acceptGroupSupervision error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.rejectGroupSupervision = async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    const result = await rejectAssignment({ type: 'group', id: req.params.id, user: req.user, reason });
+    if (result.error) return res.status(result.code || 400).json({ error: result.error });
+    res.json({ message: 'Supervision declined', data: result.data });
+  } catch (e) {
+    console.error('rejectGroupSupervision error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 exports.getMyGroups = async (req, res) => {
   try {
     const groups = await prisma.projectGroup.findMany({
       where: { supervisorId: req.user.id },
       include: {
-        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -24,7 +167,7 @@ exports.getMyTheses = async (req, res) => {
     const theses = await prisma.thesis.findMany({
       where: { supervisorId: req.user.id },
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -58,15 +201,16 @@ exports.issueRecommendation = async (req, res) => {
       });
       if (!group) return res.status(404).json({ error: 'Group not found' });
 
-      // Check access: supervisor of the group OR coordinator of the department
-      if (req.user.role === 'SUPERVISOR' && group.supervisorId !== req.user.id) {
-        return res.status(403).json({ error: 'You are not the supervisor of this group' });
+      // Access: the assigned supervisor (supervisor-level) or a coordinator
+      // whose scope includes this group (coordinator-level).
+      const isSupervisor = group.supervisorId === req.user.id;
+      let canManage = false;
+      if (req.user.role === 'COORDINATOR') {
+        const scope = await resolveCoordinatorScope(req.user);
+        canManage = await canManageGroupAsCoordinator(group, scope, req.user);
       }
-      if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-        const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-        if (prog && group.programId && group.programId !== prog.id) {
-          return res.status(403).json({ error: 'This group belongs to another program' });
-        }
+      if (!isSupervisor && !canManage) {
+        return res.status(403).json({ error: 'You are not authorized to issue a recommendation for this group' });
       }
 
       studentName = group.members.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ');
@@ -86,15 +230,16 @@ exports.issueRecommendation = async (req, res) => {
       });
       if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
 
-      // Check access: supervisor of the thesis OR coordinator of the program
-      if (req.user.role === 'SUPERVISOR' && thesis.supervisorId !== req.user.id) {
-        return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
+      // Access: the assigned supervisor (supervisor-level) or a coordinator
+      // whose scope includes this thesis (coordinator-level).
+      const isSupervisor = thesis.supervisorId === req.user.id;
+      let canManage = false;
+      if (req.user.role === 'COORDINATOR') {
+        const scope = await resolveCoordinatorScope(req.user);
+        canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
       }
-      if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-        const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-        if (prog && thesis.student?.programId && thesis.student.programId !== prog.id) {
-          return res.status(403).json({ error: 'This thesis belongs to another program' });
-        }
+      if (!isSupervisor && !canManage) {
+        return res.status(403).json({ error: 'You are not authorized to issue a recommendation for this thesis' });
       }
 
       studentName = `${thesis.student.firstName} ${thesis.student.lastName}`;
@@ -203,6 +348,26 @@ exports.downloadRecommendation = async (req, res) => {
       const isThesisStudent = rec.thesis?.studentId === req.user.id;
       if (!isMember && !isThesisStudent) return res.status(403).json({ error: 'Access denied' });
     }
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      if (rec.groupId) {
+        const group = await prisma.projectGroup.findUnique({
+          where: { id: rec.groupId },
+          select: { id: true, programId: true, supervisorId: true },
+        });
+        if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else if (rec.thesisId) {
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: rec.thesisId },
+          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        });
+        if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      }
+    }
 
     const studentName = rec.group
       ? rec.group.members.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ')
@@ -248,20 +413,25 @@ exports.deleteRecommendation = async (req, res) => {
     if (req.user.role === 'STUDENT') {
       return res.status(403).json({ error: 'Students cannot delete recommendations' });
     }
-    if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
-      const prog = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
-      if (prog) {
-        let itemProgramId = null;
-        if (rec.groupId) {
-          const g = await prisma.projectGroup.findUnique({ where: { id: rec.groupId }, select: { programId: true } });
-          itemProgramId = g?.programId;
-        } else if (rec.thesisId) {
-          const t = await prisma.thesis.findUnique({ where: { id: rec.thesisId }, include: { student: { select: { programId: true } } } });
-          itemProgramId = t?.student?.programId;
-        }
-        if (itemProgramId && itemProgramId !== prog.id) {
-          return res.status(403).json({ error: 'This recommendation belongs to another program' });
-        }
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      let canManage = false;
+      if (rec.groupId) {
+        const group = await prisma.projectGroup.findUnique({
+          where: { id: rec.groupId },
+          select: { id: true, programId: true, supervisorId: true },
+        });
+        canManage = await canManageGroupAsCoordinator(group, scope, req.user);
+      } else if (rec.thesisId) {
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: rec.thesisId },
+          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        });
+        canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
+      }
+      // The issuer can always delete their own recommendation (supervisor-level)
+      if (!canManage && rec.issuedById !== req.user.id) {
+        return res.status(403).json({ error: 'This recommendation is outside your coordinator scope' });
       }
     }
 
