@@ -17,6 +17,17 @@ const USER_SELECT = {
 const VALID_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'STUDENT', 'EXTERNAL_EXAMINER'];
 const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
 
+// Email policy:
+//  - STUDENT emails are ALWAYS auto-derived from the roll number: {rollNumber}@pcampus.edu.np
+//  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER emails must end with @pcampus.edu.np
+//    (local part is free-form: ramyadav@pcampus.edu.np and ram.yadav@pcampus.edu.np are both valid)
+const PCAMPUS_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@pcampus\.edu\.np$/;
+const PCAMPUS_DOMAIN_ROLES = ['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
+
+function isPcampusEmail(email) {
+  return PCAMPUS_EMAIL_RE.test(email || '');
+}
+
 /**
  * Extract batch from roll number. Roll "080BCT001" → "080".
  */
@@ -91,7 +102,13 @@ exports.createUser = async (req, res) => {
       if (!resolvedRoll) {
         return res.status(400).json({ error: 'rollNumber is required for students' });
       }
-      // Auto-generate email from roll (ignore provided email for students)
+      // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
+      // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
+      // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
+      // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
+      // Replace the line below with:
+      //   resolvedEmail = `${resolvedRoll.toLowerCase()}.${(firstName || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
+      // ───────────────────────────────────────────────────────────────────
       resolvedEmail = resolvedRoll.toLowerCase() + '@pcampus.edu.np';
       // Check roll uniqueness
       const existingByRoll = await prisma.user.findFirst({ where: { rollNumber: resolvedRoll } });
@@ -111,6 +128,11 @@ exports.createUser = async (req, res) => {
       }
       // Fallback degree type
       if (!resolvedDegreeType) resolvedDegreeType = 'BACHELOR';
+    }
+
+    // Enforce @pcampus.edu.np domain for coordinator/supervisor/examiner accounts
+    if (PCAMPUS_DOMAIN_ROLES.includes(role) && !isPcampusEmail(resolvedEmail)) {
+      return res.status(400).json({ error: 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
     }
 
     if (resolvedDegreeType && !VALID_DEGREE_TYPES.includes(resolvedDegreeType)) {
@@ -179,7 +201,6 @@ exports.updateUser = async (req, res) => {
     const data = {};
     if (req.body.firstName !== undefined) data.firstName = req.body.firstName;
     if (req.body.lastName !== undefined) data.lastName = req.body.lastName;
-    if (req.body.email !== undefined) data.email = req.body.email;
     if (req.body.role && req.user.role === 'MAINTAINER') data.role = req.body.role;
     if (existing.role === 'STUDENT') {
       if (req.body.degreeType) data.degreeType = req.body.degreeType;
@@ -187,6 +208,9 @@ exports.updateUser = async (req, res) => {
     }
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
+
+    // Resolve roll number first so a student's derived email stays in sync
+    let effectiveRoll = existing.rollNumber;
     if (req.body.rollNumber !== undefined) {
       const newRoll = req.body.rollNumber.toString().trim();
       if (newRoll) {
@@ -194,10 +218,43 @@ exports.updateUser = async (req, res) => {
         if (dup) return res.status(400).json({ error: `Roll number "${newRoll}" is already assigned to another student` });
         data.rollNumber = newRoll;
         data.batch = extractBatchFromRoll(newRoll);
+        effectiveRoll = newRoll;
       } else {
         data.rollNumber = null;
         data.batch = null;
+        effectiveRoll = null;
       }
+    }
+
+    // Email rules:
+    //  - STUDENT: always auto-derived from roll number, never free-form.
+    //  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER: must end with @pcampus.edu.np.
+    if (existing.role === 'STUDENT') {
+      if (req.body.email !== undefined || req.body.rollNumber !== undefined) {
+        if (!effectiveRoll) {
+          return res.status(400).json({ error: 'rollNumber is required for students' });
+        }
+        // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
+        // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
+        // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
+        // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
+        // Replace the line below with:
+        //   data.email = `${effectiveRoll.toLowerCase()}.${((req.body.firstName || existing.firstName) || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
+        // ───────────────────────────────────────────────────────────────────
+        data.email = effectiveRoll.toLowerCase() + '@pcampus.edu.np';
+      }
+    } else if (req.body.email !== undefined) {
+      const newEmail = (req.body.email || '').toString().trim().toLowerCase();
+      if (PCAMPUS_DOMAIN_ROLES.includes(existing.role) && !isPcampusEmail(newEmail)) {
+        return res.status(400).json({ error: 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
+      }
+      data.email = newEmail;
+    }
+
+    // Friendly uniqueness check for changed emails (avoids raw P2002 500 error)
+    if (data.email && data.email !== existing.email) {
+      const dupEmail = await prisma.user.findUnique({ where: { email: data.email } });
+      if (dupEmail) return res.status(400).json({ error: 'Email already in use' });
     }
     const user = await prisma.user.update({
       where: { id: userId },
@@ -319,6 +376,14 @@ exports.getUsersByRole = async (req, res) => {
     }
     if (req.user.role === 'COORDINATOR' && req.user.departmentId) {
       where.departmentId = req.user.departmentId;
+      // Bachelor coordinators only see their own program's students.
+      // Master coordinators see all dept students (they can supervise cross-program work)
+      // unless the dashboard explicitly scopes with ?programId=
+      if (role === 'STUDENT' && !req.query.programId) {
+        const ownProgram = await prisma.program.findUnique({ where: { coordinatorId: req.user.id }, select: { id: true, degreeType: true } });
+        const progId = req.user.programId ?? ownProgram?.id ?? null;
+        if (progId && ownProgram?.degreeType !== 'MASTER') where.programId = progId;
+      }
     }
     const users = await prisma.user.findMany({
       where,
@@ -407,9 +472,13 @@ exports.bulkCreateUsers = async (req, res) => {
 
     for (const u of users) {
       const { password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
-      const email = (u.email || '').toString().trim().toLowerCase();
-      if (!email || !password || !firstName || !lastName || !role) {
-        errors.push({ email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName, role)' });
+      let email = (u.email || '').toString().trim().toLowerCase();
+      if (!password || !firstName || !lastName || !role) {
+        errors.push({ email: email || 'unknown', error: 'Missing required fields (password, firstName, lastName, role)' });
+        continue;
+      }
+      if (!email && role !== 'STUDENT') {
+        errors.push({ email: email || 'unknown', error: 'email is required for this role' });
         continue;
       }
       if (!VALID_ROLES.includes(role)) {
@@ -418,6 +487,25 @@ exports.bulkCreateUsers = async (req, res) => {
       }
       if (degreeType && !VALID_DEGREE_TYPES.includes(degreeType)) {
         errors.push({ email, error: `Invalid degreeType. Must be one of: ${VALID_DEGREE_TYPES.join(', ')}` });
+        continue;
+      }
+
+      // Enforce email patterns: students derive email from rollNumber; staff must use @pcampus.edu.np
+      if (role === 'STUDENT') {
+        if (!rollNumber) {
+          errors.push({ email: email || 'unknown', error: 'rollNumber is required for students' });
+          continue;
+        }
+        // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
+        // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
+        // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
+        // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
+        // Replace the line below with:
+        //   email = `${rollNumber.toString().trim().toLowerCase()}.${(firstName || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
+        // ───────────────────────────────────────────────────────────────────
+        email = rollNumber.toString().trim().toLowerCase() + '@pcampus.edu.np';
+      } else if (PCAMPUS_DOMAIN_ROLES.includes(role) && !isPcampusEmail(email)) {
+        errors.push({ email, error: 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
         continue;
       }
 
@@ -534,6 +622,12 @@ exports.bulkImportUsersExcel = async (req, res) => {
         email = `${fn}.${ln}@pcampus.edu.np`;
       }
 
+      // Enforce @pcampus.edu.np domain for staff accounts
+      if (role !== 'STUDENT' && email && !isPcampusEmail(email)) {
+        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np (e.g. name@pcampus.edu.np)' });
+        continue;
+      }
+
       if (!email || !password || !firstName || !lastName) {
         if (role !== 'STUDENT' || !firstName || !lastName) {
           errors.push({ row: rowNum, email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName)' });
@@ -546,7 +640,13 @@ exports.bulkImportUsersExcel = async (req, res) => {
           errors.push({ row: rowNum, email: email || 'unknown', error: 'rollNumber is required for students' });
           continue;
         }
-        // Auto-generate email from roll (ignore provided email for students)
+        // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
+        // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
+        // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
+        // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
+        // Replace the line below with:
+        //   email = `${rollNumber.toLowerCase()}.${(firstName || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
+        // ───────────────────────────────────────────────────────────────────
         email = rollNumber.toLowerCase() + '@pcampus.edu.np';
         // Roll uniqueness
         if (existingRolls.has(rollNumber.toLowerCase())) {
@@ -652,15 +752,13 @@ exports.getAuditLogs = async (req, res) => {
     if (req.user.role === 'COORDINATOR') {
       const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
       if (program) {
-        // Program coordinator: only see logs relevant to their own program.
-        // Instead of fetching all supervisors/examiners in the department
-        // (which would include cross-program users), we get only:
-        //   1) Users whose programId matches this program (students)
-        //   2) Supervisors assigned to groups/theses in this program
-        //   3) External examiners assigned to groups/theses in this program
-        //   4) The coordinator themselves
-        const [programUsers, groupSup, thesisSup, thesisExtMid, thesisExtFin, groupExam, thesisExam] = await Promise.all([
-          prisma.user.findMany({ where: { programId: program.id }, select: { id: true } }),
+        // Program coordinator: only see logs belonging to their own program
+        // (programId on the audit row, resolved at log time), plus their own
+        // actions. Staff (supervisors/examiners) involved with this program's
+        // items have no programId themselves, so their User-entity events
+        // (login/logout/password) are included by involvement; their actions
+        // on OTHER programs' items are NOT visible (item-scoped programId).
+        const [groupSup, thesisSup, thesisExtMid, thesisExtFin, groupExam, thesisExam] = await Promise.all([
           prisma.projectGroup.findMany({ where: { programId: program.id, supervisorId: { not: null } }, select: { supervisorId: true } }),
           prisma.thesis.findMany({ where: { student: { programId: program.id }, supervisorId: { not: null } }, select: { supervisorId: true } }),
           prisma.thesis.findMany({ where: { student: { programId: program.id }, externalMidTermId: { not: null } }, select: { externalMidTermId: true } }),
@@ -668,8 +766,7 @@ exports.getAuditLogs = async (req, res) => {
           prisma.examinerAssignment.findMany({ where: { group: { programId: program.id } }, select: { externalExaminerId: true } }),
           prisma.examinerAssignment.findMany({ where: { thesis: { student: { programId: program.id } } }, select: { externalExaminerId: true } }),
         ]);
-        const ids = [...new Set([
-          ...programUsers.map(u => u.id),
+        const staffIds = [...new Set([
           ...groupSup.map(r => r.supervisorId),
           ...thesisSup.map(r => r.supervisorId),
           ...thesisExtMid.map(r => r.externalMidTermId),
@@ -677,8 +774,12 @@ exports.getAuditLogs = async (req, res) => {
           ...groupExam.map(r => r.externalExaminerId),
           ...thesisExam.map(r => r.externalExaminerId),
           req.user.id,
-        ])];
-        where.performedById = { in: ids };
+        ].filter(Boolean))];
+        where.OR = [
+          { programId: program.id },
+          { performedById: req.user.id },
+          { AND: [{ entity: 'User' }, { performedById: { in: staffIds } }] },
+        ];
       } else {
         // Department-level coordinator: only see logs from their department
         const deptUserIds = await prisma.user.findMany({
@@ -696,7 +797,7 @@ exports.getAuditLogs = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: parseInt(req.query.limit) || 100,
       skip: parseInt(req.query.offset) || 0,
-      include: { performedBy: { select: { id: true, firstName: true, lastName: true, email: true } } },
+      include: { performedBy: { select: { id: true, firstName: true, lastName: true, email: true } }, program: { select: { id: true, name: true, code: true } } },
     });
     const total = await prisma.auditLog.count({ where });
     res.json({ success: true, data: { logs, total } });

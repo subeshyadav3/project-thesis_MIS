@@ -3,6 +3,7 @@ const router = express.Router();
 const printController = require('../controllers/printController');
 const { authenticate, authorize } = require('../middleware/auth');
 
+router.post('/bulk-pdf', authenticate, authorize('COORDINATOR', 'MAINTAINER'), printController.bulkEvaluationPdf);
 router.get('/group/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'), printController.printGroupEvaluation);
 router.get('/thesis/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'), printController.printThesisEvaluation);
 router.get('/preview/group/:id', authenticate, authorize('COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'), printController.previewGroupEvaluation);

@@ -99,14 +99,42 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
       // referenced this one. Fall back so those links still resolve.
       const altType = type === 'theses' ? 'groups' : 'theses';
       const altPath = path.join(__dirname, '..', 'storage', altType, filename);
-      if (fs.existsSync(altPath)) return res.sendFile(altPath);
+      if (fs.existsSync(altPath)) {
+        res.sendFile(altPath);
+        return logDocumentView(req, type, filename);
+      }
       return res.status(404).json({ error: 'File not found' });
     }
     res.sendFile(filePath);
+    logDocumentView(req, type, filename);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/** Audit document views/downloads by staff (students viewing their own docs are skipped). */
+async function logDocumentView(req, type, filename) {
+  try {
+    if (req.user.role === 'STUDENT') return;
+    const audit = require('./services/auditService');
+    const prisma = require('./utils/prisma');
+    const url = `/api/files/${type}/${filename}`;
+    const proposal = await prisma.proposal.findFirst({
+      where: { documentUrl: url },
+      select: { id: true, thesis: { select: { title: true } }, group: { select: { projectTitle: true } } },
+    });
+    const itemTitle = proposal?.thesis?.title || proposal?.group?.projectTitle || filename;
+    audit.log({
+      action: 'VIEW',
+      entity: proposal ? 'Proposal' : 'Document',
+      entityId: proposal ? proposal.id : null,
+      details: `${req.user.role === 'COORDINATOR' ? 'Coordinator' : req.user.role === 'SUPERVISOR' ? 'Supervisor' : 'Examiner'} downloaded "${itemTitle}" (${filename})`,
+      performedById: req.user.id,
+    });
+  } catch (e) {
+    console.error('document view audit error:', e.message);
+  }
+}
 
 app.get('/api/stats', authenticate, async (req, res) => {
   try {
@@ -156,7 +184,7 @@ app.get('/api/stats', authenticate, async (req, res) => {
     const supervisorAssignmentAccepted = supervisorAssignmentAcceptedThesis + supervisorAssignmentAcceptedGroup;
     const supervisorAssignmentRejected = supervisorAssignmentRejectedThesis + supervisorAssignmentRejectedGroup;
     const formCreatedTheses = await prisma.thesis.count({ where: { ...thesisFilter, createdVia: 'FORM' } });
-    const pendingLateProposals = await prisma.proposal.count({ where: { status: 'PENDING_APPROVAL' } });
+    const pendingLateProposals = await prisma.proposal.count({ where: { status: 'PENDING_APPROVAL', thesis: thesisFilter } });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
       pendingGroups, activeGroups, completedGroups, pendingTheses, activeTheses, completedTheses,

@@ -989,6 +989,32 @@ return (
               <Icon name="delete" className="material-symbols-outlined" />
               Delete
             </button>
+            <button className="btn btn-sm btn-primary" onClick={() => {
+              const selected = selectedTheses;
+              if (selected.length === 0) return toast.warning('No theses selected');
+              setConfirmDialog({
+                open: true,
+                title: 'Download Evaluation PDFs',
+                message: `Download evaluation PDFs for ${selected.length} selected thesis(es)?`,
+                confirmLabel: 'Download',
+                onConfirm: async () => {
+                  try {
+                    const { data } = await api.post('/print/bulk-pdf', { type: 'thesis', ids: selected }, { responseType: 'blob' });
+                    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `theses_evaluations_${Date.now()}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success('Evaluation PDFs downloaded');
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                },
+              });
+            }}>
+              <Icon name="download" className="material-symbols-outlined" />
+              Download PDFs
+            </button>
           </div>
         </div>
       )}

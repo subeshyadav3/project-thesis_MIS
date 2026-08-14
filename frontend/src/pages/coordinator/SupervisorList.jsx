@@ -184,7 +184,8 @@ function SupervisorList() {
               </div>
               <div className="form-group">
                 <label>Email</label>
-                <input type="email" value={createForm.email} onChange={e => setCreateForm({...createForm, email: e.target.value})} required placeholder="e.g. name@pcampus.edu.np" />
+                <input type="email" value={createForm.email} onChange={e => setCreateForm({...createForm, email: e.target.value})} required pattern="[a-zA-Z0-9._%+-]+@pcampus\.edu\.np" title="Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)" placeholder="e.g. ram.yadav@pcampus.edu.np" />
+                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)</span>
               </div>
               <div className="form-group">
                 <label>Password</label>
@@ -330,7 +331,8 @@ function SupervisorList() {
               </div>
               <div className="form-group">
                 <label>Email</label>
-                <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} required placeholder="e.g. name@pcampus.edu.np" />
+                <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} required pattern="[a-zA-Z0-9._%+-]+@pcampus\.edu\.np" title="Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)" placeholder="e.g. ram.yadav@pcampus.edu.np" />
+                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)</span>
               </div>
               <div className="form-group">
                 <label>Reset Password <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(leave blank to keep current)</span></label>

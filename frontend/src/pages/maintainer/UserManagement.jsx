@@ -426,7 +426,21 @@ function UserManagement() {
               </div>
               <div className="form-group">
                 <label>Email</label>
-                <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required placeholder="email@example.com" />
+                <input
+                  type="email"
+                  value={form.role === 'STUDENT' ? (form.rollNumber ? `${form.rollNumber.toLowerCase()}@pcampus.edu.np` : '') : form.email}
+                  onChange={e => setForm({...form, email: e.target.value})}
+                  required
+                  disabled={form.role === 'STUDENT'}
+                  placeholder={form.role === 'STUDENT' ? 'auto-generated from roll number' : 'e.g. ram.yadav@pcampus.edu.np'}
+                  pattern={form.role === 'STUDENT' ? undefined : '[a-zA-Z0-9._%+-]+@pcampus\\.edu\\.np'}
+                  title={form.role === 'STUDENT' ? 'Student email is auto-generated from the roll number' : 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)'}
+                />
+                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                  {form.role === 'STUDENT'
+                    ? 'Auto-generated as {rollNumber}@pcampus.edu.np (typed email is ignored)'
+                    : 'Must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)'}
+                </span>
               </div>
               <div className="form-group">
                 <label>Password {editUser && '(leave blank to keep)'}</label>

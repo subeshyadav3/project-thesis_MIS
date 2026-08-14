@@ -494,57 +494,134 @@ async function checkPrintAccess(req, res, type, id) {
   return true;
 }
 
+/** Boolean access check (no response side effects) for bulk downloads. */
+async function canAccessItem(req, type, id) {
+  if (req.user.role === 'MAINTAINER') return true;
+  if (req.user.role === 'COORDINATOR') {
+    const scope = await resolveCoordinatorScope(req.user);
+    const item = type === 'group'
+      ? await prisma.projectGroup.findUnique({
+          where: { id },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
+        })
+      : await prisma.thesis.findUnique({
+          where: { id },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
+        });
+    if (!item) return false;
+    const isAssignedExaminer = type === 'group'
+      ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
+      : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
+    const canManage = type === 'group'
+      ? await canManageGroupAsCoordinator(item, scope, req.user)
+      : await canManageThesisAsCoordinator(item, scope, req.user);
+    return canManage || item.supervisorId === req.user.id || isAssignedExaminer;
+  }
+  return true;
+}
+
+async function buildThesisHtml(id, scope = 'both') {
+  const thesis = await prisma.thesis.findUnique({
+    where: { id },
+    include: {
+      student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
+      supervisor: { select: { firstName: true, lastName: true, designation: true } },
+      externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
+      externalFinal: { select: { firstName: true, lastName: true, designation: true } },
+      evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+      evaluationComponents: true,
+    },
+  });
+  if (!thesis) return null;
+
+  const evalData = thesis.evaluationComponents.map(c => {
+    const e = thesis.evaluations.find(ev => ev.componentId === c.id);
+    return {
+      name: c.name,
+      evaluationType: c.evaluationType,
+      evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+        : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
+        : 'Coordinator',
+      maxMarks: c.maxMarks,
+      marks: e?.marks ?? null,
+      comment: e?.comment || null,
+      comments: e?.comments || null,
+      suggestions: e?.suggestions || null,
+      submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+    };
+  });
+
+  return buildMasterFormat({
+    title: thesis.title,
+    name: `${thesis.student.firstName} ${thesis.student.lastName}`,
+    supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+    supervisorDesignation: thesis.supervisor?.designation || '',
+    evaluations: evalData,
+    student: thesis.student || null,
+    externalMidTerm: thesis.externalMidTerm || null,
+    externalFinal: thesis.externalFinal || null,
+  }, scope);
+}
+
+async function buildGroupHtml(id) {
+  const group = await prisma.projectGroup.findUnique({
+    where: { id },
+    include: {
+      supervisor: { select: { firstName: true, lastName: true } },
+      members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
+      evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+      evaluationComponents: true,
+    },
+  });
+  if (!group) return null;
+
+  const projectType = group.projectType;
+  const maxTotal = projectType === 'MAJOR' ? 100 : 50;
+  const total = group.evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+
+  const memberList = group.members.map(m =>
+    `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
+  ).join(', ');
+
+  const evalData = group.evaluationComponents.map(c => {
+    const e = group.evaluations.find(ev => ev.componentId === c.id);
+    return {
+      name: c.name,
+      evaluatorRole: c.evaluatorRole === 'COORDINATOR' ? 'Coordinator'
+        : c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+        : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner' : c.evaluatorRole,
+      maxMarks: c.maxMarks,
+      marks: e?.marks ?? null,
+      comment: e?.comment || null,
+      comments: e?.comments || null,
+      suggestions: e?.suggestions || null,
+      submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+    };
+  });
+
+  return buildBachelorFormat({
+    title: group.projectTitle,
+    name: group.name,
+    supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
+    members: memberList,
+    evaluations: evalData,
+    projectType,
+    total: total.toFixed(1),
+    maxTotal,
+  });
+}
+
 exports.printGroupEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const granted = await checkPrintAccess(req, res, 'group', id);
     if (!granted) return;
-    const group = await prisma.projectGroup.findUnique({
-      where: { id },
-      include: {
-        supervisor: { select: { firstName: true, lastName: true } },
-        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
-        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
-        evaluationComponents: true,
-      },
-    });
-    if (!group) return res.status(404).json({ error: 'Group not found' });
-
-    const evaluations = group.evaluations;
-    const projectType = group.projectType;
-    const maxTotal = projectType === 'MAJOR' ? 100 : 50;
-    const total = evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
-
-    const memberList = group.members.map(m =>
-      `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
-    ).join(', ');
-
-    const evalData = group.evaluationComponents.map(c => {
-      const e = evaluations.find(ev => ev.componentId === c.id);
-      return {
-        name: c.name,
-        evaluatorRole: c.evaluatorRole === 'COORDINATOR' ? 'Coordinator'
-          : c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
-          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner' : c.evaluatorRole,
-        maxMarks: c.maxMarks,
-        marks: e?.marks ?? null,
-        comment: e?.comment || null,
-        comments: e?.comments || null,
-        suggestions: e?.suggestions || null,
-        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
-      };
-    });
-
-    const html = buildBachelorFormat({
-      title: group.projectTitle,
-      name: group.name,
-      supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
-      members: memberList,
-      evaluations: evalData,
-      projectType,
-      total: total.toFixed(1),
-      maxTotal,
-    });
+    const html = await buildGroupHtml(id);
+    if (!html) return res.status(404).json({ error: 'Group not found' });
 
     const pdf = await generatePdf(html);
     sendPdf(res, pdf, `evaluation_${id}.pdf`);
@@ -559,55 +636,46 @@ exports.printThesisEvaluation = async (req, res) => {
     const id = parseInt(req.params.id);
     const granted = await checkPrintAccess(req, res, 'thesis', id);
     if (!granted) return;
-    const thesis = await prisma.thesis.findUnique({
-      where: { id },
-      include: {
-        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
-        supervisor: { select: { firstName: true, lastName: true, designation: true } },
-        externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
-        externalFinal: { select: { firstName: true, lastName: true, designation: true } },
-        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
-        evaluationComponents: true,
-      },
-    });
-    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
-
-    const evaluations = thesis.evaluations;
-
-    const evalData = thesis.evaluationComponents.map(c => {
-      const e = evaluations.find(ev => ev.componentId === c.id);
-      return {
-        name: c.name,
-        evaluationType: c.evaluationType,
-        evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
-          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
-          : 'Coordinator',
-        maxMarks: c.maxMarks,
-        marks: e?.marks ?? null,
-        comment: e?.comment || null,
-        comments: e?.comments || null,
-        suggestions: e?.suggestions || null,
-        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
-      };
-    });
-
     const scope = req.query.scope || 'both';
-    const html = buildMasterFormat({
-      title: thesis.title,
-      name: `${thesis.student.firstName} ${thesis.student.lastName}`,
-      supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
-      supervisorDesignation: thesis.supervisor?.designation || '',
-      evaluations: evalData,
-      student: thesis.student || null,
-      externalMidTerm: thesis.externalMidTerm || null,
-      externalFinal: thesis.externalFinal || null,
-    }, scope);
+    const html = await buildThesisHtml(id, scope);
+    if (!html) return res.status(404).json({ error: 'Thesis not found' });
 
     const pdf = await generatePdf(html);
     const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : scope === 'external-midterm' ? 'external-midterm' : scope === 'external-final' ? 'external-final' : 'full';
     sendPdf(res, pdf, `thesis_evaluation_${id}_${scopeLabel}.pdf`);
   } catch (error) {
     console.error('printThesisEvaluation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.bulkEvaluationPdf = async (req, res) => {
+  try {
+    const { type, ids, scope } = req.body || {};
+    const kind = type === 'group' ? 'group' : 'thesis';
+    const idList = (Array.isArray(ids) ? ids : []).map(Number).filter(Boolean);
+    if (!idList.length) return res.status(400).json({ error: 'No items selected' });
+
+    const pages = [];
+    for (const id of idList) {
+      if (!(await canAccessItem(req, kind, id))) continue;
+      const html = kind === 'group' ? await buildGroupHtml(id) : await buildThesisHtml(id, scope || 'both');
+      if (!html) continue;
+      pages.push(`<div style="page-break-after:always;">${html}</div>`);
+    }
+    if (!pages.length) return res.status(403).json({ error: 'None of the selected items are within your access scope.' });
+
+    const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bulk Evaluation PDFs</title>
+  <style>
+    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
+    table { border-color: #000; }
+    td, th { border-color: #000; vertical-align: top; }
+  </style></head><body>${pages.join('')}</body></html>`;
+
+    const pdf = await generatePdf(doc);
+    sendPdf(res, pdf, `${kind === 'group' ? 'projects' : 'theses'}_evaluations_${Date.now()}.pdf`);
+  } catch (error) {
+    console.error('bulkEvaluationPdf error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

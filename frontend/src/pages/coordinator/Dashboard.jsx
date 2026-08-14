@@ -33,10 +33,15 @@ function CoordinatorDashboard() {
 
   useEffect(() => {
     api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
-    api.get('/auth/me').then(({ data }) => setProgram(data.program || null)).catch(() => {});
+    api.get('/auth/me').then(({ data }) => {
+      const prog = data.program || null;
+      setProgram(prog);
+      // Dashboard stats must only reflect the coordinator's own program
+      const studentsUrl = `/users/role/STUDENT?all=true${prog?.id ? `&programId=${prog.id}` : ''}`;
+      api.get(studentsUrl).then(({ data: students }) => setAllStudents(students)).catch(() => {});
+    }).catch(() => {});
     api.get('/supervisors/theses').then(({ data }) => setMySupervisedTheses(data)).catch(() => setMySupervisedTheses([]));
     api.get('/supervisors/groups').then(({ data }) => setMySupervisedGroups(data)).catch(() => setMySupervisedGroups([]));
-    api.get('/users/role/STUDENT?all=true').then(({ data }) => setAllStudents(data)).catch(() => {});
     api.get('/theses').then(({ data }) => setAllTheses(data)).catch(() => {});
     api.get('/groups').then(({ data }) => setAllGroups(data)).catch(() => {});
     loadLate();

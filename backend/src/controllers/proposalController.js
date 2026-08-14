@@ -56,11 +56,17 @@ exports.listPendingLateProposals = async (req, res) => {
   try {
     const where = { status: 'PENDING_APPROVAL' };
     if (req.user.role === 'COORDINATOR') {
-      const deptUsers = await prisma.user.findMany({
-        where: { departmentId: req.user.departmentId },
-        select: { id: true },
-      });
-      where.submittedById = { in: deptUsers.map(u => u.id) };
+      const program = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
+      const progId = req.user.programId ?? program?.id ?? null;
+      if (progId) {
+        where.submittedBy = { programId: progId };
+      } else {
+        const deptUsers = await prisma.user.findMany({
+          where: { departmentId: req.user.departmentId },
+          select: { id: true },
+        });
+        where.submittedById = { in: deptUsers.map(u => u.id) };
+      }
     }
     const proposals = await prisma.proposal.findMany({
       where,

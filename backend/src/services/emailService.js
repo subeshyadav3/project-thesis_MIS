@@ -93,23 +93,6 @@ async function notifyFeedbackSubmitted(studentEmails, groupName, projectTitle, s
   });
 }
 
-async function notifyEvaluationSubmitted(studentEmails, groupName, projectTitle, supervisorName, stage, marks) {
-  await sendEmail({
-    to: studentEmails,
-    subject: `Evaluation Marks - ${groupName} (${stage})`,
-    title: 'Evaluation Marks Notification',
-    contentLines: [
-      `Dear Student,`,
-      `Your supervisor has submitted evaluation marks for <strong>${groupName}</strong>.`,
-      `<strong>Project Title:</strong> ${projectTitle}`,
-      `<strong>Supervisor:</strong> ${supervisorName}`,
-      `<strong>Stage:</strong> ${stage.replace(/_/g, ' ')}`,
-      `<strong>Marks:</strong> ${marks}`,
-      `Please log in to view the detailed breakdown.`,
-    ],
-  });
-}
-
 async function notifyRecommendationIssued(studentEmails, studentName, projectTitle, supervisorName) {
   await sendEmail({
     to: studentEmails,
@@ -189,7 +172,6 @@ module.exports = {
   notifySupervisorAssigned,
   notifyStudentsSupervisorAssigned,
   notifyFeedbackSubmitted,
-  notifyEvaluationSubmitted,
   notifyRecommendationIssued,
   notifyUserCreated,
   notifyExaminerAssigned,
