@@ -778,6 +778,24 @@ exports.updateThesisStatus = async (req, res) => {
     const oldThesis = await prisma.thesis.findUnique({ where: { id }, select: { status: true, title: true } });
     const transition = assertValidStatusTransition('thesis', oldThesis?.status, req.body.status);
     if (!transition.valid) return res.status(400).json({ error: transition.error });
+
+    // Don't let a thesis be finalised while any evaluation component still has
+    // an un-entered score — an incomplete grade sheet shouldn't be marked complete.
+    if (req.body.status === 'COMPLETED') {
+      const [components, evaluations] = await Promise.all([
+        prisma.evaluationComponent.findMany({ where: { thesisId: id }, select: { id: true } }),
+        prisma.evaluation.findMany({ where: { thesisId: id }, select: { componentId: true, marks: true } }),
+      ]);
+      if (!components.length) {
+        return res.status(400).json({ error: 'Cannot mark thesis complete: no evaluation components are set up.' });
+      }
+      const scored = new Map(evaluations.filter(e => e.marks != null).map(e => [e.componentId, true]));
+      const missing = components.filter(c => !scored.get(c.id)).length;
+      if (missing) {
+        return res.status(400).json({ error: `Cannot mark thesis complete: ${missing} evaluation component(s) still have no marks entered.` });
+      }
+    }
+
     const thesis = await prisma.thesis.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },

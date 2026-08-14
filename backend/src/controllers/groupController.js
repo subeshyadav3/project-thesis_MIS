@@ -861,6 +861,24 @@ exports.updateGroupStatus = async (req, res) => {
     }
     const transition = assertValidStatusTransition('group', existing.status, req.body.status);
     if (!transition.valid) return res.status(400).json({ error: transition.error });
+
+    // Don't let a project be finalised while any evaluation component still has
+    // an un-entered score — an incomplete grade sheet shouldn't be marked complete.
+    if (req.body.status === 'COMPLETED') {
+      const [components, evaluations] = await Promise.all([
+        prisma.evaluationComponent.findMany({ where: { groupId: existing.id }, select: { id: true } }),
+        prisma.evaluation.findMany({ where: { groupId: existing.id }, select: { componentId: true, marks: true } }),
+      ]);
+      if (!components.length) {
+        return res.status(400).json({ error: 'Cannot mark project complete: no evaluation components are set up.' });
+      }
+      const scored = new Map(evaluations.filter(e => e.marks != null).map(e => [e.componentId, true]));
+      const missing = components.filter(c => !scored.get(c.id)).length;
+      if (missing) {
+        return res.status(400).json({ error: `Cannot mark project complete: ${missing} evaluation component(s) still have no marks entered.` });
+      }
+    }
+
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
