@@ -98,7 +98,7 @@ function MaintainerDashboard() {
               </Link>
               <Link to="/maintainer/departments" className="btn btn-primary btn-sm">
                 <Icon name="account_balance" className="material-symbols-outlined" />
-                Departments & Programs
+                Departments
               </Link>
             </div>
           </div>

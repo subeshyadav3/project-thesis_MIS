@@ -246,11 +246,11 @@ function DepartmentManagement() {
 
   return (
     <ErrorBoundary>
-      <PageLayout title="Departments & Programs" user={user} actions={actions}>
+      <PageLayout title="Departments" user={user} actions={actions}>
         <div className="page-header">
           <h1>
             <Icon name="account_balance" className="material-symbols-outlined" />
-            Departments, Programs & Academic Batches
+            Departments
           </h1>
           <p>Configure campus academic faculties, affiliated degree programs, and active academic years</p>
         </div>

@@ -19,7 +19,7 @@ function Sidebar({ user, isOpen, onClose }) {
   const maintainerLinks = [
     { path: '/maintainer', label: 'Dashboard', icon: 'dashboard' },
     { path: '/maintainer/users', label: 'User Management', icon: 'groups' },
-    { path: '/maintainer/departments', label: 'Departments & Programs', icon: 'account_balance' },
+    { path: '/maintainer/departments', label: 'Departments', icon: 'account_balance' },
     { path: '/maintainer/audit-log', label: 'Audit Logs', icon: 'history' },
   ];
 
