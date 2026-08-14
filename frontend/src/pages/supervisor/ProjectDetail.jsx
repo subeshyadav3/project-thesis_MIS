@@ -299,7 +299,15 @@ function ProjectDetail() {
               )}
               {item?.cluster && (
                 <span style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: 11, padding: '3px 8px', borderRadius: 50 }}>
-                  {item.cluster}
+                  {(() => {
+                    const map = {
+                      'Cluster 1': 'Computer networks and security',
+                      'Cluster 2': 'Electronic devices, circuits and communication',
+                      'Cluster 3': 'AI/ML and image processing',
+                      'Cluster 4': 'Audio, NLP and data/text analytics',
+                    };
+                    return map[item.cluster] || item.cluster;
+                  })()}
                 </span>
               )}
             </div>

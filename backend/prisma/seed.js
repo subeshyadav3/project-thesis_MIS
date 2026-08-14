@@ -33,10 +33,10 @@ const BACHELOR_PROGRAMS = [
 ];
 
 const MASTER_PROGRAMS = [
-  { code: 'MSNCS', name: 'MSc in Network and Cyber Security', cluster: 'Cluster 1', maxStudents: 24 },
-  { code: 'MSICE', name: 'MSc in Information and Communication Engineering', cluster: 'Cluster 2', maxStudents: 20 },
-  { code: 'MSDSA', name: 'MSc in Data Science and Analytics', cluster: 'Cluster 3', maxStudents: 24 },
-  { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Cluster 4', maxStudents: 20 },
+  { code: 'MSNCS', name: 'MSc in Network and Cyber Security', cluster: 'Computer networks and security', maxStudents: 24 },
+  { code: 'MSICE', name: 'MSc in Information and Communication Engineering', cluster: 'Electronic devices, circuits and communication', maxStudents: 20 },
+  { code: 'MSDSA', name: 'MSc in Data Science and Analytics', cluster: 'AI/ML and image processing', maxStudents: 24 },
+  { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Audio, NLP and data/text analytics', maxStudents: 20 },
 ];
 
 // ── Name pools ─────────────────────────────────────────────────────────
@@ -171,10 +171,10 @@ async function main() {
   const progDefs = [
     { code: 'BCT', name: 'Bachelor in Computer Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
     { code: 'BEI', name: 'Bachelor in Electronics and Information Engineering', degreeType: 'BACHELOR', departmentId: eceDept.id },
-    { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', cluster: 'Cluster 1', departmentId: eceDept.id },
-    { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', cluster: 'Cluster 2', departmentId: eceDept.id },
-    { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', cluster: 'Cluster 3', departmentId: eceDept.id },
-    { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', degreeType: 'MASTER', cluster: 'Cluster 4', departmentId: eceDept.id },
+    { code: 'MSNCS', name: 'MSc in Network and Cyber Security', degreeType: 'MASTER', cluster: 'Computer networks and security', departmentId: eceDept.id },
+    { code: 'MSICE', name: 'MSc in Information and Communication Engineering', degreeType: 'MASTER', cluster: 'Electronic devices, circuits and communication', departmentId: eceDept.id },
+    { code: 'MSDSA', name: 'MSc in Data Science and Analytics', degreeType: 'MASTER', cluster: 'AI/ML and image processing', departmentId: eceDept.id },
+    { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', degreeType: 'MASTER', cluster: 'Audio, NLP and data/text analytics', departmentId: eceDept.id },
   ];
   for (const p of progDefs) {
     programs[p.code] = await prisma.program.create({ data: p });

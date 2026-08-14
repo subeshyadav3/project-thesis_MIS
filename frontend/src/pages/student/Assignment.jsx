@@ -186,7 +186,15 @@ function StudentProjectDetail() {
               )}
               <div className="detail-item">
                 <span className="detail-label">Research Cluster</span>
-                <span>{assignment.cluster ? <span className="badge badge-info">{assignment.cluster}</span> : '—'}</span>
+                <span>{assignment.cluster ? <span className="badge badge-info">{(() => {
+                  const map = {
+                    'Cluster 1': 'Computer networks and security',
+                    'Cluster 2': 'Electronic devices, circuits and communication',
+                    'Cluster 3': 'AI/ML and image processing',
+                    'Cluster 4': 'Audio, NLP and data/text analytics',
+                  };
+                  return map[assignment.cluster] || assignment.cluster;
+                })()}</span> : '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Batch</span>
