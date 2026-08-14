@@ -48,8 +48,13 @@ ctrl.create = async (req, res) => {
     const eligible = await listEligibleAnnouncementsForStudent(req.user);
     if (!eligible.find(a => a.id === ann.id)) return res.status(403).json({ error: 'You are not eligible for this announcement' });
 
-    const alreadyIn = await isStudentAlreadyInAGroupAnnouncement(req.user, ann);
-    if (alreadyIn) return res.status(400).json({ error: 'You are already in a group/thesis for this announcement type' });
+    const { getEngagement } = require('../services/engagementGuard');
+    const submitterEngagement = await getEngagement(req.user.id);
+    if (submitterEngagement.engaged) {
+      return res.status(400).json({
+        error: `You are already engaged in a ${submitterEngagement.type === 'thesis' ? 'thesis' : 'project'} (${submitterEngagement.status}): "${submitterEngagement.title}". A student cannot be part of multiple projects.`,
+      });
+    }
 
     const isThesisAnnouncement = ann.type === 'THESIS';
     const projectType = ann.type === 'MAJOR' ? 'MAJOR' : 'MINOR';
@@ -64,13 +69,15 @@ ctrl.create = async (req, res) => {
     }
 
     if (!isThesisAnnouncement && invitedIds.length > 0) {
-      const existingMembers = await prisma.groupMember.findMany({
-        where: { studentId: { in: invitedIds }, group: { announcementId: ann.id } },
-        include: { student: { select: { firstName: true, lastName: true } } },
-      });
-      if (existingMembers.length > 0) {
-        const names = existingMembers.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ');
-        return res.status(400).json({ error: `Student(s) already in another group for this announcement: ${names}` });
+      for (const sid of invitedIds) {
+        const eng = await getEngagement(Number(sid));
+        if (eng.engaged) {
+          const u = await prisma.user.findUnique({ where: { id: Number(sid) }, select: { firstName: true, lastName: true } });
+          const uName = u ? `${u.firstName} ${u.lastName}` : `Student (ID: ${sid})`;
+          return res.status(400).json({
+            error: `${uName} is already assigned to a active ${eng.type === 'thesis' ? 'thesis' : 'project'} (${eng.status}): "${eng.title}". Cannot add to another group.`,
+          });
+        }
       }
     }
 

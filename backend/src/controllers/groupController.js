@@ -98,20 +98,14 @@ exports.createGroup = async (req, res) => {
       }
     }
 
-    const group = await prisma.projectGroup.create({
-      data: {
-        name,
-        projectTitle,
-        projectType: projectType || 'MINOR',
-        cluster: cluster || null,
-        batch: batch || null,
-        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
-        supervisorId: supervisorId ? parseInt(supervisorId) : null,
-        programId: resolvedProgramId,
-        status: status || 'ACTIVE',
-      },
-    });
+    const { getEngagement } = require('../services/engagementGuard');
+
+    // Pre-resolve and validate all students before group creation to prevent orphaned records
+    const resolvedMembers = [];
     if (students && students.length > 0) {
+      if (students.length > 4) {
+        return res.status(400).json({ error: 'Maximum 4 members allowed per group' });
+      }
       let groupProgram = null;
       if (resolvedProgramId) {
         groupProgram = await prisma.program.findUnique({ where: { id: resolvedProgramId } });
@@ -148,20 +142,36 @@ exports.createGroup = async (req, res) => {
             }
           }
         }
-        const existingMembership = await prisma.groupMember.findFirst({
-          where: { studentId: student.id, group: { status: { not: 'COMPLETED' } } },
-          include: { group: { select: { name: true } } },
-        });
-        if (existingMembership) {
+
+        const engagement = await getEngagement(student.id);
+        if (engagement.engaged) {
           return res.status(400).json({
-            error: `Student ${student.firstName} ${student.lastName} is already assigned to active group "${existingMembership.group.name}".`,
+            error: `Student ${student.firstName} ${student.lastName} is already assigned to active ${engagement.type === 'thesis' ? 'thesis' : 'group'} "${engagement.title}".`,
           });
         }
 
-        await prisma.groupMember.create({
-          data: { studentId: student.id, groupId: group.id, rollNumber: roll || `R${student.id}` },
-        });
+        resolvedMembers.push({ studentId: student.id, rollNumber: roll || student.rollNumber || `R${student.id}` });
       }
+    }
+
+    const group = await prisma.projectGroup.create({
+      data: {
+        name,
+        projectTitle,
+        projectType: projectType || 'MINOR',
+        cluster: cluster || null,
+        batch: batch || null,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+        supervisorId: supervisorId ? parseInt(supervisorId) : null,
+        programId: resolvedProgramId,
+        status: status || 'ACTIVE',
+      },
+    });
+
+    for (const mem of resolvedMembers) {
+      await prisma.groupMember.create({
+        data: { studentId: mem.studentId, groupId: group.id, rollNumber: mem.rollNumber },
+      });
     }
     const defaults = getDefaultComponents(projectType || 'MINOR');
     for (const comp of defaults) {
