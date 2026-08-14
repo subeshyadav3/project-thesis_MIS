@@ -362,6 +362,85 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+exports.bulkDeleteUsers = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map(Number).filter(Boolean))] : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'No user ids provided' });
+    if (ids.length > 200) return res.status(400).json({ error: 'Too many users in one request (max 200)' });
+
+    const deleted = [];
+    const errors = [];
+
+    for (const userId of ids) {
+      const existing = await prisma.user.findUnique({ where: { id: userId } });
+      if (!existing) { errors.push({ id: userId, error: 'User not found' }); continue; }
+      if (req.user.id === userId) { errors.push({ id: userId, name: `${existing.firstName} ${existing.lastName}`, error: 'Cannot delete your own account' }); continue; }
+      if (req.user.role === 'COORDINATOR' && existing.departmentId !== req.user.departmentId) {
+        errors.push({ id: userId, name: `${existing.firstName} ${existing.lastName}`, error: 'Cannot delete users outside your department' });
+        continue;
+      }
+      if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(existing.role)) {
+        errors.push({ id: userId, name: `${existing.firstName} ${existing.lastName}`, error: 'Cannot delete this user role' });
+        continue;
+      }
+
+      let groupCount = 0, thesisCount = 0, supervisedGroupCount = 0, supervisedThesisCount = 0, examAssignCount = 0;
+      if (existing.role === 'STUDENT') {
+        [groupCount, thesisCount] = await Promise.all([
+          prisma.groupMember.count({ where: { studentId: userId } }),
+          prisma.thesis.count({ where: { studentId: userId } }),
+        ]);
+      } else if (existing.role === 'SUPERVISOR') {
+        [supervisedGroupCount, supervisedThesisCount] = await Promise.all([
+          prisma.projectGroup.count({ where: { supervisorId: userId } }),
+          prisma.thesis.count({ where: { supervisorId: userId } }),
+        ]);
+      } else if (existing.role === 'EXTERNAL_EXAMINER') {
+        examAssignCount = await prisma.examinerAssignment.count({ where: { externalExaminerId: userId } });
+      }
+
+      if (groupCount > 0 || thesisCount > 0 || supervisedGroupCount > 0 || supervisedThesisCount > 0 || examAssignCount > 0) {
+        errors.push({
+          id: userId,
+          name: `${existing.firstName} ${existing.lastName}`,
+          error: 'Has active assignments',
+          details: {
+            groups: groupCount,
+            theses: thesisCount,
+            supervisedGroups: supervisedGroupCount,
+            supervisedTheses: supervisedThesisCount,
+            examinerAssignments: examAssignCount,
+          },
+        });
+        continue;
+      }
+
+      await prisma.$transaction([
+        prisma.notification.deleteMany({ where: { userId: userId } }),
+        prisma.auditLog.deleteMany({ where: { performedById: userId } }),
+        prisma.evaluation.deleteMany({ where: { submittedById: userId } }),
+        prisma.evaluationComponent.deleteMany({ where: { createdById: userId } }),
+        prisma.recommendation.deleteMany({ where: { issuedById: userId } }),
+        prisma.assignmentRequest.deleteMany({ where: { fromCoordinatorId: userId } }),
+        prisma.assignmentRequest.deleteMany({ where: { toCoordinatorId: userId } }),
+        prisma.assignmentRequest.deleteMany({ where: { supervisorId: userId } }),
+        prisma.groupInvitation.deleteMany({ where: { inviterId: userId } }),
+        prisma.groupInvitation.deleteMany({ where: { inviteeId: userId } }),
+        prisma.announcement.deleteMany({ where: { createdById: userId } }),
+        prisma.examinerAssignment.deleteMany({ where: { assignedById: userId } }),
+        prisma.user.delete({ where: { id: userId } }),
+      ]);
+      audit.log({ action: 'DELETE', entity: 'User', entityId: userId, details: `Deleted ${existing.role} ${existing.email}`, performedById: req.user.id });
+      deleted.push(userId);
+    }
+
+    res.json({ deleted, errors });
+  } catch (error) {
+    console.error('bulkDeleteUsers error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+};
+
 exports.getSupervisorScope = async (req, res) => {
   try {
     const [ownProgram, theses, groups] = await Promise.all([

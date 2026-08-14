@@ -14,6 +14,7 @@ router.get('/role/:role', authenticate, authorize('MAINTAINER', 'COORDINATOR'), 
 router.get('/supervisor-scope', authenticate, authorize('COORDINATOR'), userController.getSupervisorScope);
 router.put('/:id/toggle-active', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.toggleActive);
 router.get('/audit-logs', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.getAuditLogs);
+router.post('/bulk-delete', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.bulkDeleteUsers);
 router.post('/bulk', authenticate, authorize('MAINTAINER', 'COORDINATOR'), userController.bulkCreateUsers);
 router.post('/bulk-import', authenticate, authorize('MAINTAINER', 'COORDINATOR'), upload.single('file'), userController.bulkImportUsersExcel);
 

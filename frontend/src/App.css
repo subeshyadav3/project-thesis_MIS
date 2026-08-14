@@ -1192,6 +1192,9 @@
   .btn-danger { background: var(--color-error); color: var(--color-on-error); }
   .btn-danger:hover { background: #b91c1c; }
 
+  /* Selected rows in management tables */
+  tr.selected-row { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+
   .btn-warning { background: var(--color-warning); color: var(--color-on-warning); }
   .btn-warning:hover { background: #c2410c; }
 

@@ -25,6 +25,7 @@ function UserManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', confirmLabel: 'Confirm', onConfirm: () => {}, danger: false });
+  const [selectedIds, setSelectedIds] = useState([]);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isCoordinator = user.role === 'COORDINATOR';
   const isMaintainer = user.role === 'MAINTAINER';
@@ -45,6 +46,8 @@ function UserManagement() {
 
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filters]);
+  // Clear selections when the visible set changes
+  useEffect(() => { setSelectedIds([]); }, [searchTerm, filters, currentPage]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,6 +115,58 @@ function UserManagement() {
         setConfirmDialog((prev) => ({ ...prev, open: false }));
       },
     });
+  };
+
+  const handleBulkDelete = () => {
+    const targets = users.filter(u => selectedIds.includes(u.id));
+    if (targets.length === 0) return;
+    const names = targets.slice(0, 5).map(u => `${u.firstName} ${u.lastName}`).join(', ') + (targets.length > 5 ? ` +${targets.length - 5} more` : '');
+    setConfirmDialog({
+      open: true,
+      title: `Delete ${targets.length} users`,
+      message: `Are you sure you want to delete ${targets.length} user(s)? This action cannot be undone.`,
+      confirmLabel: 'Delete All',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const { data } = await api.post('/users/bulk-delete', { ids: selectedIds });
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          if (data.deleted?.length) toast.success(`${data.deleted.length} user(s) deleted successfully`);
+          const errors = data.errors || [];
+          if (errors.length) {
+            const summary = errors.slice(0, 3).map(e => {
+              let msg = e.error;
+              if (e.details) {
+                const links = [];
+                if (e.details.groups) links.push(`${e.details.groups} group(s)`);
+                if (e.details.theses) links.push(`${e.details.theses} thesis(es)`);
+                if (e.details.supervisedGroups) links.push(`${e.details.supervisedGroups} supervised group(s)`);
+                if (e.details.supervisedTheses) links.push(`${e.details.supervisedTheses} supervised thesis(es)`);
+                if (e.details.examinerAssignments) links.push(`${e.details.examinerAssignments} examiner assignment(s)`);
+                if (links.length) msg += ` — ${links.join(', ')}`;
+              }
+              return `${e.name || `User #${e.id}`}: ${msg}`;
+            }).join('. ');
+            toast.error(`${errors.length} not deleted — ${summary}${errors.length > 3 ? '...' : ''}`);
+          }
+          setSelectedIds([]);
+          loadUsers();
+        } catch (err) {
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          toast.error(err.response?.data?.error || 'Error deleting users');
+        }
+      },
+    });
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectPage = () => {
+    const pageIds = paginatedUsers.map(u => u.id);
+    const allSelected = pageIds.every(id => selectedIds.includes(id));
+    setSelectedIds(prev => allSelected ? prev.filter(id => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])]);
   };
 
   const openEdit = (u) => {
@@ -232,6 +287,11 @@ function UserManagement() {
             </div>
           </div>
           <div className="table-toolbar-right">
+            {selectedIds.length > 0 && (
+              <button className="btn btn-sm btn-danger" onClick={handleBulkDelete}>
+                <Icon name="delete_sweep" className="material-symbols-outlined" /> Delete Selected ({selectedIds.length})
+              </button>
+            )}
             <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredUsers.length} users</span>
           </div>
         </div>
@@ -295,6 +355,9 @@ function UserManagement() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input type="checkbox" checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedIds.includes(u.id))} onChange={toggleSelectPage} />
+                  </th>
                   <th>User</th>
                   <th>Email / Roll</th>
                   <th>Role</th>
@@ -307,7 +370,10 @@ function UserManagement() {
               </thead>
               <tbody>
                 {paginatedUsers.map(u => (
-                  <tr key={u.id}>
+                  <tr key={u.id} className={selectedIds.includes(u.id) ? 'selected-row' : ''}>
+                    <td>
+                      <input type="checkbox" checked={selectedIds.includes(u.id)} onChange={() => toggleSelect(u.id)} />
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">
