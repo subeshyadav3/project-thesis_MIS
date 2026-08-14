@@ -154,6 +154,13 @@ exports.createUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && !['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role)) {
       return res.status(403).json({ error: 'Coordinator can only create supervisors, examiners, and students' });
     }
+    // Coordinator cannot place students in programs outside their department
+    if (req.user.role === 'COORDINATOR' && resolvedProgramId) {
+      const prog = await prisma.program.findUnique({ where: { id: resolvedProgramId }, select: { departmentId: true } });
+      if (prog && prog.departmentId !== req.user.departmentId) {
+        return res.status(403).json({ error: 'Cannot create users in a program outside your department' });
+      }
+    }
 
     const hash = await bcrypt.hash(password, 10);
     const batch = extractBatchFromRoll(resolvedRoll);
@@ -204,7 +211,16 @@ exports.updateUser = async (req, res) => {
     if (req.body.role && req.user.role === 'MAINTAINER') data.role = req.body.role;
     if (existing.role === 'STUDENT') {
       if (req.body.degreeType) data.degreeType = req.body.degreeType;
-      if (req.body.programId) data.programId = parseInt(req.body.programId);
+      if (req.body.programId) {
+        const pid = parseInt(req.body.programId);
+        if (req.user.role === 'COORDINATOR') {
+          const prog = await prisma.program.findUnique({ where: { id: pid }, select: { departmentId: true } });
+          if (prog && prog.departmentId !== req.user.departmentId) {
+            return res.status(403).json({ error: 'Cannot move students to a program outside your department' });
+          }
+        }
+        data.programId = pid;
+      }
     }
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
@@ -261,6 +277,16 @@ exports.updateUser = async (req, res) => {
       data,
       select: USER_SELECT,
     });
+    // Keep Thesis.programId in sync with the student's program (it mirrors the
+    // student's program at creation time and goes stale when the student moves).
+    if (existing.role === 'STUDENT' && data.programId && data.programId !== existing.programId) {
+      try {
+        await prisma.thesis.updateMany({
+          where: { studentId: user.id },
+          data: { programId: data.programId },
+        });
+      } catch (e) { console.error('sync thesis programId error:', e.message); }
+    }
     const changedFields = Object.keys(data).join(', ');
   audit.log({ action: 'UPDATE', entity: 'User', entityId: user.id, details: `Updated fields: ${changedFields}`, performedById: req.user.id });
   try { notifSvc.notify(user.id, 'USER_UPDATED', 'Your profile has been updated'); } catch (e) { console.error(e.message); }
@@ -469,6 +495,34 @@ exports.bulkCreateUsers = async (req, res) => {
 
     const created = [];
     const errors = [];
+
+    if (req.user.role === 'COORDINATOR') {
+      const deptPrograms = await prisma.program.findMany({
+        where: { departmentId: req.user.departmentId },
+        select: { id: true },
+      });
+      const deptProgramIds = new Set(deptPrograms.map(p => p.id));
+      const canUseProgram = (pid) => !pid || deptProgramIds.has(pid);
+      const canCreateRole = (role) => ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role);
+
+      for (const u of users) {
+        const role = (u.role || '').toUpperCase();
+        const pid = u.programId ? parseInt(u.programId) : null;
+        const did = u.departmentId ? parseInt(u.departmentId) : req.user.departmentId;
+        if (!canCreateRole(role)) {
+          errors.push({ email: u.email || 'unknown', error: 'Coordinator can only create supervisors, examiners, and students' });
+          continue;
+        }
+        if (did && did !== req.user.departmentId) {
+          errors.push({ email: u.email || 'unknown', error: 'Cannot create users outside your department' });
+          continue;
+        }
+        if (!canUseProgram(pid)) {
+          errors.push({ email: u.email || 'unknown', error: 'Cannot create users in a program outside your department' });
+          continue;
+        }
+      }
+    }
 
     for (const u of users) {
       const { password, firstName, lastName, role, degreeType, programId, departmentId, designation, rollNumber } = u;
