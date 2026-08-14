@@ -580,6 +580,11 @@ exports.finalizeFormResponse = async (req, res) => {
         }
       }
 
+      await prisma.proposal.updateMany({
+        where: { groupId, status: 'PENDING' },
+        data: { status: 'APPROVED' },
+      });
+
       return res.json({ success: true, group });
     }
 
@@ -707,7 +712,8 @@ exports.deleteFormResponse = async (req, res) => {
       }
 
       await prisma.groupMember.deleteMany({ where: { groupId } });
-      await prisma.invitation.deleteMany({ where: { groupId } });
+      await prisma.groupInvitation.deleteMany({ where: { groupId } });
+      await prisma.examinerAssignment.deleteMany({ where: { groupId } });
       await prisma.proposal.deleteMany({ where: { groupId } });
       await prisma.recommendation.deleteMany({ where: { groupId } });
       await prisma.evaluation.deleteMany({ where: { groupId } });
@@ -730,6 +736,8 @@ exports.deleteFormResponse = async (req, res) => {
     }
 
     if (existing.thesis) {
+      await prisma.examinerAssignment.deleteMany({ where: { thesisId: existing.thesis.id } });
+      await prisma.assignmentRequest.deleteMany({ where: { thesisId: existing.thesis.id } });
       await prisma.proposal.deleteMany({ where: { thesisId: existing.thesis.id } });
       await prisma.evaluation.deleteMany({ where: { thesisId: existing.thesis.id } });
       await prisma.evaluationComponent.deleteMany({ where: { thesisId: existing.thesis.id } });

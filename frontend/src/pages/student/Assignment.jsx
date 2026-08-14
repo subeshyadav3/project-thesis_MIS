@@ -185,6 +185,10 @@ function StudentProjectDetail() {
                 </div>
               )}
               <div className="detail-item">
+                <span className="detail-label">Research Cluster</span>
+                <span>{assignment.cluster ? <span className="badge badge-info">{assignment.cluster}</span> : '—'}</span>
+              </div>
+              <div className="detail-item">
                 <span className="detail-label">Batch</span>
                 <span>{assignment.batch || '—'}</span>
               </div>

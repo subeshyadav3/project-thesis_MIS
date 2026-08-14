@@ -1119,6 +1119,10 @@ exports.removeMemberFromGroup = async (req, res) => {
       where: { groupId: id, studentId },
     });
 
+    await prisma.groupInvitation.deleteMany({
+      where: { groupId: id, inviteeId: studentId },
+    });
+
     const updatedGroup = await prisma.projectGroup.findUnique({
       where: { id: group.id },
       include: {
