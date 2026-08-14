@@ -165,7 +165,8 @@ async function canManageThesisAsCoordinator(thesis, scope, user) {
   if (scope.kind === 'program') {
     return thesis.student?.programId === scope.program.id ||
       thesis.programId === scope.program.id ||
-      (thesis.student && !thesis.student.programId);
+      (thesis.student && !thesis.student.programId) ||
+      (Boolean(thesis.crossProgramRequestedById) && Boolean(user?.id) && thesis.crossProgramRequestedById === user.id);
   }
 
   if (scope.kind === 'department') {

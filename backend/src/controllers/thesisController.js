@@ -1061,12 +1061,14 @@ exports.updateThesis = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    const { title, description, startDate, endDate } = req.body;
+    const { title, description, startDate, endDate, cluster, status } = req.body;
     const data = {};
     if (title !== undefined) data.title = title;
     if (description !== undefined) data.description = description;
     if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
+    if (cluster !== undefined) data.cluster = cluster;
+    if (status !== undefined) data.status = status;
     const thesis = await prisma.thesis.update({
       where: { id },
       data,
