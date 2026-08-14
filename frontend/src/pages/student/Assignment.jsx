@@ -281,8 +281,8 @@ function StudentProjectDetail() {
               {assignment.status === 'COMPLETED' && <span className="badge badge-completed"><span className="dot" />Completed</span>}
             </div>
             <div style={{ padding: '0 16px 16px' }}>
-              {assignment.announcement?.expirationDate && (() => {
-                const info = getDeadlineInfo(assignment.announcement.expirationDate);
+              {assignment.endDate && (() => {
+                const info = getDeadlineInfo(assignment.endDate);
                 if (!info) return null;
                 return (
                   <div style={{
@@ -291,7 +291,7 @@ function StudentProjectDetail() {
                     color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                   }}>
                     <Icon name={info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                    {info.label}
+                    {info.expired ? `Due date passed: ${new Date(assignment.endDate).toLocaleDateString()}` : `Due: ${info.label}`}
                   </div>
                 );
               })()}

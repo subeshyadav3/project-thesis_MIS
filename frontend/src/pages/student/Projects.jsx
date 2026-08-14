@@ -83,18 +83,18 @@ function StudentProjects() {
                   <span className={`badge badge-${g.status?.toLowerCase() === 'active' ? 'active' : g.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`}>
                     <span className="dot" />{g.status}
                   </span>
-                  {g.announcement?.expirationDate && (() => {
-                    const info = getDeadlineInfo(g.announcement.expirationDate);
+                  {g.endDate && (() => {
+                    const info = getDeadlineInfo(g.endDate);
                     if (!info) return null;
-                    return g.announcement?.expirationDate ? (
-                      <span className={`badge`} style={{
+                    return (
+                      <span className="badge" style={{
                         fontSize: 9, padding: '1px 6px', border: 'none',
                         background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'var(--color-surface-container)',
                         color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                       }}>
-                        {info.label}
+                        {info.expired ? 'Overdue' : info.label}
                       </span>
-                    ) : null;
+                    );
                   })()}
                   <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }} />
                 </div>
