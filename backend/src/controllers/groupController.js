@@ -9,6 +9,7 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildGroupWhereForCoordinator, resolveCoordinatorScope, isGroupVisibleToCoordinator, canManageGroupAsCoordinator } = require('../utils/coordinatorScope');
+const { assertValidStatusTransition } = require('../utils/statusTransitions');
 const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 const normalizeBatch = (batch) => {
@@ -643,8 +644,18 @@ exports.bulkImportConfirm = async (req, res) => {
         }
 
         try {
+          const pt = (projectType === 'MAJOR' || projectType === 'MINOR') ? projectType : 'MINOR';
+          const annType = pt === 'MAJOR' ? 'MAJOR' : 'MINOR';
           const activeAnnouncement = await tx.announcement.findFirst({
-            where: { type: { in: ['MINOR', 'MAJOR', 'GROUP'] } },
+            where: {
+              type: annType,
+              isActive: true,
+              allowGroupFormation: true,
+              OR: [
+                { programIds: { isEmpty: true } },
+                { programIds: { has: resolvedProgramId } },
+              ],
+            },
             orderBy: { createdAt: 'desc' },
           });
           if (activeAnnouncement) {
@@ -848,12 +859,13 @@ exports.updateGroupStatus = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
       }
     }
+    const transition = assertValidStatusTransition('group', existing.status, req.body.status);
+    if (!transition.valid) return res.status(400).json({ error: transition.error });
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
-    if (existing.status !== req.body.status) {
-      try {
+    if (existing.status !== req.body.status) {      try {
         await notifSvc.notifyStatusChange({
           groupId: group.id, oldStatus: existing.status, newStatus: req.body.status,
           itemTitle: existing.projectTitle, changerId: req.user.id,

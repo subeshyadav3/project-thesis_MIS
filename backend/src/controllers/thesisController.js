@@ -9,6 +9,7 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
+const { assertValidStatusTransition } = require('../utils/statusTransitions');
 const { getEngagement } = require('../services/engagementGuard');
 
 const normalizeBatch = (batch) => {
@@ -775,6 +776,8 @@ exports.updateThesisStatus = async (req, res) => {
       }
     }
     const oldThesis = await prisma.thesis.findUnique({ where: { id }, select: { status: true, title: true } });
+    const transition = assertValidStatusTransition('thesis', oldThesis?.status, req.body.status);
+    if (!transition.valid) return res.status(400).json({ error: transition.error });
     const thesis = await prisma.thesis.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
