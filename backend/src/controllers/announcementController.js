@@ -361,9 +361,69 @@ exports.getFormResponses = async (req, res) => {
     });
     const responseByStudent = new Map(responses.map(r => [r.studentId, r]));
 
-    const filled = students
+    if (ann.degreeType === 'BACHELOR' || ['MINOR', 'MAJOR'].includes(ann.type) || req.user.program?.degreeType === 'BACHELOR') {
+      const groupWhere = [{ announcementId: id }];
+      if (ann.batch) {
+        const typeFilter = ann.type === 'MINOR' ? 'MINOR' : ann.type === 'MAJOR' ? 'MAJOR' : null;
+        if (typeFilter) {
+          groupWhere.push({ batch: ann.batch, projectType: typeFilter });
+        } else {
+          groupWhere.push({ batch: ann.batch });
+        }
+      }
+
+      const projectGroups = await prisma.projectGroup.findMany({
+        where: { OR: groupWhere },
+        include: {
+          supervisor: { select: { id: true, firstName: true, lastName: true } },
+          members: { select: { student: { select: { id: true, firstName: true, lastName: true, rollNumber: true, email: true, program: true } } } },
+          proposals: { select: { id: true, documentUrl: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        }
+      });
+
+      projectGroups.forEach(g => {
+        const validMembers = (g.members || []).filter(m => m && m.student);
+        const memberNames = validMembers.map(m => `${m.student.firstName} ${m.student.lastName}${m.student.rollNumber ? ` (${m.student.rollNumber})` : ''}`).join(', ');
+        const pdfUrl = g.proposals?.[0]?.documentUrl || null;
+        validMembers.forEach(m => {
+          if (!responseByStudent.has(m.student.id)) {
+            responseByStudent.set(m.student.id, {
+              id: `group_${g.id}_${m.student.id}`,
+              studentId: m.student.id,
+              announcementId: id,
+              status: g.status === 'ACTIVE' ? 'APPROVED' : 'SUBMITTED',
+              formData: {
+                title: g.projectTitle,
+                groupName: g.name,
+                members: memberNames,
+                cluster: g.cluster || '',
+                pdfUrl,
+                finalSupervisorId: g.supervisorId ? g.supervisorId.toString() : '',
+              },
+              groupId: g.id,
+              thesis: g.supervisor ? { id: g.id, title: g.projectTitle, status: g.status, supervisorId: g.supervisorId, supervisor: g.supervisor } : null,
+              createdAt: g.createdAt
+            });
+          }
+        });
+      });
+    }
+
+    let filled = students
       .filter(s => responseByStudent.has(s.id))
       .map(s => ({ student: s, response: responseByStudent.get(s.id) }));
+
+    if (ann.degreeType === 'BACHELOR' || ['MINOR', 'MAJOR'].includes(ann.type) || req.user.program?.degreeType === 'BACHELOR') {
+      const seenGroups = new Set();
+      filled = filled.filter(item => {
+        if (item.response.groupId) {
+          if (seenGroups.has(item.response.groupId)) return false;
+          seenGroups.add(item.response.groupId);
+        }
+        return true;
+      });
+    }
+
     const remaining = students.filter(s => !responseByStudent.has(s.id));
 
     res.json({ announcement: ann, total: students.length, filled, remaining });
@@ -421,6 +481,22 @@ exports.exportFormResponses = async (req, res) => {
 
 exports.updateFormResponse = async (req, res) => {
   try {
+    if (typeof req.params.responseId === 'string' && req.params.responseId.startsWith('group_')) {
+      const groupId = parseInt(req.params.responseId.split('_')[1]);
+      const incoming = (req.body.formData && typeof req.body.formData === 'object') ? req.body.formData : {};
+      const updates = {};
+      if (incoming.title && incoming.title.trim()) updates.projectTitle = incoming.title.trim();
+      if (incoming.cluster !== undefined) updates.cluster = incoming.cluster || null;
+      if (incoming.finalSupervisorId !== undefined) {
+        updates.supervisorId = incoming.finalSupervisorId ? parseInt(incoming.finalSupervisorId) : null;
+        updates.supervisorAssignmentStatus = incoming.finalSupervisorId ? 'PENDING' : null;
+      }
+      if (Object.keys(updates).length) {
+        await prisma.projectGroup.update({ where: { id: groupId }, data: updates });
+      }
+      return res.json({ success: true, groupId });
+    }
+
     const responseId = parseInt(req.params.responseId);
     const existing = await prisma.formResponse.findUnique({
       where: { id: responseId },
@@ -480,6 +556,33 @@ exports.updateFormResponse = async (req, res) => {
 
 exports.finalizeFormResponse = async (req, res) => {
   try {
+    if (typeof req.params.responseId === 'string' && req.params.responseId.startsWith('group_')) {
+      const groupId = parseInt(req.params.responseId.split('_')[1]);
+      const { supervisorId, title, cluster } = req.body;
+      const selectedSupId = supervisorId ? parseInt(supervisorId) : null;
+      const updates = { status: 'ACTIVE' };
+      if (title && title.trim()) updates.projectTitle = title.trim();
+      if (cluster !== undefined) updates.cluster = cluster || null;
+      if (selectedSupId) {
+        updates.supervisorId = selectedSupId;
+        updates.supervisorAssignmentStatus = 'PENDING';
+      }
+      const { getDefaultComponents } = require('../config/evaluationScheme');
+      const group = await prisma.projectGroup.update({ where: { id: groupId }, data: updates });
+
+      const existingComp = await prisma.evaluationComponent.count({ where: { groupId } });
+      if (existingComp === 0) {
+        const defaults = getDefaultComponents(group.projectType || 'MINOR');
+        for (const comp of defaults) {
+          await prisma.evaluationComponent.create({
+            data: { ...comp, groupId: group.id, createdById: req.user.id }
+          });
+        }
+      }
+
+      return res.json({ success: true, group });
+    }
+
     const responseId = parseInt(req.params.responseId);
     const { supervisorId, title, cluster, programId, batch } = req.body;
 
@@ -583,6 +686,62 @@ exports.finalizeFormResponse = async (req, res) => {
     res.json({ message: 'Thesis finalized successfully', response: updatedResponse, thesis });
   } catch (e) {
     console.error('finalizeFormResponse error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.deleteFormResponse = async (req, res) => {
+  try {
+    const responseId = req.params.responseId;
+
+    if (typeof responseId === 'string' && responseId.startsWith('group_')) {
+      const groupId = parseInt(responseId.split('_')[1]);
+      const group = await prisma.projectGroup.findUnique({
+        where: { id: groupId },
+        include: { announcement: true }
+      });
+      if (!group) return res.status(404).json({ error: 'Group not found' });
+
+      if (req.user.role === 'COORDINATOR' && group.announcement?.departmentId && group.announcement.departmentId !== req.user.departmentId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      await prisma.groupMember.deleteMany({ where: { groupId } });
+      await prisma.invitation.deleteMany({ where: { groupId } });
+      await prisma.proposal.deleteMany({ where: { groupId } });
+      await prisma.recommendation.deleteMany({ where: { groupId } });
+      await prisma.evaluation.deleteMany({ where: { groupId } });
+      await prisma.evaluationComponent.deleteMany({ where: { groupId } });
+      await prisma.projectGroup.delete({ where: { id: groupId } });
+
+      audit.log({ action: 'DELETE', entity: 'ProjectGroup', entityId: groupId, details: `Coordinator deleted project group "${group.name}"`, performedById: req.user.id });
+      return res.json({ message: 'Project group deleted successfully' });
+    }
+
+    const numericId = parseInt(responseId);
+    const existing = await prisma.formResponse.findUnique({
+      where: { id: numericId },
+      include: { announcement: true, thesis: true }
+    });
+    if (!existing) return res.status(404).json({ error: 'Form response not found' });
+
+    if (req.user.role === 'COORDINATOR' && existing.announcement?.departmentId !== req.user.departmentId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (existing.thesis) {
+      await prisma.proposal.deleteMany({ where: { thesisId: existing.thesis.id } });
+      await prisma.evaluation.deleteMany({ where: { thesisId: existing.thesis.id } });
+      await prisma.evaluationComponent.deleteMany({ where: { thesisId: existing.thesis.id } });
+      await prisma.thesis.delete({ where: { id: existing.thesis.id } });
+    }
+
+    await prisma.formResponse.delete({ where: { id: numericId } });
+
+    audit.log({ action: 'DELETE', entity: 'FormResponse', entityId: numericId, details: `Coordinator deleted form response #${numericId}`, performedById: req.user.id });
+    res.json({ message: 'Response deleted successfully' });
+  } catch (e) {
+    console.error('deleteFormResponse error:', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

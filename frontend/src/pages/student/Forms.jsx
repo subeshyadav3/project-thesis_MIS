@@ -98,10 +98,13 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
           </div>
 
           {fields.map(f => {
+            const isBachelor = user?.program?.degreeType === 'BACHELOR' || announcement?.degreeType === 'BACHELOR';
             const isCluster = f.key?.toLowerCase().includes('cluster') || f.label?.toLowerCase().includes('cluster');
             const isProgram = f.key?.toLowerCase().includes('program') || f.label?.toLowerCase().includes('program');
             const isGuided = f.key?.toLowerCase().includes('guided') || f.label?.toLowerCase().includes('guided');
-            const selectOptions = f.options || (isCluster ? ['AI/ML and image processing', 'Audio, NLP and data/text analytics', 'Electronic devices, circuits and communication', 'Computer networks and security'] : isProgram ? ['MSDSA', 'MSCSK', 'MSICE', 'MSNCS'] : isGuided ? ['Yes', 'No'] : null);
+            const bachelorClusters = ['AIML', 'IPCV', 'ANLP', 'NTS', 'EDMES', 'ACOM', 'EII'];
+            const masterClusters = ['AI/ML and image processing', 'Audio, NLP and data/text analytics', 'Electronic devices, circuits and communication', 'Computer networks and security'];
+            const selectOptions = f.options || (isCluster ? (isBachelor ? bachelorClusters : masterClusters) : isProgram ? (isBachelor ? ['BCT', 'BCE', 'BEI', 'BGE', 'BME', 'BIE'] : ['MSDSA', 'MSCSK', 'MSICE', 'MSNCS']) : isGuided ? ['Yes', 'No'] : null);
 
             return (
               <div className="form-group" key={f.key} style={{ margin: 0 }}>

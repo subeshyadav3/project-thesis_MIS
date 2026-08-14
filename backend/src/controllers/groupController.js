@@ -148,6 +148,16 @@ exports.createGroup = async (req, res) => {
             }
           }
         }
+        const existingMembership = await prisma.groupMember.findFirst({
+          where: { studentId: student.id, group: { status: { not: 'COMPLETED' } } },
+          include: { group: { select: { name: true } } },
+        });
+        if (existingMembership) {
+          return res.status(400).json({
+            error: `Student ${student.firstName} ${student.lastName} is already assigned to active group "${existingMembership.group.name}".`,
+          });
+        }
+
         await prisma.groupMember.create({
           data: { studentId: student.id, groupId: group.id, rollNumber: roll || `R${student.id}` },
         });
@@ -239,6 +249,7 @@ exports.bulkImportPreview = async (req, res) => {
       let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || row['Academic Year'] || '').toString().trim();
       const supervisorName = (row['Supervisor'] || row['supervisor'] || '').toString().trim();
       const examinerName = (row['External Examiner'] || row['examiner'] || '').toString().trim();
+      const cluster = (row['Cluster'] || row['cluster'] || row['Research Cluster'] || '').toString().trim();
 
       if (!groupName && !projectTitle && !memberNames) continue;
 
@@ -365,6 +376,7 @@ exports.bulkImportPreview = async (req, res) => {
         groupName: groupName || '(unnamed)',
         projectTitle,
         projectType,
+        cluster: cluster || null,
         members: names,
         rolls,
         batch,
@@ -565,11 +577,13 @@ exports.bulkImportConfirm = async (req, res) => {
         }
 
         const pt = (projectType === 'MAJOR' || projectType === 'MINOR') ? projectType : 'MINOR';
+        const groupCluster = row._edits?.cluster ?? row.cluster ?? null;
         const newGroup = await tx.projectGroup.create({
           data: {
             name: groupName,
             projectTitle,
             projectType: pt,
+            cluster: groupCluster || null,
             status: 'ACTIVE',
             batch: batch || null,
             programId: programId || null,
@@ -1025,6 +1039,96 @@ exports.updateGroup = async (req, res) => {
     audit.log({ action: 'UPDATE', entity: 'ProjectGroup', entityId: id, details: `Updated group "${group.name}"`, performedById: req.user.id });
     res.json({ message: 'Group updated', group });
   } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.addMemberToGroup = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { studentId } = req.body;
+    if (!studentId) return res.status(400).json({ error: 'studentId is required' });
+
+    const group = await prisma.projectGroup.findUnique({
+      where: { id },
+      include: { members: true },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    if (group.members.length >= 4) {
+      return res.status(400).json({ error: 'Maximum 4 members allowed per group' });
+    }
+
+    const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) } });
+    if (!student || student.role !== 'STUDENT') {
+      return res.status(400).json({ error: 'Valid student is required' });
+    }
+
+    if (group.members.some(m => m.studentId === student.id)) {
+      return res.status(400).json({ error: 'Student is already a member of this group' });
+    }
+
+    const existingMembership = await prisma.groupMember.findFirst({
+      where: { studentId: student.id, group: { status: { not: 'COMPLETED' } } },
+      include: { group: { select: { name: true } } },
+    });
+    if (existingMembership) {
+      return res.status(400).json({
+        error: `Student ${student.firstName} ${student.lastName} is already assigned to active group "${existingMembership.group.name}".`,
+      });
+    }
+
+    await prisma.groupMember.create({
+      data: {
+        groupId: group.id,
+        studentId: student.id,
+        rollNumber: student.rollNumber || `R${student.id}`,
+      },
+    });
+
+    const updatedGroup = await prisma.projectGroup.findUnique({
+      where: { id: group.id },
+      include: {
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } } } },
+      },
+    });
+
+    res.json({ message: 'Member added', members: updatedGroup.members });
+  } catch (error) {
+    console.error('addMemberToGroup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.removeMemberFromGroup = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const studentId = parseInt(req.params.studentId);
+
+    const group = await prisma.projectGroup.findUnique({
+      where: { id },
+      include: { members: true },
+    });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    if (group.members.length <= 1) {
+      return res.status(400).json({ error: 'Cannot remove member. A group must have at least 1 member.' });
+    }
+
+    await prisma.groupMember.deleteMany({
+      where: { groupId: id, studentId },
+    });
+
+    const updatedGroup = await prisma.projectGroup.findUnique({
+      where: { id: group.id },
+      include: {
+        members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } } } },
+      },
+    });
+
+    res.json({ message: 'Member removed', members: updatedGroup.members });
+  } catch (error) {
+    console.error('removeMemberFromGroup error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

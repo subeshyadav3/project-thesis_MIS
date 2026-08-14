@@ -359,6 +359,11 @@ function ProjectDetail() {
               </div>
               <div style={{ padding: '8px 0' }}>
                 <InfoRow label="Title" value={title} />
+                <InfoRow label="Research Cluster" value={
+                  item?.cluster ? (
+                    <span className="badge badge-info" style={{ fontSize: 11, fontWeight: 600 }}>{item.cluster}</span>
+                  ) : <span style={{ color: 'var(--color-on-surface-variant)' }}>Unassigned</span>
+                } />
                 {type === 'group' && (
                   <>
                     <InfoRow label="Group" value={item?.name} />

@@ -63,6 +63,17 @@ ctrl.create = async (req, res) => {
       return res.status(400).json({ error: `Maximum ${maxMembers} members allowed for this announcement` });
     }
 
+    if (!isThesisAnnouncement && invitedIds.length > 0) {
+      const existingMembers = await prisma.groupMember.findMany({
+        where: { studentId: { in: invitedIds }, group: { announcementId: ann.id } },
+        include: { student: { select: { firstName: true, lastName: true } } },
+      });
+      if (existingMembers.length > 0) {
+        const names = existingMembers.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ');
+        return res.status(400).json({ error: `Student(s) already in another group for this announcement: ${names}` });
+      }
+    }
+
     if (isThesisAnnouncement) {
       // Auto-detect batch from the announcement (or the student's roll number)
       const studentBatch = ann.batch || detectBatch(req.user);
@@ -115,6 +126,19 @@ ctrl.create = async (req, res) => {
         joinPolicy: 'INVITE_ONLY',
       },
     });
+
+    const pdfUrl = req.body.pdfUrl || req.body.fileUrl;
+    if (pdfUrl) {
+      await prisma.proposal.create({
+        data: {
+          stage: 'PROPOSAL',
+          documentUrl: pdfUrl,
+          groupId: group.id,
+          submittedById: req.user.id,
+          status: 'PENDING',
+        },
+      });
+    }
 
     await prisma.groupMember.create({
       data: { studentId: req.user.id, groupId: group.id, rollNumber: req.user.rollNumber || `R${req.user.id}` },

@@ -24,11 +24,10 @@ const DEFAULT_FORM_FIELDS = [
 const BACHELOR_DEFAULT_FORM_FIELDS = [
   { key: 'program', label: 'Program', type: 'select', required: true },
   { key: 'projectType', label: 'Project Type (Minor / Major)', type: 'select', required: true },
+  { key: 'cluster', label: 'Project Cluster / Area (AIML, IPCV, ANLP, NTS, EDMES, ACOM, EII)', type: 'select', required: true },
   { key: 'title', label: 'Project Concept Title', type: 'text', required: true },
   { key: 'pdf_document', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
   { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
-  { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: true },
-  { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: true },
   { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
 ];
 
@@ -178,7 +177,7 @@ function CoordinatorAnnouncements() {
   const [programs, setPrograms] = useState([]);
   const [form, setForm] = useState({
     title: '', message: '', type: 'GENERAL',
-    program: '',
+    program: user?.program?.id ? String(user.program.id) : '',
     degreeType: user.program?.degreeType || '',
     programIds: [],
     studentIds: [],
@@ -289,7 +288,7 @@ function CoordinatorAnnouncements() {
       }
       setShowCreate(false);
       setEditAnnouncement(null);
-      setForm({ title: '', message: '', type: 'GENERAL', program: '', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, formEnabled: false, formFields: [], startDate: '', expirationDate: '', expiresAt: '' });
+      setForm({ title: '', message: '', type: 'GENERAL', program: user?.program?.id ? String(user.program.id) : '', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, formEnabled: false, formFields: [], startDate: '', expirationDate: '', expiresAt: '' });
       setSelectedStudents([]);
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Failed to save'); }
@@ -444,7 +443,7 @@ function CoordinatorAnnouncements() {
                     <th>Type</th>
                     <th>Audience</th>
                     <th>Form Groups?</th>
-                    <th>Form?</th>
+                    {user.program?.degreeType !== 'BACHELOR' && <th>Form?</th>}
                     <th>Period</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
@@ -470,7 +469,9 @@ function CoordinatorAnnouncements() {
                         <td><span className={`badge badge-${a.type === 'THESIS' ? 'warning' : a.type === 'MINOR' ? 'info' : a.type === 'MAJOR' ? 'warning' : 'default'}`}>{TYPE_LABELS[a.type] || a.type}</span></td>
                         <td style={{ fontSize: 13 }}>{AUDIENCE_LABELS[a.audience]}</td>
                         <td>{hasGF ? <span className="badge badge-active"><span className="dot" /> Yes (max {a.groupSizeMax})</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
-                        <td>{a.formEnabled ? <span className="badge badge-warning"><span className="dot" /> Form {(a.formFields?.length || 0) > 0 ? `(+${a.formFields.length})` : ''}</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
+                        {user.program?.degreeType !== 'BACHELOR' && (
+                          <td>{a.formEnabled ? <span className="badge badge-warning"><span className="dot" /> Form {(a.formFields?.length || 0) > 0 ? `(+${a.formFields.length})` : ''}</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
+                        )}
                         <td style={{ fontSize: 12 }}>
                           {a.startDate ? new Date(a.startDate).toLocaleDateString() : '—'} ~ {a.expirationDate ? new Date(a.expirationDate).toLocaleDateString() : '—'}
                         </td>
@@ -492,7 +493,7 @@ function CoordinatorAnnouncements() {
                           <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
                             <Icon name="delete" className="material-symbols-outlined" />
                           </button>
-                          {a.formEnabled && (
+                          {(a.formEnabled || a.allowGroupFormation) && (
                             <button className="btn btn-sm btn-outline" onClick={() => loadResponses(a)}>
                               <Icon name="fact_check" className="material-symbols-outlined" /> Responses
                             </button>
@@ -546,11 +547,13 @@ function CoordinatorAnnouncements() {
                     <label>Program *</label>
                     <select value={form.program} onChange={e => setForm({...form, program: e.target.value})} required>
                       <option value="">Select program...</option>
-                      <option value="all">All</option>
+                      {user.program?.degreeType !== 'BACHELOR' && <option value="all">All</option>}
                       {programs.map(p => <option key={p.id} value={p.id}>{p.code}</option>)}
                     </select>
                     <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
-                      Send to all programs or only {`${programs.map(p => p.code).join(', ')}`} students
+                      {user.program?.degreeType === 'BACHELOR'
+                        ? `Send to ${programs.map(p => p.code).join(', ')} students`
+                        : `Send to all programs or only ${programs.map(p => p.code).join(', ')} students`}
                     </p>
                   </div>
                 </div>
@@ -624,39 +627,71 @@ function CoordinatorAnnouncements() {
                     </div>
                   </div>
                   {form.allowGroupFormation && (
-                    <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Max Members</label>
-                        <div style={{
-                          padding: '10px 14px',
-                          borderRadius: 'var(--border-radius-md)',
-                          background: 'var(--color-surface-container-lowest)',
-                          border: '1px solid var(--color-outline)',
-                          fontSize: 14,
-                          color: 'var(--color-on-surface)',
-                          opacity: 0.7,
-                        }}>
-                          {form.type === 'THESIS' ? 1 : 4}
-                          <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginLeft: 8 }}>
-                            (Thesis=1, Bachelor=4)
-                          </span>
+                    <>
+                      <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Max Members</label>
+                          <div style={{
+                            padding: '10px 14px',
+                            borderRadius: 'var(--border-radius-md)',
+                            background: 'var(--color-surface-container-lowest)',
+                            border: '1px solid var(--color-outline)',
+                            fontSize: 14,
+                            color: 'var(--color-on-surface)',
+                            opacity: 0.7,
+                          }}>
+                            {form.type === 'THESIS' ? 1 : 4}
+                            <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginLeft: 8 }}>
+                              (Thesis=1, Bachelor=4)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Start Date (optional)</label>
+                          <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
+                          <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
+                        </div>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
+                          <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
+                          <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
+                        </div>
+                        <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Expires At (optional)</label>
+                          <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
                         </div>
                       </div>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Start Date (optional)</label>
-                        <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
-                        <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
-                      </div>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
-                        <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
-                        <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
-                      </div>
-                      <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
-                        <label style={{ fontSize: 12 }}>Expires At (optional)</label>
-                        <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} />
-                      </div>
-                    </div>
+
+                      {(form.type === 'MINOR' || form.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                        <div style={{ marginTop: 14, padding: 14, background: 'var(--color-surface-container-low)', borderRadius: 'var(--border-radius-md)', border: '1px dashed var(--color-outline-variant)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color: 'var(--color-primary)' }}>
+                            <Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                            Student Group Registration Form Fields
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginBottom: 10 }}>
+                            Students will complete these required fields when forming their project group:
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>1. Group Name *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Custom or default group name</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>2. Project Title *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Proposed project title</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>3. Proposal PDF *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Compulsory proposal document</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-outline-variant)' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--color-on-surface)' }}>4. Group Members *</div>
+                              <div style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>Search & invite up to 4 members</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 )}
@@ -729,12 +764,20 @@ function CoordinatorAnnouncements() {
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                             <label style={{ fontSize: 12, fontWeight: 600 }}>Form Fields (Google Forms Style Editor)</label>
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: DEFAULT_FORM_FIELDS })}>
-                                Load Master Template
-                              </button>
-                              <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
-                                Load Bachelor Template
-                              </button>
+                              {user.program?.degreeType !== 'BACHELOR' && (
+                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: DEFAULT_FORM_FIELDS })}>
+                                  Load Master Template
+                                </button>
+                              )}
+                              {user.program?.degreeType === 'BACHELOR' ? (
+                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
+                                  Reset Bachelor Template
+                                </button>
+                              ) : (
+                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
+                                  Load Bachelor Template
+                                </button>
+                              )}
                               <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
                                 <Icon name="add" className="material-symbols-outlined" /> Add Field
                               </button>
@@ -755,7 +798,7 @@ function CoordinatorAnnouncements() {
                             </div>
 
                             {/* Dynamic Editable Fields */}
-                            {(form.formFields && form.formFields.length > 0 ? form.formFields : DEFAULT_FORM_FIELDS).map((f, idx) => (
+                            {(form.formFields && form.formFields.length > 0 ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)).map((f, idx) => (
                               <div key={idx} style={{ border: f.required ? '1px solid var(--color-primary)' : '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                   <input
@@ -1001,14 +1044,20 @@ function CoordinatorAnnouncements() {
                                   }}
                                 />
                               </th>
-                              <th style={{ width: 140, verticalAlign: 'middle' }}>Student & Roll</th>
-                              <th style={{ width: 200, verticalAlign: 'middle' }}>Concept Thesis Title</th>
-                              <th style={{ width: 160, verticalAlign: 'middle' }}>Research Cluster</th>
-                              <th style={{ width: 75, verticalAlign: 'middle' }}>Guided?</th>
-                              <th style={{ width: 150, verticalAlign: 'middle' }}>Primary Supervisor Pref</th>
-                              <th style={{ width: 150, verticalAlign: 'middle' }}>Secondary Supervisor Pref</th>
+                              <th style={{ width: 180, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Group Name & Members' : 'Student & Roll'}</th>
+                              <th style={{ width: 200, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Project Title' : 'Concept Thesis Title'}</th>
+                              <th style={{ width: 160, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Cluster' : 'Research Cluster'}</th>
+                              {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                <th style={{ width: 75, verticalAlign: 'middle' }}>Guided?</th>
+                              )}
+                              {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                <>
+                                  <th style={{ width: 150, verticalAlign: 'middle' }}>Primary Supervisor Pref</th>
+                                  <th style={{ width: 150, verticalAlign: 'middle' }}>Secondary Supervisor Pref</th>
+                                </>
+                              )}
                               <th style={{ width: 160, verticalAlign: 'middle' }}>Remarks / Feedback</th>
-                              <th style={{ width: 170, verticalAlign: 'middle' }}>Final Supervisor</th>
+                              <th style={{ width: 170, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Supervisor' : 'Final Supervisor'}</th>
                               <th style={{ width: 65, textAlign: 'center', verticalAlign: 'middle' }}>Proposal</th>
                               <th style={{ width: 80, verticalAlign: 'middle' }}>Status</th>
                               <th style={{ width: 120, textAlign: 'right', verticalAlign: 'middle' }}>Actions</th>
@@ -1020,8 +1069,9 @@ function CoordinatorAnnouncements() {
                             ) : responses.filled.map(({ student, response }) => {
                               const edit = matrixEdits[response.id] || {};
                               const isSelected = selectedResponseIds.includes(response.id);
+                              const isBach = (viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR');
                               return (
-                                <tr key={student.id} style={{ background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : undefined }}>
+                                <tr key={response.id || student.id} style={{ background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : undefined }}>
                                   <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                     {response.status !== 'APPROVED' && (
                                       <input
@@ -1035,8 +1085,17 @@ function CoordinatorAnnouncements() {
                                     )}
                                   </td>
                                   <td style={{ verticalAlign: 'middle' }}>
-                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{student.firstName} {student.lastName}</div>
-                                    <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', whiteSpace: 'nowrap' }}>{student.rollNumber || '—'} ({student.program?.code || 'MSc'})</div>
+                                    {isBach && response.formData?.groupName ? (
+                                      <>
+                                        <div style={{ fontWeight: 600 }}>{response.formData.groupName}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>{response.formData.members}</div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{student.firstName} {student.lastName}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', whiteSpace: 'nowrap' }}>{student.rollNumber || '—'} ({student.program?.code || 'MSc'})</div>
+                                      </>
+                                    )}
                                   </td>
                                   <td style={{ verticalAlign: 'middle' }}>
                                     <input
@@ -1055,77 +1114,97 @@ function CoordinatorAnnouncements() {
                                       onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), cluster: e.target.value } }))}
                                     >
                                       <option value="">Select Cluster...</option>
-                                      <option value="AI/ML and image processing">AI/ML and image processing</option>
-                                      <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
-                                      <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
-                                      <option value="Computer networks and security">Computer networks and security</option>
+                                      {(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? (
+                                        <>
+                                          <option value="AIML">AIML (AI & Machine Learning)</option>
+                                          <option value="IPCV">IPCV (Image Processing & Computer Vision)</option>
+                                          <option value="ANLP">ANLP (Audio & Natural Language Processing)</option>
+                                          <option value="NTS">NTS (Networks & Telecom Systems)</option>
+                                          <option value="EDMES">EDMES (Embedded & Digital Systems)</option>
+                                          <option value="ACOM">ACOM (Advanced Communication)</option>
+                                          <option value="EII">EII (Electrical & Industrial Instrumentation)</option>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <option value="AI/ML and image processing">AI/ML and image processing</option>
+                                          <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                                          <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                                          <option value="Computer networks and security">Computer networks and security</option>
+                                        </>
+                                      )}
                                     </select>
                                   </td>
-                                  <td style={{ verticalAlign: 'middle' }}>
-                                    <select
-                                      className="form-input"
-                                      style={{ padding: '4px 4px', fontSize: 12, width: '100%' }}
-                                      value={edit.is_guided ?? 'No'}
-                                      onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), is_guided: e.target.value } }))}
-                                    >
-                                      <option value="Yes">Yes</option>
-                                      <option value="No">No</option>
-                                    </select>
-                                  </td>
-                                  <td style={{ verticalAlign: 'middle' }}>
-                                    <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.primary_supervisor || 'None'}</div>
-                                    {edit.primary_supervisor && (
-                                      <button
-                                        type="button"
-                                        className="btn btn-xs btn-outline"
-                                        style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
-                                        onClick={() => {
-                                          const pref = edit.primary_supervisor;
-                                          const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
-                                          const input = norm(pref);
-                                          let matched = supervisors.find(s => {
-                                            const fn = norm(`${s.firstName} ${s.lastName}`);
-                                            return fn.includes(input) || input.includes(s.lastName.toLowerCase());
-                                          });
-                                          if (matched) {
-                                            setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
-                                            toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
-                                          } else {
-                                            toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
-                                          }
-                                        }}
+                                  {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                    <td style={{ verticalAlign: 'middle' }}>
+                                      <select
+                                        className="form-input"
+                                        style={{ padding: '4px 4px', fontSize: 12, width: '100%' }}
+                                        value={edit.is_guided ?? 'No'}
+                                        onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), is_guided: e.target.value } }))}
                                       >
-                                        <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
-                                      </button>
-                                    )}
-                                  </td>
-                                  <td style={{ verticalAlign: 'middle' }}>
-                                    <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.secondary_supervisor || 'None'}</div>
-                                    {edit.secondary_supervisor && (
-                                      <button
-                                        type="button"
-                                        className="btn btn-xs btn-outline"
-                                        style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
-                                        onClick={() => {
-                                          const pref = edit.secondary_supervisor;
-                                          const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
-                                          const input = norm(pref);
-                                          let matched = supervisors.find(s => {
-                                            const fn = norm(`${s.firstName} ${s.lastName}`);
-                                            return fn.includes(input) || input.includes(s.lastName.toLowerCase());
-                                          });
-                                          if (matched) {
-                                            setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
-                                            toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
-                                          } else {
-                                            toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
-                                          }
-                                        }}
-                                      >
-                                        <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
-                                      </button>
-                                    )}
-                                  </td>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                      </select>
+                                    </td>
+                                  )}
+                                  {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
+                                    <>
+                                      <td style={{ verticalAlign: 'middle' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.primary_supervisor || 'None'}</div>
+                                        {edit.primary_supervisor && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-xs btn-outline"
+                                            style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
+                                            onClick={() => {
+                                              const pref = edit.primary_supervisor;
+                                              const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
+                                              const input = norm(pref);
+                                              let matched = supervisors.find(s => {
+                                                const fn = norm(`${s.firstName} ${s.lastName}`);
+                                                return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                              });
+                                              if (matched) {
+                                                setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
+                                                toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                              } else {
+                                                toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                              }
+                                            }}
+                                          >
+                                            <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                          </button>
+                                        )}
+                                      </td>
+                                      <td style={{ verticalAlign: 'middle' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edit.secondary_supervisor || 'None'}</div>
+                                        {edit.secondary_supervisor && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-xs btn-outline"
+                                            style={{ marginTop: 2, padding: '1px 5px', fontSize: 10 }}
+                                            onClick={() => {
+                                              const pref = edit.secondary_supervisor;
+                                              const norm = str => str.toLowerCase().trim().replace(/\s+/g, ' ');
+                                              const input = norm(pref);
+                                              let matched = supervisors.find(s => {
+                                                const fn = norm(`${s.firstName} ${s.lastName}`);
+                                                return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                              });
+                                              if (matched) {
+                                                setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
+                                                toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                              } else {
+                                                toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                              }
+                                            }}
+                                          >
+                                            <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                          </button>
+                                        )}
+                                      </td>
+                                    </>
+                                  )}
                                   <td style={{ verticalAlign: 'middle' }}>
                                     <input
                                       className="form-input"
@@ -1143,15 +1222,24 @@ function CoordinatorAnnouncements() {
                                     />
                                   </td>
                                   <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                                    {edit.pdfUrl ? (
-                                      <a href={edit.pdfUrl} target="_blank" rel="noreferrer" title="View Proposal PDF">
+                                    {edit.pdfUrl || response.formData?.pdfUrl ? (
+                                      <a href={edit.pdfUrl || response.formData?.pdfUrl} target="_blank" rel="noreferrer" title="View Proposal PDF">
                                         <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 18 }} />
                                       </a>
                                     ) : '—'}
                                   </td>
                                   <td style={{ verticalAlign: 'middle' }}>
                                     {response.status === 'APPROVED' ? (
-                                      <a href={`/coordinator/project/thesis/${response.thesis.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                                      <a
+                                        href={
+                                          (isBach || response.groupId)
+                                            ? `/coordinator/project/group/${response.groupId}`
+                                            : `/coordinator/project/thesis/${response.thesis?.id || response.id}`
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ fontSize: 12 }}
+                                      >
                                         Finalized <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 11 }} />
                                       </a>
                                     ) : response.status === 'LATE_SUBMITTED' ? (
@@ -1204,6 +1292,30 @@ function CoordinatorAnnouncements() {
                                           }}
                                         >
                                           Finalize
+                                        </button>
+                                      )}
+                                      {response.status !== 'APPROVED' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-outline"
+                                          style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                                          disabled={savingResponse}
+                                          title="Delete submission"
+                                          onClick={async () => {
+                                            if (!window.confirm('Are you sure you want to delete this submission? It will be removed from students, supervisors, and project records everywhere.')) return;
+                                            setSavingResponse(true);
+                                            try {
+                                              await api.delete(`/announcements/responses/${response.id}`);
+                                              toast.success('Submission deleted');
+                                              loadResponses(viewResponses);
+                                            } catch (err) {
+                                              toast.error(err.response?.data?.error || 'Failed to delete');
+                                            } finally {
+                                              setSavingResponse(false);
+                                            }
+                                          }}
+                                        >
+                                          <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 13 }} />
                                         </button>
                                       )}
                                     </div>

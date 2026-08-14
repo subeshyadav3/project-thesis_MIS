@@ -78,6 +78,7 @@ function MasterThesis() {
   const [editFinalExamOpen, setEditFinalExamOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editCluster, setEditCluster] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const editSupRef = useRef(null);
   const editMidTermExamRef = useRef(null);
@@ -340,6 +341,9 @@ const handleComplete = async (id) => {
           promises.push(api.put(`/theses/${thesisId}`, { endDate: editEndDate || null }));
         }
       }
+      if (editCluster !== undefined && editCluster !== showDetail.cluster) {
+        promises.push(api.put(`/theses/${thesisId}`, { cluster: editCluster }));
+      }
       const results = await Promise.all(promises);
       const hasCrossProgram = results.some(r => r?.data?.crossProgram);
       if (hasCrossProgram) {
@@ -414,6 +418,7 @@ const handleComplete = async (id) => {
     if (mode === 'edit') {
       setEditTitle(t.title || '');
       setEditDescription(t.description || '');
+      setEditCluster(t.cluster || '');
       setEditStatus(t.status || '');
       setEditStartDate(t.startDate ? new Date(t.startDate).toISOString().split('T')[0] : '');
       setEditEndDate(t.endDate ? new Date(t.endDate).toISOString().split('T')[0] : '');
@@ -519,6 +524,12 @@ return (
                   <span className="badge badge-info">
                     <span className="dot" />
                     Thesis
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Research Cluster</span>
+                  <span className="badge badge-info">
+                    {showDetail.cluster || 'Unassigned'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -637,6 +648,16 @@ return (
                       <option value="ACTIVE">Active</option>
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: 220 }}>
+                    <label>Research Cluster</label>
+                    <select className="form-input" value={editCluster} onChange={e => setEditCluster(e.target.value)}>
+                      <option value="">Select Cluster...</option>
+                      <option value="AI/ML and image processing">AI/ML and image processing</option>
+                      <option value="Audio, NLP and data/text analytics">Audio, NLP and data/text analytics</option>
+                      <option value="Electronic devices, circuits and communication">Electronic devices, circuits and communication</option>
+                      <option value="Computer networks and security">Computer networks and security</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>

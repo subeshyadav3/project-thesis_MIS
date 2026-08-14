@@ -54,7 +54,7 @@ const sampleExaminers = [
 const bachelorTemplate = [
   {
     'Group Name': '', 'Project Title': '', 'Members': '',
-    'Roll Numbers': '', 'Batch': '', 'Supervisor': '', 'External Examiner': '',
+    'Roll Numbers': '', 'Batch': '', 'Cluster': '', 'Supervisor': '', 'External Examiner': '',
   },
   {
     'Group Name': 'TeamAlpha',
@@ -62,6 +62,7 @@ const bachelorTemplate = [
     'Members': 'Aarav Khadka, Binita Shrestha, Chandra Thapa',
     'Roll Numbers': `${roll('BCT', 1)}, ${roll('BCT', 2)}, ${roll('BCT', 3)}`,
     'Batch': '078',
+    'Cluster': 'AIML',
     'Supervisor': sampleSupervisors[0],
     'External Examiner': sampleExaminers[0],
   },
@@ -71,6 +72,7 @@ const bachelorTemplate = [
     'Members': 'Dipesh Poudel, Ekta Rai, Firoj Khan',
     'Roll Numbers': `${roll('BCT', 4)}, ${roll('BCT', 5)}, ${roll('BCT', 6)}`,
     'Batch': '078',
+    'Cluster': 'EDMES',
     'Supervisor': sampleSupervisors[1],
     'External Examiner': sampleExaminers[1],
   },
