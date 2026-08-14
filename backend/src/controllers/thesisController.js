@@ -44,6 +44,12 @@ exports.getTheses = async (req, res) => {
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      for (const t of theses) {
+        t.canManage = await canManageThesisAsCoordinator(t, scope, req.user);
+      }
+    }
     res.json(theses);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -623,6 +629,7 @@ exports.bulkImportConfirm = async (req, res) => {
             programId: student.programId || undefined,
             cluster: cluster || student.program?.cluster || null,
             batch: batch || student.batch || null,
+            createdVia: 'BULK',
           },
         });
 

@@ -364,8 +364,12 @@ const handleComplete = async (id) => {
     const coordProgId = coordinatorProgram?.id;
     return theses.filter(t => {
       const progId = t.programId || t.student?.programId;
-      const matchesProgram = !coordProgId || !progId || progId === coordProgId;
-      if (!matchesProgram) return false;
+      const isCrossProgram = coordProgId && progId && progId !== coordProgId;
+      
+      const matchesScope = programScopeFilter === 'ALL' ? true :
+        programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
+        !isCrossProgram;
+      if (!matchesScope) return false;
 
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -385,7 +389,7 @@ const handleComplete = async (id) => {
 
       return matchesSearch && matchesStatus && matchesSupervisor && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, batchFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -972,6 +976,16 @@ return (
         </div>
 
         <div className="filter-bar">
+          <FilterDropdown
+            label="Scope"
+            value={programScopeFilter}
+            onChange={setProgramScopeFilter}
+            options={[
+              { value: 'MY_PROGRAM', label: 'My Program Theses' },
+              { value: 'OTHER_PROGRAMS', label: 'Assigned for Other Programs' },
+            ]}
+            allLabel="All Department Theses"
+          />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
@@ -1112,19 +1126,19 @@ return (
                                   <Icon name="edit" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Edit
                                 </div>
-                                {t.status === 'ACTIVE' && (
+                                {t.canManage !== false && t.status === 'ACTIVE' && (
                                   <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
                                     <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                     Complete
                                   </div>
                                 )}
-                                {t.status !== 'REJECTED' && t.status !== 'COMPLETED' && (
+                                {t.canManage !== false && t.status !== 'REJECTED' && t.status !== 'COMPLETED' && (
                                   <div className="menu-item" style={{ color: 'var(--color-warning, #ea580c)' }} onClick={() => updateThesisStatus(t.id, 'REJECTED')}>
                                     <Icon name="cancel" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                     Reject
                                   </div>
                                 )}
-                                {t.status === 'REJECTED' && (
+                                {t.canManage !== false && t.status === 'REJECTED' && (
                                   <div className="menu-item" style={{ color: 'var(--color-primary)' }} onClick={() => updateThesisStatus(t.id, 'ACTIVE')}>
                                     <Icon name="restart_alt" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                     Reactivate
@@ -1138,10 +1152,12 @@ return (
                                   <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Export PDF
                                 </div>
-                                <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
-                                  <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                  Delete
-                                </div>
+                                {t.canManage !== false && (
+                                  <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
+                                    <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Delete
+                                  </div>
+                                )}
                               </div>
                             </>
                           )}

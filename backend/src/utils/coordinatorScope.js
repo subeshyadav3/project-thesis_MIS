@@ -65,11 +65,34 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
   const where = { ...baseWhere };
 
   if (scope.kind === 'program') {
-    where.OR = [
-      { student: { programId: scope.program.id } },
-      { programId: scope.program.id },
-    ];
-    return { where, allowCrossProgram: false, scope };
+    const isMaster = scope.degreeType === 'MASTER';
+    if (isMaster) {
+      const deptPrograms = await prisma.program.findMany({
+        where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
+      });
+      const programIds = deptPrograms.map(p => p.id);
+
+      where.OR = [
+        // Own program theses (all, bulk and manual)
+        { student: { programId: scope.program.id } },
+        { programId: scope.program.id },
+        // Theses this coordinator supervises
+        { supervisorId: user.id },
+        // Cross-program theses MANUALLY created (not bulk-imported from other programs)
+        {
+          AND: [
+            { createdVia: 'MANUAL' },
+            { student: { programId: { in: programIds } } },
+          ],
+        },
+      ];
+    } else {
+      where.OR = [
+        { student: { programId: scope.program.id } },
+        { programId: scope.program.id },
+      ];
+    }
+    return { where, allowCrossProgram: isMaster, scope };
   }
 
   if (scope.kind === 'department') {
