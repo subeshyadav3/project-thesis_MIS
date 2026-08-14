@@ -27,28 +27,39 @@ exports.submitComponentMarks = async (req, res) => {
     });
     if (!component) return res.status(404).json({ error: 'Evaluation component not found' });
 
-    // Coordinators may record marks only on items inside their coordinator
-    // scope, or on their own supervised components acting as the supervisor.
+    // Coordinators may record marks on items inside their coordinator
+    // scope, or on their own supervised components, or on their assigned examiner components.
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
       if (groupId) {
         const group = await prisma.projectGroup.findUnique({
           where: { id: parseInt(groupId) },
-          select: { id: true, programId: true, supervisorId: true },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
         });
         const canManage = await canManageGroupAsCoordinator(group, scope, req.user);
         const ownSupervisorComponent = group?.supervisorId === req.user.id && component.evaluatorRole === 'SUPERVISOR';
-        if (!canManage && !ownSupervisorComponent) {
+        const isAssignedExaminer = component.evaluatorRole === 'EXTERNAL_EXAMINER' &&
+          group?.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id);
+        if (!canManage && !ownSupervisorComponent && !isAssignedExaminer) {
           return res.status(403).json({ error: 'You cannot record evaluations for this group from your coordinator scope.' });
         }
       } else if (thesisId) {
         const thesis = await prisma.thesis.findUnique({
           where: { id: parseInt(thesisId) },
-          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
         });
         const canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
         const ownSupervisorComponent = thesis?.supervisorId === req.user.id && component.evaluatorRole === 'SUPERVISOR';
-        if (!canManage && !ownSupervisorComponent) {
+        const isAssignedExaminer = (
+          (thesis?.externalMidTermId === req.user.id && (component.evaluationType === 'EXTERNAL_MIDTERM' || component.evaluationType === 'MIDTERM_DEFENSE' || component.evaluatorRole === 'EXTERNAL_MIDTERM' || component.evaluatorRole === 'EXTERNAL_EXAMINER')) ||
+          (thesis?.externalFinalId === req.user.id && (component.evaluationType === 'EXTERNAL_FINAL' || component.evaluationType === 'FINAL_DEFENSE' || component.evaluatorRole === 'EXTERNAL_FINAL' || component.evaluatorRole === 'EXTERNAL_EXAMINER')) ||
+          (thesis?.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id))
+        );
+        if (!canManage && !ownSupervisorComponent && !isAssignedExaminer) {
           return res.status(403).json({ error: 'You cannot record evaluations for this thesis from your coordinator scope.' });
         }
       }

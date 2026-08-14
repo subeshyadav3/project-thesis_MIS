@@ -186,17 +186,21 @@ async function canManageThesisAsCoordinator(thesis, scope, user) {
 async function isGroupVisibleToCoordinator(group, scope, user) {
   if (!group || !scope || scope.kind === 'none') return false;
   if (group.supervisorId === user.id) return true;
+  if (group.examinerAssignments?.some(ea => ea.externalExaminerId === user.id || ea.externalExaminer?.id === user.id)) return true;
   return canManageGroupAsCoordinator(group, scope, user);
 }
 
 /**
  * View-level check: can this coordinator open the thesis at all?
- * A coordinator who is the assigned supervisor can always access the thesis
- * (supervisor-level), regardless of which program/degree it belongs to — but
- * that access is supervisor-level only, not coordinator-level.
+ * A coordinator who is the assigned supervisor OR assigned external/internal examiner
+ * can always view the thesis, regardless of which program/degree it belongs to.
  */
 async function isThesisVisibleToCoordinator(thesis, scope, user) {
-  if (thesis?.supervisorId === user.id) return true;
+  if (!thesis || !scope || scope.kind === 'none') return false;
+  if (thesis.supervisorId === user.id) return true;
+  if (thesis.externalMidTermId === user.id || thesis.externalMidTerm?.id === user.id) return true;
+  if (thesis.externalFinalId === user.id || thesis.externalFinal?.id === user.id) return true;
+  if (thesis.examinerAssignments?.some(ea => ea.externalExaminerId === user.id || ea.externalExaminer?.id === user.id)) return true;
   return canManageThesisAsCoordinator(thesis, scope, user);
 }
 
