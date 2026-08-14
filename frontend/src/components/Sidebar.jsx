@@ -21,6 +21,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/maintainer/users', label: 'User Management', icon: 'groups' },
     { path: '/maintainer/departments', label: 'Departments', icon: 'account_balance' },
     { path: '/maintainer/audit-log', label: 'Audit Logs', icon: 'history' },
+    { path: '/maintainer/files-audit', label: 'File Activity', icon: 'folder_open' },
   ];
 
   const degreeType = user?.program?.degreeType;
