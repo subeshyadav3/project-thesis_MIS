@@ -38,6 +38,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/audit-log', label: 'Audit Log', icon: 'history' },
     { path: '/supervisor/master', label: 'Supervised Theses', icon: 'task_alt' },
     { path: '/supervisor/bachelor', label: 'Supervised Projects', icon: 'task_alt' },
+    { path: '/external/evaluations', label: 'Examinations', icon: 'rate_review' },
     { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
@@ -45,6 +46,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/supervisor', label: 'Dashboard', icon: 'dashboard' },
     ...(!isMaster ? [{ path: '/supervisor/bachelor', label: 'Bachelor Projects', icon: 'school' }] : []),
     ...(!isBachelor ? [{ path: '/supervisor/master', label: "Master's Thesis", icon: 'library_books' }] : []),
+    { path: '/external/evaluations', label: 'Examinations', icon: 'rate_review' },
     { path: '/supervisor/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 

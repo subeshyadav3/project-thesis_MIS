@@ -738,10 +738,10 @@ return (
                       </div>
                       {editMidTermExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
                               const selected = editMidTermExamId === e.id.toString();
                               return (
                                 <div
@@ -786,10 +786,10 @@ return (
                       </div>
                       {editFinalExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editFinalExamSearch.toLowerCase())).map(e => {
                               const selected = editFinalExamId === e.id.toString();
                               return (
                                 <div

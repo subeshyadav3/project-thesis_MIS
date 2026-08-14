@@ -1046,10 +1046,10 @@ const filteredGroups = useMemo(() => {
                       </div>
                       {editExamOpen && (
                         <div className="sup-dropdown">
-                          {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
+                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).length === 0 ? (
                             <div className="sup-dropdown-empty">No examiners found</div>
                           ) : (
-                            examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
+                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editExamSearch.toLowerCase())).map(e => {
                               const selected = editExamId === e.id.toString();
                               return (
                                 <div

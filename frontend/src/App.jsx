@@ -98,12 +98,12 @@ function App() {
             <Route path="/student/forms" element={<PrivateRoute role="STUDENT"><StudentForms /></PrivateRoute>} />
             <Route path="/student/notifications" element={<PrivateRoute role="STUDENT"><StudentNotifications /></PrivateRoute>} />
             <Route path="/student/*" element={<PrivateRoute role="STUDENT"><StudentDashboard /></PrivateRoute>} />
-            <Route path="/external/groups" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-            <Route path="/external/theses" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-            <Route path="/external/evaluations" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationsList /></PrivateRoute>} />
-            <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalEvaluationPage /></PrivateRoute>} />
-            <Route path="/external/notifications" element={<PrivateRoute role="EXTERNAL_EXAMINER"><StudentNotifications /></PrivateRoute>} />
-            <Route path="/external/*" element={<PrivateRoute role="EXTERNAL_EXAMINER"><ExternalDashboard /></PrivateRoute>} />
+            <Route path="/external/groups" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/theses" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/evaluations" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationsList /></PrivateRoute>} />
+            <Route path="/external/evaluate/:type/:id" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalEvaluationPage /></PrivateRoute>} />
+            <Route path="/external/notifications" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><StudentNotifications /></PrivateRoute>} />
+            <Route path="/external/*" element={<PrivateRoute role={['EXTERNAL_EXAMINER', 'SUPERVISOR', 'COORDINATOR']}><ExternalDashboard /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           </Route>
         </Routes>

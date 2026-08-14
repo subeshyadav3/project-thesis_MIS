@@ -54,10 +54,11 @@ exports.submitComponentMarks = async (req, res) => {
       }
     }
 
-    // Verify assignment: supervisors can only mark their own groups/theses
-    if (req.user.role === 'SUPERVISOR') {
-      const groupIdNum = groupId ? parseInt(groupId) : null;
-      const thesisIdNum = thesisId ? parseInt(thesisId) : null;
+    // Capability-based verification based on component.evaluatorRole:
+    const groupIdNum = groupId ? parseInt(groupId) : null;
+    const thesisIdNum = thesisId ? parseInt(thesisId) : null;
+
+    if (component.evaluatorRole === 'SUPERVISOR') {
       if (groupIdNum) {
         const group = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { supervisorId: true } });
         if (!group || group.supervisorId !== req.user.id) {
@@ -69,22 +70,22 @@ exports.submitComponentMarks = async (req, res) => {
           return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
         }
       }
-    }
-
-    // Verify assignment: external examiners can only mark what they're assigned to
-    if (req.user.role === 'EXTERNAL_EXAMINER') {
-      const groupIdNum = groupId ? parseInt(groupId) : null;
-      const thesisIdNum = thesisId ? parseInt(thesisId) : null;
+    } else if (component.evaluatorRole === 'EXTERNAL_EXAMINER') {
       if (groupIdNum) {
         const assigned = await prisma.examinerAssignment.findFirst({
           where: { externalExaminerId: req.user.id, groupId: groupIdNum },
         });
-        if (!assigned) return res.status(403).json({ error: 'You are not assigned to evaluate this group' });
+        if (!assigned) return res.status(403).json({ error: 'You are not assigned as examiner for this group' });
       } else if (thesisIdNum) {
-        const assigned = await prisma.examinerAssignment.findFirst({
-          where: { externalExaminerId: req.user.id, thesisId: thesisIdNum },
+        const thesis = await prisma.thesis.findUnique({
+          where: { id: thesisIdNum },
+          select: { externalMidTermId: true, externalFinalId: true },
         });
-        if (!assigned) return res.status(403).json({ error: 'You are not assigned to evaluate this thesis' });
+        const isAssigned = (thesis && (thesis.externalMidTermId === req.user.id || thesis.externalFinalId === req.user.id)) ||
+          await prisma.examinerAssignment.findFirst({
+            where: { externalExaminerId: req.user.id, thesisId: thesisIdNum },
+          });
+        if (!isAssigned) return res.status(403).json({ error: 'You are not assigned as examiner for this thesis' });
       }
     }
 
