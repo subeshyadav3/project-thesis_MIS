@@ -35,11 +35,11 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/coordinator/supervisors', label: 'Supervisors', icon: 'supervisor_account' },
     { path: '/coordinator/examiners', label: 'Examiners', icon: 'person' },
     { path: '/coordinator/users', label: 'Users', icon: 'groups' },
-    { path: '/coordinator/announcements', label: 'Announcements', icon: 'campaign' },
-    { path: '/coordinator/audit-log', label: 'Audit Log', icon: 'history' },
     { path: '/supervisor/master', label: 'Supervised Theses', icon: 'task_alt' },
     { path: '/supervisor/bachelor', label: 'Supervised Projects', icon: 'task_alt' },
     { path: '/external/evaluations', label: 'Examinations', icon: 'rate_review' },
+    { path: '/coordinator/announcements', label: 'Announcements', icon: 'campaign' },
+    { path: '/coordinator/audit-log', label: 'Audit Log', icon: 'history' },
     { path: '/coordinator/notifications', label: 'Notifications', icon: 'notifications' },
   ];
 
