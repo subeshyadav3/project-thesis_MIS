@@ -112,12 +112,14 @@ for (let g = 0; g < bctTitles.length; g++) {
   }
   const hasSup = g % 4 !== 3;          // ~25% without supervisor
   const hasExt = g % 5 !== 4;          // ~20% without external examiner
+  const bctClusters = ['AIML', 'IPCV', 'ANLP', 'NTS', 'EDMES'];
   bctGroups.push({
     'Group Name': `BCT-083-G${g + 1}`,
     'Project Title': bctTitles[g],
     'Members': members.join(', '),
     'Roll Numbers': rolls.join(', '),
     'Batch': BATCH,
+    'Cluster': bctClusters[g % bctClusters.length],
     'Supervisor': hasSup ? supervisorNames[g % supervisorNames.length] : '',
     'External Examiner': hasExt ? externalNames[(g + 2) % externalNames.length] : '',
   });

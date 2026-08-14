@@ -104,12 +104,14 @@ for (let g = 0; g < 30; g++) {
     const studentNum = progIdx * 3 + m + 1;
     rolls.push(roll(code, studentNum));
   }
+  const sampleClusters = ['AIML', 'IPCV', 'ANLP', 'NTS', 'EDMES', 'ACOM', 'EII'];
   bachelorTestData.push({
     'Group Name': `TestGroup_${g + 1}`,
     'Project Title': `Test Bachelor Project ${g + 1} — ${['IoT', 'ML', 'Web', 'Mobile', 'Blockchain', 'NLP', 'CV', 'Robotics', 'Embedded', 'Cloud'][g % 10]} Application`,
     'Members': members.join(', '),
     'Roll Numbers': rolls.join(', '),
     'Batch': '078',
+    'Cluster': sampleClusters[g % sampleClusters.length],
     'Supervisor': g < 25 ? sampleSupervisors[g % sampleSupervisors.length] : '',
     'External Examiner': g < 20 ? sampleExaminers[g % sampleExaminers.length] : '',
   });
