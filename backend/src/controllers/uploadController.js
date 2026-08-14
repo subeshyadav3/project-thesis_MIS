@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const prisma = require('../utils/prisma');
 const audit = require('../services/auditService');
-const { resolveCoordinatorScope, canManageGroupAsCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
+const { canAccessProposal } = require('../utils/fileAccessPolicy');
 
 // Magic number signatures for common document types
 const MAGIC_SIGNATURES = {
@@ -79,32 +79,39 @@ exports.uploadProposal = async (req, res) => {
       if (!thesis) return res.status(404).json({ success: false, error: 'Thesis not found' });
     }
 
-    // Coordinators can only upload documents for items inside their scope
-    if (req.user.role === 'COORDINATOR') {
-      const scope = await resolveCoordinatorScope(req.user);
-      if (groupId) {
-        const group = await prisma.projectGroup.findUnique({
-          where: { id: parseInt(groupId) },
-          select: { id: true, programId: true, supervisorId: true },
-        });
-        if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
-          return res.status(403).json({ success: false, error: 'You cannot upload documents for this group from your coordinator scope.' });
-        }
-      } else {
-        const thesis = await prisma.thesis.findUnique({
-          where: { id: parseInt(thesisId) },
-          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
-        });
-        if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
-          return res.status(403).json({ success: false, error: 'You cannot upload documents for this thesis from your coordinator scope.' });
-        }
-      }
+    // Only members/owners of the item may upload documents for it
+    const { canUploadForItem } = require('../utils/fileAccessPolicy');
+    const group = groupId ? await prisma.projectGroup.findUnique({
+      where: { id: parseInt(groupId) },
+      select: { id: true, programId: true, supervisorId: true, members: { select: { studentId: true } } },
+    }) : null;
+    const thesis = thesisId ? await prisma.thesis.findUnique({
+      where: { id: parseInt(thesisId) },
+      select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+    }) : null;
+    if (!(await canUploadForItem(req.user, group, thesis))) {
+      return res.status(403).json({ success: false, error: 'You are not allowed to upload documents for this item' });
     }
 
     const entityType = groupId ? 'groups' : 'theses';
     const entityId = groupId || thesisId;
     const storageDir = path.join(__dirname, '..', '..', 'storage', entityType);
     if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+
+    // Late uploads (after the announcement window closed) require coordinator approval.
+    let proposalStatus = 'VISIBLE';
+    try {
+      const item = groupId
+        ? await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { announcementId: true } })
+        : await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { announcementId: true } });
+      if (item?.announcementId) {
+        const ann = await prisma.announcement.findUnique({
+          where: { id: item.announcementId },
+          select: { expirationDate: true },
+        });
+        if (ann?.expirationDate && new Date() > ann.expirationDate) proposalStatus = 'PENDING_APPROVAL';
+      }
+    } catch (e) { /* default to VISIBLE on lookup failure */ }
 
     const ext = path.extname(req.file.originalname);
     const filename = `proposal_${entityId}_${Date.now()}${ext}`;
@@ -118,6 +125,7 @@ exports.uploadProposal = async (req, res) => {
         groupId: groupId ? parseInt(groupId) : null,
         thesisId: thesisId ? parseInt(thesisId) : null,
         submittedById: req.user.id,
+        status: proposalStatus,
       },
     });
 
@@ -129,7 +137,18 @@ exports.uploadProposal = async (req, res) => {
       authToken: req.headers.authorization,
     });
 
-    audit.log({ action: 'UPLOAD', entity: 'Proposal', entityId: proposal.id, details: `Proposal uploaded for ${entityType}/${entityId}`, performedById: req.user.id });
+    if (proposal.status === 'PENDING_APPROVAL') {
+      try {
+        const notifSvc = require('../services/notificationService');
+        const coordinatorId = await notifSvc.findCoordinatorForItem(groupId ? parseInt(groupId) : null, thesisId ? parseInt(thesisId) : null);
+        if (coordinatorId) {
+          await notifSvc.notify(coordinatorId, 'PROPOSAL_PENDING_APPROVAL',
+            `A late proposal document was uploaded (stage: ${stage}) — pending your approval.`);
+        }
+      } catch (e) { console.error('notify pending approval error:', e.message); }
+    }
+
+    audit.log({ action: 'UPLOAD', entity: 'Proposal', entityId: proposal.id, details: `Proposal uploaded for ${entityType}/${entityId}${proposal.status === 'PENDING_APPROVAL' ? ' (late, pending approval)' : ''}`, performedById: req.user.id });
 
     res.status(201).json({ success: true, data: proposal });
   } catch (error) {
@@ -138,19 +157,20 @@ exports.uploadProposal = async (req, res) => {
   }
 };
 
-const MANAGER_ROLES = ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR'];
-
 exports.deleteProposal = async (req, res) => {
   try {
     const proposalId = parseInt(req.params.proposalId);
     if (!proposalId) return res.status(400).json({ success: false, error: 'Invalid proposal id' });
 
-    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
+    const proposal = await prisma.proposal.findUnique({
+      where: { id: proposalId },
+      include: { group: { select: { id: true, programId: true, supervisorId: true } }, thesis: { select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } } } },
+    });
     if (!proposal) return res.status(404).json({ success: false, error: 'Proposal not found' });
 
     const isOwner = proposal.submittedById === req.user.id;
-    const isManager = MANAGER_ROLES.includes(req.user.role);
-    if (!isOwner && !isManager) {
+    const isStaff = ['SUPERVISOR', 'COORDINATOR', 'MAINTAINER'].includes(req.user.role);
+    if (!isOwner && !(isStaff && await canAccessProposal(req.user, proposal))) {
       return res.status(403).json({ success: false, error: 'You are not allowed to delete this document' });
     }
 

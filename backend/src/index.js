@@ -28,6 +28,7 @@ const proposalCommentRoutes = require('./routes/proposalComments');
 const studentGroupRoutes = require('./routes/studentGroups');
 const aiRoutes = require('./routes/ai');
 const chatbotRoutes = require('./routes/chatbot');
+const filesAuditRoutes = require('./routes/files-audit');
 const errorHandler = require('./middleware/errorHandler');
 const uploadController = require('./controllers/uploadController');
 
@@ -78,6 +79,7 @@ app.use('/api/student-groups', studentGroupRoutes);
 app.use('/api/proposals', proposalCommentRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/files-audit', filesAuditRoutes);
 app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
 app.delete('/api/upload/proposal/:proposalId', authenticate, uploadController.deleteProposal);
 
@@ -92,6 +94,14 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
     if (!allowedTypes.includes(type)) return res.status(400).json({ error: 'Invalid file type' });
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({ error: 'Invalid filename' });
+    }
+    const url = `/api/files/${type}/${filename}`;
+    const proposal = await prisma.proposal.findFirst({ where: { documentUrl: url } });
+    const { canAccessProposal } = require('./utils/fileAccessPolicy');
+    if (proposal) {
+      if (!(await canAccessProposal(req.user, proposal))) return res.status(403).json({ error: 'Access denied' });
+    } else if (req.user.role === 'STUDENT') {
+      return res.status(403).json({ error: 'Access denied' });
     }
     let filePath = path.join(__dirname, '..', 'storage', type, filename);
     if (!fs.existsSync(filePath)) {
@@ -184,7 +194,15 @@ app.get('/api/stats', authenticate, async (req, res) => {
     const supervisorAssignmentAccepted = supervisorAssignmentAcceptedThesis + supervisorAssignmentAcceptedGroup;
     const supervisorAssignmentRejected = supervisorAssignmentRejectedThesis + supervisorAssignmentRejectedGroup;
     const formCreatedTheses = await prisma.thesis.count({ where: { ...thesisFilter, createdVia: 'FORM' } });
-    const pendingLateProposals = await prisma.proposal.count({ where: { status: 'PENDING_APPROVAL', thesis: thesisFilter } });
+    const pendingLateProposals = await prisma.proposal.count({
+      where: {
+        status: 'PENDING_APPROVAL',
+        OR: [
+          { thesis: thesisFilter },
+          { group: { ...yearFilter, ...programFilter } },
+        ],
+      },
+    });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
       pendingGroups, activeGroups, completedGroups, pendingTheses, activeTheses, completedTheses,
