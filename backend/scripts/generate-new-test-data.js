@@ -22,10 +22,13 @@ const path = require('path');
 const fs = require('fs');
 
 const OUT_DIR = path.join(__dirname, '..', 'excel-templates', 'New-Test-data');
+const PUBLIC_TEST_DIR = path.join(__dirname, '..', '..', 'frontend', 'public', 'test-data');
+const PUBLIC_DIR = path.join(__dirname, '..', '..', 'frontend', 'public');
 const BATCH = '083'; // new batch, not in seed (seed = 079..082)
 const PASSWORD = 'Test@123';
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
+fs.mkdirSync(PUBLIC_TEST_DIR, { recursive: true });
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const roll = (code, i) => {
@@ -214,6 +217,12 @@ const writeFile = (name, rows, sheet) => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet);
   XLSX.writeFile(wb, path.join(OUT_DIR, name));
+  if (fs.existsSync(PUBLIC_TEST_DIR)) {
+    XLSX.writeFile(wb, path.join(PUBLIC_TEST_DIR, name));
+  }
+  if (fs.existsSync(PUBLIC_DIR)) {
+    XLSX.writeFile(wb, path.join(PUBLIC_DIR, name));
+  }
   console.log(`✓ ${name}  (${rows.length} rows)`);
 };
 
