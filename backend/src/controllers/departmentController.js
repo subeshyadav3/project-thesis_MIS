@@ -127,10 +127,56 @@ exports.createAcademicYear = async (req, res) => {
         year: req.body.year,
         semester: req.body.semester,
         departmentId: parseInt(req.body.departmentId),
+        isActive: req.body.isActive === true || req.body.isActive === 'true',
       },
     });
     audit.log({ action: 'CREATE', entity: 'AcademicYear', entityId: year.id, details: `Created academic year "${year.year}"`, performedById: req.user.id });
     res.status(201).json(year);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.updateAcademicYear = async (req, res) => {
+  try {
+    const data = {};
+    if (req.body.year) data.year = req.body.year;
+    if (req.body.semester) data.semester = req.body.semester;
+    if (req.body.departmentId) data.departmentId = parseInt(req.body.departmentId);
+    if (req.body.isActive !== undefined) data.isActive = req.body.isActive;
+    const year = await prisma.academicYear.update({
+      where: { id: parseInt(req.params.id) },
+      data,
+    });
+    audit.log({ action: 'UPDATE', entity: 'AcademicYear', entityId: year.id, details: `Updated academic year "${year.year}"`, performedById: req.user.id });
+    res.json(year);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.deleteAcademicYear = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.academicYear.delete({ where: { id } });
+    audit.log({ action: 'DELETE', entity: 'AcademicYear', entityId: id, details: 'Deleted academic year', performedById: req.user.id });
+    res.json({ message: 'Academic year deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.toggleActiveAcademicYear = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await prisma.academicYear.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Academic year not found' });
+    const updated = await prisma.academicYear.update({
+      where: { id },
+      data: { isActive: !existing.isActive },
+    });
+    audit.log({ action: updated.isActive ? 'ACTIVATE' : 'DEACTIVATE', entity: 'AcademicYear', entityId: id, details: `${updated.isActive ? 'Activated' : 'Deactivated'} academic year "${updated.year}"`, performedById: req.user.id });
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

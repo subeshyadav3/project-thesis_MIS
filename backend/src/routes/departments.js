@@ -9,6 +9,9 @@ router.put('/:id', authenticate, authorize('MAINTAINER'), departmentController.u
 router.delete('/:id', authenticate, authorize('MAINTAINER'), departmentController.deleteDepartment);
 router.get('/academic-years', authenticate, departmentController.getAcademicYears);
 router.post('/academic-years', authenticate, authorize('MAINTAINER'), departmentController.createAcademicYear);
+router.put('/academic-years/:id', authenticate, authorize('MAINTAINER'), departmentController.updateAcademicYear);
+router.delete('/academic-years/:id', authenticate, authorize('MAINTAINER'), departmentController.deleteAcademicYear);
+router.put('/academic-years/:id/toggle-active', authenticate, authorize('MAINTAINER'), departmentController.toggleActiveAcademicYear);
 
 router.get('/programs', authenticate, departmentController.getPrograms);
 router.post('/programs', authenticate, authorize('MAINTAINER'), departmentController.createProgram);
