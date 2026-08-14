@@ -522,9 +522,10 @@ const filteredGroups = useMemo(() => {
 
   const normalizeBatch = useCallback((b) => {
     if (!b) return '';
-    const str = String(b).trim();
-    if (/^0\d{2}$/.test(str)) return '2' + str;
-    return str;
+    const digits = String(b).replace(/\D/g, '');
+    if (!digits) return String(b).trim();
+    if (digits.length >= 3) return digits.slice(-3);
+    return digits.padStart(3, '0');
   }, []);
 
   const batchOptions = useMemo(() => {

@@ -230,16 +230,18 @@ function CoordinatorAnnouncements() {
   const batchOptions = React.useMemo(() => {
     const batches = new Set();
     const normalize = (v) => {
-      if (/^\d{3}$/.test(v)) return `2${v}`;        // "080" → "2080"
-      if (/^2\d{3}$/.test(v)) return v;               // "2080" → "2080"
-      return v;
+      if (!v) return '';
+      const digits = String(v).replace(/\D/g, '');
+      if (!digits) return String(v).trim();
+      if (digits.length >= 3) return digits.slice(-3);
+      return digits.padStart(3, '0');
     };
     allStudents.forEach(s => {
       if (s.batch) batches.add(normalize(s.batch));
       const rollPrefix = s.rollNumber?.slice(0, 3);
       if (rollPrefix && /^\d{3}$/.test(rollPrefix)) batches.add(normalize(rollPrefix));
     });
-    return [...batches].sort((a, b) => b.localeCompare(a));
+    return [...batches].filter(Boolean).sort((a, b) => b.localeCompare(a));
   }, [allStudents]);
 
   useEffect(() => {

@@ -44,8 +44,10 @@ function CoordinatorDashboard() {
 
   const normalizeBatch = (v) => {
     if (!v) return '';
-    if (/^\d{3}$/.test(v)) return `2${v}`;
-    return String(v);
+    const digits = String(v).replace(/\D/g, '');
+    if (!digits) return String(v).trim();
+    if (digits.length >= 3) return digits.slice(-3);
+    return digits.padStart(3, '0');
   };
 
   const batchOptions = React.useMemo(() => {
