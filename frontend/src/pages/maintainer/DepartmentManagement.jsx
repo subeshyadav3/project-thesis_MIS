@@ -24,7 +24,7 @@ function DepartmentManagement() {
 
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [editingProgram, setEditingProgram] = useState(null);
-  const [progForm, setProgForm] = useState({ name: '', code: '', departmentId: '', degreeType: 'BACHELOR', cluster: '' });
+  const [progForm, setProgForm] = useState({ name: '', code: '', departmentId: '', degreeType: 'BACHELOR' });
 
   const [showYearModal, setShowYearModal] = useState(false);
   const [editingYear, setEditingYear] = useState(null);
@@ -124,7 +124,7 @@ function DepartmentManagement() {
       }
       setShowProgramModal(false);
       setEditingProgram(null);
-      setProgForm({ name: '', code: '', departmentId: '', degreeType: 'BACHELOR', cluster: '' });
+      setProgForm({ name: '', code: '', departmentId: '', degreeType: 'BACHELOR' });
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error saving program');
@@ -223,7 +223,7 @@ function DepartmentManagement() {
         className="btn btn-secondary btn-sm"
         onClick={() => {
           setEditingProgram(null);
-          setProgForm({ name: '', code: '', departmentId: departments[0]?.id || '', degreeType: 'BACHELOR', cluster: '' });
+          setProgForm({ name: '', code: '', departmentId: departments[0]?.id || '', degreeType: 'BACHELOR' });
           setShowProgramModal(true);
         }}
       >
@@ -246,7 +246,7 @@ function DepartmentManagement() {
 
   return (
     <ErrorBoundary>
-      <PageLayout title="Departments" user={user} actions={actions}>
+      <PageLayout user={user} actions={actions}>
         <div className="page-header">
           <h1>
             <Icon name="account_balance" className="material-symbols-outlined" />
@@ -376,7 +376,7 @@ function DepartmentManagement() {
               className="btn btn-outline btn-sm"
               onClick={() => {
                 setEditingProgram(null);
-                setProgForm({ name: '', code: '', departmentId: departments[0]?.id || '', degreeType: 'BACHELOR', cluster: '' });
+                setProgForm({ name: '', code: '', departmentId: departments[0]?.id || '', degreeType: 'BACHELOR' });
                 setShowProgramModal(true);
               }}
             >
@@ -395,14 +395,13 @@ function DepartmentManagement() {
                     <th>Code</th>
                     <th>Degree Level</th>
                     <th>Department</th>
-                    <th>Default Cluster</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {programs.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--color-on-surface-variant)', padding: 32 }}>
+                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--color-on-surface-variant)', padding: 32 }}>
                         No programs found.
                       </td>
                     </tr>
@@ -421,7 +420,6 @@ function DepartmentManagement() {
                           </span>
                         </td>
                         <td style={{ color: 'var(--color-on-surface-variant)' }}>{p.department?.name || 'N/A'}</td>
-                        <td>{p.cluster || '—'}</td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: 8 }}>
                             <button
@@ -434,7 +432,6 @@ function DepartmentManagement() {
                                   code: p.code,
                                   departmentId: p.departmentId,
                                   degreeType: p.degreeType || 'BACHELOR',
-                                  cluster: p.cluster || '',
                                 });
                                 setShowProgramModal(true);
                               }}
@@ -625,7 +622,7 @@ function DepartmentManagement() {
                 </div>
                 <div className="modal-header-text">
                   <h2>{editingProgram ? 'Edit Program' : 'Add Degree Program'}</h2>
-                  <p>Configure program code, degree level, and research cluster</p>
+                  <p>Configure program code, degree level, and department</p>
                 </div>
               </div>
               <form onSubmit={handleSaveProgram}>
@@ -673,14 +670,6 @@ function DepartmentManagement() {
                       ))}
                     </select>
                   </div>
-                </div>
-                <div className="form-group">
-                  <label>Research Cluster (Optional)</label>
-                  <input
-                    value={progForm.cluster}
-                    onChange={(e) => setProgForm({ ...progForm, cluster: e.target.value })}
-                    placeholder="e.g. AIML or Cluster 1"
-                  />
                 </div>
                 <div className="modal-actions">
                   <button type="button" className="btn btn-outline" onClick={() => setShowProgramModal(false)}>

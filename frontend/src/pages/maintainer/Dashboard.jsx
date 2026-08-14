@@ -78,7 +78,7 @@ function MaintainerDashboard() {
 
   return (
     <ErrorBoundary>
-      <PageLayout title="System Administration" user={user}>
+      <PageLayout user={user}>
         {/* Welcome Header */}
         <div className="page-header" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
