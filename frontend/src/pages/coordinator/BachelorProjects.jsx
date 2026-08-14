@@ -24,6 +24,13 @@ const BACHELOR_CLUSTERS = [
   { value: 'EII', label: 'EII (Electrical & Industrial Instrumentation)' },
 ];
 
+const ASSIGNMENT_OPTIONS = [
+  { value: 'NEEDS_SUPERVISOR', label: 'Needs Supervisor' },
+  { value: 'NEEDS_EXAMINER', label: 'Needs Examiner' },
+  { value: 'NEEDS_ANY', label: 'Missing Any Assignment' },
+  { value: 'FULLY_ASSIGNED', label: 'Fully Assigned' },
+];
+
 function BachelorProjects() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -48,6 +55,7 @@ function BachelorProjects() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [assignmentFilter, setAssignmentFilter] = useState('ALL');
   const [batchFilter, setBatchFilter] = useState('ALL');
   const [clusterFilter, setClusterFilter] = useState('ALL');
   const [editCluster, setEditCluster] = useState('');
@@ -551,11 +559,13 @@ const filteredGroups = useMemo(() => {
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
       const matchesType = typeFilter === 'ALL' || g.projectType === typeFilter;
-      const matchesSupervisor = supervisorFilter === 'ALL'
-        ? true
-        : supervisorFilter === 'NONE'
-          ? !g.supervisor
-          : g.supervisor?.id?.toString() === supervisorFilter;
+      const hasSupervisor = Boolean(g.supervisorId || g.supervisor);
+      const hasExaminer = Boolean(g.examinerAssignments?.some(ea => ea.externalExaminerId || ea.externalExaminer));
+      const matchesAssignment = assignmentFilter === 'ALL' ? true :
+        assignmentFilter === 'NEEDS_SUPERVISOR' ? !hasSupervisor :
+        assignmentFilter === 'NEEDS_EXAMINER' ? !hasExaminer :
+        assignmentFilter === 'NEEDS_ANY' ? (!hasSupervisor || !hasExaminer) :
+        assignmentFilter === 'FULLY_ASSIGNED' ? (hasSupervisor && hasExaminer) : true;
 
       const matchesBatch = batchFilter === 'ALL' || (() => {
         const b = g.batch || (g.members?.[0]?.student?.batch ? g.members[0].student.batch : (g.members?.[0]?.rollNumber && /^\d{3}/.test(g.members[0].rollNumber) ? g.members[0].rollNumber.slice(0, 3) : ''));
@@ -564,9 +574,9 @@ const filteredGroups = useMemo(() => {
 
       const matchesCluster = clusterFilter === 'ALL' || g.cluster === clusterFilter;
 
-      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesBatch && matchesCluster;
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesAssignment && matchesBatch && matchesCluster;
     });
-  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter, batchFilter, clusterFilter, normalizeBatch]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter, assignmentFilter, batchFilter, clusterFilter, normalizeBatch]);
 
   const sortedGroups = useMemo(() => {
     return [...filteredByAdvanced].sort((a, b) => {
@@ -1239,6 +1249,7 @@ const filteredGroups = useMemo(() => {
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
+          <FilterDropdown label="Assignment" value={assignmentFilter} onChange={setAssignmentFilter} options={ASSIGNMENT_OPTIONS} allLabel="All Assignments" />
           <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={typeOptions} allLabel="All Types" />
           <FilterDropdown label="Cluster" value={clusterFilter} onChange={setClusterFilter} options={BACHELOR_CLUSTERS} allLabel="All Clusters" />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />

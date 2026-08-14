@@ -21,6 +21,15 @@ const CLUSTERS = [
   'Computer networks and security',
 ];
 
+const THESIS_ASSIGNMENT_OPTIONS = [
+  { value: 'NEEDS_SUPERVISOR', label: 'Needs Supervisor' },
+  { value: 'NEEDS_MID_TERM', label: 'Needs Mid-Term Examiner' },
+  { value: 'NEEDS_FINAL', label: 'Needs Final Examiner' },
+  { value: 'NEEDS_ANY_EXAMINER', label: 'Needs Any Examiner' },
+  { value: 'NEEDS_ANY', label: 'Missing Any Assignment' },
+  { value: 'FULLY_ASSIGNED', label: 'Fully Assigned' },
+];
+
 function MasterThesis() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -45,6 +54,7 @@ function MasterThesis() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [assignmentFilter, setAssignmentFilter] = useState('ALL');
   const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
   const [batchFilter, setBatchFilter] = useState('ALL');
   const [coordinatorProgram, setCoordinatorProgram] = useState(null);
@@ -376,20 +386,25 @@ const handleComplete = async (id) => {
         (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.student?.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      const matchesSupervisor = supervisorFilter === 'ALL'
-        ? true
-        : supervisorFilter === 'NONE'
-          ? !t.supervisor
-          : t.supervisor?.id?.toString() === supervisorFilter;
+      const hasSupervisor = Boolean(t.supervisorId || t.supervisor);
+      const hasMidTerm = Boolean(t.externalMidTermId || t.externalMidTerm);
+      const hasFinal = Boolean(t.externalFinalId || t.externalFinal);
+      const matchesAssignment = assignmentFilter === 'ALL' ? true :
+        assignmentFilter === 'NEEDS_SUPERVISOR' ? !hasSupervisor :
+        assignmentFilter === 'NEEDS_MID_TERM' ? !hasMidTerm :
+        assignmentFilter === 'NEEDS_FINAL' ? !hasFinal :
+        assignmentFilter === 'NEEDS_ANY_EXAMINER' ? (!hasMidTerm || !hasFinal) :
+        assignmentFilter === 'NEEDS_ANY' ? (!hasSupervisor || !hasMidTerm || !hasFinal) :
+        assignmentFilter === 'FULLY_ASSIGNED' ? (hasSupervisor && hasMidTerm && hasFinal) : true;
 
       const matchesBatch = batchFilter === 'ALL' || (() => {
         const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
         return normalizeBatch(b) === batchFilter;
       })();
 
-      return matchesSearch && matchesStatus && matchesSupervisor && matchesBatch;
+      return matchesSearch && matchesStatus && matchesSupervisor && matchesAssignment && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, batchFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, assignmentFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -986,6 +1001,7 @@ return (
             ]}
             allLabel="All Department Theses"
           />
+          <FilterDropdown label="Assignment" value={assignmentFilter} onChange={setAssignmentFilter} options={THESIS_ASSIGNMENT_OPTIONS} allLabel="All Assignments" />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
