@@ -363,6 +363,10 @@ const handleComplete = async (id) => {
   const filteredTheses = useMemo(() => {
     const coordProgId = coordinatorProgram?.id;
     return theses.filter(t => {
+      const progId = t.programId || t.student?.programId;
+      const matchesProgram = !coordProgId || !progId || progId === coordProgId;
+      if (!matchesProgram) return false;
+
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -374,19 +378,14 @@ const handleComplete = async (id) => {
           ? !t.supervisor
           : t.supervisor?.id?.toString() === supervisorFilter;
 
-      const isCrossProgram = coordProgId && t.student?.programId && t.student.programId !== coordProgId;
-      const matchesScope = programScopeFilter === 'ALL' ? true :
-        programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
-        !isCrossProgram;
-
       const matchesBatch = batchFilter === 'ALL' || (() => {
         const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
         return normalizeBatch(b) === batchFilter;
       })();
 
-      return matchesSearch && matchesStatus && matchesSupervisor && matchesScope && matchesBatch;
+      return matchesSearch && matchesStatus && matchesSupervisor && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, batchFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -973,16 +972,6 @@ return (
         </div>
 
         <div className="filter-bar">
-          <FilterDropdown
-            label="Scope"
-            value={programScopeFilter}
-            onChange={setProgramScopeFilter}
-            options={[
-              { value: 'MY_PROGRAM', label: 'My Program Theses' },
-              { value: 'OTHER_PROGRAMS', label: 'Assigned for Other Programs' },
-            ]}
-            allLabel="All Department Theses"
-          />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />

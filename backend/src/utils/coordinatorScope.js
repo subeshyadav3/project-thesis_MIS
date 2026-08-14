@@ -65,37 +65,11 @@ async function buildThesisWhereForCoordinator(user, baseWhere = {}) {
   const where = { ...baseWhere };
 
   if (scope.kind === 'program') {
-    const isMaster = scope.degreeType === 'MASTER';
-    if (isMaster) {
-      const deptPrograms = await prisma.program.findMany({
-        where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
-      });
-      const programIds = deptPrograms.map(p => p.id);
-
-      where.OR = [
-        // Theses this coordinator supervises (may be cross-program / cross-degree as a supervisor)
-        { supervisorId: user.id },
-        // Own program theses (bulk or manual)
-        { student: { programId: scope.program.id } },
-        // Cross-program theses manually created by this coordinator or explicitly assigned
-        {
-          AND: [
-            { createdVia: 'MANUAL' },
-            { OR: [{ programId: scope.program.id }, { student: { programId: { in: programIds } } }] }
-          ]
-        }
-      ];
-    } else {
-      // BACHELOR (or non-master) — only theses in the coordinator's own program.
-      // Being the supervisor of a thesis in another program only gives
-      // supervisor-level access (visible via the supervisor pages), not
-      // coordinator-level access.
-      where.OR = [
-        { student: { ...(where.student || {}), programId: scope.program.id } },
-        { programId: scope.program.id },
-      ];
-    }
-    return { where, allowCrossProgram: isMaster, scope };
+    where.OR = [
+      { student: { programId: scope.program.id } },
+      { programId: scope.program.id },
+    ];
+    return { where, allowCrossProgram: false, scope };
   }
 
   if (scope.kind === 'department') {
@@ -176,18 +150,6 @@ async function canManageThesisAsCoordinator(thesis, scope, user) {
   if (!thesis || !scope || scope.kind === 'none') return false;
 
   if (scope.kind === 'program') {
-    if (scope.degreeType === 'MASTER') {
-      // Whole department: all MASTER programs under the same department
-      const deptPrograms = await prisma.program.findMany({
-        where: { departmentId: scope.program.departmentId, degreeType: 'MASTER' },
-      });
-      const programIds = deptPrograms.map(p => p.id);
-      return programIds.includes(thesis.student?.programId) ||
-        programIds.includes(thesis.programId) ||
-        (thesis.student && !thesis.student.programId);
-    }
-    // BACHELOR — own-program theses. Being the supervisor of a thesis in
-    // another program only gives supervisor-level access, not coordinator-level.
     return thesis.student?.programId === scope.program.id ||
       thesis.programId === scope.program.id ||
       (thesis.student && !thesis.student.programId);

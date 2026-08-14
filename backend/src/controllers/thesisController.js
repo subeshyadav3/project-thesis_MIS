@@ -33,7 +33,8 @@ exports.getTheses = async (req, res) => {
     const theses = await prisma.thesis.findMany({
       where,
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } },
+        program: { select: { id: true, name: true, code: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
