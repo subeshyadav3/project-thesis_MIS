@@ -238,17 +238,17 @@ async function main() {
   const supervisors = [];
   for (const sup of supDefs) {
     supervisors.push(await prisma.user.create({
-      data: { email: sup.email, password: hash, firstName: sup.fn, lastName: sup.ln, role: 'SUPERVISOR', designation: sup.designation, departmentId: eceDept.id },
+      data: { email: sup.email, password: hash, firstName: sup.fn, lastName: sup.ln, role: 'SUPERVISOR', designation: sup.designation, departmentId: eceDept.id, canSupervise: true },
     }));
   }
   console.log(`Created ${supervisors.length} supervisors`);
 
-  // External Examiners
+  // External Examiners (emails follow the @pcampus.edu.np domain policy)
   const externalExamDefs = [
-    { fn: 'Hari', ln: 'Adhikari', email: 'hari.adhikari@ioe.edu.np', designation: 'Prof. Dr.' },
-    { fn: 'Suman', ln: 'Bhattarai', email: 'suman.bhattarai@ioe.edu.np', designation: 'Assoc. Prof. Dr.' },
-    { fn: 'Rita', ln: 'Sharma', email: 'rita.sharma@ioe.edu.np', designation: 'Asst. Prof. Dr.' },
-    { fn: 'Kiran', ln: 'Mainali', email: 'kiran.mainali@ioe.edu.np', designation: 'Prof. Dr.' },
+    { fn: 'Hari', ln: 'Adhikari', email: 'hari.adhikari@pcampus.edu.np', designation: 'Prof. Dr.' },
+    { fn: 'Suman', ln: 'Bhattarai', email: 'suman.bhattarai@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
+    { fn: 'Rita', ln: 'Sharma', email: 'rita.sharma@pcampus.edu.np', designation: 'Asst. Prof. Dr.' },
+    { fn: 'Kiran', ln: 'Mainali', email: 'kiran.mainali@pcampus.edu.np', designation: 'Prof. Dr.' },
   ];
   const externalExaminers = [];
   for (const ex of externalExamDefs) {

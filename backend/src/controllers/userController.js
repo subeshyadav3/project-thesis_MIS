@@ -8,6 +8,7 @@ const audit = require('../services/auditService');
 const emailService = require('../services/emailService');
 const notifSvc = require('../services/notificationService');
 const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
+const { resolveCoordinatorScope } = require('../utils/coordinatorScope');
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
@@ -44,6 +45,16 @@ function extractProgramCodeFromRoll(roll) {
   if (!roll) return null;
   const code = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
   return code || null;
+}
+
+/**
+ * A roll number must be <batch><program><student> — 2-3 batch digits, then a
+ * program code, then the serial digits. e.g. "080BCT001" or "080msdsa01".
+ * Anything without the batch prefix ("sdjfljsdfj") or without the program
+ * letters ("08023402") is not a real roll and is rejected.
+ */
+function isValidRollFormat(roll) {
+  return /^\d{2,3}[a-zA-Z]+\d+$/.test((roll || '').trim());
 }
 
 function enrichWithComputedYearSemester(user) {
@@ -105,6 +116,9 @@ exports.createUser = async (req, res) => {
       if (!resolvedRoll) {
         return res.status(400).json({ error: 'rollNumber is required for students' });
       }
+      if (!isValidRollFormat(resolvedRoll)) {
+        return res.status(400).json({ error: 'Invalid roll number. Use <batch><program><number>, e.g. 080BCT001 or 080msdsa01.' });
+      }
       // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
       // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
       // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
@@ -165,6 +179,43 @@ exports.createUser = async (req, res) => {
       }
     }
 
+    // Coordinators can only create students at their own degree level (Bachelor
+    // coordinators → BACHELOR, Master coordinators → MASTER). Bachelor program
+    // coordinators are additionally limited to their own program, which the roll
+    // encodes (e.g. 080BCT001 → BCT), so mismatched rolls are rejected. Master
+    // coordinators are department-level and may place students across Master programs.
+    if (req.user.role === 'COORDINATOR' && role === 'STUDENT') {
+      const cs = await resolveCoordinatorScope(req.user);
+      const coordinatorDegreeType = cs?.kind === 'program' ? (cs.program?.degreeType || null)
+        : cs?.kind === 'department' ? ((cs.degreeTypes && cs.degreeTypes[0]) || null) : null;
+      const isBachelorCoordinator = coordinatorDegreeType === 'BACHELOR';
+
+      if (coordinatorDegreeType && resolvedDegreeType && coordinatorDegreeType !== resolvedDegreeType) {
+        return res.status(403).json({
+          error: isBachelorCoordinator
+            ? 'Bachelor coordinators can only create BACHELOR students.'
+            : 'Master coordinators can only create MASTER students.',
+        });
+      }
+
+      if (isBachelorCoordinator) {
+        const myProgram = cs.program;
+        if (resolvedProgramId && resolvedProgramId !== myProgram.id) {
+          return res.status(403).json({ error: `Bachelor coordinator can only add students to your own program (${myProgram.code}).` });
+        }
+        const rollProgCode = extractProgramCodeFromRoll(resolvedRoll);
+        if (rollProgCode && rollProgCode.toUpperCase() !== myProgram.code.toUpperCase()) {
+          return res.status(403).json({ error: `That roll belongs to ${rollProgCode}, not your program (${myProgram.code}).` });
+        }
+        // Always land the student in the coordinator's own Bachelor program
+        resolvedProgramId = myProgram.id;
+        resolvedDegreeType = myProgram.degreeType || 'BACHELOR';
+      } else if (coordinatorDegreeType) {
+        // Master coordinator: lock the student to the MASTER level
+        resolvedDegreeType = coordinatorDegreeType;
+      }
+    }
+
     const hash = await bcrypt.hash(password, 10);
     const batch = extractBatchFromRoll(resolvedRoll);
     const user = await prisma.user.create({
@@ -208,6 +259,36 @@ exports.updateUser = async (req, res) => {
       return res.status(403).json({ error: 'Cannot change user role' });
     }
 
+    // Coordinators can only manage students at their own degree level (Bachelor
+    // coordinators → BACHELOR, Master coordinators → MASTER). Bachelor program
+    // coordinators also can't move a student into another program or roll.
+    if (req.user.role === 'COORDINATOR' && existing.role === 'STUDENT') {
+      const cs = await resolveCoordinatorScope(req.user);
+      const coordinatorDegreeType = cs?.kind === 'program' ? (cs.program?.degreeType || null)
+        : cs?.kind === 'department' ? ((cs.degreeTypes && cs.degreeTypes[0]) || null) : null;
+      const isBachelorCoordinator = coordinatorDegreeType === 'BACHELOR';
+      const incomingDegreeType = req.body.degreeType || existing.degreeType;
+      if (coordinatorDegreeType && incomingDegreeType && coordinatorDegreeType !== incomingDegreeType) {
+        return res.status(403).json({
+          error: isBachelorCoordinator
+            ? 'Bachelor coordinators can only manage BACHELOR students.'
+            : 'Master coordinators can only manage MASTER students.',
+        });
+      }
+      if (isBachelorCoordinator) {
+        const myProgram = cs.program;
+        if (req.body.programId && parseInt(req.body.programId) !== myProgram.id) {
+          return res.status(403).json({ error: `Bachelor coordinator can only keep students in your own program (${myProgram.code}).` });
+        }
+        if (req.body.rollNumber && req.body.rollNumber.toString().trim()) {
+          const rollProgCode = extractProgramCodeFromRoll(req.body.rollNumber.toString().trim());
+          if (rollProgCode && rollProgCode.toUpperCase() !== myProgram.code.toUpperCase()) {
+            return res.status(403).json({ error: `That roll belongs to ${rollProgCode}, not your program (${myProgram.code}).` });
+          }
+        }
+      }
+    }
+
     const data = {};
     if (req.body.firstName !== undefined) data.firstName = req.body.firstName;
     if (req.body.lastName !== undefined) data.lastName = req.body.lastName;
@@ -233,6 +314,9 @@ exports.updateUser = async (req, res) => {
     if (req.body.rollNumber !== undefined) {
       const newRoll = req.body.rollNumber.toString().trim();
       if (newRoll) {
+        if (!isValidRollFormat(newRoll)) {
+          return res.status(400).json({ error: 'Invalid roll number. Use <batch><program><number>, e.g. 080BCT001 or 080msdsa01.' });
+        }
         const dup = await prisma.user.findFirst({ where: { rollNumber: newRoll, id: { not: userId } } });
         if (dup) return res.status(400).json({ error: `Roll number "${newRoll}" is already assigned to another student` });
         data.rollNumber = newRoll;
@@ -588,6 +672,10 @@ exports.bulkCreateUsers = async (req, res) => {
       const deptProgramIds = new Set(deptPrograms.map(p => p.id));
       const canUseProgram = (pid) => !pid || deptProgramIds.has(pid);
       const canCreateRole = (role) => ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'].includes(role);
+      const cs = await resolveCoordinatorScope(req.user);
+      const coordinatorDegreeType = cs?.kind === 'program' ? (cs.program?.degreeType || null)
+        : cs?.kind === 'department' ? ((cs.degreeTypes && cs.degreeTypes[0]) || null) : null;
+      const isBachelorCoordinator = coordinatorDegreeType === 'BACHELOR';
 
       for (const u of users) {
         const role = (u.role || '').toUpperCase();
@@ -603,6 +691,23 @@ exports.bulkCreateUsers = async (req, res) => {
         }
         if (!canUseProgram(pid)) {
           errors.push({ email: u.email || 'unknown', error: 'Cannot create users in a program outside your department' });
+          continue;
+        }
+        if (role === 'STUDENT' && coordinatorDegreeType && u.degreeType) {
+          const dt = String(u.degreeType).toUpperCase();
+          if (dt !== coordinatorDegreeType) {
+            errors.push({
+              email: u.email || 'unknown',
+              error: isBachelorCoordinator
+                ? 'Bachelor coordinators can only create BACHELOR students.'
+                : 'Master coordinators can only create MASTER students.',
+            });
+            continue;
+          }
+        }
+        // Bachelor coordinator: every student must land in their own program only.
+        if (role === 'STUDENT' && isBachelorCoordinator && (!pid || pid !== cs.program.id)) {
+          errors.push({ email: u.email || 'unknown', error: `Bachelor coordinator must place students in your own program (${cs.program.code}).` });
           continue;
         }
       }
@@ -632,6 +737,10 @@ exports.bulkCreateUsers = async (req, res) => {
       if (role === 'STUDENT') {
         if (!rollNumber) {
           errors.push({ email: email || 'unknown', error: 'rollNumber is required for students' });
+          continue;
+        }
+        if (!isValidRollFormat(rollNumber)) {
+          errors.push({ email: email || 'unknown', error: 'Invalid roll number. Use <batch><program><number>, e.g. 080BCT001 or 080msdsa01.' });
           continue;
         }
         // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
@@ -719,6 +828,14 @@ exports.bulkImportUsersExcel = async (req, res) => {
     if (req.user.role === 'COORDINATOR') {
       coordinatorProgram = await prisma.program.findUnique({ where: { coordinatorId: req.user.id } });
     }
+    // For department-level coordinators there is no single Program row, so we
+    // resolve the degree level (e.g. MASTER) from the coordinator's scope.
+    let coordinatorScopeDegreeType = null;
+    if (req.user.role === 'COORDINATOR' && !coordinatorProgram) {
+      const cs = await resolveCoordinatorScope(req.user);
+      coordinatorScopeDegreeType = cs?.kind === 'department' ? (cs.degreeTypes && cs.degreeTypes[0])
+        : (cs?.program?.degreeType || null);
+    }
 
     const allPrograms = await prisma.program.findMany({ select: { id: true, code: true, name: true, degreeType: true } });
     const findProgram = (codeOrName) => {
@@ -778,6 +895,10 @@ exports.bulkImportUsersExcel = async (req, res) => {
           errors.push({ row: rowNum, email: email || 'unknown', error: 'rollNumber is required for students' });
           continue;
         }
+        if (!isValidRollFormat(rollNumber)) {
+          errors.push({ row: rowNum, email: email || 'unknown', error: 'Invalid roll number. Use <batch><program><number>, e.g. 080BCT001 or 080msdsa01.' });
+          continue;
+        }
         // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
         // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
         // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
@@ -827,6 +948,14 @@ exports.bulkImportUsersExcel = async (req, res) => {
         }
         if (req.user.role === 'COORDINATOR' && coordinatorProgram && programId !== coordinatorProgram.id) {
           errors.push({ row: rowNum, email, error: 'Students must belong to your program' });
+          continue;
+        }
+        // Department-level coordinator: enforce the degree level even though no
+        // single program is owned (e.g. a Master coordinator can only import MASTER rows).
+        if (req.user.role === 'COORDINATOR' && !coordinatorProgram && coordinatorScopeDegreeType && degreeType && coordinatorScopeDegreeType !== degreeType) {
+          errors.push({ row: rowNum, email, error: coordinatorScopeDegreeType === 'BACHELOR'
+            ? 'Bachelor coordinators can only import BACHELOR students.'
+            : 'Master coordinators can only import MASTER students.' });
           continue;
         }
       }

@@ -30,6 +30,10 @@ function UserManagement() {
   const isCoordinator = user.role === 'COORDINATOR';
   const isMaintainer = user.role === 'MAINTAINER';
   const isMasterCoordinator = isCoordinator && user.program?.degreeType === 'MASTER';
+  // Degree type auto-derives from the coordinator's program (backend enforces the
+  // same level), so the form preselects it; a Master coordinator → MASTER, a
+  // Bachelor coordinator → BACHELOR. Maintainer keeps BACHELOR as a default.
+  const studentDegreeType = isCoordinator ? (isMasterCoordinator ? 'MASTER' : 'BACHELOR') : 'BACHELOR';
   const toast = useToast();
 
   const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
@@ -74,7 +78,7 @@ function UserManagement() {
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: studentDegreeType, programId: '', rollNumber: '', designation: '' });
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.error || 'An error occurred');
@@ -187,7 +191,7 @@ function UserManagement() {
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: studentDegreeType, programId: '', rollNumber: '', designation: '' });
     setShowModal(true);
   };
 
@@ -514,7 +518,15 @@ function UserManagement() {
               </div>
               <div className="form-group">
                 <label>Role</label>
-                <select value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                <select
+                  value={form.role}
+                  onChange={e => setForm({
+                    ...form,
+                    role: e.target.value,
+                    // Preselect the coordinator's own degree level when adding a student
+                    ...(e.target.value === 'STUDENT' ? { degreeType: studentDegreeType } : {}),
+                  })}
+                >
                   {allowedRoles.map(r => (
                     <option key={r} value={r}>{r.replace('_', ' ')}</option>
                   ))}
@@ -552,7 +564,7 @@ function UserManagement() {
                 <>
                   <div className="form-group">
                     <label>Degree Type</label>
-                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})}>
+                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})} disabled={isCoordinator}>
                       <option value="BACHELOR">Bachelor</option>
                       <option value="MASTER">Master</option>
                     </select>
