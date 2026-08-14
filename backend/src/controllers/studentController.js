@@ -176,8 +176,8 @@ exports.submitFormResponse = async (req, res) => {
       where: { announcementId_studentId: { announcementId, studentId: req.user.id } },
     });
     if (existing) {
-      if (existing.status === 'FINALIZED' || existing.thesisId) {
-        return res.status(409).json({ error: 'This form submission has already been finalized by the coordinator and cannot be edited.' });
+      if (existing.status === 'FINALIZED' || existing.status === 'UNDER_REVIEW' || existing.status === 'REVIEWED' || existing.thesisId) {
+        return res.status(409).json({ error: 'This form submission has already been reviewed or finalized by the coordinator and can no longer be edited.' });
       }
     } else {
       const engagement = await getEngagement(req.user.id);

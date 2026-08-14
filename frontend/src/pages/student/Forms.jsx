@@ -245,7 +245,9 @@ function StudentForms() {
 
             {eligible.map(a => {
               const submitted = a.formSubmitted?.submitted;
+              const isUnderReview = submitted && (a.formSubmitted?.status === 'UNDER_REVIEW' || a.formSubmitted?.status === 'REVIEWED');
               const isFinalized = submitted && (a.formSubmitted?.status === 'FINALIZED' || Boolean(a.formSubmitted?.thesisId));
+              const isLocked = isFinalized || isUnderReview;
               return (
                 <div key={a.id} className="card">
                   <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
@@ -270,6 +272,8 @@ function StudentForms() {
                         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           {isFinalized ? (
                             <span className="badge badge-completed"><Icon name="lock" className="material-symbols-outlined" style={{ fontSize: 12 }} /> Finalized by Coordinator</span>
+                          ) : isUnderReview ? (
+                            <span className="badge badge-info"><Icon name="lock" className="material-symbols-outlined" style={{ fontSize: 12 }} /> Reviewed by Coordinator (Locked)</span>
                           ) : a.formSubmitted.status === 'LATE_SUBMITTED' ? (
                             <span className="badge badge-warning"><span className="dot" />Submitted late — awaiting approval</span>
                           ) : (
@@ -288,13 +292,13 @@ function StudentForms() {
                         <button className="btn btn-primary" onClick={() => setSelected(a)}>
                           <Icon name="description" className="material-symbols-outlined" /> Fill Form
                         </button>
-                      ) : !isFinalized ? (
+                      ) : !isLocked ? (
                         <button className="btn btn-outline" onClick={() => setSelected(a)}>
                           <Icon name="edit" className="material-symbols-outlined" /> Edit Submission
                         </button>
                       ) : (
                         <button className="btn btn-outline" disabled>
-                          <Icon name="lock" className="material-symbols-outlined" /> Finalized
+                          <Icon name="lock" className="material-symbols-outlined" /> {isFinalized ? 'Finalized' : 'Under Review'}
                         </button>
                       )}
                     </div>

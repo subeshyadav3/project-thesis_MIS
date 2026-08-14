@@ -525,7 +525,10 @@ exports.updateFormResponse = async (req, res) => {
 
     const updated = await prisma.formResponse.update({
       where: { id: responseId },
-      data: { formData: mergedFormData },
+      data: {
+        formData: mergedFormData,
+        status: existing.status === 'FINALIZED' ? 'FINALIZED' : 'UNDER_REVIEW',
+      },
       include: { student: true, thesis: true },
     });
 
