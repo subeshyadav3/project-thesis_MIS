@@ -198,7 +198,7 @@ function StudentProjectDetail() {
               </div>
               <div className="detail-item">
                 <span className="detail-label">Batch</span>
-                <span>{assignment.batch || '—'}</span>
+                <span>{assignment.batch || assignment.student?.batch || assignment.student?.rollNumber?.match(/^(\d{2,3})/)?.[1] || members[0]?.rollNumber?.match(/^(\d{2,3})/)?.[1] || '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Department</span>

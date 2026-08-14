@@ -75,7 +75,7 @@ function StudentTheses() {
                       {t.title}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
-                      {t.batch ? `Batch ${t.batch}` : '—'}
+                      {t.batch || t.student?.batch || t.student?.rollNumber?.match(/^(\d{2,3})/)?.[1] ? `Batch ${t.batch || t.student?.batch || t.student?.rollNumber?.match(/^(\d{2,3})/)?.[1]}` : '—'}
                     </div>
                   </div>
                 </div>

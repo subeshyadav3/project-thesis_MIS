@@ -133,6 +133,13 @@ exports.createThesis = async (req, res) => {
       }
     }
 
+    // Derive batch from body, student.batch, or student roll number
+    let derivedBatch = req.body.batch || student.batch || null;
+    if (!derivedBatch && student.rollNumber) {
+      const match = student.rollNumber.match(/^(\d{2,3})/);
+      if (match) derivedBatch = match[1];
+    }
+
     const supId = supervisorId ? parseInt(supervisorId) : null;
     const thesis = await prisma.thesis.create({
       data: {
@@ -142,7 +149,7 @@ exports.createThesis = async (req, res) => {
         supervisorId: supId,
         supervisorAssignmentStatus: supId ? 'PENDING' : null,
         programId: requestingCoordinatorProgram?.id ?? student.programId ?? null,
-        batch: student.batch || null,
+        batch: derivedBatch,
         cluster: req.body.cluster || student.program?.cluster || null,
         startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         status: status || 'ACTIVE',

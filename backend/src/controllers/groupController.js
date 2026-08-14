@@ -154,13 +154,27 @@ exports.createGroup = async (req, res) => {
       }
     }
 
+    // Derive batch from body, or members' roll numbers
+    let derivedBatch = batch || req.body.batch || null;
+    if (!derivedBatch && resolvedMembers.length > 0) {
+      for (const m of resolvedMembers) {
+        if (m.rollNumber) {
+          const match = m.rollNumber.match(/^(\d{2,3})/);
+          if (match) {
+            derivedBatch = match[1];
+            break;
+          }
+        }
+      }
+    }
+
     const group = await prisma.projectGroup.create({
       data: {
         name,
         projectTitle,
         projectType: projectType || 'MINOR',
         cluster: cluster || null,
-        batch: batch || null,
+        batch: derivedBatch,
         startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         programId: resolvedProgramId,
