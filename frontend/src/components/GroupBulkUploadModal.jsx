@@ -179,7 +179,6 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                     <th>Group</th>
                     <th>Title</th>
                     <th>Members</th>
-                    <th>Students</th>
                     <th>Supervisor</th>
                     <th>Examiner</th>
                     <th>Type</th>
@@ -219,10 +218,20 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                             </div>
                           </td>
                           <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edits.projectTitle || p.projectTitle}</td>
-                          <td>{p.members.join(', ') || '—'}</td>
                           <td>
-                            {p.studentMatches.filter(Boolean).length > 0 ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatches.filter(Boolean).length} matched</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}
-                            {p.studentMatches.filter(m => !m).length > 0 && <span style={{ color: 'var(--color-error)', marginLeft: 4 }}>({p.studentMatches.filter(m => !m).length} missing)</span>}
+                            <div>{p.members.join(', ') || '—'}</div>
+                            <div style={{ fontSize: 10, marginTop: 2 }}>
+                              {p.studentMatches.filter(Boolean).length > 0 && (
+                                <span style={{ color: 'var(--color-success)', marginRight: 4 }}>
+                                  ✓ {p.studentMatches.filter(Boolean).length} matched
+                                </span>
+                              )}
+                              {p.studentMatches.filter(m => !m).length > 0 && (
+                                <span style={{ color: 'var(--color-warning)' }}>
+                                  ({p.studentMatches.filter(m => !m).length} missing)
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
                           <td>{p.examinerMatch ? <span style={{ color: 'var(--color-success)' }}>{p.examinerMatch.name}</span> : p.examinerWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.examinerWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
@@ -241,7 +250,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={11} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
+                            <td colSpan={10} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
                               {hasAnomaly && <div style={{ marginBottom: 8 }}>{p.anomalies.map((a, ai) => <div key={ai} style={{ fontSize: 11, color: a.type === 'exact_duplicate' ? 'var(--color-error)' : 'var(--color-warning)', marginBottom: 2 }}>⚠ {a.message}</div>)}</div>}
                               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                                 <div><label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Group Name</label><input type="text" value={edits.groupName ?? p.groupName} onChange={e => setEdit('groupName', e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} /></div>
