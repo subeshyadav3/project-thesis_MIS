@@ -126,7 +126,7 @@ export default function AuditLog() {
                     <tr key={log.id}>
                       <td><span className="badge" style={{ background: actionColors[log.action] || 'var(--color-surface-container)', color: actionOnColors[log.action] || 'var(--color-on-surface)' }}>{log.action}</span></td>
                       <td>{log.entity}{log.entityId ? ` #${log.entityId}` : ''}</td>
-                      <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || '-'}</td>
+                      <td title={log.details || ''} style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || '—'}</td>
                       <td>{log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : 'System'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.createdAt).toLocaleString()}</td>
                     </tr>

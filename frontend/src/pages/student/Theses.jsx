@@ -75,7 +75,7 @@ function StudentTheses() {
                       {t.title}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
-                      {t.batch ? `Batch ${t.batch}` : '—'}
+                      {t.batch || t.student?.batch || t.student?.rollNumber?.match(/^(\d{2,3})/)?.[1] ? `Batch ${t.batch || t.student?.batch || t.student?.rollNumber?.match(/^(\d{2,3})/)?.[1]}` : '—'}
                     </div>
                   </div>
                 </div>
@@ -83,18 +83,18 @@ function StudentTheses() {
                   <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`}>
                     <span className="dot" />{t.status}
                   </span>
-                  {t.announcement?.expirationDate && (() => {
-                    const info = getDeadlineInfo(t.announcement.expirationDate);
+                  {t.endDate && (() => {
+                    const info = getDeadlineInfo(t.endDate);
                     if (!info) return null;
-                    return t.announcement?.expirationDate ? (
-                      <span className={`badge`} style={{
+                    return (
+                      <span className="badge" style={{
                         fontSize: 9, padding: '1px 6px', border: 'none',
                         background: info.expired ? 'var(--color-error-container)' : info.urgent ? 'var(--color-warning-container)' : 'var(--color-surface-container)',
                         color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                       }}>
-                        {info.label}
+                        {info.expired ? 'Overdue' : info.label}
                       </span>
-                    ) : null;
+                    );
                   })()}
                   <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }} />
                 </div>

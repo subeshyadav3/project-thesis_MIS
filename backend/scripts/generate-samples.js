@@ -104,12 +104,14 @@ for (let g = 0; g < 30; g++) {
     const studentNum = progIdx * 3 + m + 1;
     rolls.push(roll(code, studentNum));
   }
+  const sampleClusters = ['AIML', 'IPCV', 'ANLP', 'NTS', 'EDMES', 'ACOM', 'EII'];
   bachelorTestData.push({
     'Group Name': `TestGroup_${g + 1}`,
     'Project Title': `Test Bachelor Project ${g + 1} — ${['IoT', 'ML', 'Web', 'Mobile', 'Blockchain', 'NLP', 'CV', 'Robotics', 'Embedded', 'Cloud'][g % 10]} Application`,
     'Members': members.join(', '),
     'Roll Numbers': rolls.join(', '),
     'Batch': '078',
+    'Cluster': sampleClusters[g % sampleClusters.length],
     'Supervisor': g < 25 ? sampleSupervisors[g % sampleSupervisors.length] : '',
     'External Examiner': g < 20 ? sampleExaminers[g % sampleExaminers.length] : '',
   });
@@ -130,7 +132,7 @@ const masterTemplate = [
     Roll: roll('MSCS', 1, '080'),
     Title: 'Deep Learning for Nepali Sign Language Recognition',
     Batch: '080',
-    Cluster: 'Cluster 1',
+    Cluster: 'Computer networks and security',
     Program: 'MSc in Network and Cyber Security',
     Supervisor: 'Dr. Ram Acharya',
     External_mid_term: 'Prof. Sita Sharma',
@@ -141,7 +143,7 @@ const masterTemplate = [
     Roll: roll('MSDSA', 1, '080'),
     Title: 'Predictive Analytics for Agricultural Yield in Nepal',
     Batch: '080',
-    Cluster: 'Cluster 3',
+    Cluster: 'AI/ML and image processing',
     Program: 'MSc in Data Science and Analytics',
     Supervisor: 'Prof. Krishna Poudel',
     External_mid_term: 'Dr. Gita Rai',
@@ -153,10 +155,10 @@ const masterTemplate = [
 // 4. MASTER TEST DATA (50 student rows)
 // ====================================================================
 const masterPrograms = [
-  { code: 'MSNCS', name: 'MSc in Network and Cyber Security', cluster: 'Cluster 1' },
-  { code: 'MSICE', name: 'MSc in Information and Communication Engineering', cluster: 'Cluster 2' },
-  { code: 'MSDSA', name: 'MSc in Data Science and Analytics', cluster: 'Cluster 3' },
-  { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Cluster 4' },
+  { code: 'MSNCS', name: 'MSc in Network and Cyber Security', cluster: 'Computer networks and security' },
+  { code: 'MSICE', name: 'MSc in Information and Communication Engineering', cluster: 'Electronic devices, circuits and communication' },
+  { code: 'MSDSA', name: 'MSc in Data Science and Analytics', cluster: 'AI/ML and image processing' },
+  { code: 'MSCSK', name: 'MSc in Computer Science and Knowledge Engineering', cluster: 'Audio, NLP and data/text analytics' },
 ];
 const supervisorNames = [
   'Prof. Dr. Rajan Sharma', 'Dr. Pramod Acharya', 'Assoc. Prof. Sita Dahal',

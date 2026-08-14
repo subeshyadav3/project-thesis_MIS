@@ -463,18 +463,31 @@ async function checkPrintAccess(req, res, type, id) {
   if (req.user.role === 'COORDINATOR') {
     const scope = await resolveCoordinatorScope(req.user);
     const item = type === 'group'
-      ? await prisma.projectGroup.findUnique({ where: { id }, select: { id: true, programId: true, supervisorId: true } })
-      : await prisma.thesis.findUnique({ where: { id }, select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } } });
+      ? await prisma.projectGroup.findUnique({
+          where: { id },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
+        })
+      : await prisma.thesis.findUnique({
+          where: { id },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
+        });
     if (!item) {
       res.status(404).json({ error: 'Item not found' });
       return false;
     }
+    const isAssignedExaminer = type === 'group'
+      ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
+      : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
+
     const canManage = type === 'group'
       ? await canManageGroupAsCoordinator(item, scope, req.user)
       : await canManageThesisAsCoordinator(item, scope, req.user);
-    // The assigned supervisor can print (same as a plain supervisor); a
-    // coordinator who is neither in-scope nor the supervisor cannot.
-    if (canManage || item.supervisorId === req.user.id) return true;
+    // The assigned supervisor or examiner can print; a coordinator in-scope can also print.
+    if (canManage || item.supervisorId === req.user.id || isAssignedExaminer) return true;
     res.status(403).json({ error: 'Access denied. Item is not within your coordinator scope.' });
     return false;
   }

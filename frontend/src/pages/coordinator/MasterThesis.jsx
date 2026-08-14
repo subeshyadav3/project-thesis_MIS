@@ -21,6 +21,15 @@ const CLUSTERS = [
   'Computer networks and security',
 ];
 
+const THESIS_ASSIGNMENT_OPTIONS = [
+  { value: 'NEEDS_SUPERVISOR', label: 'Needs Supervisor' },
+  { value: 'NEEDS_MID_TERM', label: 'Needs Mid-Term Examiner' },
+  { value: 'NEEDS_FINAL', label: 'Needs Final Examiner' },
+  { value: 'NEEDS_ANY_EXAMINER', label: 'Needs Any Examiner' },
+  { value: 'NEEDS_ANY', label: 'Missing Any Assignment' },
+  { value: 'FULLY_ASSIGNED', label: 'Fully Assigned' },
+];
+
 function MasterThesis() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -45,14 +54,17 @@ function MasterThesis() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [assignmentFilter, setAssignmentFilter] = useState('ALL');
   const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
   const [batchFilter, setBatchFilter] = useState('ALL');
   const [coordinatorProgram, setCoordinatorProgram] = useState(null);
 
   const normalizeBatch = (v) => {
     if (!v) return '';
-    if (/^\d{3}$/.test(v)) return `2${v}`;
-    return String(v);
+    const digits = String(v).replace(/\D/g, '');
+    if (!digits) return String(v).trim();
+    if (digits.length >= 3) return digits.slice(-3);
+    return digits.padStart(3, '0');
   };
 
   const batchOptions = useMemo(() => {
@@ -361,6 +373,14 @@ const handleComplete = async (id) => {
   const filteredTheses = useMemo(() => {
     const coordProgId = coordinatorProgram?.id;
     return theses.filter(t => {
+      const progId = t.programId || t.student?.programId;
+      const isCrossProgram = coordProgId && progId && progId !== coordProgId;
+      
+      const matchesScope = programScopeFilter === 'ALL' ? true :
+        programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
+        !isCrossProgram;
+      if (!matchesScope) return false;
+
       const matchesSearch = !searchQuery || t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${t.student?.firstName || ''} ${t.student?.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -371,20 +391,25 @@ const handleComplete = async (id) => {
         : supervisorFilter === 'NONE'
           ? !t.supervisor
           : t.supervisor?.id?.toString() === supervisorFilter;
-
-      const isCrossProgram = coordProgId && t.student?.programId && t.student.programId !== coordProgId;
-      const matchesScope = programScopeFilter === 'ALL' ? true :
-        programScopeFilter === 'OTHER_PROGRAMS' ? isCrossProgram :
-        !isCrossProgram;
+      const hasSupervisor = Boolean(t.supervisorId || t.supervisor);
+      const hasMidTerm = Boolean(t.externalMidTermId || t.externalMidTerm);
+      const hasFinal = Boolean(t.externalFinalId || t.externalFinal);
+      const matchesAssignment = assignmentFilter === 'ALL' ? true :
+        assignmentFilter === 'NEEDS_SUPERVISOR' ? !hasSupervisor :
+        assignmentFilter === 'NEEDS_MID_TERM' ? !hasMidTerm :
+        assignmentFilter === 'NEEDS_FINAL' ? !hasFinal :
+        assignmentFilter === 'NEEDS_ANY_EXAMINER' ? (!hasMidTerm || !hasFinal) :
+        assignmentFilter === 'NEEDS_ANY' ? (!hasSupervisor || !hasMidTerm || !hasFinal) :
+        assignmentFilter === 'FULLY_ASSIGNED' ? (hasSupervisor && hasMidTerm && hasFinal) : true;
 
       const matchesBatch = batchFilter === 'ALL' || (() => {
         const b = t.batch || (t.student?.batch ? t.student.batch : (t.student?.rollNumber && /^\d{3}/.test(t.student.rollNumber) ? t.student.rollNumber.slice(0, 3) : ''));
         return normalizeBatch(b) === batchFilter;
       })();
 
-      return matchesSearch && matchesStatus && matchesSupervisor && matchesScope && matchesBatch;
+      return matchesSearch && matchesStatus && matchesSupervisor && matchesAssignment && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, programScopeFilter, batchFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, supervisorFilter, assignmentFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -478,6 +503,7 @@ const handleComplete = async (id) => {
     { value: 'ACTIVE', label: 'Active' },
     { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
+    { value: 'REJECTED', label: 'Rejected' },
   ];
 
   const supervisorOptions = [
@@ -526,10 +552,18 @@ return (
                     Thesis
                   </span>
                 </div>
-                <div className="detail-item">
+                <div className="detail-item" style={{ gridColumn: 'span 2' }}>
                   <span className="detail-label">Research Cluster</span>
-                  <span className="badge badge-info">
-                    {showDetail.cluster || 'Unassigned'}
+                  <span className="badge badge-info" style={{ whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.4 }}>
+                    {(() => {
+                      const map = {
+                        'Cluster 1': 'Computer networks and security',
+                        'Cluster 2': 'Electronic devices, circuits and communication',
+                        'Cluster 3': 'AI/ML and image processing',
+                        'Cluster 4': 'Audio, NLP and data/text analytics',
+                      };
+                      return map[showDetail.cluster] || showDetail.cluster || 'Unassigned';
+                    })()}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -648,6 +682,7 @@ return (
                       <option value="ACTIVE">Active</option>
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
+                      <option value="REJECTED">Rejected</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 220 }}>
@@ -958,7 +993,7 @@ return (
         </div>
       )}
 
-      <div className="table-container">
+      <div className="table-container" style={{ minHeight: 280, overflow: 'visible' }}>
         <div className="table-toolbar">
           <div className="table-toolbar-left">
             <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by title, student, roll, email..." />
@@ -979,6 +1014,7 @@ return (
             ]}
             allLabel="All Department Theses"
           />
+          <FilterDropdown label="Assignment" value={assignmentFilter} onChange={setAssignmentFilter} options={THESIS_ASSIGNMENT_OPTIONS} allLabel="All Assignments" />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
@@ -1064,12 +1100,21 @@ return (
                           onChange={e => updateThesisStatus(t.id, e.target.value)}
                           disabled={updatingStatus === t.id}
                           onClick={e => e.stopPropagation()}
-                          style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: t.status === 'COMPLETED' ? 'var(--color-success)' : t.status === 'OVERDUE' ? 'var(--color-error)' : t.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                          style={{
+                            fontSize: 10, padding: '1px 4px', borderRadius: 4,
+                            border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer',
+                            color: t.status === 'COMPLETED' ? 'var(--color-success)'
+                              : t.status === 'OVERDUE' ? 'var(--color-error)'
+                              : t.status === 'REJECTED' ? 'var(--color-error)'
+                              : t.status === 'ACTIVE' ? 'var(--color-primary)'
+                              : 'var(--color-on-surface-variant)',
+                          }}
                         >
                           <option value="PENDING">PENDING</option>
                           <option value="ACTIVE">ACTIVE</option>
                           <option value="OVERDUE">OVERDUE</option>
                           <option value="COMPLETED">COMPLETED</option>
+                          <option value="REJECTED">REJECTED</option>
                         </select>
                       </div>
                     </td>
@@ -1086,30 +1131,64 @@ return (
                             <Icon name="more_vert" className="material-symbols-outlined" />
                           </button>
                           {actionMenuRow === t.id && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }}>
+                            <>
+                              <div
+                                style={{ position: 'fixed', inset: 0, zIndex: 9990 }}
+                                onClick={(e) => { e.stopPropagation(); setActionMenuRow(null); }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  right: 0,
+                                  top: 'calc(100% + 4px)',
+                                  zIndex: 9999,
+                                  background: 'var(--color-surface-container-lowest)',
+                                  border: '1px solid var(--color-outline)',
+                                  borderRadius: 'var(--border-radius-md)',
+                                  boxShadow: '0 12px 32px rgba(0,0,0,0.24)',
+                                  minWidth: 150,
+                                  padding: 4,
+                                }}
+                                onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}
+                              >
+                                <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }}>
                                   <Icon name="edit" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Edit
                                 </div>
-                              {t.status === 'ACTIVE' && (
-                                <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
-                                  <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                  Complete
+                                {t.canManage !== false && t.status === 'ACTIVE' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
+                                    <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Complete
+                                  </div>
+                                )}
+                                {t.canManage !== false && t.status !== 'REJECTED' && t.status !== 'COMPLETED' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-warning, #ea580c)' }} onClick={() => updateThesisStatus(t.id, 'REJECTED')}>
+                                    <Icon name="cancel" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Reject
+                                  </div>
+                                )}
+                                {t.canManage !== false && t.status === 'REJECTED' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-primary)' }} onClick={() => updateThesisStatus(t.id, 'ACTIVE')}>
+                                    <Icon name="restart_alt" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Reactivate
+                                  </div>
+                                )}
+                                <div className="menu-item" onClick={() => setPdfPreviewItem(t)}>
+                                  <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  PDF Preview
                                 </div>
-                              )}
-                              <div className="menu-item" onClick={() => setPdfPreviewItem(t)}>
-                                <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                PDF Preview
+                                <div className="menu-item" onClick={() => downloadEvalPdf(t)}>
+                                  <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  Export PDF
+                                </div>
+                                {t.canManage !== false && (
+                                  <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
+                                    <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Delete
+                                  </div>
+                                )}
                               </div>
-                              <div className="menu-item" onClick={() => downloadEvalPdf(t)}>
-                                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                Export PDF
-                              </div>
-                              <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
-                                <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                Delete
-                              </div>
-                            </div>
+                            </>
                           )}
                         </div>
                       </div>

@@ -175,13 +175,17 @@ exports.submitFormResponse = async (req, res) => {
     const existing = await prisma.formResponse.findUnique({
       where: { announcementId_studentId: { announcementId, studentId: req.user.id } },
     });
-    if (existing) return res.status(409).json({ error: 'You have already submitted this form' });
-
-    const engagement = await getEngagement(req.user.id);
-    if (engagement.engaged) {
-      return res.status(409).json({
-        error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". A student cannot be part of two projects.`,
-      });
+    if (existing) {
+      if (existing.status === 'FINALIZED' || existing.status === 'UNDER_REVIEW' || existing.status === 'REVIEWED' || existing.thesisId) {
+        return res.status(409).json({ error: 'This form submission has already been reviewed or finalized by the coordinator and can no longer be edited.' });
+      }
+    } else {
+      const engagement = await getEngagement(req.user.id);
+      if (engagement.engaged) {
+        return res.status(409).json({
+          error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". A student cannot be part of two projects.`,
+        });
+      }
     }
 
     const title = String(formData.title || '').trim();
@@ -240,16 +244,27 @@ exports.submitFormResponse = async (req, res) => {
     const savedFormData = { ...formData };
     if (!savedFormData.pdfUrl && documentUrl) savedFormData.pdfUrl = documentUrl;
 
-    // Only create the form response here — do NOT create the thesis/proposal yet.
-    // The coordinator reviews the submission and creates the thesis on finalize.
-    const formResponse = await prisma.formResponse.create({
-      data: {
-        announcementId,
-        studentId: req.user.id,
-        formData: savedFormData,
-        status: late ? 'LATE_SUBMITTED' : 'SUBMITTED',
-      },
-    });
+    let formResponse;
+    if (existing) {
+      formResponse = await prisma.formResponse.update({
+        where: { id: existing.id },
+        data: {
+          formData: savedFormData,
+          status: late ? 'LATE_SUBMITTED' : 'SUBMITTED',
+        },
+      });
+      audit.log({ action: 'UPDATE', entity: 'FormResponse', entityId: formResponse.id, details: `Updated concept note for "${title}"`, performedById: req.user.id });
+    } else {
+      formResponse = await prisma.formResponse.create({
+        data: {
+          announcementId,
+          studentId: req.user.id,
+          formData: savedFormData,
+          status: late ? 'LATE_SUBMITTED' : 'SUBMITTED',
+        },
+      });
+      audit.log({ action: 'CREATE', entity: 'FormResponse', entityId: formResponse.id, details: `Concept note submitted for "${title}"${late ? ' (late)' : ''}`, performedById: req.user.id });
+    }
 
     // Notify program + department coordinators
     try {
@@ -263,14 +278,12 @@ exports.submitFormResponse = async (req, res) => {
         await notifSvc.notifyMany(
           coordinatorIds,
           'THESIS_FORM_SUBMITTED',
-          `${studentName} submitted the thesis form "${title}"${late ? ' (late submission — proposal requires approval)' : ''}. Report: ${description.slice(0, 120)}${description.length > 120 ? '…' : ''}`
+          `${studentName} ${existing ? 'updated' : 'submitted'} the thesis form "${title}"${late ? ' (late submission — proposal requires approval)' : ''}.`
         );
       }
     } catch (e) { console.error('notify coordinators error:', e.message); }
 
-    audit.log({ action: 'CREATE', entity: 'FormResponse', entityId: formResponse.id, details: `Concept note submitted for "${title}"${late ? ' (late)' : ''}`, performedById: req.user.id });
-
-    res.status(201).json({ message: 'Form submitted successfully. It is now pending coordinator review.', formResponse, thesis: null, proposal: null, late });
+    res.status(existing ? 200 : 201).json({ message: existing ? 'Form updated successfully.' : 'Form submitted successfully. It is now pending coordinator review.', formResponse, thesis: null, proposal: null, late });
   } catch (e) {
     console.error('submitFormResponse error:', e);
     res.status(500).json({ error: 'Internal server error', details: e.message });

@@ -33,7 +33,8 @@ exports.getTheses = async (req, res) => {
     const theses = await prisma.thesis.findMany({
       where,
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true } },
+        student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } },
+        program: { select: { id: true, name: true, code: true } },
         supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
         externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
@@ -43,6 +44,12 @@ exports.getTheses = async (req, res) => {
         examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
       },
     });
+    if (req.user.role === 'COORDINATOR') {
+      const scope = await resolveCoordinatorScope(req.user);
+      for (const t of theses) {
+        t.canManage = await canManageThesisAsCoordinator(t, scope, req.user);
+      }
+    }
     res.json(theses);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -133,6 +140,13 @@ exports.createThesis = async (req, res) => {
       }
     }
 
+    // Derive batch from body, student.batch, or student roll number
+    let derivedBatch = req.body.batch || student.batch || null;
+    if (!derivedBatch && student.rollNumber) {
+      const match = student.rollNumber.match(/^(\d{2,3})/);
+      if (match) derivedBatch = match[1];
+    }
+
     const supId = supervisorId ? parseInt(supervisorId) : null;
     const thesis = await prisma.thesis.create({
       data: {
@@ -141,8 +155,10 @@ exports.createThesis = async (req, res) => {
         studentId: parseInt(studentId),
         supervisorId: supId,
         supervisorAssignmentStatus: supId ? 'PENDING' : null,
-        programId: requestingCoordinatorProgram?.id ?? student.programId ?? null,
-        batch: student.batch || null,
+        programId: student.programId || requestingCoordinatorProgram?.id || null,
+        crossProgramRequestedById: isCrossProgram ? req.user.id : null,
+        createdVia: 'MANUAL',
+        batch: derivedBatch,
         cluster: req.body.cluster || student.program?.cluster || null,
         startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         status: status || 'ACTIVE',
@@ -210,10 +226,10 @@ function parseName(inputName) {
  * Helper: generate a simple email from a name for auto-created users.
  */
 function generateEmail(firstName, lastName, role) {
-  const ln = lastName || firstName;
-  const base = `${firstName.toLowerCase()}.${ln.toLowerCase()}`.replace(/[^a-z.]/g, '');
-  const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
-  return `${base}.${suffix}@pcampus.edu.np`;
+  const parsed = parseName(`${firstName} ${lastName || ''}`.trim());
+  const fn = (parsed.firstName || firstName).toLowerCase().replace(/[^a-z]/g, '');
+  const ln = (parsed.lastName || lastName || fn).toLowerCase().replace(/[^a-z]/g, '');
+  return `${fn}.${ln}@pcampus.edu.np`;
 }
 
 // Step 1: Parse Excel + fuzzy match → return preview
@@ -271,7 +287,6 @@ exports.bulkImportPreview = async (req, res) => {
         if (byRoll) studentMatch = { user: byRoll, score: 1.0, method: 'roll' };
       }
       if (!studentMatch) {
-        warnings.push(`Student not found for roll: ${roll || '(none)'}`);
         unmatchCount++;
       } else {
         matchCount++;
@@ -437,15 +452,15 @@ exports.bulkImportConfirm = async (req, res) => {
       const cluster = _edits?.cluster ?? origCluster;
 
       if (!studentMatch?.id && !row.studentMatch?.id) {
-        // Try auto-creating the student from _edits.student
-        const willCreate = _edits?.student;
+        // Try auto-creating the student from _edits.student or row.name
+        const willCreate = _edits?.student || (row.name ? parseName(row.name) : null);
         const roll = _edits?.roll || row.roll;
         if (willCreate?.firstName && willCreate?.lastName && roll) {
           const email = roll.toLowerCase() + '@pcampus.edu.np';
-          const hash = await bcrypt.hash('subesh', 10);
+          const hash = await bcrypt.hash('Test@123', 10);
           // Derive programId from roll prefix
           const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
-          const prog = rollProg ? await prisma.program.findFirst({ where: { code: rollProg } }) : null;
+          const prog = rollProg ? await prisma.program.findFirst({ where: { code: { equals: rollProg, mode: 'insensitive' } } }) : null;
           const newStudent = await prisma.user.upsert({
             where: { email },
             update: {},
@@ -465,7 +480,7 @@ exports.bulkImportConfirm = async (req, res) => {
           if (newStudent) {
             row.studentMatch = { id: newStudent.id, name: `${willCreate.firstName} ${willCreate.lastName}` };
             audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newStudent.id, details: `Auto-created MASTER student via thesis bulk import` });
-            emailService.notifyUserCreated(email, willCreate.firstName, 'STUDENT', email, 'subesh');
+            emailService.notifyUserCreated(email, willCreate.firstName, 'STUDENT', email, 'Test@123');
           } else {
             skipped.push({ row: row.row, reason: 'Student could not be auto-created' });
             continue;
@@ -487,24 +502,24 @@ exports.bulkImportConfirm = async (req, res) => {
         if (!willCreate) return null;
         try {
           const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-           const hash = await bcrypt.hash('subesh', 10);
+          const hash = await bcrypt.hash('Test@123', 10);
           const newUser = await prisma.user.upsert({
             where: { email },
             update: {},
-          create: {
-            email,
-            password: hash,
-            firstName: willCreate.firstName,
-            lastName: willCreate.lastName || willCreate.firstName,
-            role,
-            designation: willCreate.designation || null,
-            departmentId: req.user.departmentId,
-            active: true,
-          },
+            create: {
+              email,
+              password: hash,
+              firstName: willCreate.firstName,
+              lastName: willCreate.lastName || willCreate.firstName,
+              role,
+              designation: willCreate.designation || null,
+              departmentId: req.user.departmentId,
+              active: true,
+            },
           }).catch(() => null);
           if (newUser) {
             audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newUser.id, details: `Auto-created ${role} via bulk import` });
-            emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'subesh');
+            emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'Test@123');
             return newUser.id;
           }
         } catch (e) {
@@ -559,10 +574,6 @@ exports.bulkImportConfirm = async (req, res) => {
           skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
           return null;
         }
-        if (coordinatorProgram && student.programId && student.programId !== coordinatorProgram.id) {
-          skipped.push({ row: row.row, reason: 'Student belongs to another program' });
-          return null;
-        }
 
         // Fix student without a programId — derive from roll prefix
         if (!student.programId) {
@@ -570,7 +581,7 @@ exports.bulkImportConfirm = async (req, res) => {
           if (roll) {
             const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
             if (rollProg) {
-              const prog = await tx.program.findFirst({ where: { code: rollProg } });
+              const prog = await tx.program.findFirst({ where: { code: { equals: rollProg, mode: 'insensitive' } } });
               if (prog) {
                 await tx.user.update({ where: { id: student.id }, data: { programId: prog.id } });
                 student.programId = prog.id;
@@ -617,8 +628,10 @@ exports.bulkImportConfirm = async (req, res) => {
             supervisorId: resolvedSupervisorId,
             externalMidTermId: resolvedMidTermId,
             externalFinalId: resolvedFinalId,
+            programId: student.programId || undefined,
             cluster: cluster || student.program?.cluster || null,
             batch: batch || student.batch || null,
+            createdVia: 'BULK',
           },
         });
 
@@ -906,9 +919,9 @@ exports.deleteThesis = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    // Allow delete if PENDING, or if no files uploaded AND no evaluations done
-    if (thesis.status !== 'PENDING' && (thesis.proposals.length > 0 || thesis.evaluations.length > 0)) {
-      return res.status(400).json({ error: 'Cannot delete: thesis has files uploaded or evaluations completed' });
+    const hasNonZeroEvaluations = thesis.evaluations.some(e => e.marks && e.marks > 0);
+    if (thesis.status === 'COMPLETED' || hasNonZeroEvaluations) {
+      return res.status(400).json({ error: 'Cannot delete: thesis has completed non-zero evaluations or is finalized' });
     }
     await prisma.$transaction([
       prisma.evaluation.deleteMany({ where: { thesisId: id } }),
@@ -1048,12 +1061,14 @@ exports.updateThesis = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    const { title, description, startDate, endDate } = req.body;
+    const { title, description, startDate, endDate, cluster, status } = req.body;
     const data = {};
     if (title !== undefined) data.title = title;
     if (description !== undefined) data.description = description;
     if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
+    if (cluster !== undefined) data.cluster = cluster;
+    if (status !== undefined) data.status = status;
     const thesis = await prisma.thesis.update({
       where: { id },
       data,

@@ -184,13 +184,21 @@ function StudentProjectDetail() {
                   <span style={{ fontWeight: 500 }}>{assignment.externalFinal.firstName} {assignment.externalFinal.lastName}</span>
                 </div>
               )}
-              <div className="detail-item">
+              <div className="detail-item" style={{ gridColumn: 'span 2' }}>
                 <span className="detail-label">Research Cluster</span>
-                <span>{assignment.cluster ? <span className="badge badge-info">{assignment.cluster}</span> : '—'}</span>
+                <span>{assignment.cluster ? <span className="badge badge-info" style={{ whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.4 }}>{(() => {
+                  const map = {
+                    'Cluster 1': 'Computer networks and security',
+                    'Cluster 2': 'Electronic devices, circuits and communication',
+                    'Cluster 3': 'AI/ML and image processing',
+                    'Cluster 4': 'Audio, NLP and data/text analytics',
+                  };
+                  return map[assignment.cluster] || assignment.cluster;
+                })()}</span> : '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Batch</span>
-                <span>{assignment.batch || '—'}</span>
+                <span>{assignment.batch || assignment.student?.batch || assignment.student?.rollNumber?.match(/^(\d{2,3})/)?.[1] || members[0]?.rollNumber?.match(/^(\d{2,3})/)?.[1] || '—'}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Department</span>
@@ -281,8 +289,8 @@ function StudentProjectDetail() {
               {assignment.status === 'COMPLETED' && <span className="badge badge-completed"><span className="dot" />Completed</span>}
             </div>
             <div style={{ padding: '0 16px 16px' }}>
-              {assignment.announcement?.expirationDate && (() => {
-                const info = getDeadlineInfo(assignment.announcement.expirationDate);
+              {assignment.endDate && (() => {
+                const info = getDeadlineInfo(assignment.endDate);
                 if (!info) return null;
                 return (
                   <div style={{
@@ -291,7 +299,7 @@ function StudentProjectDetail() {
                     color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                   }}>
                     <Icon name={info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                    {info.label}
+                    {info.expired ? `Due date passed: ${new Date(assignment.endDate).toLocaleDateString()}` : `Due: ${info.label}`}
                   </div>
                 );
               })()}

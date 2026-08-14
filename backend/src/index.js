@@ -49,7 +49,14 @@ const loginLimiter = rateLimit({
   max: 20,
   message: { error: 'Too many login attempts, please try again later.' },
 });
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many password reset requests, please try again later.' },
+});
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/forgot-password', passwordResetLimiter);
+app.use('/api/auth/reset-password', passwordResetLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

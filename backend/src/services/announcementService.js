@@ -85,7 +85,7 @@ async function isStudentSubmittedForm(user, announcementId) {
   if (user.role !== 'STUDENT') return false;
   const resp = await prisma.formResponse.findUnique({
     where: { announcementId_studentId: { announcementId, studentId: user.id } },
-    select: { id: true, thesisId: true, status: true },
+    select: { id: true, thesisId: true, status: true, formData: true },
   });
   return resp ? { submitted: true, ...resp } : { submitted: false };
 }

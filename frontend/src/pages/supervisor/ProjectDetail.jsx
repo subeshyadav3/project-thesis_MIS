@@ -222,6 +222,29 @@ function ProjectDetail() {
     }
   };
 
+  const handleDeleteProject = () => {
+    setConfirmDialog({
+      open: true,
+      title: `Delete ${type === 'group' ? 'Project Group' : 'Master Thesis'}`,
+      message: `Are you sure you want to delete "${title || 'this project'}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          if (type === 'group') {
+            await api.delete(`/groups/${id}`);
+          } else {
+            await api.delete(`/theses/${id}`);
+          }
+          toast.success(`${type === 'group' ? 'Project' : 'Thesis'} deleted successfully`);
+          navigate(type === 'group' ? '/coordinator/projects' : '/coordinator/thesis');
+        } catch (err) {
+          toast.error(err.response?.data?.error || 'Failed to delete');
+        }
+      },
+    });
+  };
+
   const tabs = [
     { key: 'overview', icon: 'overview', label: 'Overview' },
     { key: 'evaluation', icon: 'grading', label: 'Evaluation' },
@@ -276,7 +299,15 @@ function ProjectDetail() {
               )}
               {item?.cluster && (
                 <span style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: 11, padding: '3px 8px', borderRadius: 50 }}>
-                  {item.cluster}
+                  {(() => {
+                    const map = {
+                      'Cluster 1': 'Computer networks and security',
+                      'Cluster 2': 'Electronic devices, circuits and communication',
+                      'Cluster 3': 'AI/ML and image processing',
+                      'Cluster 4': 'Audio, NLP and data/text analytics',
+                    };
+                    return map[item.cluster] || item.cluster;
+                  })()}
                 </span>
               )}
             </div>
@@ -293,6 +324,12 @@ function ProjectDetail() {
               onClick={() => { if (window.history.length > 1) navigate(-1); else navigate(backPath); }}>
               <Icon name="arrow_back" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Back
             </button>
+            {canManageItem && item?.status !== 'COMPLETED' && (progress.earned === 0 || progress.completed === 0) && (
+              <button className="btn" style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)' }}
+                onClick={handleDeleteProject}>
+                <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 18 }} /> Delete
+              </button>
+            )}
             {canManageItem && item?.status === 'ACTIVE' && (
               <button className="btn" style={{ background: 'rgba(34,197,94,0.2)', color: '#86efac', border: '1px solid rgba(34,197,94,0.3)' }}
                 onClick={() => setConfirmDialog({ open: true, title: 'Finalize', message: `Mark this ${type === 'group' ? 'project' : 'thesis'} as COMPLETED?`, confirmLabel: 'Finalize', onConfirm: doFinalize, danger: true })}>
@@ -845,7 +882,7 @@ function InfoRow({ label, value }) {
       <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', minWidth: 130, textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>
         {label}
       </span>
-      <div style={{ fontSize: 14, color: 'var(--color-on-surface)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+      <div style={{ fontSize: 14, color: 'var(--color-on-surface)', lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word', flex: 1, minWidth: 0 }}>
         {value || '—'}
       </div>
     </div>

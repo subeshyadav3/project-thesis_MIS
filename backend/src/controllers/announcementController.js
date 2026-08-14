@@ -94,39 +94,42 @@ exports.create = async (req, res) => {
     });
 
     if (recipients.length) {
-      const notifType = allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
-      const msgSuffix = allowGroupFormation ? ' You can now form/join a group.' : (announcement.formEnabled ? ' You can now submit the thesis form.' : '');
-      await notifSvc.notifyMany(
-        recipients.map(r => r.id),
-        notifType,
-        `${announcement.title}: ${announcement.message}${msgSuffix}`
-      );
+      setImmediate(async () => {
+        try {
+          const notifType = allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
+          const msgSuffix = allowGroupFormation ? ' You can now form/join a group.' : (announcement.formEnabled ? ' You can now submit the thesis form.' : '');
+          await notifSvc.notifyMany(
+            recipients.map(r => r.id),
+            notifType,
+            `${announcement.title}: ${announcement.message}${msgSuffix}`
+          );
 
-      // Send email notifications
-      try {
-        const emailService = require('../services/emailService');
-        const studentEmails = await prisma.user.findMany({
-          where: { id: { in: recipients.map(r => r.id) } },
-          select: { email: true },
-        });
-        const emails = studentEmails.map(u => u.email).filter(Boolean);
-        if (emails.length) {
-          const typeLabels = { GENERAL: 'General Announcement', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis' };
-          const annTypeLabel = typeLabels[announcement.type] || 'Announcement';
-          await emailService.sendEmail({
-            to: emails,
-            subject: `${annTypeLabel}: ${announcement.title}`,
-            title: annTypeLabel,
-            contentLines: [
-              `A new ${annTypeLabel.toLowerCase()} has been published:`,
-              `<strong>Title:</strong> ${announcement.title}`,
-              `<strong>Message:</strong> ${announcement.message}`,
-              allowGroupFormation ? `<strong>Group Formation:</strong> You can now form/join a group for this announcement.` : '',
-              `Please log in to the system for more details.`,
-            ].filter(Boolean),
+          const emailService = require('../services/emailService');
+          const studentEmails = await prisma.user.findMany({
+            where: { id: { in: recipients.map(r => r.id) } },
+            select: { email: true },
           });
+          const emails = studentEmails.map(u => u.email).filter(Boolean);
+          if (emails.length) {
+            const typeLabels = { GENERAL: 'General Announcement', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis' };
+            const annTypeLabel = typeLabels[announcement.type] || 'Announcement';
+            await emailService.sendEmail({
+              to: emails,
+              subject: `${annTypeLabel}: ${announcement.title}`,
+              title: annTypeLabel,
+              contentLines: [
+                `A new ${annTypeLabel.toLowerCase()} has been published:`,
+                `<strong>Title:</strong> ${announcement.title}`,
+                `<strong>Message:</strong> ${announcement.message}`,
+                allowGroupFormation ? `<strong>Group Formation:</strong> You can now form/join a group for this announcement.` : '',
+                `Please log in to the system for more details.`,
+              ].filter(Boolean),
+            });
+          }
+        } catch (e) {
+          console.error('announcement background notification/email error:', e.message);
         }
-      } catch (e) { console.error('announcement email error:', e.message); }
+      });
     }
 
     audit.log({ action: 'CREATE', entity: 'Announcement', entityId: announcement.id, details: `Announcement "${announcement.title}" (${type})`, performedById: req.user.id });
@@ -152,38 +155,42 @@ async function notifyForAnnouncement(announcement, departmentId) {
   });
 
   if (recipients.length) {
-      const notifType = announcement.allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
-    const msgSuffix = announcement.allowGroupFormation ? ' You can now form/join a group.' : (announcement.formEnabled ? ' You can now submit the thesis form.' : '');
-    await notifSvc.notifyMany(
-      recipients.map(r => r.id),
-      notifType,
-      `${announcement.title}: ${announcement.message}${msgSuffix}`
-    );
+    setImmediate(async () => {
+      try {
+        const notifType = announcement.allowGroupFormation ? 'GROUP_FORMATION_OPENED' : 'BULK_ANNOUNCEMENT';
+        const msgSuffix = announcement.allowGroupFormation ? ' You can now form/join a group.' : (announcement.formEnabled ? ' You can now submit the thesis form.' : '');
+        await notifSvc.notifyMany(
+          recipients.map(r => r.id),
+          notifType,
+          `${announcement.title}: ${announcement.message}${msgSuffix}`
+        );
 
-    try {
-      const emailService = require('../services/emailService');
-      const studentEmails = await prisma.user.findMany({
-        where: { id: { in: recipients.map(r => r.id) } },
-        select: { email: true },
-      });
-      const emails = studentEmails.map(u => u.email).filter(Boolean);
-      if (emails.length) {
-        const typeLabels = { GENERAL: 'General Announcement', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis' };
-        const annTypeLabel = typeLabels[announcement.type] || 'Announcement';
-        await emailService.sendEmail({
-          to: emails,
-          subject: `[Updated] ${annTypeLabel}: ${announcement.title}`,
-          title: annTypeLabel,
-          contentLines: [
-            `A ${annTypeLabel.toLowerCase()} has been updated:`,
-            `<strong>Title:</strong> ${announcement.title}`,
-            `<strong>Message:</strong> ${announcement.message}`,
-            announcement.allowGroupFormation ? `<strong>Group Formation:</strong> You can now form/join a group for this announcement.` : '',
-            `Please log in to the system for more details.`,
-          ].filter(Boolean),
+        const emailService = require('../services/emailService');
+        const studentEmails = await prisma.user.findMany({
+          where: { id: { in: recipients.map(r => r.id) } },
+          select: { email: true },
         });
+        const emails = studentEmails.map(u => u.email).filter(Boolean);
+        if (emails.length) {
+          const typeLabels = { GENERAL: 'General Announcement', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis' };
+          const annTypeLabel = typeLabels[announcement.type] || 'Announcement';
+          await emailService.sendEmail({
+            to: emails,
+            subject: `[Updated] ${annTypeLabel}: ${announcement.title}`,
+            title: annTypeLabel,
+            contentLines: [
+              `A ${annTypeLabel.toLowerCase()} has been updated:`,
+              `<strong>Title:</strong> ${announcement.title}`,
+              `<strong>Message:</strong> ${announcement.message}`,
+              announcement.allowGroupFormation ? `<strong>Group Formation:</strong> You can now form/join a group for this announcement.` : '',
+              `Please log in to the system for more details.`,
+            ].filter(Boolean),
+          });
+        }
+      } catch (e) {
+        console.error('announcement update background email error:', e.message);
       }
-    } catch (e) { console.error('announcement email error:', e.message); }
+    });
   }
 
   return recipients;
@@ -518,7 +525,10 @@ exports.updateFormResponse = async (req, res) => {
 
     const updated = await prisma.formResponse.update({
       where: { id: responseId },
-      data: { formData: mergedFormData },
+      data: {
+        formData: mergedFormData,
+        status: existing.status === 'FINALIZED' ? 'FINALIZED' : 'UNDER_REVIEW',
+      },
       include: { student: true, thesis: true },
     });
 

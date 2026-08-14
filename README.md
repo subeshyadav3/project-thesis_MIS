@@ -1,7 +1,8 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/Status-Active-success?style=flat-square" alt="Status"/>
+<img src="https://img.shields.io/badge/Status-Production%20Ready-success?style=flat-square" alt="Status"/>
 <img src="https://img.shields.io/badge/React-18.x-61DAFB?style=flat-square&logo=react" alt="React"/>
+<img src="https://img.shields.io/badge/Vite-5.x-646CFF?style=flat-square&logo=vite" alt="Vite"/>
 <img src="https://img.shields.io/badge/Node.js-18.x-339933?style=flat-square&logo=nodedotjs" alt="Node.js"/>
 <img src="https://img.shields.io/badge/PostgreSQL-16.x-4169E1?style=flat-square&logo=postgresql" alt="PostgreSQL"/>
 <img src="https://img.shields.io/badge/Prisma-5.x-2D3748?style=flat-square&logo=prisma" alt="Prisma"/>
@@ -10,9 +11,10 @@
 
 # 🎓 Thesis & Project Management System (TPMS)
 
+### Department of Electronics & Computer Engineering (DOECE)
 ### Pulchowk Campus — Institute of Engineering, Tribhuvan University
 
-**A comprehensive academic workflow platform for managing bachelor and master thesis/project lifecycles — from group formation and supervisor assignment to final evaluation and PDF generation.**
+**A comprehensive, role-aware academic management platform designed to automate and govern the complete lifecycle of Bachelor projects (Minor/Major) and Master theses — from announcement publishing, team formation, and supervisor allocations to multi-stage defense evaluations, conflict-of-interest prevention, and official PDF grade sheet generation.**
 
 </div>
 
@@ -21,140 +23,170 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [Features](#-features)
+- [Key Architectural Highlights](#-key-architectural-highlights)
+- [Core Features & Modules](#-core-features--modules)
+  - [1. Program Scoping & Degree Isolation](#1-program-scoping--degree-isolation)
+  - [2. Bachelor Project Lifecycle (Minor / Major)](#2-bachelor-project-lifecycle-minor--major)
+  - [3. Master Thesis Lifecycle](#3-master-thesis-lifecycle)
+  - [4. Form Responses Matrix & Inline Finalization](#4-form-responses-matrix--inline-finalization)
+  - [5. Cross-Role Faculty Utilization & Conflict-of-Interest Guard](#5-cross-role-faculty-utilization--conflict-of-interest-guard)
+  - [6. Multi-Project Engagement Prevention](#6-multi-project-engagement-prevention)
+  - [7. Bulk Excel Import with Anomaly Detection](#7-bulk-excel-import-with-anomaly-detection)
+  - [8. Evaluation & Defense Rubrics](#8-evaluation--defense-rubrics)
+  - [9. Automated PDF Generation & Printing](#9-automated-pdf-generation--printing)
 - [Tech Stack](#-tech-stack)
 - [System Architecture](#-system-architecture)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Environment Variables](#environment-variables)
-  - [Database Setup](#database-setup)
-  - [Running the Application](#running-the-application)
-- [User Roles](#-user-roles)
-- [Key Workflows](#-key-workflows)
-- [API Overview](#-api-overview)
-- [Project Structure](#-project-structure)
-- [Screenshots](#-screenshots)
-- [Contributing](#-contributing)
+  - [Environment Configuration](#environment-configuration)
+  - [Database Setup & Seeding](#database-setup--seeding)
+  - [Running Locally](#running-locally)
+- [User Roles & Default Test Credentials](#-user-roles--default-test-credentials)
+- [API Route Reference](#-api-route-reference)
+- [Project Directory Structure](#-project-directory-structure)
 - [License](#-license)
 
 ---
 
 ## 📖 Overview
 
-TPMS is a full-stack academic management system designed specifically for **Pulchowk Campus, IOE**. It streamlines the entire thesis and project management workflow:
+The **Thesis & Project Management System (TPMS)** modernizes academic administration for the **Department of Electronics and Computer Engineering (DOECE)** at Pulchowk Campus, IOE.
 
-- **Bachelor Students**: Form project groups, submit proposals, upload documents, track evaluation progress
-- **Master Students**: Register theses, submit documents across proposal/mid-term/final stages
-- **Supervisors**: Evaluate students, provide feedback, issue recommendations
-- **External Examiners**: Evaluate mid-term and final thesis/project work
-- **Program Coordinators**: Manage users, assign supervisors/examiners, bulk-import students, forward results
-- **Maintainers**: System-wide administration
-
-The system supports **6 academic programs** across **Bachelor** (BCT, BEI) and **Master** (MSNCS, MSICE, MSDSA, MSCSK) levels with built-in academic year and batch management.
+It provides a unified, real-time platform across **6 degree programs**:
+- **Bachelor Programs**: Computer Engineering (**BCT**), Electronics, Communication & Information Engineering (**BEI**).
+- **Master Programs**: Computer Systems & Knowledge Engineering (**MSCSK**), Information & Communication Engineering (**MSICE**), Data Science & Analytics (**MSDSA**), Network & Cyber Security (**MSNCS**).
 
 ---
 
-## ✨ Features
+## 🌟 Key Architectural Highlights
 
-### 🔐 Role-Based Access
-- Five distinct roles with granular permissions
-- Program-scoped coordinator access (bachelor = own program, master = cross-program)
-- JWT-based authentication with secure password hashing
+```mermaid
+graph TD
+    A[Coordinator Announcement] -->|allowGroupFormation: true| B[Bachelor Group Formation / Proposal PDF]
+    A -->|formEnabled: true| C[Master Thesis Proposal Form]
+    
+    B --> D[Bachelor ProjectGroup: Max 4 Students]
+    C --> E[Master Thesis: 1 Student]
+    
+    D --> F[Coordinator Responses Matrix: Deduplicated 1 Row/Group]
+    E --> F
+    
+    F -->|Finalize Group| G[Active ProjectGroup: /coordinator/project/group/:id]
+    F -->|Finalize Thesis| H[Active Thesis: /coordinator/project/thesis/:id]
+    
+    G --> I[Evaluation Scheme: MINOR 50 / MAJOR 100]
+    H --> J[Evaluation Scheme: MASTER 300]
+```
 
-### 👥 Student Management
-- Bulk import students from Excel templates with auto-validation
-- Group formation with invitation system
-- Thesis registration for master students
-- Document upload with version tracking
+- **Global Engagement Guard**: Enforces database-wide constraints ensuring a student can never be part of multiple active project groups or theses simultaneously.
+- **Form Responses Matrix Deduplication**: Group submissions display as a single consolidated row with all members, supervisor matching, and cluster assignments.
+- **Capability-Based Multi-Role Faculty**: Enables teachers to supervise their assigned students and act as internal/external examiners for other colleagues' projects under a single university account.
+- **Automated Conflict-of-Interest Filter**: Prevents a teacher from being assigned as the examiner on a project they already supervise.
+- **Research Cluster Integration**: Full lifecycle tracking across specialized research clusters (`AIML`, `IPCV`, `ANLP`, `NTS`, `EDMES`, `ACOM`, `EII`, etc.).
 
-### 👨‍🏫 Supervisor & Examiner Management
-- Auto-assignment from bulk import
-- Cross-program supervisor assignment requests
-- Separate mid-term and final external examiner assignment
-- Designation-aware display (e.g., "Asst. Prof.", "Assoc. Prof. Dr.")
+---
 
-### 📊 Evaluation System
-- Configurable evaluation schemes per project type (Minor/Major/Master)
-- Supervisor evaluation with 5 criteria × 20 marks
-- External (Mid-Term) evaluation with 5 criteria × 20 marks
-- External (Final) evaluation with 5 criteria × 20 marks
-- Coordinator-grade evaluation oversight
-- Live PDF preview with real-time mark/comment updates
+## 🚀 Core Features & Modules
 
-### 📄 PDF Generation
-- Automated A4-formatted evaluation sheets
-- University-branded templates (TU, IOE, Pulchowk Campus)
-- Supervisor designation and external examiner details
-- Word-to-number conversion for total marks
-- Scope-specific printing (supervisor/external/all)
+### 1. Program Scoping & Degree Isolation
+- **Bachelor Coordinators**: Strictly scoped to their own department program (e.g., BCT coordinator only oversees BCT projects).
+- **Master Coordinators**: Department-level cross-program coordination across all Master specializations.
+- **DegreeGuard Component**: Protects frontend routes against cross-degree navigation.
 
-### 📬 Notifications & Communication
-- In-app notification system
-- Email notifications for assignments, feedback, and updates
-- Recommendation letter issuance
-- Feedback submission alerts
+### 2. Bachelor Project Lifecycle (`MINOR` / `MAJOR`)
+- **Team Size**: 1 to 4 students from the same academic program.
+- **Compulsory Proposal PDF**: Required during team formation.
+- **Member Management**: Coordinators can add or remove members with live auto-complete search and 4-member limit enforcement.
+- **Defense Milestones**: Proposal Defense, Mid-Term Defense, and Final Defense with Internal Examiner evaluation.
 
-### 📈 Academic Year Management
-- Batch-aware semester computation (078/079/080/081/082)
-- Automatic MINOR/MAJOR project type detection from batch year
-- Academic year-based grouping and filtering
+### 3. Master Thesis Lifecycle
+- **Single-Student Model**: 1 student per thesis.
+- **Dual External Examiners**:
+  - `externalMidTermId`: External examiner for Literature Review and Methodology Defense.
+  - `externalFinalId`: External examiner for Final Defense, Report Quality, and Viva.
+- **Cross-Program Supervision**: Allows faculty across the department to supervise Master theses in allied specializations.
+
+### 4. Form Responses Matrix & Inline Finalization
+- **Group Deduplication**: Bachelor groups display as 1 unified row instead of duplicate rows per student.
+- **1-Click Fuzzy Matching**: Matches student supervisor preferences to active faculty members.
+- **Inline Editing**: Live editing of Project Title, Research Cluster, Remarks, and Supervisor.
+- **Automatic Lifecycle Activation**: Finalization generates default evaluation criteria, approves proposal documents, and links to project management views.
+
+### 5. Cross-Role Faculty Utilization & Conflict-of-Interest Guard
+- Faculty members can serve as **Coordinator**, **Supervisor**, and **Examiner** on different projects without separate accounts.
+- **Conflict Prevention**: Examiner dropdowns automatically exclude the project's assigned supervisor.
+- **Examinations Hub**: Dedicated navigation for faculty to review assigned peer projects.
+
+### 6. Multi-Project Engagement Prevention
+- Integrated `engagementGuard` prevents:
+  - Inviting students already in an active project.
+  - Accepting an invitation if engaged in another project.
+  - Submitting duplicate group forms.
+  - Adding active students during coordinator manual creation.
+
+### 7. Bulk Excel Import with Anomaly Detection
+- **Templates**: Standardized templates with optional `Cluster` column (`bachelor_upload_template.xlsx` and `master_upload_template.xlsx`).
+- **Anomaly Detection**: Flags intra-file duplicates, students already engaged in the database, and unassigned faculty before database insertion.
+
+### 8. Evaluation & Defense Rubrics
+
+| Degree / Project Type | Total Marks | Evaluator Breakdown |
+| :--- | :--- | :--- |
+| **Minor Project** | **50 Marks** | Supervisor (25), Proposal Defense (5), Mid-Term Defense (5), Final Defense (5), Internal Examiner (10) |
+| **Major Project** | **100 Marks** | Supervisor (50), Proposal Defense (10), Mid-Term Defense (10), Final Defense (10), Internal Examiner (20) |
+| **Master Thesis** | **300 Marks** | Supervisor (100 Marks / 5 criteria), External Mid-Term (100 Marks / 5 criteria), External Final (100 Marks / 5 criteria) |
+
+### 9. Automated PDF Generation & Printing
+- Official A4 grade sheets branded for **Institute of Engineering, Pulchowk Campus**.
+- Automatic number-to-words mark conversion, student rosters, supervisor/examiner designations, and signature panels.
 
 ---
 
 ## 🛠 Tech Stack
 
 ### Frontend
-
-| Technology | Purpose |
-|-----------|---------|
-| **React 18** | UI framework |
-| **Vite 5** | Build tool & dev server |
-| **React Router v6** | Client-side routing |
-| **Axios** | HTTP client |
-| **CSS Variables** | Theming (IOE academic blue theme) |
-| **Material Symbols** | Icon library |
-| **Inter + DM Sans** | Typography |
+- **React 18** (Functional components, custom hooks, context providers)
+- **Vite 5** (Fast HMR & optimized production bundling)
+- **React Router v6** (Role-guarded client-side routing)
+- **Axios** (HTTP client with auth interceptors)
+- **CSS Variables Design System** (DOECE Academic Blue palette, responsive layouts)
+- **Material Symbols & Google Fonts** (Inter & DM Sans)
 
 ### Backend
-
-| Technology | Purpose |
-|-----------|---------|
-| **Node.js + Express** | REST API server |
-| **Prisma 5** | ORM & database migrations |
-| **PostgreSQL** | Primary database |
-| **JWT** | Authentication tokens |
-| **bcryptjs** | Password hashing |
-| **Puppeteer** | Server-side PDF generation |
-| **Multer** | File upload handling |
-| **Nodemailer** | Email notifications |
-| **xlsx** | Excel template parsing |
+- **Node.js & Express** (RESTful API architecture)
+- **PostgreSQL 16** (Relational database)
+- **Prisma 5 ORM** (Type-safe schema, migrations, transactions)
+- **JWT & bcryptjs** (Secure authentication & token management)
+- **Puppeteer** (Server-side PDF grade sheet generation)
+- **Multer** (Proposal & report document storage)
+- **xlsx (SheetJS)** (Excel template generation and bulk parsing)
 
 ---
 
 ## 🏗 System Architecture
 
 ```
-┌─────────────┐     ┌──────────────────────────────────────┐
-│   React      │     │           Express API                │
-│   Frontend   │────▶│                                      │
-│   (Vite)     │     │  /api/auth      → Auth Controller    │
-│              │     │  /api/groups    → Group Controller   │
-│   Port 5173  │     │  /api/theses    → Thesis Controller  │
-│              │     │  /api/evaluations→ Eval Controller   │
-│              │     │  /api/print     → Print Controller   │
-└─────────────┘     │  /api/users     → User Controller    │
-                    │  /api/students  → Student Controller │
-                    │  /api/upload    → Upload Controller  │
-                    │  ...                                  │
-                    │         Port 5000                     │
-                    └──────────┬───────────────────────────┘
-                               │
-                    ┌──────────▼───────────┐
-                    │     PostgreSQL        │
-                    │     Database          │
-                    │  (via Prisma ORM)     │
-                    └──────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    React 18 + Vite (Frontend)               │
+│  /coordinator/*   /supervisor/*   /student/*   /external/*  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ REST API (Bearer JWT)
+┌──────────────────────────────▼──────────────────────────────┐
+│                    Express.js REST API Server                │
+│  ├── /api/auth               ├── /api/groups                │
+│  ├── /api/announcements      ├── /api/theses                │
+│  ├── /api/student-groups     ├── /api/evaluations           │
+│  ├── /api/users              ├── /api/print                 │
+│  └── /api/external-examiners └── /api/proposals             │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Prisma ORM 5
+┌──────────────────────────────▼──────────────────────────────┐
+│                     PostgreSQL 16 Database                  │
+│  User • Department • Program • ProjectGroup • GroupMember   │
+│  Thesis • Proposal • EvaluationComponent • Evaluation       │
+│  ExaminerAssignment • GroupInvitation • FormResponse        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -162,245 +194,164 @@ The system supports **6 academic programs** across **Bachelor** (BCT, BEI) and *
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - **Node.js** ≥ 18.x
 - **PostgreSQL** ≥ 14.x
 - **npm** or **yarn**
-- **Google Chrome / Chromium** (for PDF generation via Puppeteer)
+- **Chromium / Google Chrome** (for PDF generation via Puppeteer)
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd se
+# 1. Clone repository
+git clone https://github.com/subeshyadav3/project-thesis_MIS.git
+cd project-thesis_MIS
 
-# Install backend dependencies
+# 2. Install backend dependencies
 cd backend
 npm install
 
-# Install frontend dependencies
+# 3. Install frontend dependencies
 cd ../frontend
 npm install
-
-# Return to root
-cd ..
 ```
 
-### Environment Variables
+### Environment Configuration
 
-Create `.env` files in both `backend/` and `frontend/`:
+Create `.env` in `backend/` and `frontend/`:
 
-**backend/.env**
+**`backend/.env`**
 ```env
-DATABASE_URL="postgresql://user:password@localhost:5432/thesis_management?schema=public"
-JWT_SECRET="your-jwt-secret-key"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/thesis_management?schema=public"
+JWT_SECRET="your-secure-jwt-secret-key"
 JWT_EXPIRES_IN="7d"
 PORT=5000
 
-# Email (optional — for notifications)
+# Optional SMTP Configuration
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
-
-# Puppeteer (optional — defaults to auto-detect)
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ```
 
-**frontend/.env**
+**`frontend/.env`**
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
 
-### Database Setup
+### Database Setup & Seeding
 
 ```bash
 cd backend
 
-# Generate Prisma client
+# Generate Prisma Client
 npx prisma generate
 
-# Run migrations
-npx prisma migrate dev
+# Apply Database Migrations
+npx prisma migrate dev --name init
 
-# Seed the database with sample data
+# Seed Database with sample DOECE users & programs
 npm run prisma:seed
+
+# Generate sample Excel upload templates
+node scripts/generate-samples.js
 ```
 
-The seed script creates:
-- 1 department (ECE — Electronics and Computer Engineering)
-- 6 programs (2 bachelor + 4 master)
-- 5 academic years (078–082)
-- 1 maintainer, 6 coordinators, 8 supervisors, 4 external examiners
-- ~340 students across all batches and programs
-- Sample bachelor groups and master theses with evaluations
-
-### Running the Application
+### Running Locally
 
 ```bash
-# Terminal 1: Start the backend
+# Terminal 1: Start Backend API
 cd backend
-npm run dev        # Development with hot-reload
-# OR
-npm start          # Production
+npm run dev
 
-# Terminal 2: Start the frontend
+# Terminal 2: Start Frontend Application
 cd frontend
-npm run dev        # Development server on port 5173
-# OR
-npm run build      # Production build
+npm run dev
 ```
 
-Access the application at **http://localhost:5173**
+Open your browser at **`http://localhost:5173`**.
 
 ---
 
-## 👥 User Roles
+## 👥 User Roles & Default Test Credentials
 
-| Role | Permissions | Typical Actions |
-|------|-------------|-----------------|
-| **MAINTAINER** | Full system access | User management, configuration |
-| **COORDINATOR** | Program-level management | Group/thesis oversight, bulk import, evaluation review, result forwarding |
-| **SUPERVISOR** | Evaluate assigned projects | Mark entry, feedback, recommendations |
-| **EXTERNAL_EXAMINER** | Evaluate assigned projects/theses | Mid-term/final evaluation, mark entry |
-| **STUDENT** | Project/thesis submission | Group formation, document upload, view evaluations |
+All seeded test accounts use the password: **`subesh`**
 
-### Test Accounts
-
-| Role | Email | Password |
-|------|-------|----------|
-| Maintainer | subeshgaming@gmail.com | subesh |
-| Bachelor Student | bachelor@test.com | subesh |
-| Master Student | master@test.com | subesh |
-| BCT Coordinator | bct.coordinator@pcampus.edu.np | subesh |
-| MSNCS Coordinator | msncs.coordinator@pcampus.edu.np | subesh |
-| Supervisor | bishnu.tamang@pcampus.edu.np | subesh |
-| External Examiner | kiran.mainali@ioe.edu.np | subesh |
+| Role | Email | Scope / Responsibility |
+| :--- | :--- | :--- |
+| **Maintainer** | `subeshgaming@gmail.com` | Full department administration & system configuration |
+| **BCT Coordinator** | `bct.coordinator@pcampus.edu.np` | Computer Engineering Bachelor project coordinator |
+| **BEI Coordinator** | `bei.coordinator@pcampus.edu.np` | Electronics & Information Bachelor project coordinator |
+| **MSNCS Coordinator** | `msncs.coordinator@pcampus.edu.np` | Master Network & Cyber Security coordinator |
+| **Faculty / Supervisor** | `bishnu.tamang@pcampus.edu.np` | Faculty Supervisor & Peer Examiner |
+| **Faculty / Supervisor** | `sita.devi@pcampus.edu.np` | Faculty Supervisor & Peer Examiner |
+| **External Examiner** | `kiran.mainali@ioe.edu.np` | External Defense Committee Examiner |
+| **Bachelor Student** | `080bct001@pcampus.edu.np` | Bachelor 4th Year Student (BCT) |
+| **Bachelor Student** | `080bei001@pcampus.edu.np` | Bachelor 3rd Year Student (BEI) |
+| **Master Student** | `080msncs001@pcampus.edu.np` | Master 2nd Year Student (MSNCS) |
 
 ---
 
-## 🔄 Key Workflows
+## 📡 API Route Reference
 
-### Bachelor Project Flow
-```
-Student creates group ─▶ Coordinator approves ─▶ Supervisor assigned
-    ─▶ Proposal submission ─▶ Mid-term evaluation ─▶ Final evaluation
-    ─▶ Results forwarded to exam department
-```
-
-### Master Thesis Flow
-```
-Coordinator creates announcement ─▶ Student submits thesis
-    ─▶ Coordinator approves ─▶ Supervisor assigned
-    ─▶ External examiners assigned (mid-term + final)
-    ─▶ Proposal → Mid-term → Final evaluations
-    ─▶ Thesis completion
-```
-
-### Bulk Import Flow
-```
-Upload Excel file ─▶ Preview with anomaly detection
-    ─▶ Auto-create missing users (supervisors, examiners)
-    ─▶ Confirm import ─▶ Groups/theses created with assignments
-```
+| Module | Route Prefix | Key Capabilities |
+| :--- | :--- | :--- |
+| **Authentication** | `/api/auth` | Login, current user session, password reset |
+| **Announcements** | `/api/announcements` | Notice publishing, dynamic forms, responses matrix, finalize, delete |
+| **Student Groups** | `/api/student-groups` | Self-service group formation, invitations, join open groups, proposals |
+| **Bachelor Groups** | `/api/groups` | Coordinator group management, member add/remove, bulk Excel import |
+| **Master Theses** | `/api/theses` | Master thesis management, dual external examiner allocation, bulk import |
+| **Evaluations** | `/api/evaluations` | Component criteria grading, defense marks entry, summary computation |
+| **Examinations** | `/api/external-examiners` | Assigned groups/theses review for internal and external examiners |
+| **PDF & Export** | `/api/print` | University evaluation sheet PDF generation, Excel grade sheet export |
+| **User Directory** | `/api/users` | Student, supervisor, and examiner directory management |
 
 ---
 
-## 📡 API Overview
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/auth/login` | POST | User authentication |
-| `/api/users` | GET/POST/DELETE | User management |
-| `/api/groups` | GET/POST | Project group operations |
-| `/api/theses` | GET/POST | Thesis management |
-| `/api/evaluations/marks` | POST | Submit/update evaluation marks |
-| `/api/evaluations/thesis/:id` | GET | Get thesis evaluations |
-| `/api/print/thesis/:id` | GET | Generate evaluation PDF |
-| `/api/print/preview/thesis/:id` | GET | HTML preview of evaluation |
-| `/api/upload/proposal` | POST | Document upload |
-| `/api/groups/bulk-import/preview` | POST | Preview bulk import |
-| `/api/groups/bulk-import/confirm` | POST | Confirm bulk import |
-| `/api/forward` | POST | Forward results to exam dept |
-
-Full API documentation available in the source code route handlers.
-
----
-
-## 📁 Project Structure
+## 📁 Project Directory Structure
 
 ```
 se/
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma       # Database schema
-│   │   ├── seed.js             # Database seeder
-│   │   └── migrations/         # Prisma migrations
+│   │   ├── schema.prisma            # PostgreSQL relational schema
+│   │   ├── seed.js                  # Database seeder
+│   │   └── migrations/              # Prisma migration history
 │   ├── src/
-│   │   ├── index.js            # Express app entry
-│   │   ├── controllers/        # Route handlers
-│   │   ├── routes/             # Express routes
-│   │   ├── services/           # Business logic (email, PDF, notifications)
-│   │   ├── middleware/         # Auth, error handling
-│   │   ├── config/             # Evaluation schemes, year/semester rules
-│   │   ├── utils/              # Prisma client, helpers
-│   │   └── ...
-│   ├── excel-templates/        # Sample Excel files for bulk import
+│   │   ├── index.js                 # Express server bootstrap
+│   │   ├── controllers/             # REST API controllers
+│   │   ├── routes/                  # Express route definitions
+│   │   ├── middleware/              # Authentication & authorization guards
+│   │   ├── services/                # Notification, audit, engagement & PDF services
+│   │   ├── config/                  # Evaluation rubrics & batch calculations
+│   │   └── utils/                   # Prisma client & coordinator scoping helpers
+│   ├── excel-templates/             # Pre-built Excel import templates (.xlsx)
+│   ├── scripts/                     # Sample data and template generators
 │   └── package.json
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/         # Reusable React components
-│   │   ├── pages/              # Page components by role
-│   │   │   ├── coordinator/    # Coordinator dashboard & management
-│   │   │   ├── supervisor/     # Supervisor evaluation pages
-│   │   │   ├── external/       # External examiner pages
-│   │   │   └── student/        # Student submission pages
-│   │   ├── services/           # API client configuration
-│   │   ├── contexts/           # React contexts (toast, etc.)
-│   │   └── styles/             # CSS variables & global styles
-│   ├── public/                 # Static assets
+│   │   ├── App.jsx                  # Main router with role-based private routes
+│   │   ├── components/              # Sidebar, Navbar, DegreeGuard, Skeletons
+│   │   ├── pages/
+│   │   │   ├── coordinator/         # BachelorProjects, MasterThesis, Announcements, Matrix
+│   │   │   ├── supervisor/          # SupervisedProjects, SupervisedTheses, ProjectDetail
+│   │   │   ├── student/             # Groups, Theses, Submissions, Assignment
+│   │   │   ├── external/            # EvaluationsList, ExternalEvaluationPage
+│   │   │   └── maintainer/          # UserManagement, DepartmentManagement
+│   │   ├── services/                # Axios API instance with interceptors
+│   │   └── styles/                  # Global CSS tokens, Bento grids, badges
+│   ├── public/                      # Static assets & downloadable Excel templates
 │   └── package.json
 │
-├── ai_chatbot/                 # AI chatbot for proposal review
-├── README.md
-└── .gitignore
+└── README.md
 ```
-
----
-
-## 📸 Screenshots
-
-> Screenshots are available in the project documentation.
-> 
-> *Dashboard* — Role-based overview with statistics cards
-> *Evaluation Review* — Side-by-side marks editor with live PDF preview
-> *Bulk Import* — Excel template upload with anomaly detection preview
-> *PDF Generation* — University-branded A4 evaluation sheets
-
----
-
-## 🤝 Contributing
-
-This project is developed for Pulchowk Campus, Institute of Engineering. For internal contributions:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is developed for academic purposes at **Pulchowk Campus, Institute of Engineering, Tribhuvan University**.
-
----
+Developed for the academic and administrative workflows of the **Department of Electronics and Computer Engineering (DOECE)**, Pulchowk Campus, Institute of Engineering, Tribhuvan University.
 
 <div align="center">
-  <sub>Built with ❤️ for the academic community of Pulchowk Campus, IOE</sub>
-  <br/>
-  <sub>Thesis & Project Management System © 2026</sub>
+  <sub>Thesis & Project Management System (TPMS) © 2026</sub>
 </div>

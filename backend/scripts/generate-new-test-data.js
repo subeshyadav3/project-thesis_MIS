@@ -22,10 +22,13 @@ const path = require('path');
 const fs = require('fs');
 
 const OUT_DIR = path.join(__dirname, '..', 'excel-templates', 'New-Test-data');
+const PUBLIC_TEST_DIR = path.join(__dirname, '..', '..', 'frontend', 'public', 'test-data');
+const PUBLIC_DIR = path.join(__dirname, '..', '..', 'frontend', 'public');
 const BATCH = '083'; // new batch, not in seed (seed = 079..082)
 const PASSWORD = 'Test@123';
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
+fs.mkdirSync(PUBLIC_TEST_DIR, { recursive: true });
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const roll = (code, i) => {
@@ -112,46 +115,114 @@ for (let g = 0; g < bctTitles.length; g++) {
   }
   const hasSup = g % 4 !== 3;          // ~25% without supervisor
   const hasExt = g % 5 !== 4;          // ~20% without external examiner
+  const bctClusters = ['AIML', 'IPCV', 'ANLP', 'NTS', 'EDMES'];
   bctGroups.push({
     'Group Name': `BCT-083-G${g + 1}`,
     'Project Title': bctTitles[g],
     'Members': members.join(', '),
     'Roll Numbers': rolls.join(', '),
     'Batch': BATCH,
+    'Cluster': bctClusters[g % bctClusters.length],
     'Supervisor': hasSup ? supervisorNames[g % supervisorNames.length] : '',
     'External Examiner': hasExt ? externalNames[(g + 2) % externalNames.length] : '',
   });
 }
 
-// ── 2. MASTER MSNCS THESES (25 students, Cluster 1) ────────────────────
-const msncsTitles = [
-  'Analysis of Ransomware Attack Vectors and Mitigation Strategies',
-  'AI-Powered Intrusion Detection System for Campus Networks',
-  'Secure E-Voting System Using Blockchain Technology',
-  'Phishing Detection Using Machine Learning on Email Headers',
-  'Implementation of SIEM for Small Enterprise Networks',
-  'Zero Trust Network Architecture for Cloud Environments',
-  'Malware Classification Using Deep Learning Techniques',
-  'Digital Forensics Investigation Framework for Nepali Organizations',
+// ── 2. MASTER ALL-PROGRAMS THESES (2 rows each for MSNCS, MSICE, MSDSA, MSCSK) ─
+const masterThesesDefs = [
+  // MSNCS (Network and Cyber Security)
+  {
+    programCode: 'MSNCS',
+    programName: 'MSc in Computer System and Network Engineering',
+    cluster: 'Computer networks and security',
+    title: 'Analysis of Ransomware Attack Vectors and Mitigation Strategies',
+    supervisor: 'Prof. Dr. Dinesh Koirala',
+    midTerm: 'Dr. Prajwal Ghimire',
+    finalExam: 'Dr. Anisha Rana',
+  },
+  {
+    programCode: 'MSNCS',
+    programName: 'MSc in Computer System and Network Engineering',
+    cluster: 'Computer networks and security',
+    title: 'AI-Powered Intrusion Detection System for Campus Networks',
+    supervisor: 'Assoc. Prof. Dr. Meena Shrestha',
+    midTerm: 'Dr. Bidur Khadka',
+    finalExam: 'Assoc. Prof. Dr. Manisha Aryal',
+  },
+  // MSICE (Information and Communication Engineering)
+  {
+    programCode: 'MSICE',
+    programName: 'MSc in Information and Communication Engineering',
+    cluster: 'Electronic devices, circuits and communication',
+    title: '5G Massive MIMO Beamforming Optimization Using Machine Learning',
+    supervisor: 'Dr. Kiran Adhikari',
+    midTerm: 'Prof. Dr. Lokendra Dhakal',
+    finalExam: 'Dr. Sabin Wagle',
+  },
+  {
+    programCode: 'MSICE',
+    programName: 'MSc in Information and Communication Engineering',
+    cluster: 'Electronic devices, circuits and communication',
+    title: 'Performance Evaluation of Cognitive Radio Networks in Dense Urban Areas',
+    supervisor: 'Assoc. Prof. Dr. Gyanendra Thapa',
+    midTerm: 'Dr. Prajwal Ghimire',
+    finalExam: 'Dr. Anisha Rana',
+  },
+  // MSDSA (Data Science and Analytics)
+  {
+    programCode: 'MSDSA',
+    programName: 'MSc in Data Science and Analytics',
+    cluster: 'AI/ML and image processing',
+    title: 'Predictive Analytics for Dengue Outbreak Forecasting in Nepal Using LSTM',
+    supervisor: 'Dr. Nilima Joshi',
+    midTerm: 'Assoc. Prof. Dr. Manisha Aryal',
+    finalExam: 'Dr. Bidur Khadka',
+  },
+  {
+    programCode: 'MSDSA',
+    programName: 'MSc in Data Science and Analytics',
+    cluster: 'Audio, NLP and data/text analytics',
+    title: 'Nepali Sentiment Analysis on Social Media Using Transformer Architectures',
+    supervisor: 'Prof. Dr. Raju Poudel',
+    midTerm: 'Dr. Sabin Wagle',
+    finalExam: 'Prof. Dr. Lokendra Dhakal',
+  },
+  // MSCSK (Computer Systems and Knowledge Engineering)
+  {
+    programCode: 'MSCSK',
+    programName: 'MSc in Computer Systems and Knowledge Engineering',
+    cluster: 'Audio, NLP and data/text analytics',
+    title: 'Knowledge Graph Construction for Nepali Biomedical Literature',
+    supervisor: 'Prof. Dr. Dinesh Koirala',
+    midTerm: 'Dr. Prajwal Ghimire',
+    finalExam: 'Dr. Anisha Rana',
+  },
+  {
+    programCode: 'MSCSK',
+    programName: 'MSc in Computer Systems and Knowledge Engineering',
+    cluster: 'AI/ML and image processing',
+    title: 'Automated Semantic Question Answering System Using Ontologies',
+    supervisor: 'Assoc. Prof. Dr. Meena Shrestha',
+    midTerm: 'Dr. Bidur Khadka',
+    finalExam: 'Assoc. Prof. Dr. Manisha Aryal',
+  },
 ];
 
-const msncsTheses = [];
-for (let i = 0; i < msncsTitles.length; i++) {
-  const hasSup = i % 6 !== 5;         // a few without supervisor
-  const hasMid = i % 4 !== 3;         // a few missing mid-term examiner
-  const hasFinal = i % 7 !== 6;       // a few missing final examiner
-  msncsTheses.push({
+let progCounters = { MSNCS: 1, MSICE: 1, MSDSA: 1, MSCSK: 1 };
+const masterTheses = masterThesesDefs.map((def) => {
+  const r = roll(def.programCode, progCounters[def.programCode]++);
+  return {
     Name: freshName(),
-    Roll: roll('MSNCS', i + 1),
-    Title: msncsTitles[i],
+    Roll: r,
+    Title: def.title,
     Batch: BATCH,
-    Cluster: 'Cluster 1',
-    Program: 'MSc in Network and Cyber Security',
-    Supervisor: hasSup ? supervisorNames[(i + 4) % supervisorNames.length] : '',
-    External_mid_term: hasMid ? externalNames[i % externalNames.length] : '',
-    External_final: hasFinal ? externalNames[(i + 3) % externalNames.length] : '',
-  });
-}
+    Cluster: def.cluster,
+    Program: def.programCode,
+    Supervisor: def.supervisor,
+    External_mid_term: def.midTerm,
+    External_final: def.finalExam,
+  };
+});
 
 // ── 3. USER BULK-IMPORT FILES ──────────────────────────────────────────
 // Bachelor students: exactly the BCT rolls used in the groups above.
@@ -171,39 +242,60 @@ for (let i = 1; i < rollCounter; i++) {
   });
 }
 
-// Master students: exactly the MSNCS rolls used above.
-const masterStudents = msncsTheses.map((t) => {
+// Master students: 2 for each of the 4 programs
+const masterStudents = masterTheses.map((t) => {
   const [fn, ...rest] = t.Name.split(' ');
+  const pCode = t.Program;
   return {
     email: emailFor(t.Roll),
     password: PASSWORD,
     firstName: fn,
     lastName: rest.join(' '),
     rollNumber: t.Roll,
-    programCode: 'MSNCS',
+    programCode: pCode,
     degreeType: 'MASTER',
   };
 });
 
+const parseFacultyName = (input) => {
+  const titleRegex = /^((Assoc\.\s*Prof\.|Asst\.\s*Prof\.|Prof\.|Dr\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*\.?\s*)/i;
+  let cleaned = input.trim();
+  let title = '';
+  let m;
+  while ((m = titleRegex.exec(cleaned)) !== null) {
+    title += m[1];
+    cleaned = cleaned.slice(m[0].length).trim();
+  }
+  const designation = title.trim().replace(/\.\s+/g, '. ').trim() || 'Dr.';
+  const parts = cleaned.split(/\s+/);
+  const fn = parts[0] || 'Faculty';
+  const ln = parts.slice(1).join(' ') || fn;
+  return { firstName: fn, lastName: ln, designation };
+};
+
 const supervisors = supervisorNames.map((n) => {
-  const [title, fn, ...rest] = n.split(' ');
+  const p = parseFacultyName(n);
+  const fn = p.firstName.toLowerCase().replace(/[^a-z]/g, '');
+  const ln = p.lastName.toLowerCase().replace(/[^a-z]/g, '');
   return {
-    email: `${fn.toLowerCase()}.${rest.join('').toLowerCase()}@pcampus.edu.np`,
+    email: `${fn}.${ln}@pcampus.edu.np`,
     password: PASSWORD,
-    firstName: fn,
-    lastName: rest.join(' '),
-    designation: title,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    designation: p.designation,
   };
 });
 
 const externals = externalNames.map((n) => {
-  const [title, fn, ...rest] = n.split(' ');
+  const p = parseFacultyName(n);
+  const fn = p.firstName.toLowerCase().replace(/[^a-z]/g, '');
+  const ln = p.lastName.toLowerCase().replace(/[^a-z]/g, '');
   return {
-    email: `${fn.toLowerCase()}.${rest.join('').toLowerCase()}@ioe.edu.np`,
+    email: `${fn}.${ln}@ioe.edu.np`,
     password: PASSWORD,
-    firstName: fn,
-    lastName: rest.join(' '),
-    designation: title,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    designation: p.designation,
   };
 });
 
@@ -212,6 +304,12 @@ const writeFile = (name, rows, sheet) => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet);
   XLSX.writeFile(wb, path.join(OUT_DIR, name));
+  if (fs.existsSync(PUBLIC_TEST_DIR)) {
+    XLSX.writeFile(wb, path.join(PUBLIC_TEST_DIR, name));
+  }
+  if (fs.existsSync(PUBLIC_DIR)) {
+    XLSX.writeFile(wb, path.join(PUBLIC_DIR, name));
+  }
   console.log(`✓ ${name}  (${rows.length} rows)`);
 };
 
@@ -219,7 +317,9 @@ writeFile('bachelor_bct_test_data.xlsx', bctGroups, 'Groups');
 writeFile('bachelor_student_users_test_data.xlsx', bachelorStudents, 'Students');
 writeFile('bachelor_supervisor_users_test_data.xlsx', supervisors, 'Supervisors');
 writeFile('bachelor_external_users_test_data.xlsx', externals, 'Examiners');
-writeFile('master_msncs_test_data.xlsx', msncsTheses, 'Theses');
+writeFile('master_theses_test_data.xlsx', masterTheses, 'Theses');
+writeFile('master_msncs_test_data.xlsx', masterTheses.filter(t => t.Program === 'MSNCS'), 'Theses');
+writeFile('master_all_programs_theses_test_data.xlsx', masterTheses, 'Theses');
 writeFile('master_student_users_test_data.xlsx', masterStudents, 'Students');
 writeFile('master_supervisor_users_test_data.xlsx', supervisors, 'Supervisors');
 writeFile('master_external_users_test_data.xlsx', externals, 'Examiners');

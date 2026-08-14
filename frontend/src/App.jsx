@@ -73,6 +73,7 @@ function App() {
           <Route element={<AppLayout />}>
             <Route path="/maintainer/users" element={<PrivateRoute role="MAINTAINER"><UserManagement /></PrivateRoute>} />
             <Route path="/maintainer/departments" element={<PrivateRoute role="MAINTAINER"><DepartmentManagement /></PrivateRoute>} />
+            <Route path="/maintainer/audit-log" element={<PrivateRoute role="MAINTAINER"><AuditLog /></PrivateRoute>} />
             <Route path="/maintainer/*" element={<PrivateRoute role="MAINTAINER"><MaintainerDashboard /></PrivateRoute>} />
             <Route path="/coordinator/bachelor" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="BACHELOR"><BachelorProjects /></DegreeGuard></PrivateRoute>} />
             <Route path="/coordinator/master" element={<PrivateRoute role="COORDINATOR"><DegreeGuard requiredDegreeType="MASTER"><MasterThesis /></DegreeGuard></PrivateRoute>} />

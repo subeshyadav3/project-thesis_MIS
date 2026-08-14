@@ -27,65 +27,78 @@ exports.submitComponentMarks = async (req, res) => {
     });
     if (!component) return res.status(404).json({ error: 'Evaluation component not found' });
 
-    // Coordinators may record marks only on items inside their coordinator
-    // scope, or on their own supervised components acting as the supervisor.
+    // Coordinators may record marks on items inside their coordinator
+    // scope, or on their own supervised components, or on their assigned examiner components.
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
       if (groupId) {
         const group = await prisma.projectGroup.findUnique({
           where: { id: parseInt(groupId) },
-          select: { id: true, programId: true, supervisorId: true },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
         });
         const canManage = await canManageGroupAsCoordinator(group, scope, req.user);
         const ownSupervisorComponent = group?.supervisorId === req.user.id && component.evaluatorRole === 'SUPERVISOR';
-        if (!canManage && !ownSupervisorComponent) {
+        const isAssignedExaminer = component.evaluatorRole === 'EXTERNAL_EXAMINER' &&
+          group?.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id);
+        if (!canManage && !ownSupervisorComponent && !isAssignedExaminer) {
           return res.status(403).json({ error: 'You cannot record evaluations for this group from your coordinator scope.' });
         }
       } else if (thesisId) {
         const thesis = await prisma.thesis.findUnique({
           where: { id: parseInt(thesisId) },
-          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
         });
         const canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
         const ownSupervisorComponent = thesis?.supervisorId === req.user.id && component.evaluatorRole === 'SUPERVISOR';
-        if (!canManage && !ownSupervisorComponent) {
+        const isAssignedExaminer = (
+          (thesis?.externalMidTermId === req.user.id && (component.evaluationType === 'EXTERNAL_MIDTERM' || component.evaluationType === 'MIDTERM_DEFENSE' || component.evaluatorRole === 'EXTERNAL_MIDTERM' || component.evaluatorRole === 'EXTERNAL_EXAMINER')) ||
+          (thesis?.externalFinalId === req.user.id && (component.evaluationType === 'EXTERNAL_FINAL' || component.evaluationType === 'FINAL_DEFENSE' || component.evaluatorRole === 'EXTERNAL_FINAL' || component.evaluatorRole === 'EXTERNAL_EXAMINER')) ||
+          (thesis?.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id))
+        );
+        if (!canManage && !ownSupervisorComponent && !isAssignedExaminer) {
           return res.status(403).json({ error: 'You cannot record evaluations for this thesis from your coordinator scope.' });
         }
       }
     }
 
-    // Capability-based verification based on component.evaluatorRole:
+    // Capability-based verification based on component.evaluatorRole (for non-coordinators):
     const groupIdNum = groupId ? parseInt(groupId) : null;
     const thesisIdNum = thesisId ? parseInt(thesisId) : null;
 
-    if (component.evaluatorRole === 'SUPERVISOR') {
-      if (groupIdNum) {
-        const group = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { supervisorId: true } });
-        if (!group || group.supervisorId !== req.user.id) {
-          return res.status(403).json({ error: 'You are not the supervisor of this group' });
+    if (req.user.role !== 'COORDINATOR') {
+      if (component.evaluatorRole === 'SUPERVISOR') {
+        if (groupIdNum) {
+          const group = await prisma.projectGroup.findUnique({ where: { id: groupIdNum }, select: { supervisorId: true } });
+          if (!group || group.supervisorId !== req.user.id) {
+            return res.status(403).json({ error: 'You are not the supervisor of this group' });
+          }
+        } else if (thesisIdNum) {
+          const thesis = await prisma.thesis.findUnique({ where: { id: thesisIdNum }, select: { supervisorId: true } });
+          if (!thesis || thesis.supervisorId !== req.user.id) {
+            return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
+          }
         }
-      } else if (thesisIdNum) {
-        const thesis = await prisma.thesis.findUnique({ where: { id: thesisIdNum }, select: { supervisorId: true } });
-        if (!thesis || thesis.supervisorId !== req.user.id) {
-          return res.status(403).json({ error: 'You are not the supervisor of this thesis' });
-        }
-      }
-    } else if (component.evaluatorRole === 'EXTERNAL_EXAMINER') {
-      if (groupIdNum) {
-        const assigned = await prisma.examinerAssignment.findFirst({
-          where: { externalExaminerId: req.user.id, groupId: groupIdNum },
-        });
-        if (!assigned) return res.status(403).json({ error: 'You are not assigned as examiner for this group' });
-      } else if (thesisIdNum) {
-        const thesis = await prisma.thesis.findUnique({
-          where: { id: thesisIdNum },
-          select: { externalMidTermId: true, externalFinalId: true },
-        });
-        const isAssigned = (thesis && (thesis.externalMidTermId === req.user.id || thesis.externalFinalId === req.user.id)) ||
-          await prisma.examinerAssignment.findFirst({
-            where: { externalExaminerId: req.user.id, thesisId: thesisIdNum },
+      } else if (component.evaluatorRole === 'EXTERNAL_EXAMINER') {
+        if (groupIdNum) {
+          const assigned = await prisma.examinerAssignment.findFirst({
+            where: { externalExaminerId: req.user.id, groupId: groupIdNum },
           });
-        if (!isAssigned) return res.status(403).json({ error: 'You are not assigned as examiner for this thesis' });
+          if (!assigned) return res.status(403).json({ error: 'You are not assigned as examiner for this group' });
+        } else if (thesisIdNum) {
+          const thesis = await prisma.thesis.findUnique({
+            where: { id: thesisIdNum },
+            select: { externalMidTermId: true, externalFinalId: true },
+          });
+          const isAssigned = (thesis && (thesis.externalMidTermId === req.user.id || thesis.externalFinalId === req.user.id)) ||
+            await prisma.examinerAssignment.findFirst({
+              where: { externalExaminerId: req.user.id, thesisId: thesisIdNum },
+            });
+          if (!isAssigned) return res.status(403).json({ error: 'You are not assigned as examiner for this thesis' });
+        }
       }
     }
 
@@ -251,7 +264,7 @@ exports.getGroupEvaluations = async (req, res) => {
       const scope = await resolveCoordinatorScope(req.user);
       const group = await prisma.projectGroup.findUnique({
         where: { id },
-        select: { id: true, programId: true, supervisorId: true },
+        select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
       });
       if (!await isGroupVisibleToCoordinator(group, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied' });
@@ -285,7 +298,11 @@ exports.getThesisEvaluations = async (req, res) => {
       const scope = await resolveCoordinatorScope(req.user);
       const thesis = await prisma.thesis.findUnique({
         where: { id },
-        select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+        select: {
+          id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+          student: { select: { programId: true } },
+          examinerAssignments: { select: { externalExaminerId: true } },
+        },
       });
       if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
         return res.status(403).json({ error: 'Access denied' });
@@ -321,7 +338,7 @@ exports.getMarksSummary = async (req, res) => {
       if (groupId) {
         const group = await prisma.projectGroup.findUnique({
           where: { id: parseInt(groupId) },
-          select: { id: true, programId: true, supervisorId: true },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
         });
         if (!await isGroupVisibleToCoordinator(group, scope, req.user)) {
           return res.status(403).json({ error: 'Access denied' });
@@ -329,7 +346,11 @@ exports.getMarksSummary = async (req, res) => {
       } else {
         const thesis = await prisma.thesis.findUnique({
           where: { id: parseInt(thesisId) },
-          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
         });
         if (!await isThesisVisibleToCoordinator(thesis, scope, req.user)) {
           return res.status(403).json({ error: 'Access denied' });
@@ -387,23 +408,38 @@ exports.completeEvaluation = async (req, res) => {
       return res.status(403).json({ error: 'You cannot complete this evaluation.' });
     }
 
-    // Coordinators can only complete evaluations on items inside their scope
+    // Coordinators can only complete evaluations on items inside their scope, or their own supervised/examiner evaluations
     if (req.user.role === 'COORDINATOR') {
       const scope = await resolveCoordinatorScope(req.user);
       if (groupId) {
         const group = await prisma.projectGroup.findUnique({
           where: { id: parseInt(groupId) },
-          select: { id: true, programId: true, supervisorId: true },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
         });
-        if (!await canManageGroupAsCoordinator(group, scope, req.user)) {
+        const canManage = await canManageGroupAsCoordinator(group, scope, req.user);
+        const ownSupervisorComponent = group?.supervisorId === req.user.id && evaluation.component?.evaluatorRole === 'SUPERVISOR';
+        const isAssignedExaminer = evaluation.component?.evaluatorRole === 'EXTERNAL_EXAMINER' &&
+          group?.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id);
+        if (!canManage && !ownSupervisorComponent && !isAssignedExaminer) {
           return res.status(403).json({ error: 'Access denied' });
         }
       } else {
         const thesis = await prisma.thesis.findUnique({
           where: { id: parseInt(thesisId) },
-          select: { id: true, programId: true, supervisorId: true, student: { select: { programId: true } } },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
         });
-        if (!await canManageThesisAsCoordinator(thesis, scope, req.user)) {
+        const canManage = await canManageThesisAsCoordinator(thesis, scope, req.user);
+        const ownSupervisorComponent = thesis?.supervisorId === req.user.id && evaluation.component?.evaluatorRole === 'SUPERVISOR';
+        const isAssignedExaminer = (
+          (thesis?.externalMidTermId === req.user.id && (evaluation.component?.evaluationType === 'EXTERNAL_MIDTERM' || evaluation.component?.evaluationType === 'MIDTERM_DEFENSE' || evaluation.component?.evaluatorRole === 'EXTERNAL_MIDTERM' || evaluation.component?.evaluatorRole === 'EXTERNAL_EXAMINER')) ||
+          (thesis?.externalFinalId === req.user.id && (evaluation.component?.evaluationType === 'EXTERNAL_FINAL' || evaluation.component?.evaluationType === 'FINAL_DEFENSE' || evaluation.component?.evaluatorRole === 'EXTERNAL_FINAL' || evaluation.component?.evaluatorRole === 'EXTERNAL_EXAMINER')) ||
+          (thesis?.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id))
+        );
+        if (!canManage && !ownSupervisorComponent && !isAssignedExaminer) {
           return res.status(403).json({ error: 'Access denied' });
         }
       }

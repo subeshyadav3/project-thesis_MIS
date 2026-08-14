@@ -175,18 +175,16 @@ exports.updateUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && req.body.role && req.body.role !== existing.role) {
       return res.status(403).json({ error: 'Cannot change user role' });
     }
-    // Coordinator cannot change degreeType for non-students
-    if (req.user.role === 'COORDINATOR' && req.body.degreeType && existing.role !== 'STUDENT') {
-      return res.status(403).json({ error: 'Cannot change degree type for this user' });
-    }
 
     const data = {};
     if (req.body.firstName !== undefined) data.firstName = req.body.firstName;
     if (req.body.lastName !== undefined) data.lastName = req.body.lastName;
     if (req.body.email !== undefined) data.email = req.body.email;
-    if (req.body.role) data.role = req.body.role;
-    if (req.body.degreeType) data.degreeType = req.body.degreeType;
-    if (req.body.programId) data.programId = parseInt(req.body.programId);
+    if (req.body.role && req.user.role === 'MAINTAINER') data.role = req.body.role;
+    if (existing.role === 'STUDENT') {
+      if (req.body.degreeType) data.degreeType = req.body.degreeType;
+      if (req.body.programId) data.programId = parseInt(req.body.programId);
+    }
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
     if (req.body.rollNumber !== undefined) {
@@ -302,6 +300,7 @@ exports.getSupervisorScope = async (req, res) => {
 
 exports.getUsersByRole = async (req, res) => {
   try {
+    const role = (req.params.role || '').toUpperCase();
     // Supervisor lookups include coordinators (they can supervise too)
     // Examiner lookups include supervisors and coordinators (faculty can examine other projects)
     const where = role === 'SUPERVISOR'
@@ -515,8 +514,8 @@ exports.bulkImportUsersExcel = async (req, res) => {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2; // header is row 1
-      const email = (row.email || row.Email || '').toString().trim().toLowerCase();
-      const password = (row.password || row.Password || '').toString().trim();
+      let email = (row.email || row.Email || '').toString().trim().toLowerCase();
+      let password = (row.password || row.Password || '').toString().trim();
       const firstName = (row.firstName || row.FirstName || row['First Name'] || '').toString().trim();
       const lastName = (row.lastName || row.LastName || row['Last Name'] || '').toString().trim();
       const designation = (row.designation || row.Designation || '').toString().trim() || null;
@@ -524,6 +523,16 @@ exports.bulkImportUsersExcel = async (req, res) => {
       const programRaw = (row.programCode || row.ProgramCode || row.Program || row.program || '').toString().trim();
       let degreeType = (row.degreeType || row.DegreeType || row.Degree || '').toString().trim().toUpperCase() || null;
       let programId = row.programId ? parseInt(row.programId) : null;
+
+      if (!password) {
+        password = 'Test@123';
+      }
+
+      if (!email && (role === 'SUPERVISOR' || role === 'EXTERNAL_EXAMINER') && firstName && lastName) {
+        const fn = firstName.toLowerCase().replace(/[^a-z]/g, '');
+        const ln = lastName.toLowerCase().replace(/[^a-z]/g, '') || fn;
+        email = `${fn}.${ln}@pcampus.edu.np`;
+      }
 
       if (!email || !password || !firstName || !lastName) {
         if (role !== 'STUDENT' || !firstName || !lastName) {
@@ -607,6 +616,7 @@ exports.bulkImportUsersExcel = async (req, res) => {
             designation: role === 'STUDENT' ? null : designation,
             rollNumber: role === 'STUDENT' ? rollNumber : null,
             batch: role === 'STUDENT' ? batch : null,
+            active: true,
           },
           select: USER_SELECT,
         });
@@ -649,10 +659,12 @@ exports.getAuditLogs = async (req, res) => {
         //   2) Supervisors assigned to groups/theses in this program
         //   3) External examiners assigned to groups/theses in this program
         //   4) The coordinator themselves
-        const [programUsers, groupSup, thesisSup, groupExam, thesisExam] = await Promise.all([
+        const [programUsers, groupSup, thesisSup, thesisExtMid, thesisExtFin, groupExam, thesisExam] = await Promise.all([
           prisma.user.findMany({ where: { programId: program.id }, select: { id: true } }),
           prisma.projectGroup.findMany({ where: { programId: program.id, supervisorId: { not: null } }, select: { supervisorId: true } }),
           prisma.thesis.findMany({ where: { student: { programId: program.id }, supervisorId: { not: null } }, select: { supervisorId: true } }),
+          prisma.thesis.findMany({ where: { student: { programId: program.id }, externalMidTermId: { not: null } }, select: { externalMidTermId: true } }),
+          prisma.thesis.findMany({ where: { student: { programId: program.id }, externalFinalId: { not: null } }, select: { externalFinalId: true } }),
           prisma.examinerAssignment.findMany({ where: { group: { programId: program.id } }, select: { externalExaminerId: true } }),
           prisma.examinerAssignment.findMany({ where: { thesis: { student: { programId: program.id } } }, select: { externalExaminerId: true } }),
         ]);
@@ -660,6 +672,8 @@ exports.getAuditLogs = async (req, res) => {
           ...programUsers.map(u => u.id),
           ...groupSup.map(r => r.supervisorId),
           ...thesisSup.map(r => r.supervisorId),
+          ...thesisExtMid.map(r => r.externalMidTermId),
+          ...thesisExtFin.map(r => r.externalFinalId),
           ...groupExam.map(r => r.externalExaminerId),
           ...thesisExam.map(r => r.externalExaminerId),
           req.user.id,

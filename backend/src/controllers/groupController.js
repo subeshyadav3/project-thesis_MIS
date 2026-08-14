@@ -154,13 +154,27 @@ exports.createGroup = async (req, res) => {
       }
     }
 
+    // Derive batch from body, or members' roll numbers
+    let derivedBatch = batch || req.body.batch || null;
+    if (!derivedBatch && resolvedMembers.length > 0) {
+      for (const m of resolvedMembers) {
+        if (m.rollNumber) {
+          const match = m.rollNumber.match(/^(\d{2,3})/);
+          if (match) {
+            derivedBatch = match[1];
+            break;
+          }
+        }
+      }
+    }
+
     const group = await prisma.projectGroup.create({
       data: {
         name,
         projectTitle,
         projectType: projectType || 'MINOR',
         cluster: cluster || null,
-        batch: batch || null,
+        batch: derivedBatch,
         startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         supervisorId: supervisorId ? parseInt(supervisorId) : null,
         programId: resolvedProgramId,
@@ -213,10 +227,10 @@ function parseName(inputName) {
 }
 
 function generateEmail(firstName, lastName, role) {
-  const ln = lastName || firstName;
-  const base = `${firstName.toLowerCase()}.${ln.toLowerCase()}`.replace(/[^a-z.]/g, '');
-  const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
-  return `${base}.${suffix}@pcampus.edu.np`;
+  const parsed = parseName(`${firstName} ${lastName || ''}`.trim());
+  const fn = (parsed.firstName || firstName).toLowerCase().replace(/[^a-z]/g, '');
+  const ln = (parsed.lastName || lastName || fn).toLowerCase().replace(/[^a-z]/g, '');
+  return `${fn}.${ln}@pcampus.edu.np`;
 }
 
 exports.bulkImportPreview = async (req, res) => {
@@ -285,7 +299,6 @@ exports.bulkImportPreview = async (req, res) => {
         } else {
           studentMatches.push(null);
           unmatchCount++;
-          warnings.push(`Student not found for "${name}" (roll: ${roll})`);
         }
       }
 
@@ -426,7 +439,7 @@ exports.bulkImportConfirm = async (req, res) => {
       if (!willCreate) return null;
       try {
         const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-        const hash = await bcrypt.hash('subesh', 10);
+        const hash = await bcrypt.hash('Test@123', 10);
         const newUser = await tx.user.upsert({
           where: { email },
           update: {},
@@ -497,6 +510,9 @@ exports.bulkImportConfirm = async (req, res) => {
           matchedStudents.push(sm.id);
         } else if (se?.firstName && se?.lastName && resolvedRolls[j]) {
           studentCreateSpecs.push({ index: j, se, roll: resolvedRolls[j], programId });
+        } else if (members && members[j] && resolvedRolls[j]) {
+          const parsed = parseName(members[j]);
+          studentCreateSpecs.push({ index: j, se: { firstName: parsed.firstName, lastName: parsed.lastName }, roll: resolvedRolls[j], programId });
         } else {
           skipped.push({ row: row.row, reason: `Student at position ${j + 1} could not be matched` });
         }
@@ -540,7 +556,7 @@ exports.bulkImportConfirm = async (req, res) => {
         // Create pending student records inside the transaction
         for (const spec of studentCreateSpecs) {
           const email = spec.roll.toLowerCase() + '@pcampus.edu.np';
-          const hash = await bcrypt.hash('subesh', 10);
+          const hash = await bcrypt.hash('Test@123', 10);
           const batchMatch = spec.roll.match(/^(\d{2,3})/);
           const newStudent = await tx.user.upsert({
             where: { email },
@@ -720,7 +736,7 @@ exports.bulkImportConfirm = async (req, res) => {
         se.lastName,
         sideEffect.role === 'STUDENT' ? 'STUDENT' : sideEffect.role,
       );
-      emailService.notifyUserCreated(email, se.firstName, sideEffect.role, email, 'subesh');
+      emailService.notifyUserCreated(email, se.firstName, sideEffect.role, email, 'Test@123');
     }
 
     audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Bulk imported ${created.length} groups${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });
@@ -992,8 +1008,9 @@ exports.deleteGroup = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
       }
     }
-    if (group.status !== 'PENDING' && (group.proposals.length > 0 || group.evaluations.length > 0)) {
-      return res.status(400).json({ error: 'Cannot delete: group has files uploaded or evaluations completed' });
+    const hasNonZeroEvaluations = group.evaluations.some(e => e.marks && e.marks > 0);
+    if (group.status === 'COMPLETED' || hasNonZeroEvaluations) {
+      return res.status(400).json({ error: 'Cannot delete: group has completed non-zero evaluations or is finalized' });
     }
 
     // Notify before deletion

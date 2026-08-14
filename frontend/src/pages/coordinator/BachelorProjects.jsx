@@ -24,6 +24,13 @@ const BACHELOR_CLUSTERS = [
   { value: 'EII', label: 'EII (Electrical & Industrial Instrumentation)' },
 ];
 
+const ASSIGNMENT_OPTIONS = [
+  { value: 'NEEDS_SUPERVISOR', label: 'Needs Supervisor' },
+  { value: 'NEEDS_EXAMINER', label: 'Needs Examiner' },
+  { value: 'NEEDS_ANY', label: 'Missing Any Assignment' },
+  { value: 'FULLY_ASSIGNED', label: 'Fully Assigned' },
+];
+
 function BachelorProjects() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -48,6 +55,7 @@ function BachelorProjects() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
+  const [assignmentFilter, setAssignmentFilter] = useState('ALL');
   const [batchFilter, setBatchFilter] = useState('ALL');
   const [clusterFilter, setClusterFilter] = useState('ALL');
   const [editCluster, setEditCluster] = useState('');
@@ -522,9 +530,10 @@ const filteredGroups = useMemo(() => {
 
   const normalizeBatch = useCallback((b) => {
     if (!b) return '';
-    const str = String(b).trim();
-    if (/^0\d{2}$/.test(str)) return '2' + str;
-    return str;
+    const digits = String(b).replace(/\D/g, '');
+    if (!digits) return String(b).trim();
+    if (digits.length >= 3) return digits.slice(-3);
+    return digits.padStart(3, '0');
   }, []);
 
   const batchOptions = useMemo(() => {
@@ -550,11 +559,13 @@ const filteredGroups = useMemo(() => {
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
       const matchesType = typeFilter === 'ALL' || g.projectType === typeFilter;
-      const matchesSupervisor = supervisorFilter === 'ALL'
-        ? true
-        : supervisorFilter === 'NONE'
-          ? !g.supervisor
-          : g.supervisor?.id?.toString() === supervisorFilter;
+      const hasSupervisor = Boolean(g.supervisorId || g.supervisor);
+      const hasExaminer = Boolean(g.examinerAssignments?.some(ea => ea.externalExaminerId || ea.externalExaminer));
+      const matchesAssignment = assignmentFilter === 'ALL' ? true :
+        assignmentFilter === 'NEEDS_SUPERVISOR' ? !hasSupervisor :
+        assignmentFilter === 'NEEDS_EXAMINER' ? !hasExaminer :
+        assignmentFilter === 'NEEDS_ANY' ? (!hasSupervisor || !hasExaminer) :
+        assignmentFilter === 'FULLY_ASSIGNED' ? (hasSupervisor && hasExaminer) : true;
 
       const matchesBatch = batchFilter === 'ALL' || (() => {
         const b = g.batch || (g.members?.[0]?.student?.batch ? g.members[0].student.batch : (g.members?.[0]?.rollNumber && /^\d{3}/.test(g.members[0].rollNumber) ? g.members[0].rollNumber.slice(0, 3) : ''));
@@ -563,9 +574,9 @@ const filteredGroups = useMemo(() => {
 
       const matchesCluster = clusterFilter === 'ALL' || g.cluster === clusterFilter;
 
-      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesBatch && matchesCluster;
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesAssignment && matchesBatch && matchesCluster;
     });
-  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter, batchFilter, clusterFilter, normalizeBatch]);
+  }, [filteredGroups, searchTerm, statusFilter, typeFilter, supervisorFilter, assignmentFilter, batchFilter, clusterFilter, normalizeBatch]);
 
   const sortedGroups = useMemo(() => {
     return [...filteredByAdvanced].sort((a, b) => {
@@ -669,6 +680,7 @@ const filteredGroups = useMemo(() => {
     { value: 'ACTIVE', label: 'Active' },
     { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
+    { value: 'REJECTED', label: 'Rejected' },
   ];
 
   const supervisorOptions = [
@@ -953,6 +965,7 @@ const filteredGroups = useMemo(() => {
                       <option value="ACTIVE">Active</option>
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
+                      <option value="REJECTED">Rejected</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
@@ -1224,7 +1237,7 @@ const filteredGroups = useMemo(() => {
           </div>
         </div>
       )}
-      <div className="table-container">
+      <div className="table-container" style={{ minHeight: 280, overflow: 'visible' }}>
         <div className="table-toolbar">
           <div className="table-toolbar-left">
             <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by name, roll, email, or title..." style={{ maxWidth: 320 }} />
@@ -1236,6 +1249,7 @@ const filteredGroups = useMemo(() => {
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
+          <FilterDropdown label="Assignment" value={assignmentFilter} onChange={setAssignmentFilter} options={ASSIGNMENT_OPTIONS} allLabel="All Assignments" />
           <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={typeOptions} allLabel="All Types" />
           <FilterDropdown label="Cluster" value={clusterFilter} onChange={setClusterFilter} options={BACHELOR_CLUSTERS} allLabel="All Clusters" />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
@@ -1306,12 +1320,21 @@ const filteredGroups = useMemo(() => {
                       <select value={g.status || 'PENDING'}
                         onChange={e => updateGroupStatus(g.id, e.target.value)}
                         disabled={updatingStatus === g.id}
-                        style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: g.status === 'COMPLETED' ? 'var(--color-success)' : g.status === 'OVERDUE' ? 'var(--color-error)' : g.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                        style={{
+                          fontSize: 10, padding: '1px 4px', borderRadius: 4,
+                          border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer',
+                          color: g.status === 'COMPLETED' ? 'var(--color-success)'
+                            : g.status === 'OVERDUE' ? 'var(--color-error)'
+                            : g.status === 'REJECTED' ? 'var(--color-error)'
+                            : g.status === 'ACTIVE' ? 'var(--color-primary)'
+                            : 'var(--color-on-surface-variant)',
+                        }}
                       >
                         <option value="PENDING">PENDING</option>
                         <option value="ACTIVE">ACTIVE</option>
                         <option value="OVERDUE">OVERDUE</option>
                         <option value="COMPLETED">COMPLETED</option>
+                        <option value="REJECTED">REJECTED</option>
                       </select>
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)' }}>
@@ -1327,30 +1350,62 @@ const filteredGroups = useMemo(() => {
                             <Icon name="more_vert" className="material-symbols-outlined" />
                           </button>
                           {actionMenuRow === g.id && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
+                            <>
+                              <div
+                                style={{ position: 'fixed', inset: 0, zIndex: 9990 }}
+                                onClick={(e) => { e.stopPropagation(); setActionMenuRow(null); }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  right: 0,
+                                  top: 'calc(100% + 4px)',
+                                  zIndex: 9999,
+                                  background: 'var(--color-surface-container-lowest)',
+                                  border: '1px solid var(--color-outline)',
+                                  borderRadius: 'var(--border-radius-md)',
+                                  boxShadow: '0 12px 32px rgba(0,0,0,0.24)',
+                                  minWidth: 150,
+                                  padding: 4,
+                                }}
+                                onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}
+                              >
+                                <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(g, 'edit'); setEditSupId(g.supervisorId ? g.supervisorId.toString() : ''); setEditExamId(g.examinerAssignments?.[0]?.externalExaminerId?.toString() || ''); setEditSupSearch(''); setEditExamSearch(''); }}>
                                   <Icon name="edit" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Edit
                                 </div>
-                              {g.status === 'ACTIVE' && (
-                                <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }}>
-                                  <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                  Complete
+                                {g.status === 'ACTIVE' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(g.id); }}>
+                                    <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Complete
+                                  </div>
+                                )}
+                                {g.status !== 'REJECTED' && g.status !== 'COMPLETED' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-warning, #ea580c)' }} onClick={() => updateGroupStatus(g.id, 'REJECTED')}>
+                                    <Icon name="cancel" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Reject
+                                  </div>
+                                )}
+                                {g.status === 'REJECTED' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-primary)' }} onClick={() => updateGroupStatus(g.id, 'ACTIVE')}>
+                                    <Icon name="restart_alt" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Reactivate
+                                  </div>
+                                )}
+                                <div className="menu-item" onClick={() => setPdfPreviewItem(g)}>
+                                  <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  PDF Preview
                                 </div>
-                              )}
-                              <div className="menu-item" onClick={() => setPdfPreviewItem(g)}>
-                                <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                PDF Preview
+                                <div className="menu-item" onClick={() => downloadEvalPdf(g)}>
+                                  <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  Export PDF
+                                </div>
+                                <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: g.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteGroup(g.id); }}>
+                                  <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  Delete
+                                </div>
                               </div>
-                              <div className="menu-item" onClick={() => downloadEvalPdf(g)}>
-                                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                Export PDF
-                              </div>
-                              <div className={`menu-item ${g.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: g.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: g.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteGroup(g.id); }}>
-                                <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                Delete
-                              </div>
-                            </div>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1443,7 +1498,6 @@ const filteredGroups = useMemo(() => {
                         <th>Group</th>
                         <th>Title</th>
                         <th>Members</th>
-                        <th>Students</th>
                         <th>Supervisor</th>
                         <th>Examiner</th>
                         <th>Type</th>
@@ -1520,15 +1574,20 @@ const filteredGroups = useMemo(() => {
                                 </div>
                               </td>
                               <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edits.projectTitle || p.projectTitle}</td>
-                              <td>{p.members.join(', ') || '—'}</td>
                               <td>
-                                {p.studentMatches.filter(Boolean).length > 0
-                                  ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatches.filter(Boolean).length} matched</span>
-                                  : <span style={{ color: 'var(--color-error)' }}>?</span>
-                                }
-                                {p.studentMatches.filter(m => !m).length > 0 && (
-                                  <span style={{ color: 'var(--color-error)', marginLeft: 4 }}>({p.studentMatches.filter(m => !m).length} missing)</span>
-                                )}
+                                <div>{p.members.join(', ') || '—'}</div>
+                                <div style={{ fontSize: 10, marginTop: 2 }}>
+                                  {p.studentMatches.filter(Boolean).length > 0 && (
+                                    <span style={{ color: 'var(--color-success)', marginRight: 4 }}>
+                                      ✓ {p.studentMatches.filter(Boolean).length} matched
+                                    </span>
+                                  )}
+                                  {p.studentMatches.filter(m => !m).length > 0 && (
+                                    <span style={{ color: 'var(--color-primary, #0284c7)' }}>
+                                      ({p.studentMatches.filter(m => !m).length} will create)
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
                               <td>{p.examinerMatch ? <span style={{ color: 'var(--color-success)' }}>{p.examinerMatch.name}</span> : p.examinerWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.examinerWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>—</span>}</td>
@@ -1553,7 +1612,7 @@ const filteredGroups = useMemo(() => {
                             </tr>
                             {isExpanded && (
                               <tr>
-                                <td colSpan={11} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
+                                <td colSpan={10} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
                                   {hasAnomaly && (
                                     <div style={{ marginBottom: 8 }}>
                                       {p.anomalies.map((a, ai) => (

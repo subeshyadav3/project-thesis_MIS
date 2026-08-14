@@ -172,6 +172,7 @@ function CoordinatorAnnouncements() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -230,16 +231,18 @@ function CoordinatorAnnouncements() {
   const batchOptions = React.useMemo(() => {
     const batches = new Set();
     const normalize = (v) => {
-      if (/^\d{3}$/.test(v)) return `2${v}`;        // "080" → "2080"
-      if (/^2\d{3}$/.test(v)) return v;               // "2080" → "2080"
-      return v;
+      if (!v) return '';
+      const digits = String(v).replace(/\D/g, '');
+      if (!digits) return String(v).trim();
+      if (digits.length >= 3) return digits.slice(-3);
+      return digits.padStart(3, '0');
     };
     allStudents.forEach(s => {
       if (s.batch) batches.add(normalize(s.batch));
       const rollPrefix = s.rollNumber?.slice(0, 3);
       if (rollPrefix && /^\d{3}$/.test(rollPrefix)) batches.add(normalize(rollPrefix));
     });
-    return [...batches].sort((a, b) => b.localeCompare(a));
+    return [...batches].filter(Boolean).sort((a, b) => b.localeCompare(a));
   }, [allStudents]);
 
   useEffect(() => {
@@ -253,6 +256,7 @@ function CoordinatorAnnouncements() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     if (!form.title.trim() || !form.message.trim() || !form.batch.trim()) {
       toast.warning('Title, message, and batch are required');
       return;
@@ -279,6 +283,7 @@ function CoordinatorAnnouncements() {
       expirationDate: form.expirationDate || undefined,
     };
     try {
+      setSubmitting(true);
       if (isEdit) {
         await api.put(`/announcements/${editAnnouncement.id}`, payload);
         toast.success('Announcement updated — notification re-sent');
@@ -291,7 +296,11 @@ function CoordinatorAnnouncements() {
       setForm({ title: '', message: '', type: 'GENERAL', program: user?.program?.id ? String(user.program.id) : '', degreeType: user.program?.degreeType || '', programIds: [], studentIds: [], batch: '', academicYearId: '', allowGroupFormation: false, formEnabled: false, formFields: [], startDate: '', expirationDate: '', expiresAt: '' });
       setSelectedStudents([]);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to save'); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (a) => {
@@ -867,8 +876,11 @@ function CoordinatorAnnouncements() {
                 )}
 
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}><Icon name="close" className="material-symbols-outlined" /> Cancel</button>
-                  <button type="submit" className="btn btn-primary"><Icon name="send" className="material-symbols-outlined" /> {editAnnouncement ? 'Update & Re-send' : 'Send'}</button>
+                  <button type="button" className="btn btn-outline" disabled={submitting} onClick={() => { setShowCreate(false); setEditAnnouncement(null); }}><Icon name="close" className="material-symbols-outlined" /> Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    <Icon name={submitting ? "progress_activity" : "send"} className={`material-symbols-outlined ${submitting ? 'spin' : ''}`} />
+                    {submitting ? (editAnnouncement ? 'Updating...' : 'Sending...') : (editAnnouncement ? 'Update & Re-send' : 'Send')}
+                  </button>
                 </div>
               </form>
             </div>

@@ -16,8 +16,8 @@ const COOKIE_OPTS = {
 
 exports.login = async (req, res) => {
   try {
-    const email = req.body.email?.toLowerCase();
-    const { password } = req.body;
+    const email = (req.body.email || '').toString().trim().toLowerCase();
+    const password = (req.body.password || '').toString();
     let user = await prisma.user.findUnique({
       where: { email },
       include: { department: true, program: true },
