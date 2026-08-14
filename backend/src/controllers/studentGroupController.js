@@ -295,6 +295,14 @@ ctrl.invite = async (req, res) => {
     });
     if (existingMember) return res.status(400).json({ error: 'Already a member' });
 
+    const { getEngagement } = require('../services/engagementGuard');
+    const engagement = await getEngagement(Number(inviteeId));
+    if (engagement.engaged) {
+      return res.status(409).json({
+        error: `Student is already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}".`,
+      });
+    }
+
     const invitation = await prisma.groupInvitation.create({
       data: {
         groupId,
@@ -338,6 +346,7 @@ ctrl.joinOpenGroup = async (req, res) => {
     const alreadyMember = await prisma.groupMember.findFirst({ where: { studentId: req.user.id, groupId } });
     if (alreadyMember) return res.status(400).json({ error: 'Already a member' });
 
+    const { getEngagement } = require('../services/engagementGuard');
     const engagement = await getEngagement(req.user.id);
     if (engagement.engaged) {
       return res.status(409).json({
@@ -377,6 +386,14 @@ ctrl.respondToInvitation = async (req, res) => {
     if (invitation.status !== 'PENDING') return res.status(400).json({ error: 'Already responded' });
 
     if (action === 'ACCEPT') {
+      const { getEngagement } = require('../services/engagementGuard');
+      const engagement = await getEngagement(req.user.id);
+      if (engagement.engaged) {
+        return res.status(409).json({
+          error: `You are already engaged in a ${engagement.type === 'thesis' ? 'thesis' : 'group project'} (${engagement.status}): "${engagement.title}". Cannot join another group.`,
+        });
+      }
+
       const ann = invitation.group.announcement;
       if (ann && invitation.group.members.length >= ann.groupSizeMax) return res.status(400).json({ error: 'Group is full' });
       if (!ann && invitation.group.members.length >= 4) return res.status(400).json({ error: 'Group is full' });
