@@ -478,6 +478,7 @@ const handleComplete = async (id) => {
     { value: 'ACTIVE', label: 'Active' },
     { value: 'OVERDUE', label: 'Overdue' },
     { value: 'COMPLETED', label: 'Completed' },
+    { value: 'REJECTED', label: 'Rejected' },
   ];
 
   const supervisorOptions = [
@@ -648,6 +649,7 @@ return (
                       <option value="ACTIVE">Active</option>
                       <option value="OVERDUE">Overdue</option>
                       <option value="COMPLETED">Completed</option>
+                      <option value="REJECTED">Rejected</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 220 }}>
@@ -958,7 +960,7 @@ return (
         </div>
       )}
 
-      <div className="table-container">
+      <div className="table-container" style={{ minHeight: 280, overflow: 'visible' }}>
         <div className="table-toolbar">
           <div className="table-toolbar-left">
             <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search by title, student, roll, email..." />
@@ -1064,12 +1066,21 @@ return (
                           onChange={e => updateThesisStatus(t.id, e.target.value)}
                           disabled={updatingStatus === t.id}
                           onClick={e => e.stopPropagation()}
-                          style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer', color: t.status === 'COMPLETED' ? 'var(--color-success)' : t.status === 'OVERDUE' ? 'var(--color-error)' : t.status === 'ACTIVE' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                          style={{
+                            fontSize: 10, padding: '1px 4px', borderRadius: 4,
+                            border: '1px solid var(--color-outline)', background: 'transparent', cursor: 'pointer',
+                            color: t.status === 'COMPLETED' ? 'var(--color-success)'
+                              : t.status === 'OVERDUE' ? 'var(--color-error)'
+                              : t.status === 'REJECTED' ? 'var(--color-error)'
+                              : t.status === 'ACTIVE' ? 'var(--color-primary)'
+                              : 'var(--color-on-surface-variant)',
+                          }}
                         >
                           <option value="PENDING">PENDING</option>
                           <option value="ACTIVE">ACTIVE</option>
                           <option value="OVERDUE">OVERDUE</option>
                           <option value="COMPLETED">COMPLETED</option>
+                          <option value="REJECTED">REJECTED</option>
                         </select>
                       </div>
                     </td>
@@ -1086,30 +1097,62 @@ return (
                             <Icon name="more_vert" className="material-symbols-outlined" />
                           </button>
                           {actionMenuRow === t.id && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline)', borderRadius: 'var(--border-radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, padding: 4 }} onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}>
-                              <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }}>
+                            <>
+                              <div
+                                style={{ position: 'fixed', inset: 0, zIndex: 9990 }}
+                                onClick={(e) => { e.stopPropagation(); setActionMenuRow(null); }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  right: 0,
+                                  top: 'calc(100% + 4px)',
+                                  zIndex: 9999,
+                                  background: 'var(--color-surface-container-lowest)',
+                                  border: '1px solid var(--color-outline)',
+                                  borderRadius: 'var(--border-radius-md)',
+                                  boxShadow: '0 12px 32px rgba(0,0,0,0.24)',
+                                  minWidth: 150,
+                                  padding: 4,
+                                }}
+                                onClick={e => { e.stopPropagation(); setActionMenuRow(null); }}
+                              >
+                                <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { openDetail(t, 'edit'); setEditSupId(t.supervisorId ? t.supervisorId.toString() : ''); setEditMidTermExamId(t.externalMidTerm?.id?.toString() || ''); setEditFinalExamId(t.externalFinal?.id?.toString() || ''); setEditSupSearch(''); setEditMidTermExamSearch(''); setEditFinalExamSearch(''); }}>
                                   <Icon name="edit" className="material-symbols-outlined" style={{ fontSize: 16 }} />
                                   Edit
                                 </div>
-                              {t.status === 'ACTIVE' && (
-                                <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
-                                  <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                  Complete
+                                {t.status === 'ACTIVE' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-success)' }} onClick={() => { confirmComplete(t.id); }}>
+                                    <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Complete
+                                  </div>
+                                )}
+                                {t.status !== 'REJECTED' && t.status !== 'COMPLETED' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-warning, #ea580c)' }} onClick={() => updateThesisStatus(t.id, 'REJECTED')}>
+                                    <Icon name="cancel" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Reject
+                                  </div>
+                                )}
+                                {t.status === 'REJECTED' && (
+                                  <div className="menu-item" style={{ color: 'var(--color-primary)' }} onClick={() => updateThesisStatus(t.id, 'ACTIVE')}>
+                                    <Icon name="restart_alt" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                    Reactivate
+                                  </div>
+                                )}
+                                <div className="menu-item" onClick={() => setPdfPreviewItem(t)}>
+                                  <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  PDF Preview
                                 </div>
-                              )}
-                              <div className="menu-item" onClick={() => setPdfPreviewItem(t)}>
-                                <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                PDF Preview
+                                <div className="menu-item" onClick={() => downloadEvalPdf(t)}>
+                                  <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  Export PDF
+                                </div>
+                                <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
+                                  <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                                  Delete
+                                </div>
                               </div>
-                              <div className="menu-item" onClick={() => downloadEvalPdf(t)}>
-                                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                Export PDF
-                              </div>
-                              <div className={`menu-item ${t.status === 'COMPLETED' ? 'menu-item-disabled' : ''}`} style={{ color: t.status === 'COMPLETED' ? 'var(--color-on-surface-variant)' : 'var(--color-error)', opacity: t.status === 'COMPLETED' ? 0.55 : 1 }} onClick={() => { confirmDeleteThesis(t.id); }}>
-                                <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                                Delete
-                              </div>
-                            </div>
+                            </>
                           )}
                         </div>
                       </div>

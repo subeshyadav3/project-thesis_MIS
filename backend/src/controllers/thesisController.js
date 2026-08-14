@@ -906,9 +906,9 @@ exports.deleteThesis = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Thesis belongs to another program.' });
       }
     }
-    // Allow delete if PENDING, or if no files uploaded AND no evaluations done
-    if (thesis.status !== 'PENDING' && (thesis.proposals.length > 0 || thesis.evaluations.length > 0)) {
-      return res.status(400).json({ error: 'Cannot delete: thesis has files uploaded or evaluations completed' });
+    const hasNonZeroEvaluations = thesis.evaluations.some(e => e.marks && e.marks > 0);
+    if (thesis.status === 'COMPLETED' || hasNonZeroEvaluations) {
+      return res.status(400).json({ error: 'Cannot delete: thesis has completed non-zero evaluations or is finalized' });
     }
     await prisma.$transaction([
       prisma.evaluation.deleteMany({ where: { thesisId: id } }),

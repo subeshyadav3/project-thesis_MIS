@@ -994,8 +994,9 @@ exports.deleteGroup = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
       }
     }
-    if (group.status !== 'PENDING' && (group.proposals.length > 0 || group.evaluations.length > 0)) {
-      return res.status(400).json({ error: 'Cannot delete: group has files uploaded or evaluations completed' });
+    const hasNonZeroEvaluations = group.evaluations.some(e => e.marks && e.marks > 0);
+    if (group.status === 'COMPLETED' || hasNonZeroEvaluations) {
+      return res.status(400).json({ error: 'Cannot delete: group has completed non-zero evaluations or is finalized' });
     }
 
     // Notify before deletion

@@ -30,6 +30,7 @@ enum GroupStatus {
   ACTIVE
   COMPLETED
   OVERDUE
+  REJECTED
 }
 
 enum ThesisStatus {
@@ -37,6 +38,7 @@ enum ThesisStatus {
   ACTIVE
   COMPLETED
   OVERDUE
+  REJECTED
 }
 
 enum EvaluationStatus {
