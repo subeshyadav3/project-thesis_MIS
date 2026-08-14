@@ -302,6 +302,7 @@ exports.getSupervisorScope = async (req, res) => {
 
 exports.getUsersByRole = async (req, res) => {
   try {
+    const role = (req.params.role || '').toUpperCase();
     // Supervisor lookups include coordinators (they can supervise too)
     // Examiner lookups include supervisors and coordinators (faculty can examine other projects)
     const where = role === 'SUPERVISOR'
