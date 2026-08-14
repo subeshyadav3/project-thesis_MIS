@@ -1528,8 +1528,8 @@ const filteredGroups = useMemo(() => {
                                     </span>
                                   )}
                                   {p.studentMatches.filter(m => !m).length > 0 && (
-                                    <span style={{ color: 'var(--color-warning)' }}>
-                                      ({p.studentMatches.filter(m => !m).length} missing)
+                                    <span style={{ color: 'var(--color-primary, #0284c7)' }}>
+                                      ({p.studentMatches.filter(m => !m).length} will create)
                                     </span>
                                   )}
                                 </div>

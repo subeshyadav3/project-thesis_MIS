@@ -285,7 +285,6 @@ exports.bulkImportPreview = async (req, res) => {
         } else {
           studentMatches.push(null);
           unmatchCount++;
-          warnings.push(`Student not found for "${name}" (roll: ${roll})`);
         }
       }
 

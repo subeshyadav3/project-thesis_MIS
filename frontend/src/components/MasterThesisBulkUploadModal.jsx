@@ -266,7 +266,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                             </div>
                           </td>
                           <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edits.title || p.title}</td>
-                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
+                          <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-primary, #0284c7)' }}>Will create: {p.name || edits.roll || p.roll}</span>}</td>
                           <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
                           <td>{p.externalMidTermMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalMidTermMatch.name}</span> : p.externalMidTermWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalMidTermWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
                           <td>{p.externalFinalMatch ? <span style={{ color: 'var(--color-success)' }}>{p.externalFinalMatch.name}</span> : p.externalFinalWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.externalFinalWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
