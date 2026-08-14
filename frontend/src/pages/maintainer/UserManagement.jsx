@@ -51,8 +51,17 @@ function UserManagement() {
     try {
       const payload = { ...form };
       if (!payload.password) delete payload.password;
-      if (!payload.programId) delete payload.programId;
-      if (!payload.rollNumber) delete payload.rollNumber;
+      if (payload.role !== 'STUDENT') {
+        delete payload.degreeType;
+        delete payload.programId;
+        delete payload.rollNumber;
+      } else {
+        if (!payload.programId) delete payload.programId;
+        if (!payload.rollNumber) delete payload.rollNumber;
+      }
+      if (['STUDENT'].includes(payload.role)) {
+        delete payload.designation;
+      }
       if (editUser) {
         await api.put(`/users/${editUser.id}`, payload);
         toast.success('User updated successfully');
@@ -107,7 +116,17 @@ function UserManagement() {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ email: u.email, password: '', firstName: u.firstName, lastName: u.lastName, role: u.role, degreeType: u.degreeType || 'BACHELOR', programId: u.programId || '', rollNumber: u.rollNumber || '', designation: u.designation || '' });
+    setForm({
+      email: u.email,
+      password: '',
+      firstName: u.firstName,
+      lastName: u.lastName,
+      role: u.role,
+      degreeType: u.degreeType || (u.role === 'STUDENT' ? 'BACHELOR' : ''),
+      programId: u.programId || '',
+      rollNumber: u.rollNumber || '',
+      designation: u.designation || '',
+    });
     setShowModal(true);
   };
 

@@ -175,18 +175,16 @@ exports.updateUser = async (req, res) => {
     if (req.user.role === 'COORDINATOR' && req.body.role && req.body.role !== existing.role) {
       return res.status(403).json({ error: 'Cannot change user role' });
     }
-    // Coordinator cannot change degreeType for non-students
-    if (req.user.role === 'COORDINATOR' && req.body.degreeType && existing.role !== 'STUDENT') {
-      return res.status(403).json({ error: 'Cannot change degree type for this user' });
-    }
 
     const data = {};
     if (req.body.firstName !== undefined) data.firstName = req.body.firstName;
     if (req.body.lastName !== undefined) data.lastName = req.body.lastName;
     if (req.body.email !== undefined) data.email = req.body.email;
-    if (req.body.role) data.role = req.body.role;
-    if (req.body.degreeType) data.degreeType = req.body.degreeType;
-    if (req.body.programId) data.programId = parseInt(req.body.programId);
+    if (req.body.role && req.user.role === 'MAINTAINER') data.role = req.body.role;
+    if (existing.role === 'STUDENT') {
+      if (req.body.degreeType) data.degreeType = req.body.degreeType;
+      if (req.body.programId) data.programId = parseInt(req.body.programId);
+    }
     if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
     if (req.body.designation !== undefined) data.designation = req.body.designation;
     if (req.body.rollNumber !== undefined) {
