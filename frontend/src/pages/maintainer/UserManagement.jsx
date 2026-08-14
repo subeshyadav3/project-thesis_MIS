@@ -6,6 +6,7 @@ import api from '../../services/api';
 import Pagination from '../../components/Pagination';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { formatYearSemester } from '../../utils/romanNumerals';
+import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
 
 const COORDINATOR_ALLOWED_ROLES = ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -20,13 +21,7 @@ function UserManagement() {
   const [filters, setFilters] = useState({ role: '', degreeType: '', departmentId: '', programId: '', batch: '' });
   const [programs, setPrograms] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [showBulk, setShowBulk] = useState(false);
-  const [bulkJson, setBulkJson] = useState('');
-  const [showExcelBulk, setShowExcelBulk] = useState(false);
-  const [excelUserType, setExcelUserType] = useState('STUDENT');
-  const [excelFile, setExcelFile] = useState(null);
-  const [excelUploading, setExcelUploading] = useState(false);
-  const [excelResult, setExcelResult] = useState(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', confirmLabel: 'Confirm', onConfirm: () => {}, danger: false });
@@ -37,16 +32,6 @@ function UserManagement() {
   const toast = useToast();
 
   const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
-
-  const excelTemplateHref = excelUserType === 'STUDENT'
-    ? '/student_users_template.xlsx'
-    : excelUserType === 'SUPERVISOR'
-      ? '/supervisor_users_template.xlsx'
-      : '/external_users_template.xlsx';
-
-  const excelColumnsHint = excelUserType === 'STUDENT'
-    ? 'email, password, firstName, lastName, rollNumber, programCode, degreeType'
-    : 'email, password, firstName, lastName, designation';
 
   const loadUsers = () => {
     setLoading(true);
@@ -185,18 +170,10 @@ function UserManagement() {
 
   const actions = (
     <>
-      {!isCoordinator && (
-        <button className="btn btn-outline btn-sm" onClick={() => setShowBulk(true)}>
-          <Icon name="upload_file" className="material-symbols-outlined" />
-          Bulk Import
-        </button>
-      )}
-      {isCoordinator && (
-        <button className="btn btn-secondary btn-sm" onClick={() => { setShowExcelBulk(true); setExcelResult(null); setExcelFile(null); }}>
-          <Icon name="upload_file" className="material-symbols-outlined" />
-          Bulk Upload
-        </button>
-      )}
+      <button className="btn btn-secondary btn-sm" onClick={() => setShowBulkUpload(true)}>
+        <Icon name="upload_file" className="material-symbols-outlined" />
+        Bulk Add
+      </button>
       <button className="btn btn-primary btn-sm" onClick={openCreate}>
         <Icon name="add" className="material-symbols-outlined" />
         Add User
@@ -398,158 +375,12 @@ function UserManagement() {
         )}
       </div>
 
-      {showBulk && (
-        <div className="modal-overlay" onClick={() => setShowBulk(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
-            <div className="modal-header">
-              <div className="modal-header-icon info">
-                <Icon name="upload_file" className="material-symbols-outlined" />
-              </div>
-              <div className="modal-header-text">
-                <h2>Bulk Import Users</h2>
-                <p>Paste a JSON array of users to create them in bulk</p>
-              </div>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', margin: 0 }}>
-                Expected format: [{"{"}"email": "...", "password": "...", "firstName": "...", "lastName": "...", "role": "...", "designation": "...", "programId": ..., "canSupervise": true/false{"}"}]
-              </p>
-            </div>
-            <div className="form-group">
-              <textarea
-                className="form-input"
-                rows={10}
-                value={bulkJson}
-                onChange={e => setBulkJson(e.target.value)}
-                placeholder='[&#10;  {"email": "coord.bct@example.com", "password": "pass123", "firstName": "Ram", "lastName": "Prasad", "role": "COORDINATOR", "designation": "Asst. Prof.", "programId": 1, "canSupervise": false}&#10;]'
-                style={{ fontFamily: 'monospace', fontSize: 12 }}
-              />
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn btn-outline" onClick={() => setShowBulk(false)}>
-                <Icon name="close" className="material-symbols-outlined" />
-                Cancel
-              </button>
-              <button type="button" className="btn btn-primary" onClick={async () => {
-                try {
-                  const users = JSON.parse(bulkJson);
-                  if (!Array.isArray(users)) throw new Error('Must be an array');
-                  const { data } = await api.post('/users/bulk', { users });
-                  toast.success(data.message);
-                  setShowBulk(false);
-                  setBulkJson('');
-                  loadUsers();
-                } catch (err) {
-                  toast.error(err.response?.data?.error || err.message || 'Invalid JSON');
-                }
-              }}>
-                <Icon name="upload" className="material-symbols-outlined" />
-                Import
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showExcelBulk && (
-        <div className="modal-overlay" onClick={() => setShowExcelBulk(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <div className="modal-header">
-              <div className="modal-header-icon info">
-                <Icon name="upload_file" className="material-symbols-outlined" />
-              </div>
-              <div className="modal-header-text">
-                <h2>Bulk Upload Users</h2>
-                <p>Choose user type, download the template, then upload Excel</p>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>User type</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[
-                  { value: 'STUDENT', label: 'Student' },
-                  { value: 'SUPERVISOR', label: 'Supervisor' },
-                  { value: 'EXTERNAL_EXAMINER', label: 'External Examiner' },
-                ].map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => { setExcelUserType(opt.value); setExcelResult(null); setExcelFile(null); }}
-                    style={{
-                      flex: 1, padding: '8px 10px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                      border: excelUserType === opt.value ? '2px solid var(--color-primary)' : '1px solid var(--color-outline)',
-                      background: excelUserType === opt.value ? 'var(--color-primary-container)' : 'var(--color-surface)',
-                      fontWeight: excelUserType === opt.value ? 600 : 400,
-                      minWidth: 0,
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 8 }}>
-                Columns: {excelColumnsHint}
-              </span>
-            </div>
-
-            <div className="form-group">
-              <label>Excel file (.xlsx)</label>
-              <input type="file" accept=".xlsx,.xls" onChange={e => setExcelFile(e.target.files[0])} />
-              <a href={excelTemplateHref} download style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, display: 'inline-block' }}>
-                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
-                {' '}Download blank template
-              </a>
-            </div>
-
-            {excelResult && (
-              <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'var(--color-surface-container-low)', fontSize: 13 }}>
-                <div>Created: <strong>{excelResult.created}</strong> · Failed: <strong>{excelResult.failed}</strong></div>
-                {excelResult.errors?.length > 0 && (
-                  <ul style={{ margin: '8px 0 0', paddingLeft: 18, maxHeight: 120, overflow: 'auto', fontSize: 12 }}>
-                    {excelResult.errors.slice(0, 20).map((err, i) => (
-                      <li key={i}>Row {err.row || '?'}: {err.email} — {err.error}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button type="button" className="btn btn-outline" onClick={() => setShowExcelBulk(false)}>
-                <Icon name="close" className="material-symbols-outlined" />
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={excelUploading || !excelFile}
-                onClick={async () => {
-                  if (!excelFile) { toast.warning('Select a file'); return; }
-                  setExcelUploading(true);
-                  setExcelResult(null);
-                  try {
-                    const formData = new FormData();
-                    formData.append('file', excelFile);
-                    formData.append('role', excelUserType);
-                    const { data } = await api.post('/users/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                    setExcelResult(data);
-                    toast.success(data.message || `Created ${data.created} user(s)`);
-                    loadUsers();
-                  } catch (err) {
-                    toast.error(err.response?.data?.error || 'Upload failed');
-                  } finally {
-                    setExcelUploading(false);
-                  }
-                }}
-              >
-                <Icon name={excelUploading ? 'progress_activity' : 'upload'} className="material-symbols-outlined" />
-                {excelUploading ? 'Uploading...' : 'Upload'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <UsersBulkUploadModal
+        open={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onSuccess={loadUsers}
+        title="Bulk Upload Users"
+      />
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
