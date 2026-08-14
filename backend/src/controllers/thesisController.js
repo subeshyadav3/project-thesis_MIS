@@ -210,10 +210,10 @@ function parseName(inputName) {
  * Helper: generate a simple email from a name for auto-created users.
  */
 function generateEmail(firstName, lastName, role) {
-  const ln = lastName || firstName;
-  const base = `${firstName.toLowerCase()}.${ln.toLowerCase()}`.replace(/[^a-z.]/g, '');
-  const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
-  return `${base}.${suffix}@pcampus.edu.np`;
+  const parsed = parseName(`${firstName} ${lastName || ''}`.trim());
+  const fn = (parsed.firstName || firstName).toLowerCase().replace(/[^a-z]/g, '');
+  const ln = (parsed.lastName || lastName || fn).toLowerCase().replace(/[^a-z]/g, '');
+  return `${fn}.${ln}@pcampus.edu.np`;
 }
 
 // Step 1: Parse Excel + fuzzy match → return preview
@@ -437,12 +437,12 @@ exports.bulkImportConfirm = async (req, res) => {
       const cluster = _edits?.cluster ?? origCluster;
 
       if (!studentMatch?.id && !row.studentMatch?.id) {
-        // Try auto-creating the student from _edits.student
-        const willCreate = _edits?.student;
+        // Try auto-creating the student from _edits.student or row.name
+        const willCreate = _edits?.student || (row.name ? parseName(row.name) : null);
         const roll = _edits?.roll || row.roll;
         if (willCreate?.firstName && willCreate?.lastName && roll) {
           const email = roll.toLowerCase() + '@pcampus.edu.np';
-          const hash = await bcrypt.hash('subesh', 10);
+          const hash = await bcrypt.hash('Test@123', 10);
           // Derive programId from roll prefix
           const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
           const prog = rollProg ? await prisma.program.findFirst({ where: { code: rollProg } }) : null;
@@ -465,7 +465,7 @@ exports.bulkImportConfirm = async (req, res) => {
           if (newStudent) {
             row.studentMatch = { id: newStudent.id, name: `${willCreate.firstName} ${willCreate.lastName}` };
             audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newStudent.id, details: `Auto-created MASTER student via thesis bulk import` });
-            emailService.notifyUserCreated(email, willCreate.firstName, 'STUDENT', email, 'subesh');
+            emailService.notifyUserCreated(email, willCreate.firstName, 'STUDENT', email, 'Test@123');
           } else {
             skipped.push({ row: row.row, reason: 'Student could not be auto-created' });
             continue;
@@ -487,24 +487,24 @@ exports.bulkImportConfirm = async (req, res) => {
         if (!willCreate) return null;
         try {
           const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-           const hash = await bcrypt.hash('subesh', 10);
+          const hash = await bcrypt.hash('Test@123', 10);
           const newUser = await prisma.user.upsert({
             where: { email },
             update: {},
-          create: {
-            email,
-            password: hash,
-            firstName: willCreate.firstName,
-            lastName: willCreate.lastName || willCreate.firstName,
-            role,
-            designation: willCreate.designation || null,
-            departmentId: req.user.departmentId,
-            active: true,
-          },
+            create: {
+              email,
+              password: hash,
+              firstName: willCreate.firstName,
+              lastName: willCreate.lastName || willCreate.firstName,
+              role,
+              designation: willCreate.designation || null,
+              departmentId: req.user.departmentId,
+              active: true,
+            },
           }).catch(() => null);
           if (newUser) {
             audit.log({ action: 'AUTO_CREATE', entity: 'User', entityId: newUser.id, details: `Auto-created ${role} via bulk import` });
-            emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'subesh');
+            emailService.notifyUserCreated(email, willCreate.firstName, role, email, 'Test@123');
             return newUser.id;
           }
         } catch (e) {

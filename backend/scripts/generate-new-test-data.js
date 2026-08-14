@@ -190,25 +190,45 @@ const masterStudents = msncsTheses.map((t) => {
   };
 });
 
+const parseFacultyName = (input) => {
+  const titleRegex = /^((Assoc\.\s*Prof\.|Asst\.\s*Prof\.|Prof\.|Dr\.|Mr\.|Ms\.|Mrs\.|Er\.)\s*\.?\s*)/i;
+  let cleaned = input.trim();
+  let title = '';
+  let m;
+  while ((m = titleRegex.exec(cleaned)) !== null) {
+    title += m[1];
+    cleaned = cleaned.slice(m[0].length).trim();
+  }
+  const designation = title.trim().replace(/\.\s+/g, '. ').trim() || 'Dr.';
+  const parts = cleaned.split(/\s+/);
+  const fn = parts[0] || 'Faculty';
+  const ln = parts.slice(1).join(' ') || fn;
+  return { firstName: fn, lastName: ln, designation };
+};
+
 const supervisors = supervisorNames.map((n) => {
-  const [title, fn, ...rest] = n.split(' ');
+  const p = parseFacultyName(n);
+  const fn = p.firstName.toLowerCase().replace(/[^a-z]/g, '');
+  const ln = p.lastName.toLowerCase().replace(/[^a-z]/g, '');
   return {
-    email: `${fn.toLowerCase()}.${rest.join('').toLowerCase()}@pcampus.edu.np`,
+    email: `${fn}.${ln}@pcampus.edu.np`,
     password: PASSWORD,
-    firstName: fn,
-    lastName: rest.join(' '),
-    designation: title,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    designation: p.designation,
   };
 });
 
 const externals = externalNames.map((n) => {
-  const [title, fn, ...rest] = n.split(' ');
+  const p = parseFacultyName(n);
+  const fn = p.firstName.toLowerCase().replace(/[^a-z]/g, '');
+  const ln = p.lastName.toLowerCase().replace(/[^a-z]/g, '');
   return {
-    email: `${fn.toLowerCase()}.${rest.join('').toLowerCase()}@ioe.edu.np`,
+    email: `${fn}.${ln}@ioe.edu.np`,
     password: PASSWORD,
-    firstName: fn,
-    lastName: rest.join(' '),
-    designation: title,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    designation: p.designation,
   };
 });
 

@@ -213,10 +213,10 @@ function parseName(inputName) {
 }
 
 function generateEmail(firstName, lastName, role) {
-  const ln = lastName || firstName;
-  const base = `${firstName.toLowerCase()}.${ln.toLowerCase()}`.replace(/[^a-z.]/g, '');
-  const suffix = role === 'SUPERVISOR' ? 'sup' : 'ext';
-  return `${base}.${suffix}@pcampus.edu.np`;
+  const parsed = parseName(`${firstName} ${lastName || ''}`.trim());
+  const fn = (parsed.firstName || firstName).toLowerCase().replace(/[^a-z]/g, '');
+  const ln = (parsed.lastName || lastName || fn).toLowerCase().replace(/[^a-z]/g, '');
+  return `${fn}.${ln}@pcampus.edu.np`;
 }
 
 exports.bulkImportPreview = async (req, res) => {
@@ -426,7 +426,7 @@ exports.bulkImportConfirm = async (req, res) => {
       if (!willCreate) return null;
       try {
         const email = generateEmail(willCreate.firstName, willCreate.lastName, role === 'SUPERVISOR' ? 'SUPERVISOR' : 'EXTERNAL_EXAMINER');
-        const hash = await bcrypt.hash('subesh', 10);
+        const hash = await bcrypt.hash('Test@123', 10);
         const newUser = await tx.user.upsert({
           where: { email },
           update: {},
@@ -497,6 +497,9 @@ exports.bulkImportConfirm = async (req, res) => {
           matchedStudents.push(sm.id);
         } else if (se?.firstName && se?.lastName && resolvedRolls[j]) {
           studentCreateSpecs.push({ index: j, se, roll: resolvedRolls[j], programId });
+        } else if (members && members[j] && resolvedRolls[j]) {
+          const parsed = parseName(members[j]);
+          studentCreateSpecs.push({ index: j, se: { firstName: parsed.firstName, lastName: parsed.lastName }, roll: resolvedRolls[j], programId });
         } else {
           skipped.push({ row: row.row, reason: `Student at position ${j + 1} could not be matched` });
         }
@@ -540,7 +543,7 @@ exports.bulkImportConfirm = async (req, res) => {
         // Create pending student records inside the transaction
         for (const spec of studentCreateSpecs) {
           const email = spec.roll.toLowerCase() + '@pcampus.edu.np';
-          const hash = await bcrypt.hash('subesh', 10);
+          const hash = await bcrypt.hash('Test@123', 10);
           const batchMatch = spec.roll.match(/^(\d{2,3})/);
           const newStudent = await tx.user.upsert({
             where: { email },
@@ -720,7 +723,7 @@ exports.bulkImportConfirm = async (req, res) => {
         se.lastName,
         sideEffect.role === 'STUDENT' ? 'STUDENT' : sideEffect.role,
       );
-      emailService.notifyUserCreated(email, se.firstName, sideEffect.role, email, 'subesh');
+      emailService.notifyUserCreated(email, se.firstName, sideEffect.role, email, 'Test@123');
     }
 
     audit.log({ action: 'CREATE', entity: 'ProjectGroup', details: `Bulk imported ${created.length} groups${skipped.length ? `, ${skipped.length} skipped` : ''}`, performedById: req.user.id });

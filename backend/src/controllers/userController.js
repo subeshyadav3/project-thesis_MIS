@@ -524,8 +524,14 @@ exports.bulkImportUsersExcel = async (req, res) => {
       let degreeType = (row.degreeType || row.DegreeType || row.Degree || '').toString().trim().toUpperCase() || null;
       let programId = row.programId ? parseInt(row.programId) : null;
 
-      if (role === 'STUDENT') {
-        if (!password) password = 'Test@123';
+      if (!password) {
+        password = 'Test@123';
+      }
+
+      if (!email && (role === 'SUPERVISOR' || role === 'EXTERNAL_EXAMINER') && firstName && lastName) {
+        const fn = firstName.toLowerCase().replace(/[^a-z]/g, '');
+        const ln = lastName.toLowerCase().replace(/[^a-z]/g, '') || fn;
+        email = `${fn}.${ln}@pcampus.edu.np`;
       }
 
       if (!email || !password || !firstName || !lastName) {
@@ -610,6 +616,7 @@ exports.bulkImportUsersExcel = async (req, res) => {
             designation: role === 'STUDENT' ? null : designation,
             rollNumber: role === 'STUDENT' ? rollNumber : null,
             batch: role === 'STUDENT' ? batch : null,
+            active: true,
           },
           select: USER_SELECT,
         });
