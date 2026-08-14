@@ -271,7 +271,6 @@ exports.bulkImportPreview = async (req, res) => {
         if (byRoll) studentMatch = { user: byRoll, score: 1.0, method: 'roll' };
       }
       if (!studentMatch) {
-        warnings.push(`Student not found for roll: ${roll || '(none)'}`);
         unmatchCount++;
       } else {
         matchCount++;
@@ -445,7 +444,7 @@ exports.bulkImportConfirm = async (req, res) => {
           const hash = await bcrypt.hash('Test@123', 10);
           // Derive programId from roll prefix
           const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
-          const prog = rollProg ? await prisma.program.findFirst({ where: { code: rollProg } }) : null;
+          const prog = rollProg ? await prisma.program.findFirst({ where: { code: { equals: rollProg, mode: 'insensitive' } } }) : null;
           const newStudent = await prisma.user.upsert({
             where: { email },
             update: {},
@@ -559,10 +558,6 @@ exports.bulkImportConfirm = async (req, res) => {
           skipped.push({ row: row.row, reason: 'Matched user is not a master student' });
           return null;
         }
-        if (coordinatorProgram && student.programId && student.programId !== coordinatorProgram.id) {
-          skipped.push({ row: row.row, reason: 'Student belongs to another program' });
-          return null;
-        }
 
         // Fix student without a programId — derive from roll prefix
         if (!student.programId) {
@@ -570,7 +565,7 @@ exports.bulkImportConfirm = async (req, res) => {
           if (roll) {
             const rollProg = roll.replace(/^\d{2,3}/, '').replace(/\d+$/, '');
             if (rollProg) {
-              const prog = await tx.program.findFirst({ where: { code: rollProg } });
+              const prog = await tx.program.findFirst({ where: { code: { equals: rollProg, mode: 'insensitive' } } });
               if (prog) {
                 await tx.user.update({ where: { id: student.id }, data: { programId: prog.id } });
                 student.programId = prog.id;
@@ -617,6 +612,7 @@ exports.bulkImportConfirm = async (req, res) => {
             supervisorId: resolvedSupervisorId,
             externalMidTermId: resolvedMidTermId,
             externalFinalId: resolvedFinalId,
+            programId: student.programId || undefined,
             cluster: cluster || student.program?.cluster || null,
             batch: batch || student.batch || null,
           },
