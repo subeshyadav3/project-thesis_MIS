@@ -386,6 +386,11 @@ const handleComplete = async (id) => {
         (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.student?.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+      const matchesSupervisor = supervisorFilter === 'ALL'
+        ? true
+        : supervisorFilter === 'NONE'
+          ? !t.supervisor
+          : t.supervisor?.id?.toString() === supervisorFilter;
       const hasSupervisor = Boolean(t.supervisorId || t.supervisor);
       const hasMidTerm = Boolean(t.externalMidTermId || t.externalMidTerm);
       const hasFinal = Boolean(t.externalFinalId || t.externalFinal);
