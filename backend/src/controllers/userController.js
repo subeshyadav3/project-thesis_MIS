@@ -659,10 +659,12 @@ exports.getAuditLogs = async (req, res) => {
         //   2) Supervisors assigned to groups/theses in this program
         //   3) External examiners assigned to groups/theses in this program
         //   4) The coordinator themselves
-        const [programUsers, groupSup, thesisSup, groupExam, thesisExam] = await Promise.all([
+        const [programUsers, groupSup, thesisSup, thesisExtMid, thesisExtFin, groupExam, thesisExam] = await Promise.all([
           prisma.user.findMany({ where: { programId: program.id }, select: { id: true } }),
           prisma.projectGroup.findMany({ where: { programId: program.id, supervisorId: { not: null } }, select: { supervisorId: true } }),
           prisma.thesis.findMany({ where: { student: { programId: program.id }, supervisorId: { not: null } }, select: { supervisorId: true } }),
+          prisma.thesis.findMany({ where: { student: { programId: program.id }, externalMidTermId: { not: null } }, select: { externalMidTermId: true } }),
+          prisma.thesis.findMany({ where: { student: { programId: program.id }, externalFinalId: { not: null } }, select: { externalFinalId: true } }),
           prisma.examinerAssignment.findMany({ where: { group: { programId: program.id } }, select: { externalExaminerId: true } }),
           prisma.examinerAssignment.findMany({ where: { thesis: { student: { programId: program.id } } }, select: { externalExaminerId: true } }),
         ]);
@@ -670,6 +672,8 @@ exports.getAuditLogs = async (req, res) => {
           ...programUsers.map(u => u.id),
           ...groupSup.map(r => r.supervisorId),
           ...thesisSup.map(r => r.supervisorId),
+          ...thesisExtMid.map(r => r.externalMidTermId),
+          ...thesisExtFin.map(r => r.externalFinalId),
           ...groupExam.map(r => r.externalExaminerId),
           ...thesisExam.map(r => r.externalExaminerId),
           req.user.id,
