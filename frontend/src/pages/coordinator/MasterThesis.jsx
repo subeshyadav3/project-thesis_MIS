@@ -552,10 +552,18 @@ return (
                     Thesis
                   </span>
                 </div>
-                <div className="detail-item">
+                <div className="detail-item" style={{ gridColumn: 'span 2' }}>
                   <span className="detail-label">Research Cluster</span>
-                  <span className="badge badge-info">
-                    {showDetail.cluster || 'Unassigned'}
+                  <span className="badge badge-info" style={{ whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.4 }}>
+                    {(() => {
+                      const map = {
+                        'Cluster 1': 'Computer networks and security',
+                        'Cluster 2': 'Electronic devices, circuits and communication',
+                        'Cluster 3': 'AI/ML and image processing',
+                        'Cluster 4': 'Audio, NLP and data/text analytics',
+                      };
+                      return map[showDetail.cluster] || showDetail.cluster || 'Unassigned';
+                    })()}
                   </span>
                 </div>
                 <div className="detail-item">

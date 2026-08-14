@@ -184,9 +184,9 @@ function StudentProjectDetail() {
                   <span style={{ fontWeight: 500 }}>{assignment.externalFinal.firstName} {assignment.externalFinal.lastName}</span>
                 </div>
               )}
-              <div className="detail-item">
+              <div className="detail-item" style={{ gridColumn: 'span 2' }}>
                 <span className="detail-label">Research Cluster</span>
-                <span>{assignment.cluster ? <span className="badge badge-info">{(() => {
+                <span>{assignment.cluster ? <span className="badge badge-info" style={{ whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.4 }}>{(() => {
                   const map = {
                     'Cluster 1': 'Computer networks and security',
                     'Cluster 2': 'Electronic devices, circuits and communication',

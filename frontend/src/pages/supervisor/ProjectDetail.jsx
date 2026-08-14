@@ -882,7 +882,7 @@ function InfoRow({ label, value }) {
       <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', minWidth: 130, textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>
         {label}
       </span>
-      <div style={{ fontSize: 14, color: 'var(--color-on-surface)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+      <div style={{ fontSize: 14, color: 'var(--color-on-surface)', lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word', flex: 1, minWidth: 0 }}>
         {value || '—'}
       </div>
     </div>
