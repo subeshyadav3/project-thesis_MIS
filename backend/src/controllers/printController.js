@@ -214,13 +214,14 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
   const pageMax = extCriteria.reduce((s, c) => s + c.max, 0) || 100;
 
   const isProject = projectType === 'PROJECT';
-  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
+  const isFinal = phase === 'final';
+  const phaseLabel = isFinal ? 'Final' : 'Mid-Term';
   const credit = isProject ? 4 : 16;
 
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
-  if (isProject) {
+  if (isFinal || isProject) {
     // Exact layout from External_evaluation_sheets Project.docx
     const criteriaRows = extCriteria.map((c, i) => `
       <tr>
@@ -234,7 +235,7 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
       <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
         ${buildPageHeader()}
         <div style="text-align:center;margin-bottom:12px;">
-          <div style="font-weight:700;font-size:12pt;line-height:1.3;">M. Sc.  - Project Evaluation: External</div>
+          <div style="font-weight:700;font-size:12pt;line-height:1.3;">M. Sc.  - ${isProject ? 'Project' : 'Thesis'} Evaluation: External</div>
         </div>
 
         <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
@@ -242,7 +243,7 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
             <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
             <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
           </tr>
-          <tr><td colspan="2" style="padding-top:4px;"><strong>Project Title:</strong> ${esc(title)}</td></tr>
+          <tr><td colspan="2" style="padding-top:4px;"><strong>${isProject ? 'Project Title:' : 'Title:'}</strong> ${esc(title)}</td></tr>
           <tr><td colspan="2" style="padding-top:2px;"><strong>Student  (Name):</strong> ${esc(studentName)}, Roll No.: ${esc(rollNo)}</td></tr>
           ${supervisor ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>` : ''}
         </table>
