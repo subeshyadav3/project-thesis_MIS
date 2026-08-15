@@ -100,191 +100,293 @@ process.on('SIGINT', () => { shutdownBrowser(); });
 
 function buildPageHeader() {
   return `
-    <div style="text-align:center;margin-bottom:16px;font-size:13px;">
-      <div style="font-weight:700;">TRIBHUVAN UNIVERSITY</div>
-      <div style="font-weight:700;">INSTITUTE OF ENGINEERING</div>
-      <div style="font-weight:700;">PULCHOWK CAMPUS</div>
+    <div style="text-align:center;margin-bottom:12px;font-family:'Times New Roman', Times, serif;">
+      <div style="font-weight:700;font-size:14pt;line-height:1.25;">TRIBHUVAN UNIVERSITY</div>
+      <div style="font-weight:700;font-size:13pt;line-height:1.25;">INSTITUTE OF ENGINEERING</div>
+      <div style="font-weight:700;font-size:13pt;line-height:1.25;">PULCHOWK CAMPUS</div>
     </div>`;
 }
 
 function buildNote() {
-  return `<p style="font-size:12px;margin:4px 0;"><strong>Note:</strong> 100%: Outstanding, 90%: Excellent, 75%: Good, 60%: Satisfactory, 50%: Poor, &lt; 50%: Fail</p>`;
+  return `<div style="font-size:10pt;margin:6px 0;font-family:'Times New Roman', Times, serif;"><strong>Note:</strong> 100%: Outstanding, 90%: Excellent, 75%: Good, 60%: Satisfactory, 50%: Poor, &lt; 50%: Fail</div>`;
 }
 
 function buildBlankLines(count) {
   let out = '';
-  for (let i = 0; i < count; i++) out += '<div style="height:1.2em;"></div>';
+  for (let i = 0; i < count; i++) out += '<div style="height:1.2em;border-bottom:1px dotted #ccc;margin-bottom:2px;"></div>';
   return out;
 }
 
-function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions, supervisorDesignation) {
+function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions, supervisorDesignation, programName, phase = 'midterm') {
   const totalMarks = supCriteria.reduce((s, c) => s + (c.marks || 0), 0);
-  const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined);
+  const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined && c.marks !== '');
+  const pageMax = supCriteria.reduce((s, c) => s + c.max, 0) || 100;
+  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
 
   const criteriaRows = supCriteria.map((c, i) => `
     <tr>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${i + 1}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(c.name)}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.max}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${i + 1}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(c.name)}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.max}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${c.marks !== null && c.marks !== undefined && c.marks !== '' ? c.marks : ''}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
     </tr>`).join('');
 
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
   return `
-    ${buildPageHeader()}
-    <div style="font-weight:700;font-size:13px;text-align:center;">Mid-Term Evaluation Form for Thesis Program</div>
-    <div style="font-size:12px;text-align:center;margin-bottom:8px;">(to be filled by supervisor)</div>
-    <div style="font-size:12px;margin:4px 0;"><strong>Credit: 16 | Full Marks: 100</strong></div>
+    <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+      ${buildPageHeader()}
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">${phaseLabel} Evaluation Form for</div>
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">Thesis Program: <span style="font-weight:normal;">${esc(programName || '')}</span></div>
+        <div style="font-size:10.5pt;margin-top:2px;">(to be filled by supervisor)</div>
+      </div>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
-      <tr><td style="width:120px;"><strong>Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Name of Student:</strong></td><td>${esc(studentName)}</td></tr>
-      <tr><td><strong>Roll No:</strong></td><td>${esc(rollNo)}</td></tr>
-      <tr><td><strong>Supervisor:</strong></td><td>${esc(supervisor)}</td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
-      <thead><tr>
-        <th style="text-align:center;padding:4px;">S.No.</th>
-        <th style="text-align:left;padding:4px;">Marking Parameters</th>
-        <th style="text-align:center;padding:4px;">Full Marks</th>
-        <th style="text-align:center;padding:4px;">Marks Obtained</th>
-        <th style="text-align:center;padding:4px;">Remarks</th>
-      </tr></thead>
-      <tbody>
-        ${criteriaRows}
+      <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
         <tr>
-          <td></td>
-          <td style="font-weight:700;">Total Marks</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">100</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">${hasMarks ? totalMarks : ''}</td>
-          <td></td>
+          <td style="font-weight:bold;width:50%;">Credit: 16</td>
+          <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
         </tr>
-      </tbody>
-    </table>
-    ${buildNote()}
-
-    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
-      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</td></tr>
-    </table>
-
-    <div style="margin-top:8px;font-size:12px;">
-      <strong>Comments:</strong>
-      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
-    </div>
-    <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>
-      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
-    </div>
-
-    <div style="font-size:12px;margin-top:16px;">
-      <strong>Examiner:</strong><br/>
-      <strong>Name:</strong> ${esc(supervisor)}<br/>
-      <strong>Post:</strong> ${esc(supervisorDesignation || 'Supervisor')}<br/>
-      <strong>University/Organization:</strong> IOE<br/>
-      <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
-        <tr>
-          <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-          <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
-        </tr>
+        <tr><td colspan="2" style="padding-top:4px;"><strong>Title:</strong> ${esc(title)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Name of Student:</strong> ${esc(studentName)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Roll No:</strong> ${esc(rollNo)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>
       </table>
+
+      <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+        <thead>
+          <tr style="background-color:#fafafa;">
+            <th style="width:8%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+            <th style="width:52%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Marking Parameters</th>
+            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${criteriaRows}
+          <tr>
+            <td style="border:1px solid #000;"></td>
+            <td style="font-weight:bold;padding:5px 8px;border:1px solid #000;">Total Marks</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${pageMax}</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? totalMarks : ''}</td>
+            <td style="border:1px solid #000;"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${buildNote()}
+
+      <div style="font-size:11pt;margin:8px 0 6px 0;">
+        <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
+      </div>
+
+      <div style="margin-top:8px;font-size:11pt;">
+        <strong>Comments:</strong>
+        ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+      </div>
+
+      <div style="margin-top:6px;font-size:11pt;">
+        <strong>Suggestions &amp; recommendations:</strong>
+        ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+      </div>
+
+      <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
+        <div><strong>Name:</strong> ${esc(supervisor)}</div>
+        <div><strong>Post:</strong> ${esc(supervisorDesignation || 'Supervisor')}</div>
+        <div><strong>Organization:</strong> IOE</div>
+        <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+          <tr>
+            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
+          </tr>
+        </table>
+      </div>
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation, projectType) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation, projectType, programName, supervisor) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
-  const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
-  const pageMax = extCriteria.reduce((s, c) => s + c.max, 0);
+  const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined && c.marks !== '');
+  const pageMax = extCriteria.reduce((s, c) => s + c.max, 0) || 100;
 
-  const criteriaRows = extCriteria.map((c, i) => `
-    <tr>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${i + 1}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(c.name)}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.max}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
-    </tr>`).join('');
+  const isProject = projectType === 'PROJECT';
+  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
+  const credit = isProject ? 4 : 16;
 
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
-  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
-  const isProject = projectType === 'PROJECT';
-  const titleLabel = isProject
-    ? `M. Sc. - Project Evaluation: External (${phaseLabel})`
-    : `M. Sc. - Thesis Evaluation: External (${phaseLabel})`;
-  const credit = isProject ? 4 : 16;
+  if (isProject) {
+    // Exact layout from External_evaluation_sheets Project.docx
+    const criteriaRows = extCriteria.map((c, i) => `
+      <tr>
+        <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${i + 1}</td>
+        <td style="padding:5px 8px;border:1px solid #000;">${esc(c.name)}</td>
+        <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.max}</td>
+        <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${c.marks !== null && c.marks !== undefined && c.marks !== '' ? c.marks : ''}</td>
+      </tr>`).join('');
+
+    return `
+      <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+        ${buildPageHeader()}
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:12pt;line-height:1.3;">M. Sc.  - Project Evaluation: External</div>
+        </div>
+
+        <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
+          <tr>
+            <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
+            <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
+          </tr>
+          <tr><td colspan="2" style="padding-top:4px;"><strong>Project Title:</strong> ${esc(title)}</td></tr>
+          <tr><td colspan="2" style="padding-top:2px;"><strong>Student  (Name):</strong> ${esc(studentName)}, Roll No.: ${esc(rollNo)}</td></tr>
+          ${supervisor ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>` : ''}
+        </table>
+
+        <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+          <thead>
+            <tr style="background-color:#fafafa;">
+              <th style="width:8%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+              <th style="width:58%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Marking Parameters</th>
+              <th style="width:17%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+              <th style="width:17%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${criteriaRows}
+            <tr>
+              <td style="border:1px solid #000;"></td>
+              <td style="font-weight:bold;padding:5px 8px;border:1px solid #000;">Total Marks</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${pageMax}</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? totalMarks : ''}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${buildNote()}
+
+        <div style="font-size:11pt;margin:8px 0 6px 0;">
+          <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
+        </div>
+
+        <div style="margin-top:8px;font-size:11pt;">
+          <strong>Comments:</strong>
+          ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+        </div>
+
+        <div style="margin-top:6px;font-size:11pt;">
+          <strong>Suggestions &amp; recommendations:</strong>
+          ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+        </div>
+
+        <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+          <div style="font-weight:bold;margin-bottom:2px;">Examiner :</div>
+          <div><strong>Name:</strong> ${esc(extName || '')}</div>
+          <div><strong>Designation :</strong> ${esc(extDesignation || '')}</div>
+          <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;"><strong>Date :</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;"><strong>Signature :</strong> _____________________</td>
+            </tr>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  // Exact layout from External_evaluation_sheets_Thesis.docx
+  const criteriaRows = extCriteria.map((c, i) => `
+    <tr>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${i + 1}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(c.name)}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.max}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${c.marks !== null && c.marks !== undefined && c.marks !== '' ? c.marks : ''}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
+    </tr>`).join('');
 
   return `
-    ${buildPageHeader()}
-    <div style="font-weight:700;font-size:13px;text-align:center;">${titleLabel}</div>
-    <div style="font-size:12px;text-align:center;margin-bottom:8px;">(to be filled by external examiner)</div>
-    <div style="font-size:12px;margin:4px 0;"><strong>Credit: ${credit} | Full Marks: ${pageMax}</strong></div>
+    <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+      ${buildPageHeader()}
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">${phaseLabel} Evaluation Form for</div>
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">Thesis Program: <span style="font-weight:normal;">${esc(programName || '')}</span></div>
+        <div style="font-size:10.5pt;margin-top:2px;">(to be filled by external examiner)</div>
+      </div>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
-      <tr><td style="width:120px;"><strong>Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Name of Student:</strong></td><td>${esc(studentName)}</td></tr>
-      <tr><td><strong>Roll No:</strong></td><td>${esc(rollNo)}</td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
-      <thead><tr>
-        <th style="text-align:center;padding:4px;">S.No.</th>
-        <th style="text-align:left;padding:4px;">Marking Parameters</th>
-        <th style="text-align:center;padding:4px;">Full Marks</th>
-        <th style="text-align:center;padding:4px;">Marks Obtained</th>
-        <th style="text-align:center;padding:4px;">Remarks</th>
-      </tr></thead>
-      <tbody>
-        ${criteriaRows}
+      <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
         <tr>
-          <td></td>
-          <td style="font-weight:700;">Total Marks</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">${pageMax}</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">${hasMarks ? totalMarks : ''}</td>
-          <td></td>
+          <td style="font-weight:bold;width:50%;">Credit: 16</td>
+          <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
         </tr>
-      </tbody>
-    </table>
-    ${buildNote()}
-
-    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
-      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</td></tr>
-    </table>
-
-    <div style="margin-top:8px;font-size:12px;">
-      <strong>Comments:</strong>
-      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
-    </div>
-    <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>
-      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
-    </div>
-
-    <div style="font-size:12px;margin-top:16px;">
-      <strong>Examiner:</strong><br/>
-      <strong>Name:</strong> ${esc(extName || '')}<br/>
-      <strong>Post:</strong> ${esc(extDesignation || '')}<br/>
-      <strong>University/Organization:</strong><br/>
-      <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
-        <tr>
-          <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-          <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
-        </tr>
+        <tr><td colspan="2" style="padding-top:4px;"><strong>Title:</strong> ${esc(title)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Name of Student:</strong> ${esc(studentName)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Roll No:</strong> ${esc(rollNo)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor || '')}</td></tr>
       </table>
+
+      <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+        <thead>
+          <tr style="background-color:#fafafa;">
+            <th style="width:8%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+            <th style="width:52%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Marking Parameters</th>
+            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${criteriaRows}
+          <tr>
+            <td style="border:1px solid #000;"></td>
+            <td style="font-weight:bold;padding:5px 8px;border:1px solid #000;">Total Marks</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${pageMax}</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? totalMarks : ''}</td>
+            <td style="border:1px solid #000;"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${buildNote()}
+
+      <div style="font-size:11pt;margin:8px 0 6px 0;">
+        <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
+      </div>
+
+      <div style="margin-top:8px;font-size:11pt;">
+        <strong>Comments:</strong>
+        ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+      </div>
+
+      <div style="margin-top:6px;font-size:11pt;">
+        <strong>Suggestions &amp; recommendations:</strong>
+        ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+      </div>
+
+      <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
+        <div><strong>Name:</strong> ${esc(extName || '')}</div>
+        <div><strong>Post:</strong> ${esc(extDesignation || '')}</div>
+        <div><strong>University/Organization:</strong> IOE</div>
+        <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+          <tr>
+            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
+          </tr>
+        </table>
+      </div>
     </div>`;
 }
 
 /**
  * Build the master thesis evaluation HTML.
  * @param {Object} data - thesis data
- * @param {'supervisor'|'external'|'both'} [scope='both'] - which evaluator pages to include
+ * @param {'supervisor'|'external'|'both'|'external-midterm'|'external-final'|'external-both'} [scope='both'] - which evaluator pages to include
  */
 function buildMasterFormat(data, scope = 'both') {
-  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal, projectType } = data;
+  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal, projectType, programName } = data;
   const projectLabel = projectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
@@ -335,25 +437,26 @@ function buildMasterFormat(data, scope = 'both') {
   if (includeSup) {
     pages += `
     <div style="page-break-after:always;">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation)}
+      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation, programName, 'midterm')}
     </div>`;
   }
   if (includeExt) {
     pages += `
     <div${includeSup ? ' style="page-break-after:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType)}
+      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType, programName, supervisor)}
     </div>`;
   }
   if (includeExtFinal) {
     pages += `
     <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType)}
+      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType, programName, supervisor)}
     </div>`;
   }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
-    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
+    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11pt; line-height: 1.35; margin: 0; padding: 0; background: #fff; }
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
   </style></head><body>
@@ -556,7 +659,8 @@ async function buildThesisHtml(id, scope = 'both') {
   const thesis = await prisma.thesis.findUnique({
     where: { id },
     include: {
-      student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
+      program: { select: { name: true, code: true } },
+      student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } },
       supervisor: { select: { firstName: true, lastName: true, designation: true } },
       externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
       externalFinal: { select: { firstName: true, lastName: true, designation: true } },
@@ -565,6 +669,8 @@ async function buildThesisHtml(id, scope = 'both') {
     },
   });
   if (!thesis) return null;
+
+  const programName = thesis.program?.name || thesis.student?.program?.name || '';
 
   const evalData = thesis.evaluationComponents.map(c => {
     const e = thesis.evaluations.find(ev => ev.componentId === c.id);
@@ -593,6 +699,7 @@ async function buildThesisHtml(id, scope = 'both') {
     externalMidTerm: thesis.externalMidTerm || null,
     externalFinal: thesis.externalFinal || null,
     projectType: thesis.projectType,
+    programName,
   }, scope);
 }
 
@@ -778,7 +885,8 @@ exports.previewThesisEvaluation = async (req, res) => {
     const thesis = await prisma.thesis.findUnique({
       where: { id },
       include: {
-        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
+        program: { select: { name: true, code: true } },
+        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } },
         supervisor: { select: { firstName: true, lastName: true, designation: true } },
         externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
         externalFinal: { select: { firstName: true, lastName: true, designation: true } },
@@ -787,6 +895,8 @@ exports.previewThesisEvaluation = async (req, res) => {
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    const programName = thesis.program?.name || thesis.student?.program?.name || '';
 
     const evaluations = thesis.evaluations;
 
@@ -818,6 +928,7 @@ exports.previewThesisEvaluation = async (req, res) => {
       externalMidTerm: thesis.externalMidTerm || null,
       externalFinal: thesis.externalFinal || null,
       projectType: thesis.projectType,
+      programName,
     }, scope);
 
     res.setHeader('Content-Type', 'text/html');
