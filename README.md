@@ -295,18 +295,55 @@ Open your browser at **`http://localhost:5173`**.
 
 All seeded test accounts use the password: **`subesh`**
 
-| Role | Email | Scope / Responsibility |
-| :--- | :--- | :--- |
-| **Maintainer** | `subeshgaming@gmail.com` | Full department administration & system configuration |
-| **BCT Coordinator** | `bct.coordinator@pcampus.edu.np` | Computer Engineering Bachelor project coordinator |
-| **BEI Coordinator** | `bei.coordinator@pcampus.edu.np` | Electronics & Information Bachelor project coordinator |
-| **MSNCS Coordinator** | `msncs.coordinator@pcampus.edu.np` | Master Network & Cyber Security coordinator |
-| **Faculty / Supervisor** | `bishnu.tamang@pcampus.edu.np` | Faculty Supervisor & Peer Examiner |
-| **Faculty / Supervisor** | `sita.devi@pcampus.edu.np` | Faculty Supervisor & Peer Examiner |
-| **External Examiner** | `kiran.mainali@ioe.edu.np` | External Defense Committee Examiner |
-| **Bachelor Student** | `080bct001@pcampus.edu.np` | Bachelor 4th Year Student (BCT) |
-| **Bachelor Student** | `080bei001@pcampus.edu.np` | Bachelor 3rd Year Student (BEI) |
-| **Master Student** | `080msncs001@pcampus.edu.np` | Master 2nd Year Student (MSNCS) |
+### 1. Administration & Program Coordinators
+| Role | Email | Name | Scope / Department |
+| :--- | :--- | :--- | :--- |
+| **Maintainer** | `subeshgaming@gmail.com` | Subesh Gaming | Full Department Administration |
+| **BCT Coordinator** | `bct.coordinator@pcampus.edu.np` | Ram Prasad | Bachelor in Computer Engineering |
+| **BEI Coordinator** | `bei.coordinator@pcampus.edu.np` | Sita Devi | Bachelor in Electronics & Info Engineering |
+| **MSDSA Coordinator** | `msdsa.coordinator@pcampus.edu.np` | Gopal Adhikari | MSc in Data Science and Analytics |
+| **MSNCS Coordinator** | `msncs.coordinator@pcampus.edu.np` | Anil Thapa | MSc in Network and Cyber Security |
+| **MSICE Coordinator** | `msice.coordinator@pcampus.edu.np` | Pooja Sharma | MSc in Information & Communication Eng. |
+| **MSCSK Coordinator** | `mscsk.coordinator@pcampus.edu.np` | Meera Joshi | MSc in Computer Science & Knowledge Eng. |
+
+### 2. Faculty Supervisors & External Examiners
+| Role | Email | Name | Designation |
+| :--- | :--- | :--- | :--- |
+| **Faculty / Supervisor** | `prabesh.bhattarai@pcampus.edu.np` | Prabesh Bhattarai | Assoc. Prof. Dr. |
+| **Faculty / Supervisor** | `ramesh.sharma@pcampus.edu.np` | Ramesh Sharma | Assoc. Prof. |
+| **Faculty / Supervisor** | `anita.gurung@pcampus.edu.np` | Anita Gurung | Asst. Prof. Dr. |
+| **Faculty / Supervisor** | `bishnu.tamang@pcampus.edu.np` | Bishnu Tamang | Asst. Prof. |
+| **Faculty / Supervisor** | `sagar.acharya@pcampus.edu.np` | Sagar Acharya | Prof. Dr. |
+| **Faculty / Supervisor** | `maya.khadka@pcampus.edu.np` | Maya Khadka | Asst. Prof. Dr. |
+| **External Examiner** | `hari.adhikari@pcampus.edu.np` | Hari Adhikari | Prof. Dr. |
+| **External Examiner** | `suman.bhattarai@pcampus.edu.np` | Suman Bhattarai | Assoc. Prof. Dr. |
+| **External Examiner** | `rita.sharma@pcampus.edu.np` | Rita Sharma | Asst. Prof. Dr. |
+| **External Examiner** | `kiran.mainali@pcampus.edu.np` | Kiran Mainali | Prof. Dr. |
+
+### 3. Master Students (M.Sc. Theses & Projects)
+| Program | Email | Roll Number | Batch | Assigned Type | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **MSDSA** | `079msdsa01@pcampus.edu.np` | `079MSDSA01` | 2079 | **Master Thesis** | **COMPLETED** (300/300 evaluated) |
+| **MSDSA** | `080msdsa01@pcampus.edu.np` | `080MSDSA01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSDSA** | `080msdsa02@pcampus.edu.np` | `080MSDSA02` | 2080 | **Master Project** | **ACTIVE** |
+| **MSNCS** | `079msncs02@pcampus.edu.np` | `079MSNCS02` | 2079 | **Master Project** | **COMPLETED** (100/100 evaluated) |
+| **MSNCS** | `080msncs01@pcampus.edu.np` | `080MSNCS01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSNCS** | `080msncs02@pcampus.edu.np` | `080MSNCS02` | 2080 | **Master Project** | **ACTIVE** |
+| **MSICE** | `080msice01@pcampus.edu.np` | `080MSICE01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSICE** | `080msice02@pcampus.edu.np` | `080MSICE02` | 2080 | **Master Project** | **ACTIVE** |
+| **MSCSK** | `080mscsk01@pcampus.edu.np` | `080MSCSK01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSCSK** | `080mscsk02@pcampus.edu.np` | `080MSCSK02` | 2080 | **Master Project** | **ACTIVE** |
+
+### 4. Bachelor Students (B.E. Projects)
+| Program | Email | Roll Number | Batch | Assigned Type | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **BCT** | `079bct001@pcampus.edu.np` | `079BCT001` | 2079 | **Major Project** | **COMPLETED** |
+| **BCT** | `080bct001@pcampus.edu.np` | `080BCT001` | 2080 | **Major Project** | **ACTIVE** |
+| **BCT** | `080bct004@pcampus.edu.np` | `080BCT004` | 2080 | **Minor Project** | **ACTIVE** |
+| **BCT** | `081bct001@pcampus.edu.np` | `081BCT001` | 2081 | **Minor Project** | **ACTIVE** |
+| **BEI** | `079bei001@pcampus.edu.np` | `079BEI001` | 2079 | **Minor Project** | **ACTIVE** |
+| **BEI** | `080bei001@pcampus.edu.np` | `080BEI001` | 2080 | **Minor Project** | **ACTIVE** |
+| **BEI** | `081bei001@pcampus.edu.np` | `081BEI001` | 2081 | **Minor Project** | **ACTIVE** |
 
 ---
 
