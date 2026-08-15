@@ -103,7 +103,12 @@ function Sidebar({ user, isOpen, onClose }) {
       <div className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-area">
-            <img src="https://ioe.tu.edu.np/assets/logo.png" alt="IOE Logo" className="sidebar-logo" />
+            <img
+              src="/ioe_logo.png"
+              onError={(e) => { e.currentTarget.src = 'https://ioe.tu.edu.np/assets/logo.png'; }}
+              alt="IOE Logo"
+              className="sidebar-logo"
+            />
             <div className="logo-text">
               <h2>TPMS</h2>
               <p>Thesis/Project Management System</p>

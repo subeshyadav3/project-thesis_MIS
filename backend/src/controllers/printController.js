@@ -194,16 +194,18 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       </div>
 
       <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-        <div style="margin-bottom:2px;">Examiner:</div>
-        <div>Name: ${esc(supervisor)}</div>
-        <div>Post: ${esc(supervisorDesignation || 'Supervisor')}</div>
-        <div>Organization: IOE</div>
-        <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
-          <tr>
-            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;">Signature: _____________________</td>
-          </tr>
-        </table>
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(supervisor)}</div>
+          <div>Post: ${esc(supervisorDesignation || 'Supervisor')}</div>
+          <div>Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>`;
 }
@@ -270,7 +272,7 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
 
         ${buildNote()}
 
-        <div style="font-size:11pt;margin:8px 0 6px 0;">
+        <div style="font-size:11pt;margin-8px 0 6px 0;">
           <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
         </div>
 
@@ -285,15 +287,17 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
         </div>
 
         <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-          <div style="margin-bottom:2px;">Examiner :</div>
-          <div>Name: ${esc(extName || '')}</div>
-          <div>Designation : ${esc(extDesignation || '')}</div>
-          <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
-            <tr>
-              <td style="width:50%;">Date : ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-              <td style="width:50%;">Signature : _____________________</td>
-            </tr>
-          </table>
+          <div style="font-weight:bold;margin-bottom:4px;">Examiner :</div>
+          <div style="padding-left:18px;">
+            <div>Name: ${esc(extName || '')}</div>
+            <div>Designation : ${esc(extDesignation || '')}</div>
+            <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+              <tr>
+                <td style="width:50%;">Date : ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                <td style="width:50%;">Signature : _____________________</td>
+              </tr>
+            </table>
+          </div>
         </div>
       </div>`;
   }
@@ -367,16 +371,18 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
       </div>
 
       <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-        <div style="margin-bottom:2px;">Examiner:</div>
-        <div>Name: ${esc(extName || '')}</div>
-        <div>Post: ${esc(extDesignation || '')}</div>
-        <div>University/Organization: IOE</div>
-        <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
-          <tr>
-            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;">Signature: _____________________</td>
-          </tr>
-        </table>
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(extName || '')}</div>
+          <div>Post: ${esc(extDesignation || '')}</div>
+          <div>University/Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>`;
 }
@@ -435,23 +441,39 @@ function buildMasterFormat(data, scope = 'both') {
   const finalExtName = externalFinal ? `${externalFinal.firstName} ${externalFinal.lastName}`.trim() : '';
   const finalExtDesignation = externalFinal?.designation || '';
 
-  if (includeSup) {
+  if (projectType === 'PROJECT') {
+    // Master Project has exactly ONE external evaluation sheet (100 marks) per External_evaluation_sheets Project.docx
+    const projCriteria = finalCriteria.length ? finalCriteria : (midCriteria.length ? midCriteria : legacyExt);
+    const projComments = finalComments.length ? finalComments : midComments;
+    const projFeedbackComments = finalFeedbackComments || midFeedbackComments;
+    const projFeedbackSuggestions = finalFeedbackSuggestions || midFeedbackSuggestions;
+    const projExtName = finalExtName || midExtName;
+    const projExtDesignation = finalExtDesignation || midExtDesignation;
+
     pages += `
     <div class="page-sheet">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation, programName, 'midterm')}
+      ${buildExternalPage(title, studentName, rollNo, projCriteria, projComments, projFeedbackComments, projFeedbackSuggestions, 'final', projExtName, projExtDesignation, projectType, programName, supervisor)}
     </div>`;
-  }
-  if (includeExt) {
-    pages += `
-    <div class="page-sheet">
-      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType, programName, supervisor)}
-    </div>`;
-  }
-  if (includeExtFinal) {
-    pages += `
-    <div class="page-sheet">
-      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType, programName, supervisor)}
-    </div>`;
+  } else {
+    // Master Thesis has Supervisor, External Mid-Term, and External Final
+    if (includeSup) {
+      pages += `
+      <div class="page-sheet">
+        ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation, programName, 'midterm')}
+      </div>`;
+    }
+    if (includeExt) {
+      pages += `
+      <div class="page-sheet">
+        ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType, programName, supervisor)}
+      </div>`;
+    }
+    if (includeExtFinal) {
+      pages += `
+      <div class="page-sheet">
+        ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType, programName, supervisor)}
+      </div>`;
+    }
   }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
@@ -541,29 +563,33 @@ function buildBachelorFormat(data) {
   const examinerBlocks = examiners.length
     ? examiners.map((e, idx) => `
       <div style="font-size:11pt;margin-top:${idx === 0 ? 14 : 10}px;page-break-inside:avoid;">
-        <div style="margin-bottom:2px;">Examiner:</div>
-        <div>Name: ${esc(e.submittedBy)}</div>
-        <div>Post: ${esc(e.evaluatorRole || 'Examiner')}</div>
-        <div>Organization: IOE</div>
-        <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
-          <tr>
-            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;">Signature: _____________________</td>
-          </tr>
-        </table>
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(e.submittedBy)}</div>
+          <div>Post: ${esc(e.evaluatorRole || 'Examiner')}</div>
+          <div>Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
       </div>`).join('')
     : `
       <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-        <div style="margin-bottom:2px;">Examiner:</div>
-        <div>Name: ${esc(supervisor)}</div>
-        <div>Post: Supervisor</div>
-        <div>Organization: IOE</div>
-        <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
-          <tr>
-            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;">Signature: _____________________</td>
-          </tr>
-        </table>
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(supervisor)}</div>
+          <div>Post: Supervisor</div>
+          <div>Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
       </div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>

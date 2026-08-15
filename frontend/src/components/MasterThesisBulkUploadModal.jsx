@@ -11,6 +11,7 @@ import BulkPendingUsersModal from './BulkPendingUsersModal';
 export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, title }) {
   const toast = useToast();
   const [selectedFile, setSelectedFile] = useState(null);
+  const [defaultProjectType, setDefaultProjectType] = useState('THESIS');
   const [bulkPreview, setBulkPreview] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showReview, setShowReview] = useState(false);
@@ -37,6 +38,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
 
   const resetAndClose = () => {
     setSelectedFile(null);
+    setDefaultProjectType('THESIS');
     setBulkPreview(null);
     setBulkLoading(false);
     setShowReview(false);
@@ -56,6 +58,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('projectType', defaultProjectType);
       const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setBulkPreview(data);
     } catch (err) {
@@ -165,16 +168,30 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
         {!bulkPreview ? (
           <form onSubmit={handleFileUpload}>
             <div className="form-group">
+              <label>Default Type</label>
+              <select
+                value={defaultProjectType}
+                onChange={e => setDefaultProjectType(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="THESIS">Thesis (Default)</option>
+                <option value="PROJECT">Project</option>
+              </select>
+              <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 2, display: 'block' }}>
+                Applies to all rows unless overridden in an optional &quot;Type&quot; column in Excel.
+              </span>
+            </div>
+            <div className="form-group">
               <label>Excel File (.xlsx)</label>
               <input type="file" accept=".xlsx,.xls" onChange={e => setSelectedFile(e.target.files[0])} required />
-                  <a
-                    href={user.role === 'SUPERVISOR' || user.role === 'EXTERNAL_EXAMINER' ? '/api/download-template/master_upload_template.xlsx' : '/master_upload_template.xlsx'}
-                    download
-                    style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}
-                  >
-                    <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
-                    {' '}Download blank template
-                  </a>
+              <a
+                href={user.role === 'SUPERVISOR' || user.role === 'EXTERNAL_EXAMINER' ? '/api/download-template/master_upload_template.xlsx' : '/master_upload_template.xlsx'}
+                download
+                style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 4, display: 'inline-block' }}
+              >
+                <Icon name="download" className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }} />
+                {' '}Download blank template
+              </a>
             </div>
             <div className="modal-actions">
               <button type="button" className="btn btn-outline" onClick={resetAndClose}>
@@ -213,6 +230,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                     <th style={{ width: 30 }}></th>
                     <th>#</th>
                     <th>Roll</th>
+                    <th>Type</th>
                     <th>Title</th>
                     <th>Student</th>
                     <th>Supervisor</th>
@@ -228,6 +246,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                     const isExpanded = expandedRow === p.row;
                     const edits = rowEdits[p.row] || {};
                     const hasAnomaly = p.anomalies && p.anomalies.length > 0;
+                    const currentType = edits.projectType ?? p.projectType ?? 'THESIS';
 
                     const toggleExpand = () => setExpandedRow(isExpanded ? null : p.row);
 
@@ -266,6 +285,11 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                               </span>
                             </div>
                           </td>
+                          <td>
+                            <span className={`badge ${currentType === 'PROJECT' ? 'badge-primary' : 'badge-default'}`} style={{ fontSize: 10 }}>
+                              {currentType === 'PROJECT' ? 'Project' : 'Thesis'}
+                            </span>
+                          </td>
                           <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{edits.title || p.title}</td>
                           <td>{p.studentMatch ? <span style={{ color: 'var(--color-success)' }}>{p.studentMatch.name}</span> : <span style={{ color: 'var(--color-primary, #0284c7)' }}>Will create: {p.name || edits.roll || p.roll}</span>}</td>
                           <td>{p.supervisorMatch ? <span style={{ color: 'var(--color-success)' }}>{p.supervisorMatch.name}</span> : p.supervisorWillCreate ? <span style={{ color: 'var(--color-warning)' }}>Will create: {p.supervisorWillCreate.name}</span> : <span style={{ color: 'var(--color-error)' }}>?</span>}</td>
@@ -282,7 +306,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={10} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
+                            <td colSpan={11} style={{ padding: '8px 12px', background: 'var(--color-surface-variant)' }}>
                               {hasAnomaly && (
                                 <div style={{ marginBottom: 8 }}>
                                   {p.anomalies.map((a, ai) => (

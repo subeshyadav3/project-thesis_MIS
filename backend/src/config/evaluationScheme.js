@@ -52,17 +52,12 @@ const SCHEMES = {
     name: 'Master Project',
     totalMaxMarks: 100,
     components: [
-      // Supervisor criteria (3 × 10 = 30)
-      { type: 'SUPERVISOR', name: 'Attendance and regular progress reporting', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
-      { type: 'SUPERVISOR', name: 'Degree of completeness of project work', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
-      { type: 'SUPERVISOR', name: 'Understanding of project work & related theory', maxMarks: 10, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
-      // External (Mid-Term) criteria (2 × 10 = 20)
-      { type: 'EXTERNAL_MIDTERM', name: 'Literature Review & Background Study', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Preliminary Work & Implementation Progress', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      // External (Final) criteria (3 = 50)
-      { type: 'EXTERNAL_FINAL', name: 'Presentation Skills and Defense', maxMarks: 15, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_FINAL', name: 'Implementation Quality & Functionality', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_FINAL', name: 'Report Writing', maxMarks: 15, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      // External Examiner criteria (5 × 20 = 100) per official PULCHOWK form
+      { type: 'EXTERNAL_FINAL', name: 'Presentation Skills and Flow of Slides', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Defense & Question Handling', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Understanding of Thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Research Quality & Originality', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Report Writing', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ],
   },
 };

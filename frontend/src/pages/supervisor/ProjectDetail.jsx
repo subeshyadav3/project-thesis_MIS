@@ -40,6 +40,11 @@ function ProjectDetail() {
   // merely the assigned supervisor gets supervisor-level access only.
   const canManageItem = isCoordinator && item?.canManage === true;
   const isItemSupervisor = item?.supervisor?.id === user.id;
+  const isMasterProject = type === 'thesis' && item?.projectType === 'PROJECT';
+  const getRoleLabel = (role) => {
+    if (role === 'EXTERNAL_EXAMINER') return type === 'thesis' ? 'External Examiner' : 'Internal Examiner';
+    return ROLE_LABEL[role] || role;
+  };
   const [uploadStage, setUploadStage] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -351,7 +356,7 @@ function ProjectDetail() {
         {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
         {activeTab === 'overview' && (
           <>
-            <WorkflowStepper status={item?.status} degreeType={type === 'thesis' ? 'MASTER' : 'BACHELOR'} components={components} evaluations={evaluations} />
+            <WorkflowStepper status={item?.status} degreeType={type === 'thesis' ? 'MASTER' : 'BACHELOR'} projectType={item?.projectType || 'THESIS'} components={components} evaluations={evaluations} />
 
             {/* Summary cards */}
             <div className="stats-grid" style={{ marginBottom: 24 }}>
@@ -419,23 +424,33 @@ function ProjectDetail() {
                 {type === 'thesis' && (
                   <InfoRow label="Student" value={`${item?.student?.firstName || ''} ${item?.student?.lastName || ''}${item?.student?.rollNumber ? ` (${item.student.rollNumber})` : ''}`} />
                 )}
-                <InfoRow label="Supervisor" value={item?.supervisor
-                  ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
-                  : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
-                } />
+                {!isMasterProject && (
+                  <InfoRow label="Supervisor" value={item?.supervisor
+                    ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
+                    : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                  } />
+                )}
                 {type === 'thesis' ? (
-                  <>
-                    <InfoRow label="External (Mid-Term)" value={
-                      item?.externalMidTerm
-                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalMidTerm.firstName} {item.externalMidTerm.lastName}</span>
+                  isMasterProject ? (
+                    <InfoRow label="External Examiner" value={
+                      (item?.externalFinal || item?.externalMidTerm)
+                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>{(item.externalFinal || item.externalMidTerm).firstName} {(item.externalFinal || item.externalMidTerm).lastName}</span>
                         : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                     } />
-                    <InfoRow label="External (Final)" value={
-                      item?.externalFinal
-                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalFinal.firstName} {item.externalFinal.lastName}</span>
-                        : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
-                    } />
-                  </>
+                  ) : (
+                    <>
+                      <InfoRow label="External (Mid-Term)" value={
+                        item?.externalMidTerm
+                          ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalMidTerm.firstName} {item.externalMidTerm.lastName}</span>
+                          : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                      } />
+                      <InfoRow label="External (Final)" value={
+                        item?.externalFinal
+                          ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalFinal.firstName} {item.externalFinal.lastName}</span>
+                          : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                      } />
+                    </>
+                  )
                 ) : (
                   <InfoRow label="Internal Examiner" value={
                     item?.examinerAssignments?.length > 0
@@ -490,7 +505,7 @@ function ProjectDetail() {
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface)' }}>{c.name}</div>
                               <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                                {ROLE_LABEL[c.evaluatorRole] !== c.name ? `${ROLE_LABEL[c.evaluatorRole]} · ` : ''}Max {c.maxMarks}
+                                {getRoleLabel(c.evaluatorRole) !== c.name ? `${getRoleLabel(c.evaluatorRole)} · ` : ''}Max {c.maxMarks}
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -544,25 +559,35 @@ function ProjectDetail() {
             {/* Coordinator sections */}
             {canManageItem && (
               <div style={{ display: 'grid', gap: 24, marginBottom: 24 }}>
-                <SupervisorAssignmentSection
-                  type={type} id={parseInt(id)}
-                  currentSupervisor={item?.supervisor}
-                  supervisorAssignmentStatus={item?.supervisorAssignmentStatus}
-                  onRefresh={loadData} disabled={false}
-                />
+                {!isMasterProject && (
+                  <SupervisorAssignmentSection
+                    type={type} id={parseInt(id)}
+                    currentSupervisor={item?.supervisor}
+                    supervisorAssignmentStatus={item?.supervisorAssignmentStatus}
+                    onRefresh={loadData} disabled={false}
+                  />
+                )}
                 {type === 'thesis' && (
-                  <>
-                    <ExternalExaminerSection
-                      type="midterm" id={parseInt(id)}
-                      currentExaminer={item?.externalMidTerm} label="Mid-Term"
-                      onRefresh={loadData} disabled={false}
-                    />
+                  isMasterProject ? (
                     <ExternalExaminerSection
                       type="final" id={parseInt(id)}
-                      currentExaminer={item?.externalFinal} label="Final"
+                      currentExaminer={item?.externalFinal || item?.externalMidTerm} label="External Examiner"
                       onRefresh={loadData} disabled={false}
                     />
-                  </>
+                  ) : (
+                    <>
+                      <ExternalExaminerSection
+                        type="midterm" id={parseInt(id)}
+                        currentExaminer={item?.externalMidTerm} label="Mid-Term"
+                        onRefresh={loadData} disabled={false}
+                      />
+                      <ExternalExaminerSection
+                        type="final" id={parseInt(id)}
+                        currentExaminer={item?.externalFinal} label="Final"
+                        onRefresh={loadData} disabled={false}
+                      />
+                    </>
+                  )
                 )}
                 {type !== 'thesis' && (
                   <ExaminerAssignmentSection
@@ -585,7 +610,7 @@ function ProjectDetail() {
                     <select className="form-input" value={uploadStage} onChange={e => setUploadStage(e.target.value)}>
                       <option value="">Select...</option>
                       <option value="PROPOSAL">Proposal</option>
-                      <option value="MID_TERM">Mid Term</option>
+                      {!isMasterProject && <option value="MID_TERM">Mid Term</option>}
                       <option value="FINAL">Final</option>
                     </select>
                   </div>
@@ -983,11 +1008,13 @@ function CoordinatorEvaluationView({ type, orderedComponents, componentByType, e
           {orderedComponents.map(c => {
             const e = evaluationForComponent(c.id);
             const hasMarks = e?.marks !== null && e?.marks !== undefined;
-            const roleLabel = c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
-              : c.evaluationType === 'EXTERNAL_MIDTERM' ? 'External (Mid)'
-              : c.evaluationType === 'EXTERNAL_FINAL' ? 'External (Final)'
-              : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner'
-              : c.name;
+            const roleLabel = (type === 'thesis')
+              ? (c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+                : c.evaluationType === 'EXTERNAL_MIDTERM' ? 'External (Mid)'
+                : 'External Examiner')
+              : (c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+                : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner'
+                : c.name);
             return (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
                 <td style={{ padding: '8px 14px' }}>

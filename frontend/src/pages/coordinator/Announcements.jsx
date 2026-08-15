@@ -7,19 +7,34 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
-const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
+const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
 
-const DEFAULT_FORM_FIELDS = [
+const MASTER_THESIS_FORM_FIELDS = [
+  { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis'] },
   { key: 'program', label: 'Program', type: 'select', required: true },
-  { key: 'cluster', label: 'Research Project Cluster / Area', type: 'select', required: true },
-  { key: 'title', label: 'Project / Thesis Concept Title', type: 'text', required: true },
-  { key: 'pdf_document', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
+  { key: 'cluster', label: 'Research Thesis Cluster / Area', type: 'select', required: true },
+  { key: 'title', label: 'Thesis Concept Title', type: 'text', required: true },
+  { key: 'pdf_document', label: 'Thesis Concept Note Document (PDF, max 10MB)', type: 'file', required: true },
   { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
   { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: true },
   { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: true },
   { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
 ];
+
+const MASTER_PROJECT_FORM_FIELDS = [
+  { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Project'] },
+  { key: 'program', label: 'Program', type: 'select', required: true },
+  { key: 'cluster', label: 'Research Project Cluster / Area', type: 'select', required: true },
+  { key: 'title', label: 'Project Concept Title', type: 'text', required: true },
+  { key: 'pdf_document', label: 'Project Proposal Document (PDF, max 10MB)', type: 'file', required: true },
+  { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'radio', required: true },
+  { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: true },
+  { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false },
+];
+
+const DEFAULT_FORM_FIELDS = MASTER_THESIS_FORM_FIELDS;
 
 const BACHELOR_DEFAULT_FORM_FIELDS = [
   { key: 'program', label: 'Program', type: 'select', required: true },
@@ -167,8 +182,16 @@ function CoordinatorAnnouncements() {
   const degreeType = user.program?.degreeType || '';
   const isMasterCoordinator = degreeType === 'MASTER';
   const TYPE_OPTIONS = isMasterCoordinator
-    ? [{ value: 'GENERAL', label: 'General' }, { value: 'THESIS', label: 'Thesis' }]
-    : [{ value: 'GENERAL', label: 'General' }, { value: 'MINOR', label: 'Minor Project' }, { value: 'MAJOR', label: 'Major Project' }];
+    ? [
+        { value: 'GENERAL', label: 'General Announcement' },
+        { value: 'THESIS', label: 'Master Thesis Registration' },
+        { value: 'MASTER_PROJECT', label: 'Master Project Registration' }
+      ]
+    : [
+        { value: 'GENERAL', label: 'General Announcement' },
+        { value: 'MINOR', label: 'Minor Project' },
+        { value: 'MAJOR', label: 'Major Project' }
+      ];
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -204,6 +227,7 @@ function CoordinatorAnnouncements() {
   const [editResponseForm, setEditResponseForm] = useState({});
   const [savingResponse, setSavingResponse] = useState(false);
   const [finalizingResponse, setFinalizingResponse] = useState(null);
+  const [finalizeProjectType, setFinalizeProjectType] = useState('THESIS');
   const [finalizeSupervisorId, setFinalizeSupervisorId] = useState('');
   const [finalizeTitle, setFinalizeTitle] = useState('');
   const [finalizeCluster, setFinalizeCluster] = useState('');
@@ -268,16 +292,19 @@ function CoordinatorAnnouncements() {
     const isEdit = !!editAnnouncement;
     const isAllPrograms = form.program === 'all';
     const programIds = isAllPrograms ? [] : [Number(form.program)];
+    const isMasterProject = form.type === 'MASTER_PROJECT';
+    const backendType = isMasterProject ? 'THESIS' : form.type;
     const normalizedFields = (form.formFields || [])
       .filter(f => f.label?.trim() && f.key?.trim())
       .map(f => ({ key: f.key.trim(), label: f.label.trim(), type: f.type || 'text', required: !!f.required, placeholder: f.placeholder || '' }));
     const payload = {
       ...form,
+      type: backendType,
       audience: isAllPrograms ? 'ALL' : 'PROGRAMS',
       programIds,
       degreeType: user.program?.degreeType || '',
       studentIds: selectedStudents,
-      formEnabled: form.type === 'THESIS' && form.formEnabled,
+      formEnabled: (backendType === 'THESIS') && form.formEnabled,
       formFields: normalizedFields,
       startDate: form.startDate || undefined,
       expirationDate: form.expirationDate || undefined,
@@ -538,7 +565,27 @@ function CoordinatorAnnouncements() {
                 <div className="form-row" style={{ display: 'flex', gap: 12 }}>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label>Type</label>
-                    <select value={form.type} onChange={e => { const t = e.target.value; setForm({...form, type: t, allowGroupFormation: ['MINOR', 'MAJOR', 'THESIS'].includes(t) ? true : form.allowGroupFormation, degreeType: ['MINOR', 'MAJOR'].includes(t) ? 'BACHELOR' : t === 'THESIS' ? 'MASTER' : '' }); }}>
+                    <select
+                      value={form.type}
+                      onChange={e => {
+                        const t = e.target.value;
+                        const isThesis = t === 'THESIS';
+                        const isMasterProject = t === 'MASTER_PROJECT';
+                        const isBachelorProject = ['MINOR', 'MAJOR'].includes(t);
+                        const today = new Date().toISOString().split('T')[0];
+                        const defaultFields = isMasterProject ? MASTER_PROJECT_FORM_FIELDS : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : MASTER_THESIS_FORM_FIELDS);
+                        setForm({
+                          ...form,
+                          type: t,
+                          title: isMasterProject && !form.title ? 'Master Project Concept Registration' : (isThesis && !form.title ? 'Master Thesis Concept Registration' : form.title),
+                          allowGroupFormation: isBachelorProject ? true : false,
+                          formEnabled: (isThesis || isMasterProject) ? true : (isBachelorProject ? false : form.formEnabled),
+                          formFields: (isThesis || isMasterProject) ? defaultFields : form.formFields,
+                          startDate: (isThesis || isMasterProject) && !form.startDate ? today : form.startDate,
+                          degreeType: isBachelorProject ? 'BACHELOR' : (isThesis || isMasterProject) ? 'MASTER' : '',
+                        });
+                      }}
+                    >
                       {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
@@ -705,7 +752,7 @@ function CoordinatorAnnouncements() {
                 </div>
                 )}
 
-                {form.type === 'THESIS' && (
+                {(form.type === 'THESIS' || form.type === 'MASTER_PROJECT') && (
                   <div className="form-group" style={{
                     background: 'var(--color-surface-container-low)',
                     borderRadius: 'var(--border-radius-md)',
@@ -739,16 +786,20 @@ function CoordinatorAnnouncements() {
                           onClick={() => {
                             const on = !form.formEnabled;
                             const today = new Date().toISOString().split('T')[0];
-                            const defaultFields = user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS;
+                            const defaultFields = form.type === 'MASTER_PROJECT' ? MASTER_PROJECT_FORM_FIELDS : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : MASTER_THESIS_FORM_FIELDS);
                             setForm({ ...form, formEnabled: on, formFields: on && !form.formFields?.length ? defaultFields : form.formFields, startDate: on && !form.startDate && !editAnnouncement ? today : form.startDate });
                           }}
                         >
-                          {user.program?.degreeType === 'BACHELOR' ? 'Enable Project Registration Form' : 'Enable Thesis Registration Form'}
+                          {user.program?.degreeType === 'BACHELOR'
+                            ? 'Enable Project Registration Form'
+                            : (form.type === 'MASTER_PROJECT' ? 'Enable Master Project Registration Form' : 'Enable Master Thesis Registration Form')}
                         </label>
                         <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
                           {user.program?.degreeType === 'BACHELOR'
                             ? 'Students fill out a project registration form; submitting creates their bachelor project proposal (PDF). Submissions after the deadline require approval.'
-                            : 'Students fill out a thesis registration form; submitting creates their master thesis proposal (PDF). Submissions after the deadline require approval.'}
+                            : (form.type === 'MASTER_PROJECT'
+                              ? 'Students fill out a project registration form; submitting creates their MSc project concept proposal (PDF). Submissions after the deadline require approval.'
+                              : 'Students fill out a thesis registration form; submitting creates their MSc thesis concept proposal (PDF). Submissions after the deadline require approval.')}
                         </p>
                       </div>
                     </div>
@@ -774,9 +825,14 @@ function CoordinatorAnnouncements() {
                             <label style={{ fontSize: 12, fontWeight: 600 }}>Form Fields (Google Forms Style Editor)</label>
                             <div style={{ display: 'flex', gap: 6 }}>
                               {user.program?.degreeType !== 'BACHELOR' && (
-                                <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: DEFAULT_FORM_FIELDS })}>
-                                  Load Master Template
-                                </button>
+                                <>
+                                  <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: MASTER_THESIS_FORM_FIELDS })}>
+                                    Load Thesis Template
+                                  </button>
+                                  <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: MASTER_PROJECT_FORM_FIELDS })}>
+                                    Load Project Template
+                                  </button>
+                                </>
                               )}
                               {user.program?.degreeType === 'BACHELOR' ? (
                                 <button type="button" className="btn btn-xs btn-outline" onClick={() => setForm({ ...form, formFields: BACHELOR_DEFAULT_FORM_FIELDS })}>
@@ -787,7 +843,7 @@ function CoordinatorAnnouncements() {
                                   Load Bachelor Template
                                 </button>
                               )}
-                              <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
+                              <button type="button" className="btn btn-sm btn-outline" onClick={() => setForm({ ...form, formFields: [...(form.formFields?.length ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : MASTER_THESIS_FORM_FIELDS)), { key: `custom_${Date.now()}`, label: 'New Question', type: 'text', required: false, placeholder: '' }] })}>
                                 <Icon name="add" className="material-symbols-outlined" /> Add Field
                               </button>
                             </div>
@@ -796,7 +852,6 @@ function CoordinatorAnnouncements() {
                             Customize field labels, select field types, or toggle Required / Optional for each question.
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {/* Fixed Student Profile Metadata info */}
                             <div style={{ border: '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                 <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
@@ -806,8 +861,7 @@ function CoordinatorAnnouncements() {
                               </div>
                             </div>
 
-                            {/* Dynamic Editable Fields */}
-                            {(form.formFields && form.formFields.length > 0 ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : DEFAULT_FORM_FIELDS)).map((f, idx) => (
+                            {(form.formFields && form.formFields.length > 0 ? form.formFields : (user.program?.degreeType === 'BACHELOR' ? BACHELOR_DEFAULT_FORM_FIELDS : MASTER_THESIS_FORM_FIELDS)).map((f, idx) => (
                               <div key={idx} style={{ border: f.required ? '1px solid var(--color-primary)' : '1px solid var(--color-outline-variant)', borderRadius: 10, background: 'var(--color-surface-container-lowest)', padding: '12px 14px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                   <input
@@ -815,7 +869,7 @@ function CoordinatorAnnouncements() {
                                     style={{ flex: 1, fontWeight: 600, fontSize: 14 }}
                                     value={f.label}
                                     onChange={e => {
-                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...MASTER_THESIS_FORM_FIELDS];
                                       currentFields[idx] = { ...currentFields[idx], label: e.target.value, key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') };
                                       setForm({ ...form, formFields: currentFields });
                                     }}
@@ -826,7 +880,7 @@ function CoordinatorAnnouncements() {
                                     className="icon-btn danger"
                                     title="Remove field"
                                     onClick={() => {
-                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                      const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...MASTER_THESIS_FORM_FIELDS];
                                       setForm({ ...form, formFields: currentFields.filter((_, i) => i !== idx) });
                                     }}
                                   >
@@ -839,31 +893,31 @@ function CoordinatorAnnouncements() {
                                     <select
                                       className="form-input"
                                       style={{ padding: '2px 6px', fontSize: 12 }}
-                                      value={f.type || 'text'}
+                                      value={f.type}
                                       onChange={e => {
-                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...MASTER_THESIS_FORM_FIELDS];
                                         currentFields[idx] = { ...currentFields[idx], type: e.target.value };
                                         setForm({ ...form, formFields: currentFields });
                                       }}
                                     >
                                       <option value="text">Short Text</option>
-                                      <option value="textarea">Paragraph</option>
-                                      <option value="select">Dropdown</option>
-                                      <option value="radio">Radio Choice</option>
-                                      <option value="file">PDF File Upload</option>
+                                      <option value="textarea">Paragraph / Long Text</option>
+                                      <option value="select">Dropdown Select</option>
+                                      <option value="radio">Radio Buttons</option>
+                                      <option value="file">File Upload (PDF)</option>
                                     </select>
                                   </div>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', margin: 0 }}>
                                     <input
                                       type="checkbox"
                                       checked={!!f.required}
                                       onChange={e => {
-                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...DEFAULT_FORM_FIELDS];
+                                        const currentFields = form.formFields && form.formFields.length > 0 ? [...form.formFields] : [...MASTER_THESIS_FORM_FIELDS];
                                         currentFields[idx] = { ...currentFields[idx], required: e.target.checked };
                                         setForm({ ...form, formFields: currentFields });
                                       }}
                                     />
-                                    {f.required ? <span style={{ color: 'var(--color-error)' }}>Required *</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>Optional</span>}
+                                    Required
                                   </label>
                                 </div>
                               </div>
@@ -1467,14 +1521,14 @@ function CoordinatorAnnouncements() {
           </div>
         )}
 
-        {/* Modal for Finalizing Form Response to Thesis */}
+        {/* Modal for Finalizing Form Response to Thesis or Project */}
         {finalizingResponse && (
           <div className="modal-overlay" onClick={() => setFinalizingResponse(null)}>
             <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
               <div className="modal-header">
                 <div className="modal-header-icon success"><Icon name="task_alt" className="material-symbols-outlined" /></div>
                 <div className="modal-header-text">
-                  <h2>Finalize Response & Create Thesis</h2>
+                  <h2>Finalize Response & Create {finalizeProjectType === 'PROJECT' ? 'Project' : 'Thesis'}</h2>
                   <p>Student: {finalizingResponse.student?.firstName} {finalizingResponse.student?.lastName}</p>
                 </div>
                 <button className="modal-close-btn" onClick={() => setFinalizingResponse(null)}><Icon name="close" className="material-symbols-outlined" /></button>
@@ -1482,8 +1536,16 @@ function CoordinatorAnnouncements() {
 
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Thesis Title</label>
-                  <input className="form-input" value={finalizeTitle} onChange={e => setFinalizeTitle(e.target.value)} placeholder="Enter finalized thesis title" />
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Record Type</label>
+                  <select className="form-input" value={finalizeProjectType} onChange={e => setFinalizeProjectType(e.target.value)}>
+                    <option value="THESIS">Master Thesis</option>
+                    <option value="PROJECT">Master Project</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final {finalizeProjectType === 'PROJECT' ? 'Project' : 'Thesis'} Title</label>
+                  <input className="form-input" value={finalizeTitle} onChange={e => setFinalizeTitle(e.target.value)} placeholder={`Enter finalized ${finalizeProjectType === 'PROJECT' ? 'project' : 'thesis'} title`} />
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
@@ -1564,10 +1626,12 @@ function CoordinatorAnnouncements() {
                     try {
                       await api.post(`/announcements/responses/${finalizingResponse.id}/finalize`, {
                         title: finalizeTitle,
+                        projectType: finalizeProjectType,
                         cluster: finalizeCluster,
                         supervisorId: finalizeSupervisorId ? parseInt(finalizeSupervisorId) : undefined,
                       });
-                      toast.success('Thesis record finalized & created!');
+                      const label = finalizeProjectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
+                      toast.success(`${label} record finalized & created!`);
                       setFinalizingResponse(null);
                       if (viewResponses) loadResponses(viewResponses);
                     } catch (err) {
@@ -1575,7 +1639,7 @@ function CoordinatorAnnouncements() {
                     }
                   }}
                 >
-                  <Icon name="check_circle" className="material-symbols-outlined" /> Finalize Thesis
+                  <Icon name="check_circle" className="material-symbols-outlined" /> Finalize {finalizeProjectType === 'PROJECT' ? 'Project' : 'Thesis'}
                 </button>
               </div>
             </div>

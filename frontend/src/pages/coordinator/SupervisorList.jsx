@@ -38,12 +38,12 @@ function SupervisorList() {
     setLoading(true);
     const promises = [
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
-      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
     ];
-    // Only fetch theses for Master coordinators
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
       promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
+    } else {
+      promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
@@ -55,11 +55,12 @@ function SupervisorList() {
     setLoading(true);
     const promises = [
       api.get('/users/role/supervisor?all=true', { signal }).then(({ data }) => setSupervisors(data)),
-      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
     ];
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
       promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
+    } else {
+      promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
@@ -105,14 +106,18 @@ function SupervisorList() {
   };
 
   const enriched = useMemo(() => {
-    return supervisors.map(s => ({
-      ...s,
-      groupCount: groups.filter(g => g.supervisorId === s.id).length,
-      thesisCount: isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id).length : 0,
-      totalCount: groups.filter(g => g.supervisorId === s.id).length + (isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id).length : 0),
-      assignedGroups: groups.filter(g => g.supervisorId === s.id),
-      assignedTheses: isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id) : [],
-    }));
+    return supervisors.map(s => {
+      const gCount = groups.filter(g => g.supervisorId === s.id).length;
+      const tCount = theses.filter(t => t.supervisorId === s.id).length;
+      return {
+        ...s,
+        groupCount: gCount,
+        thesisCount: tCount,
+        totalCount: isMasterCoordinator ? tCount : gCount,
+        assignedGroups: groups.filter(g => g.supervisorId === s.id),
+        assignedTheses: isMasterCoordinator ? theses.filter(t => t.supervisorId === s.id) : [],
+      };
+    });
   }, [supervisors, groups, theses, isMasterCoordinator]);
 
   const filteredSupervisors = useMemo(() => {
@@ -231,51 +236,53 @@ function SupervisorList() {
                 <p>{showDetail.email}</p>
               </div>
             </div>
-            <div className="detail-section">
-              <h4 className="detail-section-title">Assigned Projects ({showDetail.groupCount})</h4>
-              {showDetail.assignedGroups.length === 0 ? (
-                <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No bachelor projects assigned.</p>
-              ) : (
-                <table className="detail-table">
-                  <thead>
-                    <tr>
-                      <th>Group</th>
-                      <th>Project</th>
-                      <th>Members</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {showDetail.assignedGroups.map(g => (
-                      <tr key={g.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/group/${g.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{g.name}</td>
-                        <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                        <td style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
-                          {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
-                        </td>
-                        <td>
-                          <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
-                            <span className="dot" />
-                            {g.status || 'PENDING'}
-                          </span>
-                        </td>
+            {!isMasterCoordinator && (
+              <div className="detail-section">
+                <h4 className="detail-section-title">Assigned Projects ({showDetail.groupCount})</h4>
+                {showDetail.assignedGroups.length === 0 ? (
+                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No bachelor projects assigned.</p>
+                ) : (
+                  <table className="detail-table">
+                    <thead>
+                      <tr>
+                        <th>Group</th>
+                        <th>Project</th>
+                        <th>Members</th>
+                        <th>Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                    </thead>
+                    <tbody>
+                      {showDetail.assignedGroups.map(g => (
+                        <tr key={g.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/group/${g.id}`)}>
+                          <td style={{ fontWeight: 500 }}>{g.name}</td>
+                          <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
+                          <td style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                            {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
+                          </td>
+                          <td>
+                            <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
+                              <span className="dot" />
+                              {g.status || 'PENDING'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
             {isMasterCoordinator && (
               <div className="detail-section">
-                <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
+                <h4 className="detail-section-title">Assigned Theses & Projects ({showDetail.thesisCount})</h4>
                 {showDetail.assignedTheses.length === 0 ? (
-                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses assigned.</p>
+                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses or projects assigned.</p>
                 ) : (
                   <table className="detail-table">
                     <thead>
                       <tr>
                         <th>Student</th>
-                        <th>Thesis Title</th>
+                        <th>Thesis / Project Title</th>
                         <th>Status</th>
                       </tr>
                     </thead>
@@ -312,7 +319,7 @@ function SupervisorList() {
         <div className="modal-overlay" onClick={() => setShowEdit(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-header-icon warning">
+              <div className="modal-header-icon info">
                 <Icon name="edit" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
@@ -383,21 +390,23 @@ function SupervisorList() {
           <div className="stat-number">{supervisors.length}</div>
           <div className="stat-label">Total Supervisors</div>
         </div>
-        <div className="stat-card bento-card">
-          <div className="stat-icon"><Icon name="school" className="material-symbols-outlined" /></div>
-          <div className="stat-number">{totalGroups}</div>
-          <div className="stat-label">Bachelor Projects</div>
-        </div>
+        {!isMasterCoordinator && (
+          <div className="stat-card bento-card">
+            <div className="stat-icon"><Icon name="school" className="material-symbols-outlined" /></div>
+            <div className="stat-number">{totalGroups}</div>
+            <div className="stat-label">Bachelor Projects</div>
+          </div>
+        )}
         {isMasterCoordinator && (
           <div className="stat-card bento-card">
             <div className="stat-icon"><Icon name="library_books" className="material-symbols-outlined" /></div>
             <div className="stat-number">{totalTheses}</div>
-            <div className="stat-label">Master Theses</div>
+            <div className="stat-label">Master Theses & Projects</div>
           </div>
         )}
         <div className="stat-card bento-card">
           <div className="stat-icon"><Icon name="person_add" className="material-symbols-outlined" /></div>
-          <div className="stat-number">{unassignedGroups + unassignedTheses}</div>
+          <div className="stat-number">{isMasterCoordinator ? unassignedTheses : unassignedGroups}</div>
           <div className="stat-label">Unassigned</div>
         </div>
       </div>
@@ -429,8 +438,8 @@ function SupervisorList() {
                     <th>Designation</th>
                     <th>Email</th>
                     <th>Status</th>
-                    <th>Bachelor Groups</th>
-                    {isMasterCoordinator && <th>Master Theses</th>}
+                    {!isMasterCoordinator && <th>Bachelor Groups</th>}
+                    {isMasterCoordinator && <th>Master Theses & Projects</th>}
                     <th>Total</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
@@ -449,7 +458,7 @@ function SupervisorList() {
                     <td>
                       <Icon name={s.active ? 'check_circle' : 'cancel'} className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }} />
                     </td>
-                    <td><span className="stat-chip">{s.groupCount}</span></td>
+                    {!isMasterCoordinator && <td><span className="stat-chip">{s.groupCount}</span></td>}
                     {isMasterCoordinator && <td><span className="stat-chip">{s.thesisCount}</span></td>}
                     <td><span className="stat-chip stat-chip-primary">{s.totalCount}</span></td>
                     <td style={{ textAlign: 'right' }}>

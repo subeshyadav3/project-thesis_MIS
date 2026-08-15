@@ -15,6 +15,12 @@ const MASTER_STEPS = [
   { id: 'FINAL', label: 'Final Defense & Degree', description: 'Final defense & thesis completion' },
 ];
 
+const MASTER_PROJECT_STEPS = [
+  { id: 'PENDING', label: 'Project Registration', description: 'Topic submitted for coordinator approval' },
+  { id: 'PROPOSAL', label: 'Proposal Submission', description: 'Proposal report submission' },
+  { id: 'FINAL', label: 'Final Defense & Evaluation', description: 'Final report & external evaluation' },
+];
+
 // Evaluation types required to consider each lifecycle step completed
 const STEP_REQUIREMENTS = {
   BACHELOR: {
@@ -26,11 +32,16 @@ const STEP_REQUIREMENTS = {
     MID_TERM: ['MIDTERM_DEFENSE', 'EXTERNAL_MIDTERM'],
     FINAL: ['FINAL_DEFENSE', 'SUPERVISOR', 'EXTERNAL_FINAL'],
   },
+  MASTER_PROJECT: {
+    PROPOSAL: [],
+    FINAL: ['EXTERNAL_FINAL'],
+  },
 };
 
-function WorkflowStepper({ status, degreeType = 'BACHELOR', components = [], evaluations = [] }) {
-  const steps = degreeType === 'MASTER' ? MASTER_STEPS : BACHELOR_STEPS;
-  const requirements = STEP_REQUIREMENTS[degreeType] || {};
+function WorkflowStepper({ status, degreeType = 'BACHELOR', projectType = 'THESIS', components = [], evaluations = [] }) {
+  const isMasterProject = degreeType === 'MASTER' && projectType === 'PROJECT';
+  const steps = isMasterProject ? MASTER_PROJECT_STEPS : (degreeType === 'MASTER' ? MASTER_STEPS : BACHELOR_STEPS);
+  const requirements = STEP_REQUIREMENTS[isMasterProject ? 'MASTER_PROJECT' : degreeType] || {};
 
   const hasMarks = (compId) => {
     const e = evaluations.find(ev => ev.componentId === compId);

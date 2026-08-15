@@ -45,11 +45,12 @@ function ExaminerList() {
     setLoading(true);
     const promises = [
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
-      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
     ];
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
       promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
+    } else {
+      promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') console.error(err); }).finally(() => setLoading(false));
     return () => controller.abort();
@@ -62,11 +63,12 @@ function ExaminerList() {
     setLoading(true);
     const promises = [
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
-      api.get('/groups', { signal }).then(({ data }) => setGroups(data)),
     ];
     if (isMasterCoordinator) {
       promises.push(api.get('/theses', { signal }).then(({ data }) => setTheses(data)));
       promises.push(api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)));
+    } else {
+      promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
     }
     Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error('Failed to refresh data'); }).finally(() => setLoading(false));
   };
@@ -149,7 +151,7 @@ function ExaminerList() {
         assignedTheses,
         groupCount: assignedGroups.length,
         thesisCount: assignedTheses.length,
-        totalCount: assignedGroups.length + assignedTheses.length,
+        totalCount: isMasterCoordinator ? assignedTheses.length : assignedGroups.length,
       };
     });
   }, [examiners, groups, theses, isMasterCoordinator]);
@@ -167,8 +169,9 @@ function ExaminerList() {
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(1); }, [totalPages, currentPage]);
   useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
-  const totalAssigned = groups.reduce((s, g) => s + (g.examinerAssignments?.length || 0), 0)
-    + (isMasterCoordinator ? theses.reduce((s, t) => s + (t.examinerAssignments?.length || 0), 0) : 0);
+  const totalAssigned = isMasterCoordinator
+    ? theses.reduce((s, t) => s + (t.examinerAssignments?.length || 0), 0)
+    : groups.reduce((s, g) => s + (g.examinerAssignments?.length || 0), 0);
   const unassignedGroups = groups.filter(g => !g.examinerAssignments?.length).length;
   const unassignedTheses = isMasterCoordinator ? theses.filter(t => !t.examinerAssignments?.length).length : 0;
 
@@ -280,41 +283,43 @@ function ExaminerList() {
                 <p>{showDetail.email}</p>
               </div>
             </div>
-            <div className="detail-section">
-              <h4 className="detail-section-title">Assigned Projects ({showDetail.groupCount})</h4>
-              {showDetail.assignedGroups.length === 0 ? (
-                <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No bachelor projects assigned.</p>
-              ) : (
-                <table className="detail-table">
-                  <thead>
-                    <tr><th>Group</th><th>Project</th><th>Members</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {showDetail.assignedGroups.map(g => (
-                      <tr key={g.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/group/${g.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{g.name}</td>
-                        <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                        <td style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
-                          {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
-                        </td>
-                        <td>
-                          <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}><span className="dot" />{g.status || 'PENDING'}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            {isMasterCoordinator && (
+            {!isMasterCoordinator && (
               <div className="detail-section">
-                <h4 className="detail-section-title">Assigned Theses ({showDetail.thesisCount})</h4>
-                {showDetail.assignedTheses.length === 0 ? (
-                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses assigned.</p>
+                <h4 className="detail-section-title">Assigned Projects ({showDetail.groupCount})</h4>
+                {showDetail.assignedGroups.length === 0 ? (
+                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No bachelor projects assigned.</p>
                 ) : (
                   <table className="detail-table">
                     <thead>
-                      <tr><th>Student</th><th>Thesis Title</th><th>Status</th></tr>
+                      <tr><th>Group</th><th>Project</th><th>Members</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {showDetail.assignedGroups.map(g => (
+                        <tr key={g.id} className="clickable-row" onClick={() => navigate(`/coordinator/project/group/${g.id}`)}>
+                          <td style={{ fontWeight: 500 }}>{g.name}</td>
+                          <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
+                          <td style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                            {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
+                          </td>
+                          <td>
+                            <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}><span className="dot" />{g.status || 'PENDING'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+            {isMasterCoordinator && (
+              <div className="detail-section">
+                <h4 className="detail-section-title">Assigned Theses & Projects ({showDetail.thesisCount})</h4>
+                {showDetail.assignedTheses.length === 0 ? (
+                  <p style={{ color: 'var(--color-on-surface-variant)', fontSize: 14, padding: '8px 0' }}>No master theses or projects assigned.</p>
+                ) : (
+                  <table className="detail-table">
+                    <thead>
+                      <tr><th>Student</th><th>Thesis / Project Title</th><th>Status</th></tr>
                     </thead>
                     <tbody>
                       {showDetail.assignedTheses.map(t => (
@@ -434,15 +439,17 @@ function ExaminerList() {
           )}
           <div className="stat-label">Total Assignments</div>
         </div>
-        <div className="stat-card bento-card">
-          <div className="stat-icon"><Icon name="school" className="material-symbols-outlined" /></div>
-          {loading ? (
-            <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
-          ) : (
-            <div className="stat-number">{unassignedGroups}</div>
-          )}
-          <div className="stat-label">Projects Unassigned</div>
-        </div>
+        {!isMasterCoordinator && (
+          <div className="stat-card bento-card">
+            <div className="stat-icon"><Icon name="school" className="material-symbols-outlined" /></div>
+            {loading ? (
+              <div className="stat-number" style={{ color: 'var(--color-outline-variant)' }}>...</div>
+            ) : (
+              <div className="stat-number">{unassignedGroups}</div>
+            )}
+            <div className="stat-label">Projects Unassigned</div>
+          </div>
+        )}
         {isMasterCoordinator && (
           <div className="stat-card bento-card">
             <div className="stat-icon"><Icon name="library_books" className="material-symbols-outlined" /></div>
@@ -451,7 +458,7 @@ function ExaminerList() {
             ) : (
               <div className="stat-number">{unassignedTheses}</div>
             )}
-            <div className="stat-label">Theses Unassigned</div>
+            <div className="stat-label">Theses & Projects Unassigned</div>
           </div>
         )}
       </div>
@@ -482,8 +489,8 @@ function ExaminerList() {
                     <th>Designation</th>
                     <th>Email</th>
                     <th>Status</th>
-                    <th>Bachelor Projects</th>
-                    {isMasterCoordinator && <th>Master Theses</th>}
+                    {!isMasterCoordinator && <th>Bachelor Projects</th>}
+                    {isMasterCoordinator && <th>Master Theses & Projects</th>}
                     <th>Total</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
@@ -502,7 +509,7 @@ function ExaminerList() {
                     <td>
                       <Icon name={s.active ? 'check_circle' : 'cancel'} className="material-symbols-outlined" style={{ fontSize: 20, color: s.active ? 'var(--color-success)' : 'var(--color-outline-variant)', verticalAlign: 'middle' }} />
                     </td>
-                    <td><span className="stat-chip">{s.groupCount}</span></td>
+                    {!isMasterCoordinator && <td><span className="stat-chip">{s.groupCount}</span></td>}
                     {isMasterCoordinator && <td><span className="stat-chip">{s.thesisCount}</span></td>}
                     <td><span className="stat-chip stat-chip-primary">{s.totalCount}</span></td>
                     <td style={{ textAlign: 'right' }}>

@@ -78,7 +78,6 @@ function nextName() {
 }
 
 // ── Batch definitions ──────────────────────────────────────────────────
-// Each object: { batch: '079', bsYear: 2079, counts: { BCT: n, BEI: n, ... } }
 const BATCH_DEFS = [
   {
     batch: '079',
@@ -137,11 +136,12 @@ function generateStudentDefs() {
 }
 
 async function main() {
-  console.log('Seeding database...');
+  console.log('Seeding database with comprehensive demo dataset...');
 
   // ── Clean slate ──
   await prisma.recommendation.deleteMany();
   await prisma.examinerAssignment.deleteMany();
+  await prisma.formResponse.deleteMany();
   await prisma.proposal.deleteMany();
   await prisma.evaluation.deleteMany();
   await prisma.evaluationComponent.deleteMany();
@@ -191,11 +191,10 @@ async function main() {
     });
     ayMap[bd.batch] = ay;
   }
-  // Also add 078 for legacy groups
   ayMap['078'] = await prisma.academicYear.create({
     data: { year: '078', semester: 'Regular', departmentId: eceDept.id, isActive: false },
   });
-  console.log(`Created ${Object.keys(ayMap).length} academic years (078, 079, 080, 081, 082)`);
+  console.log(`Created ${Object.keys(ayMap).length} academic years (078–082)`);
 
   // ============================================================
   // USERS
@@ -224,7 +223,7 @@ async function main() {
   }
   console.log(`Created ${coordDefs.length} program coordinators`);
 
-  // Supervisors (all under ECE)
+  // Supervisors
   const supDefs = [
     { fn: 'Prabesh', ln: 'Bhattarai', email: 'prabesh.bhattarai@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
     { fn: 'Ramesh', ln: 'Sharma', email: 'ramesh.sharma@pcampus.edu.np', designation: 'Assoc. Prof.' },
@@ -243,7 +242,7 @@ async function main() {
   }
   console.log(`Created ${supervisors.length} supervisors`);
 
-  // External Examiners (emails follow the @pcampus.edu.np domain policy)
+  // External Examiners
   const externalExamDefs = [
     { fn: 'Hari', ln: 'Adhikari', email: 'hari.adhikari@pcampus.edu.np', designation: 'Prof. Dr.' },
     { fn: 'Suman', ln: 'Bhattarai', email: 'suman.bhattarai@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
@@ -256,9 +255,9 @@ async function main() {
       data: { email: ex.email, password: hash, firstName: ex.fn, lastName: ex.ln, role: 'EXTERNAL_EXAMINER', designation: ex.designation, departmentId: eceDept.id },
     }));
   }
-  console.log(`Created ${externalExamDefs.length} external examiners`);
+  console.log(`Created ${externalExaminers.length} external examiners`);
 
-  // ── Generate all student definitions ──
+  // ── Students ──
   const studentDefs = generateStudentDefs();
   const students = [];
   for (const s of studentDefs) {
@@ -279,31 +278,17 @@ async function main() {
       },
     }));
   }
-  console.log(`Created ${students.length} students across ${BATCH_DEFS.length} batches`);
-
-  // Print batch/program summary
-  const summary = {};
-  for (const bd of BATCH_DEFS) {
-    summary[bd.batch] = {};
-    for (const prog of [...BACHELOR_PROGRAMS, ...MASTER_PROGRAMS]) {
-      summary[bd.batch][prog.code] = bd.counts[prog.code];
-    }
-  }
-  console.log('Batch → Student counts:');
-  for (const [batch, counts] of Object.entries(summary)) {
-    const parts = Object.entries(counts).map(([code, n]) => `${code}=${n}`);
-    console.log(`  ${batch}: ${parts.join(', ')}`);
-  }
+  console.log(`Created ${students.length} students across 4 batches`);
 
   // Helper to create evaluation components
   async function attachComponents({ groupId, thesisId, projectType }) {
     const defaults = getDefaultComponents(projectType || 'MINOR');
-    const out = {};
+    const out = [];
     for (const c of defaults) {
       const created = await prisma.evaluationComponent.create({
         data: { ...c, groupId, thesisId, createdById: maintainer.id },
       });
-      out[c.evaluationType] = created;
+      out.push(created);
     }
     return out;
   }
@@ -319,9 +304,9 @@ async function main() {
   }
 
   // ============================================================
-  // BACHELOR GROUPS — create some groups for each batch
+  // BACHELOR GROUPS (Minor & Major Projects)
   // ============================================================
-  const groupTitles = [
+  const bachelorGroupTitles = [
     'AI-Powered Code Review Assistant for Nepali Developers',
     'Multi-Cloud Cost Optimization Dashboard for SMEs',
     'Real-Time Data Analytics for IoT-enabled Hydropower Plants',
@@ -337,30 +322,31 @@ async function main() {
   ];
 
   let createdGroups = [];
-  let groupIndex = 0;
+  let bGroupIdx = 0;
 
   for (const bd of BATCH_DEFS) {
     const batchStr = bd.batch;
     const bsYear = bd.bsYear;
-    // Make 3-4 BCT groups per batch, 1 BEI group per batch
-    const nBCTGroups = Math.min(4, Math.floor(bd.counts.BCT / 3));
-    const nBEIGroups = bd.counts.BEI >= 3 ? 1 : 0;
+    const nBCTGroups = Math.min(3, Math.floor(bd.counts.BCT / 3));
 
     for (let gi = 0; gi < nBCTGroups; gi++) {
       const bctStudents = findStudents(bsYear, 'BCT');
       const startIdx = gi * 3;
       if (startIdx + 3 > bctStudents.length) break;
       const members = bctStudents.slice(startIdx, startIdx + 3);
+      const isMajor = bd.batch === '079' || gi === 0;
+      const pType = isMajor ? 'MAJOR' : 'MINOR';
+      const status = (gi === 0 && bd.batch === '079') ? 'COMPLETED' : (gi === 1 ? 'ACTIVE' : 'ACTIVE');
 
       const group = await prisma.projectGroup.create({
         data: {
           name: `BCT-${batchStr}-Group${gi + 1}`,
-          projectTitle: groupTitles[groupIndex % groupTitles.length],
-          projectType: 'MINOR',
-          status: 'ACTIVE',
+          projectTitle: bachelorGroupTitles[bGroupIdx % bachelorGroupTitles.length],
+          projectType: pType,
+          status,
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
-          supervisorId: supervisors[groupIndex % supervisors.length].id,
+          supervisorId: supervisors[bGroupIdx % supervisors.length].id,
           programId: programs.BCT.id,
           academicYearId: ayMap[batchStr].id,
           batch: String(bsYear),
@@ -372,45 +358,52 @@ async function main() {
           data: { studentId: student.id, groupId: group.id, rollNumber: student.rollNumber },
         });
       }
+
+      const extExaminer = externalExaminers[bGroupIdx % externalExaminers.length];
+      await prisma.examinerAssignment.create({
+        data: { groupId: group.id, externalExaminerId: extExaminer.id, assignedById: coordinators.BCT.id },
+      });
+
+      await attachComponents({ groupId: group.id, projectType: pType });
+      createdGroups.push(group);
+      bGroupIdx++;
+    }
+
+    // 1 BEI group
+    const beiStudents = findStudents(bsYear, 'BEI');
+    if (beiStudents.length >= 2) {
+      const group = await prisma.projectGroup.create({
+        data: {
+          name: `BEI-${batchStr}-Group1`,
+          projectTitle: 'IoT-based Smart Environmental Monitoring System',
+          projectType: 'MINOR',
+          status: 'ACTIVE',
+          startDate: new Date('2025-02-01'),
+          endDate: new Date('2025-07-30'),
+          supervisorId: supervisors[1].id,
+          programId: programs.BEI.id,
+          academicYearId: ayMap[batchStr].id,
+          batch: String(bsYear),
+        },
+      });
+      for (let mi = 0; mi < Math.min(3, beiStudents.length); mi++) {
+        await prisma.groupMember.create({
+          data: { studentId: beiStudents[mi].id, groupId: group.id, rollNumber: beiStudents[mi].rollNumber },
+        });
+      }
+      await prisma.examinerAssignment.create({
+        data: { groupId: group.id, externalExaminerId: externalExaminers[0].id, assignedById: coordinators.BEI.id },
+      });
       await attachComponents({ groupId: group.id, projectType: 'MINOR' });
       createdGroups.push(group);
-      groupIndex++;
-    }
-
-    if (nBEIGroups) {
-      const beiStudents = findStudents(bsYear, 'BEI');
-      const memberCount = Math.min(3, beiStudents.length);
-      if (memberCount >= 2) {
-        const group = await prisma.projectGroup.create({
-          data: {
-            name: `BEI-${batchStr}-Group1`,
-            projectTitle: 'IoT-based Smart Monitoring System for Electronics Labs',
-            projectType: 'MINOR',
-            status: 'ACTIVE',
-            startDate: new Date('2025-02-01'),
-            endDate: new Date('2025-07-30'),
-            supervisorId: supervisors[0].id,
-            programId: programs.BEI.id,
-            academicYearId: ayMap[batchStr].id,
-            batch: String(bsYear),
-          },
-        });
-        for (let mi = 0; mi < memberCount; mi++) {
-          await prisma.groupMember.create({
-            data: { studentId: beiStudents[mi].id, groupId: group.id, rollNumber: beiStudents[mi].rollNumber },
-          });
-        }
-        await attachComponents({ groupId: group.id, projectType: 'MINOR' });
-        createdGroups.push(group);
-      }
     }
   }
-  console.log(`Created ${createdGroups.length} bachelor groups`);
+  console.log(`Created ${createdGroups.length} bachelor project groups`);
 
   // ============================================================
-  // MASTER THESES — create for each batch
+  // MASTER THESES (16 Credits) & MASTER PROJECTS (4 Credits)
   // ============================================================
-  const thesisTitles = [
+  const masterThesisTitles = [
     'Deep Learning for Nepali Handwriting Recognition',
     'Optimizing Transformer Models for Low-Resource Nepali Languages',
     'Federated Learning for Privacy-Preserving Healthcare in Nepal',
@@ -423,254 +416,324 @@ async function main() {
     'IoMT-based Remote Patient Monitoring System for Rural Nepal',
     'Predictive Analytics for Crop Yield Optimization using Satellite Data',
     'Natural Language Processing for Nepali Legal Document Summarization',
-    'Real-Time Sentiment Analysis of Nepali Social Media using Transformers',
-    'Big Data Pipeline for Earthquake Early Warning System in Nepal',
-    'Recommendation System for E-Learning Platforms using Collaborative Filtering',
-    'Knowledge Graph Construction from Nepali Academic Publications',
-    'Semantic Web Framework for Nepali Cultural Heritage Preservation',
-    'Multi-Agent Reinforcement Learning for Traffic Optimization in Kathmandu',
-    'Ontology-Based Question Answering System for Nepali Medical Domain',
-    'Automated Essay Scoring using BERT for Nepali Language Education',
+  ];
+
+  const masterProjectTitles = [
+    'Audio-Visual Speech Synthesis for Nepali Language Virtual Assistant',
+    'Microservices-Based Real-Time Log Analytics Engine for Cloud Infrastructure',
+    'Automated Fact-Checking System for Nepali News Media using LLMs',
+    'Computer Vision Pipeline for Automated Road Pothole Detection',
+    'Decentralized Identity Verification Framework using Verifiable Credentials',
+    'Smart Grid Energy Consumption Forecasting using Hybrid Temporal Networks',
+    'Semantic Code Search Engine for Multi-Repository Open Source Codebases',
+    'Edge-AI Accelerated Real-Time Video Analytics for Surveillance Systems',
   ];
 
   let createdTheses = [];
-  let thesisIndex = 0;
+  let createdProjects = [];
+  let tIdx = 0;
+  let pIdx = 0;
 
   for (const bd of BATCH_DEFS) {
-    const batchStr = bd.batch;
     const bsYear = bd.bsYear;
     for (const prog of MASTER_PROGRAMS) {
-      const maxTheses = Math.min(3, Math.floor(bd.counts[prog.code] / 2));
-      if (maxTheses < 1) continue;
       const progStudents = findStudents(bsYear, prog.code);
-      for (let ti = 0; ti < maxTheses; ti++) {
-        const student = progStudents[ti];
-        if (!student) break;
+      if (!progStudents.length) continue;
+
+      // 1. Create Master Thesis (16 Cr)
+      const thesisStudent = progStudents[0];
+      if (thesisStudent) {
+        const isCompleted = (bd.batch === '079' && prog.code === 'MSDSA');
+        const sup = supervisors[tIdx % supervisors.length];
+        const extMid = externalExaminers[tIdx % externalExaminers.length];
+        const extFinal = externalExaminers[(tIdx + 1) % externalExaminers.length];
 
         const thesis = await prisma.thesis.create({
           data: {
-            title: thesisTitles[thesisIndex % thesisTitles.length],
-            projectType: 'MASTER',
-            studentId: student.id,
-            status: 'ACTIVE',
+            title: masterThesisTitles[tIdx % masterThesisTitles.length],
+            projectType: 'THESIS',
+            studentId: thesisStudent.id,
+            status: isCompleted ? 'COMPLETED' : 'ACTIVE',
             startDate: new Date('2025-02-01'),
             endDate: new Date('2025-08-30'),
-            supervisorId: supervisors[thesisIndex % supervisors.length].id,
+            supervisorId: sup.id,
+            externalMidTermId: extMid.id,
+            externalFinalId: extFinal.id,
             batch: String(bsYear),
             cluster: prog.cluster,
+            programId: prog.id,
           },
         });
-        await attachComponents({ thesisId: thesis.id, projectType: 'MASTER' });
+
+        // Attach THESIS components (300 marks total: Sup 100 + Ext Mid 100 + Ext Final 100)
+        await attachComponents({ thesisId: thesis.id, projectType: 'THESIS' });
+
+        // Add examiner assignments
+        await prisma.examinerAssignment.create({
+          data: { thesisId: thesis.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
+        });
+
+        // Proposal document
+        await prisma.proposal.create({
+          data: { stage: 'PROPOSAL', documentUrl: '/api/files/theses/thesis_proposal.pdf', submittedById: thesisStudent.id, thesisId: thesis.id },
+        });
+
         createdTheses.push(thesis);
-        thesisIndex++;
+        tIdx++;
+      }
+
+      // 2. Create Master Project (4 Cr)
+      if (progStudents.length > 1) {
+        const projectStudent = progStudents[1];
+        const isCompleted = (bd.batch === '079' && prog.code === 'MSNCS');
+        const extFinal = externalExaminers[pIdx % externalExaminers.length];
+
+        const mProject = await prisma.thesis.create({
+          data: {
+            title: masterProjectTitles[pIdx % masterProjectTitles.length],
+            projectType: 'PROJECT',
+            studentId: projectStudent.id,
+            status: isCompleted ? 'COMPLETED' : 'ACTIVE',
+            startDate: new Date('2025-02-01'),
+            endDate: new Date('2025-08-30'),
+            supervisorId: null,
+            externalMidTermId: null,
+            externalFinalId: extFinal.id,
+            batch: String(bsYear),
+            cluster: prog.cluster,
+            programId: prog.id,
+          },
+        });
+
+        // Attach PROJECT components (100 marks total: 5 criteria x 20 marks)
+        await attachComponents({ thesisId: mProject.id, projectType: 'PROJECT' });
+
+        await prisma.examinerAssignment.create({
+          data: { thesisId: mProject.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
+        });
+
+        await prisma.proposal.create({
+          data: { stage: 'PROPOSAL', documentUrl: '/api/files/theses/project_proposal.pdf', submittedById: projectStudent.id, thesisId: mProject.id },
+        });
+
+        createdProjects.push(mProject);
+        pIdx++;
       }
     }
   }
-  console.log(`Created ${createdTheses.length} master theses`);
+  console.log(`Created ${createdTheses.length} Master Theses (16 Cr) and ${createdProjects.length} Master Projects (4 Cr)`);
 
   // ============================================================
-  // SAMPLE EVALUATIONS (first few groups/theses)
+  // EVALUATIONS & MARKS (Populate demo evaluations)
   // ============================================================
-  // Evaluate first 4 groups
-  for (let i = 0; i < 4 && i < createdGroups.length; i++) {
-    const g = createdGroups[i];
-    if (!g.supervisorId) continue;
 
-    const components = await prisma.evaluationComponent.findMany({ where: { groupId: g.id } });
-    const compByType = Object.fromEntries(components.map(c => [c.evaluationType, c]));
+  // 1. Fully evaluate completed Bachelor group
+  const compGroup = createdGroups.find(g => g.status === 'COMPLETED') || createdGroups[0];
+  if (compGroup) {
+    const comps = await prisma.evaluationComponent.findMany({ where: { groupId: compGroup.id } });
+    const cMap = Object.fromEntries(comps.map(c => [c.evaluationType, c]));
+    const ext = await prisma.examinerAssignment.findFirst({ where: { groupId: compGroup.id } });
 
-    const leadStudent = students[0]; // arbitrary student
-    await prisma.proposal.create({
-      data: { stage: 'PROPOSAL', documentUrl: '/api/files/groups/sample_proposal.pdf', submittedById: leadStudent.id, groupId: g.id },
-    });
-
-    // Find which coordinator to use based on program
-    const groupProg = await prisma.projectGroup.findUnique({ where: { id: g.id }, include: { program: true } });
-    const coordKey = groupProg?.program?.code || 'BCT';
-    const coord = coordinators[coordKey];
-
-    await prisma.evaluation.create({
-      data: { componentId: compByType.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 4.0, comment: 'Strong defense presentation.', comments: 'Proposal was well prepared and clearly presented.', suggestions: 'Consider adding more technical depth to the methodology section.', status: 'COMPLETED', submittedById: coord.id, groupId: g.id },
-    });
-    await prisma.evaluation.create({
-      data: { componentId: compByType.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 3.5, comment: 'Progress is on track.', comments: 'Good progress shown during midterm review.', suggestions: 'Focus on completing the implementation phase before the final defense.', status: 'COMPLETED', submittedById: coord.id, groupId: g.id },
-    });
-    await prisma.evaluation.create({
-      data: { componentId: compByType.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 21.5, comment: 'Well-structured proposal.', comments: 'The student showed consistent effort throughout the project.', suggestions: 'Document the code more thoroughly for future reference.', status: 'COMPLETED', submittedById: g.supervisorId, groupId: g.id },
-    });
-    const examiner = externalExaminers[i % externalExaminers.length];
-    await prisma.evaluation.create({
-      data: { componentId: compByType.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 8.0, comment: 'Solid technical implementation.', comments: 'Technical implementation was solid and well-tested.', suggestions: 'Improve the user interface for better usability.', status: 'COMPLETED', submittedById: examiner.id, groupId: g.id },
-    });
-    await prisma.evaluation.create({
-      data: { componentId: compByType.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE',      marks: 4.5, comment: 'Excellent final presentation.', comments: 'The final defense was comprehensive and well-delivered.', suggestions: 'Publish the findings in a research paper.', status: 'COMPLETED', submittedById: coord.id, groupId: g.id },
-    });
-  }
-
-  // Evaluate first 2 theses — use SUPERVISOR & EXTERNAL_EXAMINER components per MASTER scheme
-  for (let i = 0; i < 2 && i < createdTheses.length; i++) {
-    const t = createdTheses[i];
-    if (!t.supervisorId) continue;
-
-    const components = await prisma.evaluationComponent.findMany({ where: { thesisId: t.id } });
-    const compByType = Object.fromEntries(components.map(c => [c.evaluationType, c]));
-    const thesisStudent = await prisma.user.findUnique({ where: { id: t.studentId } });
-
-    await prisma.proposal.create({
-      data: { stage: 'PROPOSAL', documentUrl: '/api/files/theses/sample_proposal.pdf', submittedById: thesisStudent.id, thesisId: t.id },
-    });
-
-    // MASTER scheme only has SUPERVISOR and EXTERNAL_EXAMINER components
-    if (compByType.SUPERVISOR) {
+    if (cMap.PROPOSAL_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: compByType.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 16.0, comment: 'Well-defined research scope.', comments: 'The research problem is clearly identified and relevant.', suggestions: 'Expand the literature review section.', status: 'COMPLETED', submittedById: t.supervisorId, thesisId: t.id },
+        data: { componentId: cMap.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 8.5, comments: 'Well prepared proposal.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
       });
     }
-    if (compByType.EXTERNAL_EXAMINER) {
-      const examiner = externalExaminers[i % externalExaminers.length];
+    if (cMap.MIDTERM_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: compByType.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 16.0, comment: 'Good presentation and defense.', comments: 'The student demonstrated good understanding of the subject.', suggestions: 'Improve the literature review.', status: 'COMPLETED', submittedById: examiner.id, thesisId: t.id },
+        data: { componentId: cMap.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 8.0, comments: 'Significant implementation progress.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
+      });
+    }
+    if (cMap.SUPERVISOR && compGroup.supervisorId) {
+      await prisma.evaluation.create({
+        data: { componentId: cMap.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 44.0, comments: 'Outstanding dedication and code quality.', suggestions: 'Publish benchmark results.', status: 'COMPLETED', submittedById: compGroup.supervisorId, groupId: compGroup.id },
+      });
+    }
+    if (cMap.EXTERNAL_EXAMINER && ext) {
+      await prisma.evaluation.create({
+        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 18.0, comments: 'Clear presentation and solid defense.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
+      });
+    }
+    if (cMap.FINAL_DEFENSE) {
+      await prisma.evaluation.create({
+        data: { componentId: cMap.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 9.0, comments: 'Excellent final project defense.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
       });
     }
   }
 
-  // ── Thesis registration form announcements ──
-  const msncs = programs.MSNCS;
-  const formAnn = await prisma.announcement.create({
+  // 2. Fully evaluate completed Master Thesis (300 Marks: Sup 100 + Ext Mid 100 + Ext Final 100)
+  const compThesis = createdTheses.find(t => t.status === 'COMPLETED') || createdTheses[0];
+  if (compThesis) {
+    const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compThesis.id } });
+    for (const c of comps) {
+      let subId = compThesis.supervisorId;
+      let score = 17.5;
+      if (c.evaluationType === 'EXTERNAL_MIDTERM') {
+        subId = compThesis.externalMidTermId || externalExaminers[0].id;
+        score = c.maxMarks === 20 ? 17.0 : 8.5;
+      } else if (c.evaluationType === 'EXTERNAL_FINAL') {
+        subId = compThesis.externalFinalId || externalExaminers[1].id;
+        score = 18.0;
+      }
+      await prisma.evaluation.create({
+        data: {
+          componentId: c.id,
+          stage: c.stage || 'FINAL',
+          evaluationType: c.evaluationType,
+          marks: score,
+          comments: `${c.name} evaluated thoroughly with commendable rigor.`,
+          suggestions: 'Consider submitting extended results to an IEEE conference.',
+          status: 'COMPLETED',
+          submittedById: subId,
+          thesisId: compThesis.id,
+        },
+      });
+    }
+    console.log(`Fully evaluated demo Master Thesis "${compThesis.title}" (300 Marks)`);
+  }
+
+  // 3. Fully evaluate completed Master Project (100 Marks: 5 criteria x 20)
+  const compProject = createdProjects.find(p => p.status === 'COMPLETED') || createdProjects[0];
+  if (compProject) {
+    const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compProject.id } });
+    const subId = compProject.externalFinalId || externalExaminers[0].id;
+    for (const c of comps) {
+      await prisma.evaluation.create({
+        data: {
+          componentId: c.id,
+          stage: 'FINAL',
+          evaluationType: 'EXTERNAL_FINAL',
+          marks: 18.5,
+          comments: 'High quality implementation and defense.',
+          suggestions: 'Refactor modular components for production packaging.',
+          status: 'COMPLETED',
+          submittedById: subId,
+          thesisId: compProject.id,
+        },
+      });
+    }
+    console.log(`Fully evaluated demo Master Project "${compProject.title}" (100 Marks)`);
+  }
+
+  // 4. Partially evaluate active Master Thesis & Project (for live grading / testing)
+  const activeThesis = createdTheses.find(t => t.status === 'ACTIVE');
+  if (activeThesis) {
+    const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: activeThesis.id } });
+    const supComps = comps.filter(c => c.evaluatorRole === 'SUPERVISOR');
+    for (const c of supComps) {
+      await prisma.evaluation.create({
+        data: {
+          componentId: c.id,
+          stage: 'FINAL',
+          evaluationType: 'SUPERVISOR',
+          marks: 16.0,
+          comments: 'Good consistent progress.',
+          status: 'COMPLETED',
+          submittedById: activeThesis.supervisorId,
+          thesisId: activeThesis.id,
+        },
+      });
+    }
+  }
+
+  // ============================================================
+  // ANNOUNCEMENTS & FORMS
+  // ============================================================
+  // 1. Master Thesis Registration Announcement
+  await prisma.announcement.create({
     data: {
-      title: 'Master Thesis Registration 2081 (Batch 2080)',
-      message: 'All Master students of batch 2080 must submit the thesis registration form with their proposed thesis title and abstract by 30 June 2081.',
+      title: 'Master Thesis Topic Registration 2081 (Batch 2080)',
+      message: 'All enrolled M.Sc. students of Batch 2080 must register their research thesis proposal topic and preferred supervisor before the deadline.',
       type: 'THESIS',
       audience: 'PROGRAMS',
       degreeType: 'MASTER',
-      programIds: [msncs.id],
+      programIds: [programs.MSDSA.id, programs.MSNCS.id, programs.MSICE.id, programs.MSCSK.id],
       batch: '2080',
       academicYearId: ayMap['080'].id,
       departmentId: eceDept.id,
       formEnabled: true,
       formFields: [
-        { key: 'research_area', label: 'Research Area', type: 'text', required: false, placeholder: 'e.g. Machine Learning, Security, Networking' },
-        { key: 'expected_mentor', label: 'Preferred Supervisor (optional)', type: 'text', required: false, placeholder: 'Leave blank if unsure' },
+        { key: 'research_area', label: 'Research Area / Cluster', type: 'text', required: true, placeholder: 'e.g. AI/ML, Cloud Security, Signal Processing' },
+        { key: 'expected_mentor', label: 'Preferred Supervisor (optional)', type: 'text', required: false, placeholder: 'Faculty name' },
       ],
       startDate: new Date('2026-01-01'),
       expirationDate: new Date('2027-06-30'),
-      expiresAt: null,
-      createdById: coordinators.MSNCS.id,
+      createdById: coordinators.MSDSA.id,
     },
   });
-  console.log(`Created thesis form announcement (id=${formAnn.id})`);
 
-  // A second form announcement whose deadline has already passed (for testing late submissions)
-  const lateFormAnn = await prisma.announcement.create({
+  // 2. Master Project Registration Announcement
+  await prisma.announcement.create({
     data: {
-      title: 'Thesis Re-Registration (Late Window)',
-      message: 'Late thesis registration for students who missed the first window.',
+      title: 'Master Project Registration (4 Credit Course)',
+      message: 'M.Sc. students undertaking the 4-credit Master Project course should register their project title and domain.',
       type: 'THESIS',
       audience: 'PROGRAMS',
       degreeType: 'MASTER',
-      programIds: [msncs.id],
+      programIds: [programs.MSDSA.id, programs.MSNCS.id, programs.MSICE.id, programs.MSCSK.id],
       batch: '2080',
       academicYearId: ayMap['080'].id,
       departmentId: eceDept.id,
       formEnabled: true,
-      formFields: [],
-      startDate: new Date('2025-01-01'),
-      expirationDate: new Date('2025-06-30'),
-      createdById: coordinators.MSNCS.id,
+      formFields: [
+        { key: 'project_domain', label: 'Project Domain', type: 'text', required: true, placeholder: 'e.g. DevOps, Computer Vision' },
+      ],
+      startDate: new Date('2026-01-01'),
+      expirationDate: new Date('2027-06-30'),
+      createdById: coordinators.MSDSA.id,
     },
   });
-  console.log(`Created late-window thesis form announcement (id=${lateFormAnn.id})`);
 
-  // Form-created theses: one on-time, one late
-  const formStudents = findStudents(2080, 'MSNCS').slice(0, 2);
-  if (formStudents[0]) {
-    const s = formStudents[0];
-    const t = await prisma.thesis.create({
-      data: {
-        title: 'On-Time Form Thesis: Secure Federated Learning for Healthcare',
-        description: 'Submitted through the thesis registration form.',
-        projectType: 'MASTER',
-        studentId: s.id,
-        status: 'PENDING',
-        createdVia: 'FORM',
-        supervisorAssignmentStatus: 'PENDING',
-        programId: msncs.id,
-        cluster: msncs.cluster,
-        batch: s.batch,
-        startDate: new Date(),
-        announcementId: formAnn.id,
-      },
-    });
-    await attachComponents({ thesisId: t.id, projectType: 'MASTER' });
-    await prisma.proposal.create({
-      data: {
-        stage: 'PROPOSAL', documentType: 'PROPOSAL', status: 'VISIBLE',
-        documentUrl: '/api/files/theses/form_proposal_sample.pdf',
-        thesisId: t.id, submittedById: s.id,
-      },
-    });
-    await prisma.formResponse.create({
-      data: {
-        announcementId: formAnn.id, studentId: s.id, thesisId: t.id,
-        formData: { title: t.title, description: t.description, research_area: 'Federated Learning', expected_mentor: '' },
-        status: 'SUBMITTED',
-      },
-    });
-    console.log(`Created on-time form thesis (id=${t.id})`);
-  }
-  if (formStudents[1]) {
-    const s = formStudents[1];
-    const t = await prisma.thesis.create({
-      data: {
-        title: 'Late Form Thesis: NLP for Nepali Legal Documents',
-        description: 'Submitted after the deadline — proposal requires coordinator approval.',
-        projectType: 'MASTER',
-        studentId: s.id,
-        status: 'PENDING',
-        createdVia: 'FORM',
-        supervisorAssignmentStatus: 'PENDING',
-        programId: msncs.id,
-        cluster: msncs.cluster,
-        batch: s.batch,
-        startDate: new Date(),
-        announcementId: lateFormAnn.id,
-      },
-    });
-    await attachComponents({ thesisId: t.id, projectType: 'MASTER' });
-    await prisma.proposal.create({
-      data: {
-        stage: 'PROPOSAL', documentType: 'PROPOSAL', status: 'PENDING_APPROVAL',
-        documentUrl: '/api/files/theses/form_proposal_sample.pdf',
-        thesisId: t.id, submittedById: s.id,
-      },
-    });
-    await prisma.formResponse.create({
-      data: {
-        announcementId: lateFormAnn.id, studentId: s.id, thesisId: t.id,
-        formData: { title: t.title, description: t.description },
-        status: 'LATE_SUBMITTED',
-      },
-    });
-    console.log(`Created late form thesis (id=${t.id})`);
-  }
+  // 3. Bachelor Project Registration
+  await prisma.announcement.create({
+    data: {
+      title: 'Bachelor Major Project Group Formation & Proposal Call',
+      message: 'Final year BCT & BEI students must form groups of 2–4 members and submit project proposals.',
+      type: 'MAJOR',
+      audience: 'PROGRAMS',
+      degreeType: 'BACHELOR',
+      programIds: [programs.BCT.id, programs.BEI.id],
+      batch: '2080',
+      academicYearId: ayMap['080'].id,
+      departmentId: eceDept.id,
+      formEnabled: true,
+      formFields: [
+        { key: 'project_cluster', label: 'Project Cluster', type: 'text', required: true, placeholder: 'AIML, IPCV, NTS, EDMES' },
+      ],
+      startDate: new Date('2026-01-01'),
+      expirationDate: new Date('2027-06-30'),
+      createdById: coordinators.BCT.id,
+    },
+  });
 
-  // ── Test users for login ──
-  const testBCT = findStudents('080', 'BCT');
+  // ── Test User Convenience Accounts ──
   await prisma.user.create({
-    data: { email: 'bachelor@test.com', password: hash, firstName: 'Bach', lastName: 'Student', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: eceDept.id, programId: programs.BCT.id, rollNumber: '080BCT099', batch: '2080' },
-  }).catch(() => {});
-  await prisma.user.create({
-    data: { email: 'master@test.com', password: hash, firstName: 'Mast', lastName: 'Student', role: 'STUDENT', degreeType: 'MASTER', departmentId: eceDept.id, programId: programs.MSNCS.id, rollNumber: '080MSNCS99', batch: '2080' },
+    data: { email: 'bachelor@test.com', password: hash, firstName: 'Bikash', lastName: 'Shrestha', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: eceDept.id, programId: programs.BCT.id, rollNumber: '080BCT099', batch: '2080' },
   }).catch(() => {});
 
-  console.log('\nSeed complete!');
-  console.log('Test login:');
-  console.log('  Maintainer:       subeshgaming@gmail.com');
-  console.log('  Bachelor student: bachelor@test.com');
-  console.log('  Master student:   master@test.com');
-  console.log('  Password:         subesh');
+  await prisma.user.create({
+    data: { email: 'master@test.com', password: hash, firstName: 'Manish', lastName: 'Poudel', role: 'STUDENT', degreeType: 'MASTER', departmentId: eceDept.id, programId: programs.MSDSA.id, rollNumber: '080MSDSA99', batch: '2080' },
+  }).catch(() => {});
+
+  console.log('\n======================================================');
+  console.log('Seed Complete! Comprehensive Presentation Dataset Ready:');
+  console.log('------------------------------------------------------');
+  console.log('• Password for all seeded users: "subesh"');
+  console.log('• Maintainer:          subeshgaming@gmail.com');
+  console.log('• MSDSA Coordinator:   msdsa.coordinator@pcampus.edu.np');
+  console.log('• MSNCS Coordinator:   msncs.coordinator@pcampus.edu.np');
+  console.log('• BCT Coordinator:     bct.coordinator@pcampus.edu.np');
+  console.log('• Faculty/Supervisor:  prabesh.bhattarai@pcampus.edu.np');
+  console.log('• External Examiner:   hari.adhikari@pcampus.edu.np');
+  console.log('• Bachelor Student:    bachelor@test.com');
+  console.log('• Master Student:      master@test.com');
+  console.log('======================================================\n');
 }
 
 main()
-  .catch(e => { console.error('Seed error:', e); process.exit(1); })
-  .finally(() => prisma.$disconnect());
+  .then(async () => { await prisma.$disconnect(); })
+  .catch(async (e) => {
+    console.error('Seed error:', e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

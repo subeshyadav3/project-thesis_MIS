@@ -149,7 +149,10 @@ exports.createThesis = async (req, res) => {
       if (match) derivedBatch = match[1];
     }
 
-    const supId = supervisorId ? parseInt(supervisorId) : null;
+    const supId = resolvedProjectType === 'PROJECT' ? null : (supervisorId ? parseInt(supervisorId) : null);
+    const extMidId = resolvedProjectType === 'PROJECT' ? null : (req.body.externalMidTermId ? parseInt(req.body.externalMidTermId) : null);
+    const extFinId = req.body.externalFinalId ? parseInt(req.body.externalFinalId) : (req.body.examinerId ? parseInt(req.body.examinerId) : null);
+
     const thesis = await prisma.thesis.create({
       data: {
         title,
@@ -157,6 +160,8 @@ exports.createThesis = async (req, res) => {
         studentId: parseInt(studentId),
         supervisorId: supId,
         supervisorAssignmentStatus: supId ? 'PENDING' : null,
+        externalMidTermId: extMidId,
+        externalFinalId: extFinId,
         programId: student.programId || requestingCoordinatorProgram?.id || null,
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         createdVia: 'MANUAL',
@@ -174,12 +179,25 @@ exports.createThesis = async (req, res) => {
           `${assignerName} assigned you as supervisor for "${thesis.title}" (Master ${resolvedProjectType === 'PROJECT' ? 'Project' : 'Thesis'}) — pending your acceptance.`, `/theses/${thesis.id}`);
       } catch (e) { console.error('notify supervisor error:', e.message); }
     }
+
+    if (extMidId) {
+      await prisma.examinerAssignment.create({
+        data: { externalExaminerId: extMidId, thesisId: thesis.id, assignedById: req.user.id },
+      }).catch(() => {});
+    }
+    if (extFinId && extFinId !== extMidId) {
+      await prisma.examinerAssignment.create({
+        data: { externalExaminerId: extFinId, thesisId: thesis.id, assignedById: req.user.id },
+      }).catch(() => {});
+    }
+
     const defaults = getDefaultComponents(resolvedProjectType);
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
         data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
       });
     }
+
     // Check if the linked announcement's expirationDate has passed
     if (thesis.announcementId) {
       await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
@@ -261,12 +279,15 @@ exports.bulkImportPreview = async (req, res) => {
     const preview = [];
     let matchCount = 0;
     let unmatchCount = 0;
+    const defaultProjectType = (req.body.projectType || 'THESIS').toUpperCase() === 'PROJECT' ? 'PROJECT' : 'THESIS';
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const name = (row['Name'] || row['name'] || '').toString().trim();
       const roll = (row['Roll'] || row['roll'] || row['Roll Numbers'] || '').toString().trim();
       const title = (row['Title'] || row['title'] || row['Project Title'] || '').toString().trim();
+      const rawType = (row['Type'] || row['type'] || row['Project Type'] || row['projectType'] || '').toString().trim().toUpperCase();
+      const rowProjectType = (rawType === 'PROJECT' || rawType === 'MASTER PROJECT') ? 'PROJECT' : (rawType === 'THESIS' || rawType === 'MASTER THESIS') ? 'THESIS' : defaultProjectType;
       let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || '').toString().trim();
       const cluster = (row['Cluster'] || row['cluster'] || '').toString().trim();
       const programValue = (row['Program'] || row['program'] || '').toString().trim();
@@ -392,6 +413,7 @@ exports.bulkImportPreview = async (req, res) => {
         name,
         roll,
         title,
+        projectType: rowProjectType,
         batch,
         cluster,
         program: importedProgram ? { id: importedProgram.id, code: importedProgram.code, name: importedProgram.name, cluster: importedProgram.cluster } : null,

@@ -128,10 +128,11 @@ for (let g = 0; g < bctTitles.length; g++) {
   });
 }
 
-// ── 2. MASTER ALL-PROGRAMS THESES (2 rows each for MSNCS, MSICE, MSDSA, MSCSK) ─
+// ── 2. MASTER ALL-PROGRAMS THESES & PROJECTS (MSNCS, MSICE, MSDSA, MSCSK) ─
 const masterThesesDefs = [
   // MSNCS (Network and Cyber Security)
   {
+    type: 'Thesis',
     programCode: 'MSNCS',
     programName: 'MSc in Computer System and Network Engineering',
     cluster: 'Computer networks and security',
@@ -141,16 +142,18 @@ const masterThesesDefs = [
     finalExam: 'Dr. Anisha Rana',
   },
   {
+    type: 'Project',
     programCode: 'MSNCS',
     programName: 'MSc in Computer System and Network Engineering',
     cluster: 'Computer networks and security',
     title: 'AI-Powered Intrusion Detection System for Campus Networks',
-    supervisor: 'Assoc. Prof. Dr. Meena Shrestha',
-    midTerm: 'Dr. Bidur Khadka',
+    supervisor: '',
+    midTerm: '',
     finalExam: 'Assoc. Prof. Dr. Manisha Aryal',
   },
   // MSICE (Information and Communication Engineering)
   {
+    type: 'Thesis',
     programCode: 'MSICE',
     programName: 'MSc in Information and Communication Engineering',
     cluster: 'Electronic devices, circuits and communication',
@@ -160,16 +163,18 @@ const masterThesesDefs = [
     finalExam: 'Dr. Sabin Wagle',
   },
   {
+    type: 'Project',
     programCode: 'MSICE',
     programName: 'MSc in Information and Communication Engineering',
     cluster: 'Electronic devices, circuits and communication',
     title: 'Performance Evaluation of Cognitive Radio Networks in Dense Urban Areas',
-    supervisor: 'Assoc. Prof. Dr. Gyanendra Thapa',
-    midTerm: 'Dr. Prajwal Ghimire',
+    supervisor: '',
+    midTerm: '',
     finalExam: 'Dr. Anisha Rana',
   },
   // MSDSA (Data Science and Analytics)
   {
+    type: 'Thesis',
     programCode: 'MSDSA',
     programName: 'MSc in Data Science and Analytics',
     cluster: 'AI/ML and image processing',
@@ -179,16 +184,18 @@ const masterThesesDefs = [
     finalExam: 'Dr. Bidur Khadka',
   },
   {
+    type: 'Project',
     programCode: 'MSDSA',
     programName: 'MSc in Data Science and Analytics',
-    cluster: 'Audio, NLP and data/text analytics',
+    cluster: 'AI/ML and image processing',
     title: 'Nepali Sentiment Analysis on Social Media Using Transformer Architectures',
-    supervisor: 'Prof. Dr. Raju Poudel',
-    midTerm: 'Dr. Sabin Wagle',
+    supervisor: '',
+    midTerm: '',
     finalExam: 'Prof. Dr. Lokendra Dhakal',
   },
   // MSCSK (Computer Systems and Knowledge Engineering)
   {
+    type: 'Thesis',
     programCode: 'MSCSK',
     programName: 'MSc in Computer Systems and Knowledge Engineering',
     cluster: 'Audio, NLP and data/text analytics',
@@ -198,12 +205,13 @@ const masterThesesDefs = [
     finalExam: 'Dr. Anisha Rana',
   },
   {
+    type: 'Project',
     programCode: 'MSCSK',
     programName: 'MSc in Computer Systems and Knowledge Engineering',
-    cluster: 'AI/ML and image processing',
+    cluster: 'Audio, NLP and data/text analytics',
     title: 'Automated Semantic Question Answering System Using Ontologies',
-    supervisor: 'Assoc. Prof. Dr. Meena Shrestha',
-    midTerm: 'Dr. Bidur Khadka',
+    supervisor: '',
+    midTerm: '',
     finalExam: 'Assoc. Prof. Dr. Manisha Aryal',
   },
 ];
@@ -212,6 +220,7 @@ let progCounters = { MSNCS: 1, MSICE: 1, MSDSA: 1, MSCSK: 1 };
 const masterTheses = masterThesesDefs.map((def) => {
   const r = roll(def.programCode, progCounters[def.programCode]++);
   return {
+    Type: def.type,
     Name: freshName(),
     Roll: r,
     Title: def.title,
@@ -317,8 +326,10 @@ writeFile('bachelor_bct_test_data.xlsx', bctGroups, 'Groups');
 writeFile('bachelor_student_users_test_data.xlsx', bachelorStudents, 'Students');
 writeFile('bachelor_supervisor_users_test_data.xlsx', supervisors, 'Supervisors');
 writeFile('bachelor_external_users_test_data.xlsx', externals, 'Examiners');
-writeFile('master_theses_test_data.xlsx', masterTheses, 'Theses');
+writeFile('master_theses_test_data.xlsx', masterTheses.filter(t => t.Type === 'Thesis'), 'Theses');
+writeFile('master_projects_test_data.xlsx', masterTheses.filter(t => t.Type === 'Project'), 'Projects');
 writeFile('master_msncs_test_data.xlsx', masterTheses.filter(t => t.Program === 'MSNCS'), 'Theses');
+writeFile('master_msdsa_test_data.xlsx', masterTheses.filter(t => t.Program === 'MSDSA'), 'Theses');
 writeFile('master_all_programs_theses_test_data.xlsx', masterTheses, 'Theses');
 writeFile('master_student_users_test_data.xlsx', masterStudents, 'Students');
 writeFile('master_supervisor_users_test_data.xlsx', supervisors, 'Supervisors');

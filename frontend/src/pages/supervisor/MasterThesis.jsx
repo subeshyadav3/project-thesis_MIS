@@ -24,6 +24,7 @@ function SupervisorMasterThesis() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('DEFAULT');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -46,7 +47,7 @@ function SupervisorMasterThesis() {
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {
       const studentName = `${t.student?.firstName || ''} ${t.student?.lastName || ''}`;
-      const searchStr = (studentName + ' ' + (t.title || '')).toLowerCase();
+      const searchStr = (studentName + ' ' + (t.title || '') + ' ' + (t.student?.rollNumber || '')).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
       const matchesType = typeFilter === 'ALL' || t.projectType === typeFilter;
@@ -56,11 +57,39 @@ function SupervisorMasterThesis() {
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
+      if (sortBy === 'DATE_DESC') {
+        const dateA = new Date(a.createdAt || a.startDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.startDate || 0).getTime();
+        return dateB - dateA;
+      }
+      if (sortBy === 'DATE_ASC') {
+        const dateA = new Date(a.createdAt || a.startDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.startDate || 0).getTime();
+        return dateA - dateB;
+      }
+      if (sortBy === 'ROLL_ASC') {
+        const rollA = a.student?.rollNumber || '';
+        const rollB = b.student?.rollNumber || '';
+        return rollA.localeCompare(rollB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortBy === 'ROLL_DESC') {
+        const rollA = a.student?.rollNumber || '';
+        const rollB = b.student?.rollNumber || '';
+        return rollB.localeCompare(rollA, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortBy === 'NAME_ASC') {
+        const nameA = `${a.student?.firstName || ''} ${a.student?.lastName || ''}`.trim();
+        const nameB = `${b.student?.firstName || ''} ${b.student?.lastName || ''}`.trim();
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'TITLE_ASC') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
       if (a.status === 'COMPLETED' && b.status !== 'COMPLETED') return 1;
       if (a.status !== 'COMPLETED' && b.status === 'COMPLETED') return -1;
       return a.id - b.id;
     });
-  }, [filteredTheses]);
+  }, [filteredTheses, sortBy]);
 
   const totalPages = Math.ceil(sortedTheses.length / PAGE_SIZE);
   const paginatedTheses = sortedTheses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -235,6 +264,21 @@ function SupervisorMasterThesis() {
             { value: 'THESIS', label: 'Thesis' },
             { value: 'PROJECT', label: 'Project' },
           ]} allLabel="All Types" />
+          <FilterDropdown
+            label="Sort By"
+            value={sortBy}
+            onChange={setSortBy}
+            options={[
+              { value: 'DEFAULT', label: 'Default (Status)' },
+              { value: 'DATE_DESC', label: 'Date Added (Newest)' },
+              { value: 'DATE_ASC', label: 'Date Added (Oldest)' },
+              { value: 'ROLL_ASC', label: 'Roll Number (Ascending)' },
+              { value: 'ROLL_DESC', label: 'Roll Number (Descending)' },
+              { value: 'NAME_ASC', label: 'Student Name (A–Z)' },
+              { value: 'TITLE_ASC', label: 'Title (A–Z)' },
+            ]}
+            allLabel="Default Sorting"
+          />
         </div>
 
         {loading ? (

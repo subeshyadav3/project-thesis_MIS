@@ -1,34 +1,34 @@
 # Graph Report - se  (2026-08-15)
 
 ## Corpus Check
-- 192 files · ~355,759 words
+- 194 files · ~484,746 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1515 nodes · 3160 edges · 105 communities (89 shown, 16 thin omitted)
+- 1524 nodes · 3170 edges · 108 communities (92 shown, 16 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 91 edges (avg confidence: 0.52)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c2c12357`
+- Built from commit: `fb124c15`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - router.py
-- PageLayout
+- Icon
 - App.jsx
 - index.js
 - test_pipeline.py
 - 🎓 Thesis & Project Management System (TPMS)
-- analyzer.py
+- ProcessedDocument
 - dependencies
-- ToastContext.jsx
+- studentGroupController.js
 - Assignment.jsx
 - resolveCoordinatorScope
 - ui.jsx
 - LLMFactory
-- analysis_repository.py
+- pipeline.py
 - thesisController.js
 - useToast
 - vector_store.py
@@ -36,12 +36,12 @@
 - userController.js
 - generate-new-test-data.js
 - announcementController.js
-- llm_factory.py
+- embeddings.py
 - generate-samples.js
 - groupController.js
 - AnalysisStatus
 - studentController.js
-- pipeline.py
+- .ask
 - evaluationController.js
 - seed.js
 - authController.js
@@ -52,22 +52,22 @@
 - supervisorController.js
 - get_llm
 - departmentController.js
-- notificationController.js
+- coordinatorScope.js
 - chatbotController.js
 - emailService.js
-- Icon
+- PageLayout.jsx
 - aiController.js
-- embeddings.py
 - post
+- prisma.js
 - parseId
 - dependencies
 - api.jsx
 - build_report.py
 - AI Chatbot Service — TPMS Thesis Management
 - UserManagement.jsx
-- externalExaminerController.js
+- auditService.js
 - authenticate
-- coordinatorScope.js
+- db.py
 - students.js
 - generate_perfect_diagrams.py
 - chatbot.js
@@ -86,34 +86,36 @@
 - cosine_similarity
 - backend/package.json
 - devDependencies
-- prisma.js
+- analyzer.py
 - express-rate-limit
-- examinerAssignments.js
+- Forms.jsx
 - forward.js
 - print.js
 - proposals.js
 - studentGroups.js
-- Pipeline
+- examinerAssignments.js
 - .prettierrc.json
 - fetch_proposal_text
-- studentGroupController.js
+- analyze
 - AGENTS.md
 - rules/graphify.md
 - workflows/graphify.md
-- .ask
-- analyze
-- cookie-parser
-- dotenv
+- bcryptjs
+- health
+- proposalCommentController.js
 - express
 - checkOverdue.js
 - mammoth
 - multer
 - nodemailer
 - pdfkit
-- health
+- PipelineStage
+- test-all-flows.js
 - evaluations.js
 - cors
-- bcryptjs
+- resolve_auth_token
+- axios
+- dotenv
 
 ## God Nodes (most connected - your core abstractions)
 1. `useToast()` - 85 edges
@@ -128,81 +130,88 @@
 10. `canManageGroupAsCoordinator()` - 22 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `embed_endpoint()` --indirect_call--> `embed_text()`  [INFERRED]
+  ai_chatbot/app/router.py → ai_chatbot/core/embeddings.py
+- `similarity_endpoint()` --indirect_call--> `embed_text()`  [INFERRED]
+  ai_chatbot/app/router.py → ai_chatbot/core/embeddings.py
 - `_coerce_analysis()` --uses--> `ProcessedDocument`  [INFERRED]
   ai_chatbot/core/analyzer.py → ai_chatbot/core/pdf_processor.py
 - `DocumentAnalyzer` --uses--> `LLMFactory`  [INFERRED]
   ai_chatbot/core/analyzer.py → ai_chatbot/core/llm_factory.py
-- `DocumentAnalyzer` --uses--> `ProcessedDocument`  [INFERRED]
-  ai_chatbot/core/analyzer.py → ai_chatbot/core/pdf_processor.py
-- `Pipeline` --uses--> `DocumentAnalyzer`  [INFERRED]
-  ai_chatbot/core/pipeline.py → ai_chatbot/core/analyzer.py
 - `fallback_analysis()` --uses--> `ProcessedDocument`  [INFERRED]
   ai_chatbot/core/analyzer.py → ai_chatbot/core/pdf_processor.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (105 total, 16 thin omitted)
+## Communities (108 total, 16 thin omitted)
 
 ### Community 0 - "router.py"
-Cohesion: 0.13
-Nodes (33): Extract the bearer token from the Authorization header, if present. Used to…, resolve_auth_token(), embed_endpoint(), _norm(), FastAPI routes for the AI chatbot service., Return a single dense embedding vector for the supplied text. The Node backend…, Compute cosine similarity between the source text and each candidate., similarity_endpoint() (+25 more)
+Cohesion: 0.17
+Nodes (26): embed_endpoint(), _norm(), FastAPI routes for the AI chatbot service., Return a single dense embedding vector for the supplied text. The Node backend…, Compute cosine similarity between the source text and each candidate., similarity_endpoint(), AnalyzeAcceptedResponse, AnalyzeRequest (+18 more)
 
-### Community 1 - "PageLayout"
+### Community 1 - "Icon"
 Cohesion: 0.14
-Nodes (21): Evaluations, SupervisorAssignments, ErrorBoundary, EvaluationPdfPreview(), PageLayout(), Pagination(), SearchInput(), TableSkeleton() (+13 more)
+Nodes (23): Evaluations, FileAudit, ErrorBoundary, EvaluationPdfPreview(), ROLE_LABEL, Pagination(), SearchInput(), TableSkeleton() (+15 more)
 
 ### Community 2 - "App.jsx"
 Cohesion: 0.07
-Nodes (26): App(), AuditLog, BachelorProjects, DepartmentManagement, ExaminerList, ExternalEvaluationsList, FileAudit, Login (+18 more)
+Nodes (29): App(), AuditLog, BachelorProjects, DepartmentManagement, ExternalDashboard, ExternalEvaluationsList, Login, MaintainerDashboard (+21 more)
 
 ### Community 3 - "index.js"
 Cohesion: 0.05
 Nodes (39): aiRoutes, announcementRoutes, app, assignmentRequestRoutes, { authenticate }, authRoutes, chatbotRoutes, cookieParser (+31 more)
 
 ### Community 4 - "test_pipeline.py"
-Cohesion: 0.13
-Nodes (29): _build_synthetic_doc(), Wrap text into the ProcessedDocument shape analyzers expect., chunk_text(), clean_extracted_text(), extract_text_from_bytes(), process_pdf_async(), process_pdf_sync(), ProcessedDocument (+21 more)
+Cohesion: 0.09
+Nodes (38): _build_synthetic_doc(), Wrap text into the ProcessedDocument shape analyzers expect., embed_text(), Single-text convenience wrapper. Returns a single vector., _build_url(), chunk_text(), clean_extracted_text(), extract_text_from_bytes() (+30 more)
 
 ### Community 5 - "🎓 Thesis & Project Management System (TPMS)"
 Cohesion: 0.05
 Nodes (36): 10. Program-Scoped Audit Trail, 11. Email Policy Enforcement, 1. Program Scoping & Degree Isolation, 2. Bachelor Project Lifecycle (`MINOR` / `MAJOR`), 3. Master Thesis Lifecycle, 4. Form Responses Matrix & Inline Finalization, 5. Cross-Role Faculty Utilization & Conflict-of-Interest Guard, 6. Multi-Project Engagement Prevention (+28 more)
 
-### Community 6 - "analyzer.py"
-Cohesion: 0.22
-Nodes (15): _band_for(), _coerce_analysis(), fallback_analysis(), _map_criteria(), Any, Document analyzer. Runs the LLM in a single call that returns summary +…, Deterministic placeholder output. Keeps the pipeline alive even if Groq is…, Map raw LLM JSON output into the typed ``DocumentAnalysis`` shape. Resilient:… (+7 more)
+### Community 6 - "ProcessedDocument"
+Cohesion: 0.15
+Nodes (14): get_analyzer(), get_pipeline(), Return a memoized Pipeline., DocumentAnalyzer, Run a single end-to-end analysis pass., Run analysis. Truncates text fed to the model to keep tokens sane., ProcessedDocument, Result of the full preprocess pipeline. (+6 more)
 
 ### Community 7 - "dependencies"
 Cohesion: 0.06
 Nodes (35): @fontsource-variable/dm-sans, @fontsource-variable/inter, dependencies, axios, @fontsource-variable/dm-sans, @fontsource-variable/inter, lucide-react, react (+27 more)
 
-### Community 8 - "ToastContext.jsx"
-Cohesion: 0.13
-Nodes (13): ProjectDetail, ConfirmDialog(), ExaminerAssignmentSection(), ExternalExaminerSection(), SupervisorAssignmentSection(), BACHELOR_STEPS, MASTER_STEPS, STEP_REQUIREMENTS (+5 more)
+### Community 8 - "studentGroupController.js"
+Cohesion: 0.19
+Nodes (11): listEligible(), audit, { getDefaultComponents }, GROUP_INCLUDES, {
+  listEligibleAnnouncementsForStudent,
+  isStudentAlreadyInAGroupAnnouncement,
+}, notifSvc, prisma, isStudentAlreadyInAGroupAnnouncement() (+3 more)
 
 ### Community 9 - "Assignment.jsx"
-Cohesion: 0.10
-Nodes (20): StudentProjectDetail, StudentProjects, StudentSubmissions, StudentTheses, AiAssistantModal(), PRESET_CRITERIA, SUGGESTED_QUESTIONS, DocumentViewer() (+12 more)
+Cohesion: 0.17
+Nodes (14): StudentProjectDetail, StudentProjects, StudentSubmissions, StudentTheses, DocumentViewer(), COMMENT_ROLE_COLORS, ProposalCommentsViewer(), ROLE_LABEL (+6 more)
 
 ### Community 10 - "resolveCoordinatorScope"
 Cohesion: 0.11
-Nodes (30): completeEvaluation(), assignExaminerToGroup(), assignExaminerToThesis(), audit, emailService, notifSvc, prisma, removeAssignment() (+22 more)
+Nodes (31): completeEvaluation(), assignExaminerToGroup(), assignExaminerToThesis(), audit, emailService, notifSvc, prisma, removeAssignment() (+23 more)
+
+### Community 11 - "ui.jsx"
+Cohesion: 0.06
+Nodes (6): iconMap, BACHELOR_STEPS, MASTER_PROJECT_STEPS, MASTER_STEPS, STEP_REQUIREMENTS, WorkflowStepper()
 
 ### Community 12 - "LLMFactory"
-Cohesion: 0.09
-Nodes (21): _coerce_json(), _fallback_provider(), LLMAuthError, LLMFactory, LLMOutputError, LLMUnavailableError, Any, RuntimeError (+13 more)
+Cohesion: 0.08
+Nodes (29): get_chat_agent(), Dependency-injection helpers for FastAPI routes., ChatAgent, RAG chat agent. Retrieves relevant chunks for the question, builds a context…, Stateless agent. Call repeatedly for each new question., _coerce_json(), _fallback_provider(), get_llm_factory() (+21 more)
 
-### Community 13 - "analysis_repository.py"
-Cohesion: 0.10
-Nodes (26): fetch_analysis(), notify_backend_status(), Any, Persistence layer for AI analysis results. Stores per-proposal AI analyses into…, Tell the Express backend about the AI status. The backend's…, Create-or-update the analysis row. Returns the row id., safe_json(), upsert_analysis() (+18 more)
+### Community 13 - "pipeline.py"
+Cohesion: 0.16
+Nodes (16): fetch_analysis(), notify_backend_status(), Any, Persistence layer for AI analysis results. Stores per-proposal AI analyses into…, Tell the Express backend about the AI status. The backend's…, Create-or-update the analysis row. Returns the row id., safe_json(), upsert_analysis() (+8 more)
 
 ### Community 14 - "thesisController.js"
 Cohesion: 0.10
-Nodes (29): getDefaultComponents(), createGroup(), { assertValidStatusTransition }, audit, bcrypt, { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator, canManageThesisAsCoordinator }, bulkImportConfirm(), bulkImportPreview() (+21 more)
+Nodes (28): getDefaultComponents(), createGroup(), { assertValidStatusTransition }, audit, bcrypt, { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator, canManageThesisAsCoordinator }, bulkImportPreview(), createThesis() (+20 more)
 
 ### Community 15 - "useToast"
-Cohesion: 0.11
-Nodes (22): ExternalEvaluationPage, SupervisorDashboard, ProposalsSection(), SupervisionActions(), useToast(), AuditLog(), BachelorProjects(), ExaminerList() (+14 more)
+Cohesion: 0.07
+Nodes (30): ExternalEvaluationPage, StudentGroups, AiAssistantModal(), PRESET_CRITERIA, SUGGESTED_QUESTIONS, ConfirmDialog(), ExaminerAssignmentSection(), ExternalExaminerSection() (+22 more)
 
 ### Community 16 - "vector_store.py"
 Cohesion: 0.14
@@ -210,7 +219,7 @@ Nodes (23): has_stored_analysis(), _chromadb_collection(), collection_count(), _
 
 ### Community 17 - "printController.js"
 Cohesion: 0.17
-Nodes (27): buildBachelorFormat(), buildBlankLines(), buildExternalPage(), buildGroupHtml(), buildMasterFormat(), buildNote(), buildPageHeader(), buildSupervisorPage() (+19 more)
+Nodes (26): buildBachelorFormat(), buildBlankLines(), buildExternalPage(), buildGroupHtml(), buildMasterFormat(), buildNote(), buildPageHeader(), buildSupervisorPage() (+18 more)
 
 ### Community 18 - "userController.js"
 Cohesion: 0.11
@@ -224,9 +233,9 @@ Nodes (24): bachelorStudents, bctGroups, bctTitles, emailFor(), externalNames, e
 Cohesion: 0.11
 Nodes (21): RULES, asCleanAudience(), audit, create(), deactivate(), delete(), deleteFormResponse(), finalizeFormResponse() (+13 more)
 
-### Community 21 - "llm_factory.py"
-Cohesion: 0.15
-Nodes (17): get_settings(), Configuration module for the AI chatbot service. Loads environment variables…, Factory cached by lru_cache in deps.py. Kept as a small wrapper for DI., Application settings loaded from environment variables. Environment variables…, Settings, LLM factory — Groq primary, NVIDIA build API fallback. Both providers are…, configure_logging(), get_logger() (+9 more)
+### Community 21 - "embeddings.py"
+Cohesion: 0.09
+Nodes (29): get_settings(), Configuration module for the AI chatbot service. Loads environment variables…, Factory cached by lru_cache in deps.py. Kept as a small wrapper for DI., Application settings loaded from environment variables. Environment variables…, Settings, _dev_hash_fallback(), embed_texts(), embedding_dim_for() (+21 more)
 
 ### Community 22 - "generate-samples.js"
 Cohesion: 0.08
@@ -237,16 +246,16 @@ Cohesion: 0.10
 Nodes (19): { assertValidStatusTransition }, audit, bcrypt, { buildGroupWhereForCoordinator, resolveCoordinatorScope, isGroupVisibleToCoordinator, canManageGroupAsCoordinator }, bulkImportPreview(), { computeCurrentYearSemesterFromBatch }, emailService, exportGroups() (+11 more)
 
 ### Community 24 - "AnalysisStatus"
-Cohesion: 0.14
-Nodes (14): Inspect where the pipeline currently is for a given proposal., status_endpoint(), _status_or_404(), get_status(), get_tracker(), In-process status tracker for the analyze pipeline. Each proposal has a single-…, Thread-safe-ish in-memory tracker (single-process)." for multi-process…, Return the singleton tracker instance. (+6 more)
+Cohesion: 0.18
+Nodes (10): Inspect where the pipeline currently is for a given proposal., status_endpoint(), _status_or_404(), get_status(), get_tracker(), In-process status tracker for the analyze pipeline. Each proposal has a single-…, Thread-safe-ish in-memory tracker (single-process)." for multi-process…, Return the singleton tracker instance. (+2 more)
 
 ### Community 25 - "studentController.js"
 Cohesion: 0.10
 Nodes (13): audit, fs, { getEngagement }, notifSvc, path, prisma, submitFormResponse(), triggerAIPipeline() (+5 more)
 
-### Community 26 - "pipeline.py"
-Cohesion: 0.13
-Nodes (16): get_analyzer(), get_chat_agent(), get_pipeline(), Dependency-injection helpers for FastAPI routes., Return a memoized Pipeline., DocumentAnalyzer, Run a single end-to-end analysis pass., Run analysis. Truncates text fed to the model to keep tokens sane. (+8 more)
+### Community 26 - ".ask"
+Cohesion: 0.19
+Nodes (10): chat(), Answer a question grounded in the document's vector store., _format_context(), _format_history(), Non-streaming answer., Async generator yielding (delta, None) chunks and a final (None, result) at end., Compact conversation history format. Limit to last 6 turns., Build the numbered context block the prompt expects. Returns the formatted… (+2 more)
 
 ### Community 27 - "evaluationController.js"
 Cohesion: 0.14
@@ -288,29 +297,33 @@ Nodes (13): build_ask_agent(), LangGraph Q&A agent using Gemini., get_llm(), Ret
 Cohesion: 0.12
 Nodes (3): audit, notifSvc, prisma
 
+### Community 37 - "coordinatorScope.js"
+Cohesion: 0.24
+Nodes (8): p, { PrismaClient }, { resolveCoordinatorScope, canManageThesisAsCoordinator, isThesisVisibleToCoordinator }, test(), getThesisEvaluations(), isThesisVisibleToCoordinator(), prisma, IMPORTANT: Cross-program is allowed ONLY for MASTER degree-type
+
 ### Community 38 - "chatbotController.js"
 Cohesion: 0.20
 Nodes (12): AI_CHATBOT_URL, callChatbot(), chat(), getAnalysis(), getProposalDocumentOr403(), getStatus(), opts_timeout(), prisma (+4 more)
 
 ### Community 39 - "emailService.js"
 Cohesion: 0.24
-Nodes (15): assignSupervisor(), bulkAssignSupervisor(), bulkImportConfirm(), buildUniversityTemplate(), nodemailer, notifyExaminerAssigned(), notifyFeedbackSubmitted(), notifyGroupCreated() (+7 more)
+Nodes (16): assignSupervisor(), bulkAssignSupervisor(), bulkImportConfirm(), bulkImportConfirm(), buildUniversityTemplate(), nodemailer, notifyExaminerAssigned(), notifyFeedbackSubmitted() (+8 more)
 
-### Community 40 - "Icon"
+### Community 40 - "PageLayout.jsx"
 Cohesion: 0.10
-Nodes (18): CoordinatorDashboard, ExternalDashboard, MaintainerDashboard, StudentNotifications, LayoutContext, useLayout(), CommandPalette(), NotificationBell() (+10 more)
+Nodes (18): CoordinatorDashboard, StudentDashboard, SupervisorAssignments, AppLayout(), LayoutContext, useLayout(), CommandPalette(), NotificationBell() (+10 more)
 
 ### Community 41 - "aiController.js"
 Cohesion: 0.26
 Nodes (14): ask(), callAI(), callAIStream(), evaluate(), extractText(), fs, getStoragePath(), loadCandidates() (+6 more)
 
-### Community 42 - "embeddings.py"
-Cohesion: 0.19
-Nodes (13): _dev_hash_fallback(), embed_texts(), embedding_dim_for(), force_hash_only(), _load_model(), _model_dim(), Embedding generation backed by sentence-transformers. The model is loaded once…, Return the configured/derived embedding dimensionality. (+5 more)
+### Community 42 - "post"
+Cohesion: 0.13
+Nodes (23): ask_endpoint(), ask_stream_endpoint(), chat_stream(), _clamp_score(), evaluate_endpoint(), _evaluate_fallback_row(), evaluate_stream_endpoint(), Return an LLM factory for the configured primary provider. Honors the legacy… (+15 more)
 
-### Community 43 - "post"
-Cohesion: 0.12
-Nodes (23): ask_endpoint(), ask_stream_endpoint(), chat(), chat_stream(), _clamp_score(), evaluate_endpoint(), _evaluate_fallback_row(), evaluate_stream_endpoint() (+15 more)
+### Community 43 - "prisma.js"
+Cohesion: 0.10
+Nodes (9): audit, notifSvc, prisma, audit, notifSvc, prisma, prisma, prisma (+1 more)
 
 ### Community 44 - "parseId"
 Cohesion: 0.15
@@ -318,11 +331,11 @@ Nodes (14): approveLateProposal(), audit, getProposal(), logger, notifSvc, { par
 
 ### Community 45 - "dependencies"
 Cohesion: 0.15
-Nodes (13): dependencies, axios, jsonwebtoken, pdf-parse, @prisma/client, puppeteer-core, xlsx, axios (+5 more)
+Nodes (13): dependencies, cookie-parser, jsonwebtoken, pdf-parse, @prisma/client, puppeteer-core, xlsx, cookie-parser (+5 more)
 
 ### Community 46 - "api.jsx"
-Cohesion: 0.15
-Nodes (15): MasterThesis, BulkPendingUsersModal(), DESIGNATION_OPTIONS, generateEmail(), normalizeName(), ROLE_LABEL, GroupBulkUploadModal(), MasterThesisBulkUploadModal() (+7 more)
+Cohesion: 0.19
+Nodes (13): ExaminerList, BulkPendingUsersModal(), DESIGNATION_OPTIONS, generateEmail(), normalizeName(), GroupBulkUploadModal(), MasterThesisBulkUploadModal(), TYPE_ICON (+5 more)
 
 ### Community 47 - "build_report.py"
 Cohesion: 0.24
@@ -336,17 +349,17 @@ Nodes (11): AI Chatbot Service — TPMS Thesis Management, `ai_document_analysis
 Cohesion: 0.24
 Nodes (9): Profile, UserManagement, COORDINATOR_ALLOWED_ROLES, PAGE_SIZES, UserManagement(), Profile(), formatYearSemester(), ROMAN (+1 more)
 
-### Community 50 - "externalExaminerController.js"
-Cohesion: 0.25
-Nodes (5): audit, { computeSummary }, logger, notifSvc, prisma
+### Community 50 - "auditService.js"
+Cohesion: 0.15
+Nodes (12): audit, { computeSummary }, logger, notifSvc, prisma, log(), logger, logMarks() (+4 more)
 
 ### Community 51 - "authenticate"
 Cohesion: 0.18
 Nodes (9): authenticate(), assignmentRequestController, { authenticate, authorize }, express, router, { authenticate }, express, notificationController (+1 more)
 
-### Community 52 - "coordinatorScope.js"
-Cohesion: 0.24
-Nodes (8): p, { PrismaClient }, { resolveCoordinatorScope, canManageThesisAsCoordinator, isThesisVisibleToCoordinator }, test(), getThesisEvaluations(), isThesisVisibleToCoordinator(), prisma, IMPORTANT: Cross-program is allowed ONLY for MASTER degree-type
+### Community 52 - "db.py"
+Cohesion: 0.22
+Nodes (11): get_engine(), get_session_factory(), ping_database(), Database engine + session factory. Built with SQLAlchemy core for async…, Lazily build the async engine. Re-used across the app lifetime., Quick connectivity probe — used by /health., Async context manager yielding a transactional session. Auto-rolls back on…, session_scope() (+3 more)
 
 ### Community 53 - "students.js"
 Cohesion: 0.20
@@ -373,8 +386,8 @@ Cohesion: 0.25
 Nodes (7): Color Theme:, Development, Key Components:, New Features:, Responsive Design:, UI Updates, University Thesis Management System - Frontend
 
 ### Community 59 - "Announcements.jsx"
-Cohesion: 0.25
-Nodes (6): CoordinatorAnnouncements, AUDIENCE_LABELS, BACHELOR_DEFAULT_FORM_FIELDS, CoordinatorAnnouncements(), DEFAULT_FORM_FIELDS, TYPE_LABELS
+Cohesion: 0.22
+Nodes (7): CoordinatorAnnouncements, AUDIENCE_LABELS, BACHELOR_DEFAULT_FORM_FIELDS, CoordinatorAnnouncements(), MASTER_PROJECT_FORM_FIELDS, MASTER_THESIS_FORM_FIELDS, TYPE_LABELS
 
 ### Community 60 - "scripts"
 Cohesion: 0.29
@@ -420,13 +433,13 @@ Nodes (4): name, prisma, seed, version
 Cohesion: 0.40
 Nodes (5): devDependencies, nodemon, prisma, nodemon, prisma
 
-### Community 71 - "prisma.js"
-Cohesion: 0.09
-Nodes (17): audit, notifSvc, prisma, audit, notifSvc, prisma, audit, prisma (+9 more)
+### Community 71 - "analyzer.py"
+Cohesion: 0.26
+Nodes (13): _band_for(), _coerce_analysis(), fallback_analysis(), _map_criteria(), Any, Document analyzer. Runs the LLM in a single call that returns summary +…, Deterministic placeholder output. Keeps the pipeline alive even if Groq is…, Map raw LLM JSON output into the typed ``DocumentAnalysis`` shape. Resilient:… (+5 more)
 
-### Community 73 - "examinerAssignments.js"
-Cohesion: 0.40
-Nodes (4): { authenticate, authorize }, examinerAssignmentController, express, router
+### Community 73 - "Forms.jsx"
+Cohesion: 0.33
+Nodes (4): StudentForms, DEFAULT_STUDENT_FORM_FIELDS, FIELD_TYPES, StudentForms()
 
 ### Community 74 - "forward.js"
 Cohesion: 0.40
@@ -444,43 +457,40 @@ Nodes (4): { authenticate, authorize }, express, proposalController, router
 Cohesion: 0.40
 Nodes (4): { authenticate, authorize }, ctrl, express, router
 
-### Community 78 - "Pipeline"
-Cohesion: 0.18
-Nodes (13): _build_url(), fetch_document_bytes(), PDFFetchError, RuntimeError, File could not be obtained from the backend., Resolve a stored ``/api/files/…``-style path into a fully-qualified URL., Download the PDF from the backend. Accepts either a fully-qualified URL or the…, Pipeline (+5 more)
+### Community 78 - "examinerAssignments.js"
+Cohesion: 0.40
+Nodes (4): { authenticate, authorize }, examinerAssignmentController, express, router
 
 ### Community 79 - ".prettierrc.json"
 Cohesion: 0.40
 Nodes (4): printWidth, semi, singleQuote, trailingComma
 
-### Community 82 - "studentGroupController.js"
-Cohesion: 0.19
-Nodes (11): listEligible(), audit, { getDefaultComponents }, GROUP_INCLUDES, {
-  listEligibleAnnouncementsForStudent,
-  isStudentAlreadyInAGroupAnnouncement,
-}, notifSvc, prisma, isStudentAlreadyInAGroupAnnouncement() (+3 more)
-
-### Community 86 - ".ask"
-Cohesion: 0.27
-Nodes (7): _format_context(), _format_history(), Non-streaming answer., Async generator yielding (delta, None) chunks and a final (None, result) at end., Compact conversation history format. Limit to last 6 turns., Build the numbered context block the prompt expects. Returns the formatted…, ChatFinalResponse
-
-### Community 87 - "analyze"
+### Community 82 - "analyze"
 Cohesion: 0.22
 Nodes (9): analyze(), _fetch_document_type(), _fetch_proposal_url(), Accept an analyze request and run the pipeline in the background. The backend…, Run the pipeline swallowing exceptions (already tracked in status)., Query the Express backend for the Proposal row to find document_url., Return the document type from the Proposal (defaults to PROPOSAL)., _run_pipeline_safe() (+1 more)
+
+### Community 88 - "health"
+Cohesion: 0.29
+Nodes (7): analysis_endpoint(), candidates_endpoint(), health(), Return the persisted analysis result for a proposal, if any., Return a list of stored proposal vectors used for similarity checks. Scoping…, Lightweight readiness probe used by the orchestrator., get
 
 ### Community 91 - "checkOverdue.js"
 Cohesion: 0.32
 Nodes (6): GROUP_STATUS, PROPOSAL_STATUS, SUPERVISOR_ASSIGNMENT_STATUS, THESIS_STATUS, { GROUP_STATUS, THESIS_STATUS }, prisma
 
-### Community 101 - "health"
-Cohesion: 0.29
-Nodes (7): analysis_endpoint(), candidates_endpoint(), health(), Return the persisted analysis result for a proposal, if any., Return a list of stored proposal vectors used for similarity checks. Scoping…, Lightweight readiness probe used by the orchestrator., get
+### Community 101 - "PipelineStage"
+Cohesion: 0.40
+Nodes (6): PipelineStage, Current step the pipeline is executing., Qualitative band derived from a /10 numeric score., ScoreBand, Enum, str
 
-### Community 102 - "evaluations.js"
+### Community 102 - "test-all-flows.js"
+Cohesion: 0.40
+Nodes (5): assert(), axios, bcrypt, prisma, runTests()
+
+### Community 103 - "evaluations.js"
 Cohesion: 0.40
 Nodes (4): { authenticate, authorize }, evaluationController, express, router
 
 ## Knowledge Gaps
-- **510 isolated node(s):** `root`, `dist`, `node_modules`, `ecmaVersion`, `sourceType` (+505 more)
+- **515 isolated node(s):** `root`, `dist`, `node_modules`, `ecmaVersion`, `sourceType` (+510 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -489,15 +499,15 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `getDefaultComponents()` connect `thesisController.js` to `emailService.js`, `studentGroupController.js`, `groupController.js`, `evaluationController.js`, `seed.js`?**
   _High betweenness centrality (0.008) - this node is a cross-community bridge._
-- **Why does `resolveCoordinatorScope()` connect `resolveCoordinatorScope` to `supervisorController.js`, `emailService.js`, `thesisController.js`, `printController.js`, `userController.js`, `coordinatorScope.js`, `groupController.js`, `evaluationController.js`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
-- **Why does `useToast()` connect `useToast` to `PageLayout`, `App.jsx`, `ToastContext.jsx`, `Assignment.jsx`, `Icon`, `api.jsx`, `UserManagement.jsx`, `Announcements.jsx`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
+- **Why does `useToast()` connect `useToast` to `Icon`, `App.jsx`, `PageLayout.jsx`, `Assignment.jsx`, `Forms.jsx`, `api.jsx`, `UserManagement.jsx`, `Announcements.jsx`?**
+  _High betweenness centrality (0.007) - this node is a cross-community bridge._
+- **Why does `resolveCoordinatorScope()` connect `resolveCoordinatorScope` to `supervisorController.js`, `coordinatorScope.js`, `emailService.js`, `thesisController.js`, `printController.js`, `userController.js`, `groupController.js`, `evaluationController.js`?**
+  _High betweenness centrality (0.007) - this node is a cross-community bridge._
 - **What connects `root`, `dist`, `node_modules` to the rest of the system?**
-  _510 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `router.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.13277310924369748 - nodes in this community are weakly interconnected._
-- **Should `PageLayout` be split into smaller, more focused modules?**
-  _Cohesion score 0.14268292682926828 - nodes in this community are weakly interconnected._
+  _515 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Icon` be split into smaller, more focused modules?**
+  _Cohesion score 0.13742071881606766 - nodes in this community are weakly interconnected._
 - **Should `App.jsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.07142857142857142 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07317073170731707 - nodes in this community are weakly interconnected._
+- **Should `index.js` be split into smaller, more focused modules?**
+  _Cohesion score 0.04878048780487805 - nodes in this community are weakly interconnected._
