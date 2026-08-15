@@ -194,14 +194,14 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       </div>
 
       <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
-        <div><strong>Name:</strong> ${esc(supervisor)}</div>
-        <div><strong>Post:</strong> ${esc(supervisorDesignation || 'Supervisor')}</div>
-        <div><strong>Organization:</strong> IOE</div>
+        <div style="margin-bottom:2px;">Examiner:</div>
+        <div>Name: ${esc(supervisor)}</div>
+        <div>Post: ${esc(supervisorDesignation || 'Supervisor')}</div>
+        <div>Organization: IOE</div>
         <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
           <tr>
-            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
+            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;">Signature: _____________________</td>
           </tr>
         </table>
       </div>
@@ -285,13 +285,13 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
         </div>
 
         <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-          <div style="font-weight:bold;margin-bottom:2px;">Examiner :</div>
-          <div><strong>Name:</strong> ${esc(extName || '')}</div>
-          <div><strong>Designation :</strong> ${esc(extDesignation || '')}</div>
+          <div style="margin-bottom:2px;">Examiner :</div>
+          <div>Name: ${esc(extName || '')}</div>
+          <div>Designation : ${esc(extDesignation || '')}</div>
           <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
             <tr>
-              <td style="width:50%;"><strong>Date :</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-              <td style="width:50%;"><strong>Signature :</strong> _____________________</td>
+              <td style="width:50%;">Date : ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature : _____________________</td>
             </tr>
           </table>
         </div>
@@ -367,14 +367,14 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
       </div>
 
       <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
-        <div><strong>Name:</strong> ${esc(extName || '')}</div>
-        <div><strong>Post:</strong> ${esc(extDesignation || '')}</div>
-        <div><strong>University/Organization:</strong> IOE</div>
+        <div style="margin-bottom:2px;">Examiner:</div>
+        <div>Name: ${esc(extName || '')}</div>
+        <div>Post: ${esc(extDesignation || '')}</div>
+        <div>University/Organization: IOE</div>
         <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
           <tr>
-            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
+            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;">Signature: _____________________</td>
           </tr>
         </table>
       </div>
@@ -541,27 +541,27 @@ function buildBachelorFormat(data) {
   const examinerBlocks = examiners.length
     ? examiners.map((e, idx) => `
       <div style="font-size:11pt;margin-top:${idx === 0 ? 14 : 10}px;page-break-inside:avoid;">
-        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
-        <div><strong>Name:</strong> ${esc(e.submittedBy)}</div>
-        <div><strong>Post:</strong> ${esc(e.evaluatorRole || 'Examiner')}</div>
-        <div><strong>Organization:</strong> IOE</div>
+        <div style="margin-bottom:2px;">Examiner:</div>
+        <div>Name: ${esc(e.submittedBy)}</div>
+        <div>Post: ${esc(e.evaluatorRole || 'Examiner')}</div>
+        <div>Organization: IOE</div>
         <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
           <tr>
-            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
+            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;">Signature: _____________________</td>
           </tr>
         </table>
       </div>`).join('')
     : `
       <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
-        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
-        <div><strong>Name:</strong> ${esc(supervisor)}</div>
-        <div><strong>Post:</strong> Supervisor</div>
-        <div><strong>Organization:</strong> IOE</div>
+        <div style="margin-bottom:2px;">Examiner:</div>
+        <div>Name: ${esc(supervisor)}</div>
+        <div>Post: Supervisor</div>
+        <div>Organization: IOE</div>
         <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
           <tr>
-            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
+            <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;">Signature: _____________________</td>
           </tr>
         </table>
       </div>`;
