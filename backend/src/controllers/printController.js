@@ -437,29 +437,70 @@ function buildMasterFormat(data, scope = 'both') {
 
   if (includeSup) {
     pages += `
-    <div style="page-break-after:always;">
+    <div class="page-sheet">
       ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation, programName, 'midterm')}
     </div>`;
   }
   if (includeExt) {
     pages += `
-    <div${includeSup ? ' style="page-break-after:always;"' : ''}>
+    <div class="page-sheet">
       ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType, programName, supervisor)}
     </div>`;
   }
   if (includeExtFinal) {
     pages += `
-    <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
+    <div class="page-sheet">
       ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType, programName, supervisor)}
     </div>`;
   }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
-    @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
-    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11pt; line-height: 1.35; margin: 0; padding: 0; background: #fff; }
+    @page { size: A4 portrait; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      color: #000;
+      font-size: 11pt;
+      line-height: 1.35;
+      margin: 0;
+      padding: 20px;
+      background: #eef2f6;
+    }
+    .page-sheet {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      max-width: 210mm;
+      margin: 0 auto 28px auto;
+      padding: 20mm 15mm;
+      box-sizing: border-box;
+      min-height: 297mm;
+      page-break-after: always;
+    }
+    .page-sheet:last-child {
+      margin-bottom: 0;
+      page-break-after: auto;
+    }
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .page-sheet {
+        border: none;
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0;
+        padding: 0;
+        max-width: 100%;
+        min-height: auto;
+      }
+    }
   </style></head><body>
     ${pages}
   </body></html>`;
@@ -527,68 +568,111 @@ function buildBachelorFormat(data) {
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
-    @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
-    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11pt; line-height: 1.35; margin: 0; padding: 0; background: #fff; }
+    @page { size: A4 portrait; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      color: #000;
+      font-size: 11pt;
+      line-height: 1.35;
+      margin: 0;
+      padding: 20px;
+      background: #eef2f6;
+    }
+    .page-sheet {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      max-width: 210mm;
+      margin: 0 auto 28px auto;
+      padding: 20mm 15mm;
+      box-sizing: border-box;
+      min-height: 297mm;
+      page-break-after: always;
+    }
+    .page-sheet:last-child {
+      margin-bottom: 0;
+      page-break-after: auto;
+    }
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .page-sheet {
+        border: none;
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0;
+        padding: 0;
+        max-width: 100%;
+        min-height: auto;
+      }
+    }
   </style></head><body>
-    <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
-      ${buildPageHeader()}
-      <div style="text-align:center;margin-bottom:12px;">
-        <div style="font-weight:700;font-size:12pt;line-height:1.3;">Bachelor Degree - ${projectLabel} Evaluation Form</div>
-        ${programName ? `<div style="font-weight:700;font-size:12pt;line-height:1.3;">Program: <span style="font-weight:normal;">${esc(programName)}</span></div>` : ''}
-      </div>
+    <div class="page-sheet">
+      <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+        ${buildPageHeader()}
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:12pt;line-height:1.3;">Bachelor Degree - ${projectLabel} Evaluation Form</div>
+          ${programName ? `<div style="font-weight:700;font-size:12pt;line-height:1.3;">Program: <span style="font-weight:normal;">${esc(programName)}</span></div>` : ''}
+        </div>
 
-      <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
-        <tr>
-          <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
-          <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${maxTotal}</td>
-        </tr>
-        <tr><td colspan="2" style="padding-top:4px;"><strong>Project Title:</strong> ${esc(title)}</td></tr>
-        <tr><td colspan="2" style="padding-top:2px;"><strong>Group:</strong> ${esc(name)}</td></tr>
-        <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>
-        ${members ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Members:</strong> ${esc(members)}</td></tr>` : ''}
-      </table>
-
-      <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
-        <thead>
-          <tr style="background-color:#fafafa;">
-            <th style="width:6%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
-            <th style="width:40%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Component</th>
-            <th style="width:20%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Evaluator</th>
-            <th style="width:10%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
-            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
-            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${bodyRows}
+        <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
           <tr>
-            <td colspan="3" style="font-weight:bold;padding:5px 8px;border:1px solid #000;text-align:right;">Total Marks</td>
-            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${maxTotal}</td>
-            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? total : ''}</td>
-            <td style="border:1px solid #000;"></td>
+            <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
+            <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${maxTotal}</td>
           </tr>
-        </tbody>
-      </table>
+          <tr><td colspan="2" style="padding-top:4px;"><strong>Project Title:</strong> ${esc(title)}</td></tr>
+          <tr><td colspan="2" style="padding-top:2px;"><strong>Group:</strong> ${esc(name)}</td></tr>
+          <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>
+          ${members ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Members:</strong> ${esc(members)}</td></tr>` : ''}
+        </table>
 
-      ${buildNote()}
+        <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+          <thead>
+            <tr style="background-color:#fafafa;">
+              <th style="width:6%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+              <th style="width:40%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Component</th>
+              <th style="width:20%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Evaluator</th>
+              <th style="width:10%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+              <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+              <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+            <tr>
+              <td colspan="3" style="font-weight:bold;padding:5px 8px;border:1px solid #000;text-align:right;">Total Marks</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${maxTotal}</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? total : ''}</td>
+              <td style="border:1px solid #000;"></td>
+            </tr>
+          </tbody>
+        </table>
 
-      <div style="font-size:11pt;margin:8px 0 6px 0;">
-        <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</span>
+        ${buildNote()}
+
+        <div style="font-size:11pt;margin:8px 0 6px 0;">
+          <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</span>
+        </div>
+
+        <div style="margin-top:8px;font-size:11pt;">
+          <strong>Comments:</strong>
+          ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+        </div>
+
+        <div style="margin-top:6px;font-size:11pt;">
+          <strong>Suggestions &amp; recommendations:</strong>
+          ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+        </div>
+
+        ${examinerBlocks}
       </div>
-
-      <div style="margin-top:8px;font-size:11pt;">
-        <strong>Comments:</strong>
-        ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
-      </div>
-
-      <div style="margin-top:6px;font-size:11pt;">
-        <strong>Suggestions &amp; recommendations:</strong>
-        ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
-      </div>
-
-      ${examinerBlocks}
     </div>
   </body></html>`;
 }
