@@ -466,7 +466,7 @@ function buildMasterFormat(data, scope = 'both') {
 }
 
 function buildBachelorFormat(data) {
-  const { title, name, supervisor, members, evaluations, projectType, total, maxTotal } = data;
+  const { title, name, supervisor, members, evaluations, projectType, total, maxTotal, programName } = data;
   const isMajor = projectType === 'MAJOR';
   const projectLabel = isMajor ? 'Major Project' : 'Minor Project';
   const credit = isMajor ? '6' : '3';
@@ -476,15 +476,15 @@ function buildBachelorFormat(data) {
 
   let sn = 0;
   const bodyRows = evaluations.map((e) => {
-    const marks = e.marks !== null && e.marks !== undefined ? e.marks : '';
+    const marks = e.marks !== null && e.marks !== undefined && e.marks !== '' ? e.marks : '';
     sn++;
     return `<tr>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${sn}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(e.name)}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(e.evaluatorRole)}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${e.maxMarks}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;font-weight:700;">${marks}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(e.comment || '')}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${sn}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(e.name)}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(e.evaluatorRole)}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${e.maxMarks}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${marks}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${esc(e.comment || '')}</td>
     </tr>`;
   }).join('');
 
@@ -498,86 +498,98 @@ function buildBachelorFormat(data) {
   const examiners = evaluations.filter(e => e.submittedBy && !seen.has(e.submittedBy) && seen.add(e.submittedBy));
 
   const examinerBlocks = examiners.length
-    ? examiners.map(e => `
-      <div style="font-size:12px;margin-top:${e === examiners[0] ? 16 : 12}px;">
-        <strong>Examiner:</strong><br/>
-        <strong>Name:</strong> ${esc(e.submittedBy)}<br/>
-        <strong>Post:</strong> ${esc(e.evaluatorRole)}<br/>
-        <strong>University/Organization:</strong> IOE<br/>
-        <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
+    ? examiners.map((e, idx) => `
+      <div style="font-size:11pt;margin-top:${idx === 0 ? 14 : 10}px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
+        <div><strong>Name:</strong> ${esc(e.submittedBy)}</div>
+        <div><strong>Post:</strong> ${esc(e.evaluatorRole || 'Examiner')}</div>
+        <div><strong>Organization:</strong> IOE</div>
+        <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
           <tr>
             <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
+            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
           </tr>
         </table>
       </div>`).join('')
     : `
-      <div style="font-size:12px;margin-top:16px;">
-        <strong>Examiner:</strong><br/>
-        <strong>Name:</strong><br/>
-        <strong>Post:</strong><br/>
-        <strong>University/Organization:</strong> IOE<br/>
-        <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
+      <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:2px;">Examiner:</div>
+        <div><strong>Name:</strong> ${esc(supervisor)}</div>
+        <div><strong>Post:</strong> Supervisor</div>
+        <div><strong>Organization:</strong> IOE</div>
+        <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
           <tr>
             <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
+            <td style="width:50%;"><strong>Signature:</strong> _____________________</td>
           </tr>
         </table>
       </div>`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evaluation - ${esc(title)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
-    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
+    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 11pt; line-height: 1.35; margin: 0; padding: 0; background: #fff; }
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
   </style></head><body>
-    <div style="text-align:center;margin-bottom:16px;font-size:13px;">
-      <div style="font-weight:700;">TRIBHUVAN UNIVERSITY</div>
-      <div style="font-weight:700;">INSTITUTE OF ENGINEERING</div>
-      <div style="font-weight:700;">PULCHOWK CAMPUS</div>
-      <div style="font-weight:700;margin-top:8px;">${projectLabel} Evaluation</div>
-    </div>
-    <table style="width:100%;font-size:12px;" cellpadding="2">
-      <tr><td style="width:140px;"><strong>Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Group / Student:</strong></td><td>${esc(name)}</td></tr>
-      <tr><td><strong>Supervisor:</strong></td><td>${esc(supervisor)}</td></tr>
-      <tr><td><strong>Credit:</strong></td><td>${credit} | Full Marks: ${maxTotal}</td></tr>
-      ${members ? `<tr><td><strong>Members:</strong></td><td>${members}</td></tr>` : ''}
-    </table>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
-      <thead><tr>
-        <th style="text-align:center;padding:4px;">S.N.</th>
-        <th style="text-align:left;padding:4px;">Component</th>
-        <th style="text-align:left;padding:4px;">Evaluator</th>
-        <th style="text-align:center;padding:4px;">Max</th>
-        <th style="text-align:center;padding:4px;">Marks</th>
-        <th style="text-align:left;padding:4px;">Remarks</th>
-      </tr></thead>
-      <tbody>
-        ${bodyRows}
+    <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+      ${buildPageHeader()}
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">Bachelor Degree - ${projectLabel} Evaluation Form</div>
+        ${programName ? `<div style="font-weight:700;font-size:12pt;line-height:1.3;">Program: <span style="font-weight:normal;">${esc(programName)}</span></div>` : ''}
+      </div>
+
+      <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
         <tr>
-          <td colspan="3" style="text-align:right;padding:4px;font-weight:700;border:1px solid #000;">Total</td>
-          <td style="text-align:center;padding:4px;font-weight:700;border:1px solid #000;">${maxTotal}</td>
-          <td style="text-align:center;padding:4px;font-weight:700;border:1px solid #000;">${total}</td>
-          <td style="border:1px solid #000;"></td>
+          <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
+          <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${maxTotal}</td>
         </tr>
-      </tbody>
-    </table>
-    ${buildNote()}
+        <tr><td colspan="2" style="padding-top:4px;"><strong>Project Title:</strong> ${esc(title)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Group:</strong> ${esc(name)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>
+        ${members ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Members:</strong> ${esc(members)}</td></tr>` : ''}
+      </table>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
-      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</td></tr>
-    </table>
+      <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+        <thead>
+          <tr style="background-color:#fafafa;">
+            <th style="width:6%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+            <th style="width:40%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Component</th>
+            <th style="width:20%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Evaluator</th>
+            <th style="width:10%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+          <tr>
+            <td colspan="3" style="font-weight:bold;padding:5px 8px;border:1px solid #000;text-align:right;">Total Marks</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${maxTotal}</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? total : ''}</td>
+            <td style="border:1px solid #000;"></td>
+          </tr>
+        </tbody>
+      </table>
 
-    <div style="margin-top:8px;font-size:12px;">
-      <strong>Comments:</strong>
-      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
+      ${buildNote()}
+
+      <div style="font-size:11pt;margin:8px 0 6px 0;">
+        <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</span>
+      </div>
+
+      <div style="margin-top:8px;font-size:11pt;">
+        <strong>Comments:</strong>
+        ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+      </div>
+
+      <div style="margin-top:6px;font-size:11pt;">
+        <strong>Suggestions &amp; recommendations:</strong>
+        ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+      </div>
+
+      ${examinerBlocks}
     </div>
-    <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>
-      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
-    </div>
-    ${examinerBlocks}
   </body></html>`;
 }
 
@@ -708,8 +720,9 @@ async function buildGroupHtml(id) {
   const group = await prisma.projectGroup.findUnique({
     where: { id },
     include: {
+      program: { select: { name: true, code: true } },
       supervisor: { select: { firstName: true, lastName: true } },
-      members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
+      members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } } } },
       evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
       evaluationComponents: true,
     },
@@ -719,6 +732,7 @@ async function buildGroupHtml(id) {
   const projectType = group.projectType;
   const maxTotal = projectType === 'MAJOR' ? 100 : 50;
   const total = group.evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+  const programName = group.program?.name || group.members?.[0]?.student?.program?.name || '';
 
   const memberList = group.members.map(m =>
     `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
@@ -749,6 +763,7 @@ async function buildGroupHtml(id) {
     projectType,
     total: total.toFixed(1),
     maxTotal,
+    programName,
   });
 }
 
@@ -826,8 +841,9 @@ exports.previewGroupEvaluation = async (req, res) => {
     const group = await prisma.projectGroup.findUnique({
       where: { id },
       include: {
+        program: { select: { name: true, code: true } },
         supervisor: { select: { firstName: true, lastName: true } },
-        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
+        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -838,6 +854,7 @@ exports.previewGroupEvaluation = async (req, res) => {
     const projectType = group.projectType;
     const maxTotal = projectType === 'MAJOR' ? 100 : 50;
     const total = evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+    const programName = group.program?.name || group.members?.[0]?.student?.program?.name || '';
 
     const memberList = group.members.map(m =>
       `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
@@ -868,6 +885,7 @@ exports.previewGroupEvaluation = async (req, res) => {
       projectType,
       total: total.toFixed(1),
       maxTotal,
+      programName,
     });
 
     res.setHeader('Content-Type', 'text/html');
