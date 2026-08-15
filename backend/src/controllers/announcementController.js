@@ -638,7 +638,7 @@ exports.finalizeFormResponse = async (req, res) => {
       thesis = await prisma.thesis.create({
         data: {
           title: finalTitle,
-          projectType: 'MASTER',
+          projectType: 'THESIS',
           studentId: student.id,
           supervisorId: selectedSupId,
           supervisorAssignmentStatus: selectedSupId ? 'PENDING' : null,
@@ -653,7 +653,7 @@ exports.finalizeFormResponse = async (req, res) => {
 
       // Create default evaluation components
       const { getDefaultComponents } = require('../config/evaluationScheme');
-      const defaults = getDefaultComponents('MASTER');
+      const defaults = getDefaultComponents('THESIS');
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
           data: { ...comp, thesisId: thesis.id, createdById: req.user.id },

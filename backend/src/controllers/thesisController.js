@@ -80,7 +80,7 @@ exports.getThesis = async (req, res) => {
     if (!thesis.evaluationComponents || thesis.evaluationComponents.length === 0) {
       try {
         const { getDefaultComponents } = require('../config/evaluationScheme');
-        const defaults = getDefaultComponents('MASTER');
+        const defaults = getDefaultComponents(thesis.projectType || 'THESIS');
         for (const comp of defaults) {
           await prisma.evaluationComponent.create({
             data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
@@ -109,10 +109,11 @@ exports.getThesis = async (req, res) => {
 
 exports.createThesis = async (req, res) => {
   try {
-    const { title, studentId, supervisorId, status } = req.body;
+    const { title, studentId, supervisorId, status, projectType } = req.body;
     if (!title || !studentId) {
       return res.status(400).json({ error: 'title and studentId are required' });
     }
+    const resolvedProjectType = projectType === 'PROJECT' ? 'PROJECT' : 'THESIS';
     const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) }, include: { program: true } });
     if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
       return res.status(400).json({ error: 'studentId must belong to a master student' });
@@ -152,7 +153,7 @@ exports.createThesis = async (req, res) => {
     const thesis = await prisma.thesis.create({
       data: {
         title,
-        projectType: 'MASTER',
+        projectType: resolvedProjectType,
         studentId: parseInt(studentId),
         supervisorId: supId,
         supervisorAssignmentStatus: supId ? 'PENDING' : null,
@@ -170,10 +171,10 @@ exports.createThesis = async (req, res) => {
       try {
         const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
         await notifSvc.notify(supId, 'SUPERVISOR_ASSIGNMENT',
-          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master Thesis) — pending your acceptance.`, `/theses/${thesis.id}`);
+          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master ${resolvedProjectType === 'PROJECT' ? 'Project' : 'Thesis'}) — pending your acceptance.`, `/theses/${thesis.id}`);
       } catch (e) { console.error('notify supervisor error:', e.message); }
     }
-    const defaults = getDefaultComponents('MASTER');
+    const defaults = getDefaultComponents(resolvedProjectType);
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
         data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
@@ -451,6 +452,8 @@ exports.bulkImportConfirm = async (req, res) => {
       const title = _edits?.title ?? origTitle;
       const batch = normalizeBatch(_edits?.batch ?? origBatch);
       const cluster = _edits?.cluster ?? origCluster;
+      const projectType = _edits?.projectType ?? row.projectType ?? 'THESIS';
+      const resolvedProjectType = projectType === 'PROJECT' ? 'PROJECT' : 'THESIS';
 
       if (!studentMatch?.id && !row.studentMatch?.id) {
         // Try auto-creating the student from _edits.student or row.name
@@ -623,7 +626,7 @@ exports.bulkImportConfirm = async (req, res) => {
         const newThesis = await tx.thesis.create({
           data: {
             title,
-            projectType: 'MASTER',
+            projectType: resolvedProjectType,
             studentId: effectiveStudentId,
             status: 'ACTIVE',
             supervisorId: resolvedSupervisorId,
@@ -637,7 +640,7 @@ exports.bulkImportConfirm = async (req, res) => {
         });
 
         // Create default evaluation components
-        const defaults = getDefaultComponents('MASTER');
+const defaults = getDefaultComponents(resolvedProjectType);
         for (const comp of defaults) {
           await tx.evaluationComponent.create({
             data: { ...comp, thesisId: newThesis.id, createdById: req.user.id },

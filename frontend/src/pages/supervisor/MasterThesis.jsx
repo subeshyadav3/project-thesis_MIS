@@ -23,6 +23,7 @@ function SupervisorMasterThesis() {
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -48,9 +49,10 @@ function SupervisorMasterThesis() {
       const searchStr = (studentName + ' ' + (t.title || '')).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesType = typeFilter === 'ALL' || t.projectType === typeFilter;
+      return matchesSearch && matchesStatus && matchesType;
     });
-  }, [theses, searchTerm, statusFilter]);
+  }, [theses, searchTerm, statusFilter, typeFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -122,7 +124,7 @@ function SupervisorMasterThesis() {
                   <span className="detail-label">Type</span>
                   <span className="badge badge-info">
                     <span className="dot" />
-                    Thesis
+                    {showDetail.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -229,6 +231,10 @@ function SupervisorMasterThesis() {
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
+          <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={[
+            { value: 'THESIS', label: 'Thesis' },
+            { value: 'PROJECT', label: 'Project' },
+          ]} allLabel="All Types" />
         </div>
 
         {loading ? (
@@ -265,7 +271,14 @@ function SupervisorMasterThesis() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.student?.rollNumber || '—'}</td>
-                    <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
+                    <td style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                          {t.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
+                        </span>
+                        <span>{t.title}</span>
+                      </div>
+                    </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13, wordBreak: 'break-all' }}>{t.student?.email || '—'}</td>
                     <td>
                       <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>

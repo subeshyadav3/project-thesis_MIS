@@ -89,7 +89,7 @@ ctrl.create = async (req, res) => {
       const thesis = await prisma.thesis.create({
         data: {
           title: projectTitle?.trim() || ann.title,
-          projectType: 'MASTER',
+          projectType: 'THESIS',
           status: 'PENDING',
           studentId: req.user.id,
           announcementId: ann.id,
@@ -97,7 +97,7 @@ ctrl.create = async (req, res) => {
         },
       });
 
-      const defaults = getDefaultComponents('MASTER');
+      const defaults = getDefaultComponents('THESIS');
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
           data: { ...comp, thesisId: thesis.id, createdById: req.user.id },

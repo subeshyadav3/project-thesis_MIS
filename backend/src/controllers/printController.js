@@ -184,15 +184,20 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       <strong>Examiner:</strong><br/>
       <strong>Name:</strong> ${esc(supervisor)}<br/>
       <strong>Post:</strong> ${esc(supervisorDesignation || 'Supervisor')}<br/>
-      <strong>Organization:</strong> IOE<br/>
-      <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-      <strong>Signature:</strong><br/>
+      <strong>University/Organization:</strong> IOE<br/>
+      <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
+        <tr>
+          <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+          <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
+        </tr>
+      </table>
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation, projectType) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
   const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
+  const pageMax = extCriteria.reduce((s, c) => s + c.max, 0);
 
   const criteriaRows = extCriteria.map((c, i) => `
     <tr>
@@ -200,22 +205,29 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
       <td style="padding:4px;border:1px solid #000;">${esc(c.name)}</td>
       <td style="text-align:center;padding:4px;border:1px solid #000;">${c.max}</td>
       <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
+      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
     </tr>`).join('');
 
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
   const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
-  const titleLabel = phase === 'final' ? 'M. Sc. - Thesis Evaluation: External (Final)' : 'M. Sc. - Project Evaluation: External';
+  const isProject = projectType === 'PROJECT';
+  const titleLabel = isProject
+    ? `M. Sc. - Project Evaluation: External (${phaseLabel})`
+    : `M. Sc. - Thesis Evaluation: External (${phaseLabel})`;
+  const credit = isProject ? 4 : 16;
 
   return `
     ${buildPageHeader()}
     <div style="font-weight:700;font-size:13px;text-align:center;">${titleLabel}</div>
-    <div style="font-size:12px;margin:4px 0;"><strong>Credit: 4 | Full Marks: 100</strong></div>
+    <div style="font-size:12px;text-align:center;margin-bottom:8px;">(to be filled by external examiner)</div>
+    <div style="font-size:12px;margin:4px 0;"><strong>Credit: ${credit} | Full Marks: ${pageMax}</strong></div>
 
     <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
-      <tr><td style="width:120px;"><strong>Project Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Student (Name):</strong></td><td>${esc(studentName)}, <strong>Roll No.:</strong> ${esc(rollNo)}</td></tr>
+      <tr><td style="width:120px;"><strong>Title:</strong></td><td>${esc(title)}</td></tr>
+      <tr><td><strong>Name of Student:</strong></td><td>${esc(studentName)}</td></tr>
+      <tr><td><strong>Roll No:</strong></td><td>${esc(rollNo)}</td></tr>
     </table>
 
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
@@ -224,14 +236,16 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
         <th style="text-align:left;padding:4px;">Marking Parameters</th>
         <th style="text-align:center;padding:4px;">Full Marks</th>
         <th style="text-align:center;padding:4px;">Marks Obtained</th>
+        <th style="text-align:center;padding:4px;">Remarks</th>
       </tr></thead>
       <tbody>
         ${criteriaRows}
         <tr>
           <td></td>
           <td style="font-weight:700;">Total Marks</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">100</td>
+          <td style="text-align:center;padding:4px;font-weight:700;">${pageMax}</td>
           <td style="text-align:center;padding:4px;font-weight:700;">${hasMarks ? totalMarks : ''}</td>
+          <td></td>
         </tr>
       </tbody>
     </table>
@@ -253,9 +267,14 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
     <div style="font-size:12px;margin-top:16px;">
       <strong>Examiner:</strong><br/>
       <strong>Name:</strong> ${esc(extName || '')}<br/>
-      <strong>Designation:</strong> ${esc(extDesignation || '')}<br/>
-      <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-      <strong>Signature:</strong><br/>
+      <strong>Post:</strong> ${esc(extDesignation || '')}<br/>
+      <strong>University/Organization:</strong><br/>
+      <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
+        <tr>
+          <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+          <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
+        </tr>
+      </table>
     </div>`;
 }
 
@@ -265,7 +284,8 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
  * @param {'supervisor'|'external'|'both'} [scope='both'] - which evaluator pages to include
  */
 function buildMasterFormat(data, scope = 'both') {
-  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal } = data;
+  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal, projectType } = data;
+  const projectLabel = projectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
   const midEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_MIDTERM');
@@ -321,17 +341,17 @@ function buildMasterFormat(data, scope = 'both') {
   if (includeExt) {
     pages += `
     <div${includeSup ? ' style="page-break-after:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation)}
+      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType)}
     </div>`;
   }
   if (includeExtFinal) {
     pages += `
     <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation)}
+      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType)}
     </div>`;
   }
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Thesis Evaluation - ${esc(title)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
     body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
     table { border-color: #000; }
@@ -379,18 +399,26 @@ function buildBachelorFormat(data) {
         <strong>Examiner:</strong><br/>
         <strong>Name:</strong> ${esc(e.submittedBy)}<br/>
         <strong>Post:</strong> ${esc(e.evaluatorRole)}<br/>
-        <strong>Organization:</strong> IOE<br/>
-        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-        <strong>Signature:</strong><br/>
+        <strong>University/Organization:</strong> IOE<br/>
+        <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
+          <tr>
+            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
+          </tr>
+        </table>
       </div>`).join('')
     : `
       <div style="font-size:12px;margin-top:16px;">
         <strong>Examiner:</strong><br/>
         <strong>Name:</strong><br/>
         <strong>Post:</strong><br/>
-        <strong>Organization:</strong> IOE<br/>
-        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-        <strong>Signature:</strong><br/>
+        <strong>University/Organization:</strong> IOE<br/>
+        <table style="width:100%;font-size:12px;margin-top:6px;" cellpadding="2">
+          <tr>
+            <td style="width:50%;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="width:50%;"><strong>Signature:</strong>&nbsp;</td>
+          </tr>
+        </table>
       </div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evaluation - ${esc(title)}</title>
@@ -564,6 +592,7 @@ async function buildThesisHtml(id, scope = 'both') {
     student: thesis.student || null,
     externalMidTerm: thesis.externalMidTerm || null,
     externalFinal: thesis.externalFinal || null,
+    projectType: thesis.projectType,
   }, scope);
 }
 
@@ -788,6 +817,7 @@ exports.previewThesisEvaluation = async (req, res) => {
       student: thesis.student || null,
       externalMidTerm: thesis.externalMidTerm || null,
       externalFinal: thesis.externalFinal || null,
+      projectType: thesis.projectType,
     }, scope);
 
     res.setHeader('Content-Type', 'text/html');

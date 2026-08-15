@@ -225,7 +225,7 @@ function ProjectDetail() {
   const handleDeleteProject = () => {
     setConfirmDialog({
       open: true,
-      title: `Delete ${type === 'group' ? 'Project Group' : 'Master Thesis'}`,
+      title: `Delete ${type === 'group' ? 'Project Group' : (item?.projectType === 'PROJECT' ? 'Master Project' : 'Master Thesis')}`,
       message: `Are you sure you want to delete "${title || 'this project'}"? This action cannot be undone.`,
       confirmLabel: 'Delete',
       danger: true,
@@ -290,7 +290,7 @@ function ProjectDetail() {
                 background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontSize: 11,
                 padding: '3px 10px', borderRadius: 50, fontWeight: 500,
               }}>
-                {type === 'group' ? (item?.projectType === 'MAJOR' ? 'Major Project' : 'Minor Project') : 'Master Thesis'}
+                {type === 'group' ? (item?.projectType === 'MAJOR' ? 'Major Project' : 'Minor Project') : (item?.projectType === 'PROJECT' ? 'Master Project' : 'Master Thesis')}
               </span>
               {item?.batch && (
                 <span style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', fontSize: 11, padding: '3px 8px', borderRadius: 50 }}>

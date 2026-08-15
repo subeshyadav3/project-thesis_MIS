@@ -139,7 +139,7 @@ function StudentProjectDetail() {
               <div>
                 <h3 style={{ margin: 0, fontSize: 15 }}>{nameLabel} Details</h3>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                  {isGroup ? 'Bachelor Project' : "Master's Thesis"}
+                  {isGroup ? 'Bachelor Project' : (assignment?.projectType === 'PROJECT' ? 'Master Project' : "Master's Thesis")}
                 </p>
               </div>
             </div>

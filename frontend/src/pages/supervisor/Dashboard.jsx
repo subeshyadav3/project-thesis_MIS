@@ -98,7 +98,7 @@ function SupervisorDashboard() {
                   <div style={{ flex: 1, minWidth: 220 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{itemTitle}</div>
                     <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-                      {isThesis ? "Master's Thesis" : 'Bachelor Project'} · Student: <strong>{studentName}</strong>
+                      {isThesis ? (item.projectType === 'PROJECT' ? 'Master Project' : "Master's Thesis") : 'Bachelor Project'} · Student: <strong>{studentName}</strong>
                     </div>
                   </div>
                   <SupervisionActions item={item} type={isThesis ? 'thesis' : 'group'} onDone={loadAll} />

@@ -44,7 +44,7 @@ function MasterThesis() {
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
   const todayStr = new Date().toISOString().split('T')[0];
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', projectType: 'THESIS', startDate: todayStr, endDate: '' });
   const [creating, setCreating] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [editStartDate, setEditStartDate] = useState('');
@@ -53,6 +53,7 @@ function MasterThesis() {
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
   const [assignmentFilter, setAssignmentFilter] = useState('ALL');
   const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
@@ -386,6 +387,7 @@ const handleComplete = async (id) => {
         (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.student?.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+      const matchesType = typeFilter === 'ALL' || t.projectType === typeFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
         : supervisorFilter === 'NONE'
@@ -407,9 +409,9 @@ const handleComplete = async (id) => {
         return normalizeBatch(b) === batchFilter;
       })();
 
-      return matchesSearch && matchesStatus && matchesSupervisor && matchesAssignment && matchesBatch;
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesAssignment && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, assignmentFilter, programScopeFilter, batchFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, typeFilter, supervisorFilter, assignmentFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
@@ -549,7 +551,7 @@ return (
                   <span className="detail-label">Type</span>
                   <span className="badge badge-info">
                     <span className="dot" />
-                    Thesis
+                    {showDetail.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
                   </span>
                 </div>
                 <div className="detail-item" style={{ gridColumn: 'span 2' }}>
@@ -1040,6 +1042,10 @@ return (
             ]}
             allLabel="All Department Theses"
           />
+          <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={[
+            { value: 'THESIS', label: 'Thesis' },
+            { value: 'PROJECT', label: 'Project' },
+          ]} allLabel="All Types" />
           <FilterDropdown label="Assignment" value={assignmentFilter} onChange={setAssignmentFilter} options={THESIS_ASSIGNMENT_OPTIONS} allLabel="All Assignments" />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
@@ -1095,7 +1101,14 @@ return (
                         </span>
                       </div>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.title}</td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                          {t.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                      </div>
+                    </td>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
                       {t.supervisor ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1250,14 +1263,21 @@ return (
                 <Icon name="add" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
-                <h2>Create Thesis</h2>
-                <p>Add a new master's thesis record</p>
+                <h2>Create Thesis / Project</h2>
+                <p>Add a new master's thesis or project record</p>
               </div>
             </div>
             <form onSubmit={handleCreate}>
               <div className="form-group">
-                <label>Thesis Title</label>
-                <input value={createForm.title} onChange={e => setCreateForm({...createForm, title: e.target.value})} required placeholder="Enter thesis title" />
+                <label>Type</label>
+                <select value={createForm.projectType || 'THESIS'} onChange={e => setCreateForm({...createForm, projectType: e.target.value})}>
+                  <option value="THESIS">Thesis</option>
+                  <option value="PROJECT">Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Title</label>
+                <input value={createForm.title} onChange={e => setCreateForm({...createForm, title: e.target.value})} required placeholder="Enter thesis / project title" />
               </div>
               <div className="form-group">
                 <label>Research Project Cluster / Area <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>

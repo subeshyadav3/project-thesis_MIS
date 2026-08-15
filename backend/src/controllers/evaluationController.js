@@ -167,7 +167,8 @@ exports.submitComponentMarks = async (req, res) => {
       const grp = await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectType: true } });
       if (grp) projectType = grp.projectType;
     } else if (thesisId) {
-      projectType = 'MASTER';
+      const ths = await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { projectType: true } });
+      projectType = ths?.projectType || 'THESIS';
     }
     const summary = computeSummary(evaluations, components, projectType);
 
@@ -324,7 +325,8 @@ exports.getThesisEvaluations = async (req, res) => {
         orderBy: { id: 'asc' },
       }),
     ]);
-    const summary = computeSummary(evaluations, components, 'MASTER');
+    const thesis2 = await prisma.thesis.findUnique({ where: { id }, select: { projectType: true } });
+    const summary = computeSummary(evaluations, components, thesis2?.projectType || 'THESIS');
     res.json({ evaluations, components, summary });
   } catch (error) {
     logger.error('getThesisEvaluations error:', error);
@@ -367,7 +369,7 @@ exports.completeEvaluation = async (req, res) => {
     ]);
     const projectType = groupId
       ? (await prisma.projectGroup.findUnique({ where: { id: parseInt(groupId) }, select: { projectType: true } }))?.projectType
-      : 'MASTER';
+      : (await prisma.thesis.findUnique({ where: { id: parseInt(thesisId) }, select: { projectType: true } }))?.projectType || 'THESIS';
     const summary = computeSummary(allEvals, components, projectType);
     if (summary.total > summary.maxTotal) {
       return res.status(400).json({

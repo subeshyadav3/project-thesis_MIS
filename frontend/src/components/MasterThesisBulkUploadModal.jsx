@@ -82,6 +82,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
         _edits: edits,
         row: p.row,
         name: p.name,
+        projectType: edits?.projectType ?? p.projectType ?? 'THESIS',
         roll: edits?.roll ?? p.roll,
         title: edits?.title ?? p.title,
         batch: edits?.batch ?? p.batch,
@@ -343,6 +344,17 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
                                     onChange={e => setEdit('title', e.target.value)}
                                     style={{ fontSize: 12, padding: '4px 8px', width: 200 }}
                                   />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Type</label>
+                                  <select
+                                    value={edits.projectType ?? p.projectType ?? 'THESIS'}
+                                    onChange={e => setEdit('projectType', e.target.value)}
+                                    style={{ fontSize: 12, padding: '4px 8px' }}
+                                  >
+                                    <option value="THESIS">Thesis</option>
+                                    <option value="PROJECT">Project</option>
+                                  </select>
                                 </div>
                                 <div>
                                   <label style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Batch</label>
