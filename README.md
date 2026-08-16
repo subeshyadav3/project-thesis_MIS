@@ -34,6 +34,8 @@
   - [7. Bulk Excel Import with Anomaly Detection](#7-bulk-excel-import-with-anomaly-detection)
   - [8. Evaluation & Defense Rubrics](#8-evaluation--defense-rubrics)
   - [9. Automated PDF Generation & Printing](#9-automated-pdf-generation--printing)
+  - [10. Program-Scoped Audit Trail](#10-program-scoped-audit-trail)
+  - [11. Email Policy Enforcement](#11-email-policy-enforcement)
 - [Tech Stack](#-tech-stack)
 - [System Architecture](#-system-architecture)
 - [Getting Started](#-getting-started)
@@ -43,6 +45,7 @@
   - [Database Setup & Seeding](#database-setup--seeding)
   - [Running Locally](#running-locally)
 - [User Roles & Default Test Credentials](#-user-roles--default-test-credentials)
+- [Changing the Student Email Format](#-changing-the-student-email-format)
 - [API Route Reference](#-api-route-reference)
 - [Project Directory Structure](#-project-directory-structure)
 - [License](#-license)
@@ -84,6 +87,8 @@ graph TD
 - **Capability-Based Multi-Role Faculty**: Enables teachers to supervise their assigned students and act as internal/external examiners for other colleagues' projects under a single university account.
 - **Automated Conflict-of-Interest Filter**: Prevents a teacher from being assigned as the examiner on a project they already supervise.
 - **Research Cluster Integration**: Full lifecycle tracking across specialized research clusters (`AIML`, `IPCV`, `ANLP`, `NTS`, `EDMES`, `ACOM`, `EII`, etc.).
+- **Program-Scoped Audit Trail**: Every audit event is tagged with the program it belongs to; coordinators see only their own program's audit history.
+- **Bulk Evaluation PDF Export**: Select any set of groups or theses and download a single combined PDF of official evaluation sheets.
 
 ---
 
@@ -93,6 +98,7 @@ graph TD
 - **Bachelor Coordinators**: Strictly scoped to their own department program (e.g., BCT coordinator only oversees BCT projects).
 - **Master Coordinators**: Department-level cross-program coordination across all Master specializations.
 - **DegreeGuard Component**: Protects frontend routes against cross-degree navigation.
+- **Scoped Dashboards & Queues**: Coordinator dashboard stats and pending/late proposal queues are restricted to the coordinator's own program.
 
 ### 2. Bachelor Project Lifecycle (`MINOR` / `MAJOR`)
 - **Team Size**: 1 to 4 students from the same academic program.
@@ -140,6 +146,18 @@ graph TD
 ### 9. Automated PDF Generation & Printing
 - Official A4 grade sheets branded for **Institute of Engineering, Pulchowk Campus**.
 - Automatic number-to-words mark conversion, student rosters, supervisor/examiner designations, and signature panels.
+- **Bulk Download**: Select multiple groups or theses and export one combined PDF — each evaluation sheet is page-separated and filtered to the caller's access scope.
+
+### 10. Program-Scoped Audit Trail
+- **Automatic Program Tagging**: Every audit entry is resolved to the program it belongs to — by item (Thesis/Group/Proposal/Evaluation), by user, by failed-login email, or by the performer.
+- **Coordinator Scoping**: Coordinators only see audit logs for their own program; department/system-level events remain visible to the Maintainer.
+- **Document View Tracking**: Staff (coordinator/supervisor/examiner) downloads of proposal PDFs are recorded as `VIEW` events on the audit trail.
+- **UI**: The Audit Log page shows the owning Program for each entry.
+
+### 11. Email Policy Enforcement
+- **Students**: Emails are always auto-generated as `{rollNumber}@pcampus.edu.np` — any typed email is ignored on create, update, and bulk import.
+- **Coordinators / Supervisors / External Examiners**: Emails must end with `@pcampus.edu.np` (local part is free-form, e.g. `ram.yadav@pcampus.edu.np`); other domains are rejected.
+- See [Changing the Student Email Format](#-changing-the-student-email-format) to customize the student format.
 
 ---
 
@@ -186,6 +204,7 @@ graph TD
 │  User • Department • Program • ProjectGroup • GroupMember   │
 │  Thesis • Proposal • EvaluationComponent • Evaluation       │
 │  ExaminerAssignment • GroupInvitation • FormResponse        │
+│  AuditLog • Announcement • Recommendation • Document        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -276,18 +295,105 @@ Open your browser at **`http://localhost:5173`**.
 
 All seeded test accounts use the password: **`subesh`**
 
-| Role | Email | Scope / Responsibility |
+### 1. Administration & Program Coordinators
+| Role | Email | Name | Scope / Department |
+| :--- | :--- | :--- | :--- |
+| **Maintainer** | `subeshgaming@gmail.com` | Subesh Gaming | Full Department Administration |
+| **BCT Coordinator** | `bct.coordinator@pcampus.edu.np` | Ram Prasad | Bachelor in Computer Engineering |
+| **BEI Coordinator** | `bei.coordinator@pcampus.edu.np` | Sita Devi | Bachelor in Electronics & Info Engineering |
+| **MSDSA Coordinator** | `msdsa.coordinator@pcampus.edu.np` | Gopal Adhikari | MSc in Data Science and Analytics |
+| **MSNCS Coordinator** | `msncs.coordinator@pcampus.edu.np` | Anil Thapa | MSc in Network and Cyber Security |
+| **MSICE Coordinator** | `msice.coordinator@pcampus.edu.np` | Pooja Sharma | MSc in Information & Communication Eng. |
+| **MSCSK Coordinator** | `mscsk.coordinator@pcampus.edu.np` | Meera Joshi | MSc in Computer Science & Knowledge Eng. |
+
+### 2. Faculty Supervisors & External Examiners
+| Role | Email | Name | Designation |
+| :--- | :--- | :--- | :--- |
+| **Faculty / Supervisor** | `prabesh.bhattarai@pcampus.edu.np` | Prabesh Bhattarai | Assoc. Prof. Dr. |
+| **Faculty / Supervisor** | `ramesh.sharma@pcampus.edu.np` | Ramesh Sharma | Assoc. Prof. |
+| **Faculty / Supervisor** | `anita.gurung@pcampus.edu.np` | Anita Gurung | Asst. Prof. Dr. |
+| **Faculty / Supervisor** | `bishnu.tamang@pcampus.edu.np` | Bishnu Tamang | Asst. Prof. |
+| **Faculty / Supervisor** | `sagar.acharya@pcampus.edu.np` | Sagar Acharya | Prof. Dr. |
+| **Faculty / Supervisor** | `maya.khadka@pcampus.edu.np` | Maya Khadka | Asst. Prof. Dr. |
+| **External Examiner** | `hari.adhikari@pcampus.edu.np` | Hari Adhikari | Prof. Dr. |
+| **External Examiner** | `suman.bhattarai@pcampus.edu.np` | Suman Bhattarai | Assoc. Prof. Dr. |
+| **External Examiner** | `rita.sharma@pcampus.edu.np` | Rita Sharma | Asst. Prof. Dr. |
+| **External Examiner** | `kiran.mainali@pcampus.edu.np` | Kiran Mainali | Prof. Dr. |
+
+### 3. Master Students (M.Sc. Theses & Projects)
+| Program | Email | Roll Number | Batch | Assigned Type | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **MSDSA** | `079msdsa01@pcampus.edu.np` | `079MSDSA01` | 2079 | **Master Thesis** | **COMPLETED** (300/300 evaluated) |
+| **MSDSA** | `080msdsa01@pcampus.edu.np` | `080MSDSA01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSDSA** | `080msdsa02@pcampus.edu.np` | `080MSDSA02` | 2080 | **Master Project** | **ACTIVE** |
+| **MSNCS** | `079msncs02@pcampus.edu.np` | `079MSNCS02` | 2079 | **Master Project** | **COMPLETED** (100/100 evaluated) |
+| **MSNCS** | `080msncs01@pcampus.edu.np` | `080MSNCS01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSNCS** | `080msncs02@pcampus.edu.np` | `080MSNCS02` | 2080 | **Master Project** | **ACTIVE** |
+| **MSICE** | `080msice01@pcampus.edu.np` | `080MSICE01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSICE** | `080msice02@pcampus.edu.np` | `080MSICE02` | 2080 | **Master Project** | **ACTIVE** |
+| **MSCSK** | `080mscsk01@pcampus.edu.np` | `080MSCSK01` | 2080 | **Master Thesis** | **ACTIVE** |
+| **MSCSK** | `080mscsk02@pcampus.edu.np` | `080MSCSK02` | 2080 | **Master Project** | **ACTIVE** |
+
+### 4. Bachelor Students (B.E. Projects)
+| Program | Email | Roll Number | Batch | Assigned Type | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **BCT** | `079bct001@pcampus.edu.np` | `079BCT001` | 2079 | **Major Project** | **COMPLETED** |
+| **BCT** | `080bct001@pcampus.edu.np` | `080BCT001` | 2080 | **Major Project** | **ACTIVE** |
+| **BCT** | `080bct004@pcampus.edu.np` | `080BCT004` | 2080 | **Minor Project** | **ACTIVE** |
+| **BCT** | `081bct001@pcampus.edu.np` | `081BCT001` | 2081 | **Minor Project** | **ACTIVE** |
+| **BEI** | `079bei001@pcampus.edu.np` | `079BEI001` | 2079 | **Minor Project** | **ACTIVE** |
+| **BEI** | `080bei001@pcampus.edu.np` | `080BEI001` | 2080 | **Minor Project** | **ACTIVE** |
+| **BEI** | `081bei001@pcampus.edu.np` | `081BEI001` | 2081 | **Minor Project** | **ACTIVE** |
+
+---
+
+## 🔧 Changing the Student Email Format
+
+Student emails are **always auto-generated from the roll number** — any email typed in the UI/import is ignored. The default format is:
+
+```
+{rollNumber}@pcampus.edu.np
+```
+
+Example: `080BCT001` → `080bct001@pcampus.edu.np`
+
+### Where the format is defined
+
+Each location has a `// ── STUDENT EMAIL FORMAT` comment marking the exact line to edit:
+
+| File | Location | Flow |
 | :--- | :--- | :--- |
-| **Maintainer** | `subeshgaming@gmail.com` | Full department administration & system configuration |
-| **BCT Coordinator** | `bct.coordinator@pcampus.edu.np` | Computer Engineering Bachelor project coordinator |
-| **BEI Coordinator** | `bei.coordinator@pcampus.edu.np` | Electronics & Information Bachelor project coordinator |
-| **MSNCS Coordinator** | `msncs.coordinator@pcampus.edu.np` | Master Network & Cyber Security coordinator |
-| **Faculty / Supervisor** | `bishnu.tamang@pcampus.edu.np` | Faculty Supervisor & Peer Examiner |
-| **Faculty / Supervisor** | `sita.devi@pcampus.edu.np` | Faculty Supervisor & Peer Examiner |
-| **External Examiner** | `kiran.mainali@ioe.edu.np` | External Defense Committee Examiner |
-| **Bachelor Student** | `080bct001@pcampus.edu.np` | Bachelor 4th Year Student (BCT) |
-| **Bachelor Student** | `080bei001@pcampus.edu.np` | Bachelor 3rd Year Student (BEI) |
-| **Master Student** | `080msncs001@pcampus.edu.np` | Master 2nd Year Student (MSNCS) |
+| `backend/src/controllers/userController.js` | `createUser` (~line 105) | Manual user creation (maintainer/coordinator) |
+| `backend/src/controllers/userController.js` | `updateUser` (~line 237) | Editing an existing student |
+| `backend/src/controllers/userController.js` | `bulkCreateUsers` (~line 499) | `/api/users/bulk` JSON import |
+| `backend/src/controllers/userController.js` | `bulkImportUsersExcel` (~line 643) | `/api/users/bulk-import` Excel import |
+| `backend/src/controllers/groupController.js` | line 129 & 558 | Group formation / bulk groups |
+| `backend/src/controllers/thesisController.js` | line 459 | Master thesis bulk import (auto-creates students) |
+
+### Changing it to `{rollNumber}.{firstName}@pcampus.edu.np`
+
+At each site, replace the current line with:
+
+```js
+email = `${rollNumber.toLowerCase()}.${(firstName || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
+```
+
+- The roll may be typed in **any case**; it is lowercased for consistency.
+- Non-letter characters in the first name are stripped (`Ram` → `ram`).
+
+Validation regex for that format:
+
+```
+/^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i
+```
+
+Example: roll `080BCT001` + first name `Ram` → `080bct001.ram@pcampus.edu.np`
+
+### ⚠️ Keep lookups in sync
+
+`groupController.js` looks up students by constructing the same email string. If you change the format in `userController.js`, also update the matching lines in `groupController.js` and `thesisController.js` (see table above), otherwise student lookups / auto-creates will break.
+
+Existing users already in the database keep their old email — update them manually (or via SQL) if existing students must use the new format.
 
 ---
 
@@ -302,8 +408,8 @@ All seeded test accounts use the password: **`subesh`**
 | **Master Theses** | `/api/theses` | Master thesis management, dual external examiner allocation, bulk import |
 | **Evaluations** | `/api/evaluations` | Component criteria grading, defense marks entry, summary computation |
 | **Examinations** | `/api/external-examiners` | Assigned groups/theses review for internal and external examiners |
-| **PDF & Export** | `/api/print` | University evaluation sheet PDF generation, Excel grade sheet export |
-| **User Directory** | `/api/users` | Student, supervisor, and examiner directory management |
+| **PDF & Export** | `/api/print` | University evaluation sheet PDF generation, Excel grade sheet export, bulk PDF download (`POST /bulk-pdf`) |
+| **User Directory** | `/api/users` | Student, supervisor, and examiner directory management, program-scoped audit logs (`GET /audit-logs`), bulk Excel import |
 
 ---
 

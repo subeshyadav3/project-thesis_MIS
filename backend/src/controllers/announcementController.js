@@ -599,7 +599,7 @@ exports.finalizeFormResponse = async (req, res) => {
     }
 
     const responseId = parseInt(req.params.responseId);
-    const { supervisorId, title, cluster, programId, batch } = req.body;
+    const { supervisorId, title, cluster, programId, batch, projectType } = req.body;
 
     const existing = await prisma.formResponse.findUnique({
       where: { id: responseId },
@@ -613,7 +613,9 @@ exports.finalizeFormResponse = async (req, res) => {
     }
 
     const student = existing.student;
-    const finalTitle = title || existing.formData?.title || 'Master Thesis';
+    const rawType = (projectType || existing.formData?.projectType || existing.formData?.type || (existing.announcement?.title?.toLowerCase().includes('project') ? 'PROJECT' : 'THESIS')).toString().trim().toUpperCase();
+    const resolvedProjectType = rawType === 'PROJECT' ? 'PROJECT' : 'THESIS';
+    const finalTitle = title || existing.formData?.title || (resolvedProjectType === 'PROJECT' ? 'Master Project' : 'Master Thesis');
     const finalCluster = cluster || existing.formData?.cluster || null;
     const finalProgramId = programId ? parseInt(programId) : (student.programId || null);
     const finalBatch = batch || student.batch || null;
@@ -626,6 +628,7 @@ exports.finalizeFormResponse = async (req, res) => {
         where: { id: thesis.id },
         data: {
           title: finalTitle,
+          projectType: resolvedProjectType,
           cluster: finalCluster,
           programId: finalProgramId,
           batch: finalBatch,
@@ -638,7 +641,7 @@ exports.finalizeFormResponse = async (req, res) => {
       thesis = await prisma.thesis.create({
         data: {
           title: finalTitle,
-          projectType: 'MASTER',
+          projectType: resolvedProjectType,
           studentId: student.id,
           supervisorId: selectedSupId,
           supervisorAssignmentStatus: selectedSupId ? 'PENDING' : null,
@@ -653,7 +656,7 @@ exports.finalizeFormResponse = async (req, res) => {
 
       // Create default evaluation components
       const { getDefaultComponents } = require('../config/evaluationScheme');
-      const defaults = getDefaultComponents('MASTER');
+      const defaults = getDefaultComponents(resolvedProjectType);
       for (const comp of defaults) {
         await prisma.evaluationComponent.create({
           data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
@@ -679,9 +682,10 @@ exports.finalizeFormResponse = async (req, res) => {
     // Notify only when a supervisor was newly assigned or changed
     if (selectedSupId && (!existing.thesis || selectedSupId !== previousSupId)) {
       try {
+        const itemLabel = resolvedProjectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
         const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
         await notifSvc.notify(selectedSupId, 'SUPERVISOR_ASSIGNMENT',
-          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master Thesis) — pending your acceptance.`, `/theses/${thesis.id}`);
+          `${assignerName} assigned you as supervisor for "${thesis.title}" (${itemLabel}) — pending your acceptance.`, `/theses/${thesis.id}`);
       } catch (e) { console.error('notify supervisor error:', e.message); }
     }
 

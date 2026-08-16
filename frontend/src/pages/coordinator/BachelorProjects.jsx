@@ -1234,6 +1234,32 @@ const filteredGroups = useMemo(() => {
               <Icon name="delete" className="material-symbols-outlined" />
               Delete
             </button>
+            <button className="btn btn-sm btn-primary" onClick={() => {
+              const selected = selectedGroups;
+              if (selected.length === 0) return toast.warning('No groups selected');
+              setConfirmDialog({
+                open: true,
+                title: 'Download Evaluation PDFs',
+                message: `Download evaluation PDFs for ${selected.length} selected project(s)?`,
+                confirmLabel: 'Download',
+                onConfirm: async () => {
+                  try {
+                    const { data } = await api.post('/print/bulk-pdf', { type: 'group', ids: selected.map(g => g.id) }, { responseType: 'blob' });
+                    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `projects_evaluations_${Date.now()}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success('Evaluation PDFs downloaded');
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                },
+              });
+            }}>
+              <Icon name="download" className="material-symbols-outlined" />
+              Download PDFs
+            </button>
           </div>
         </div>
       )}

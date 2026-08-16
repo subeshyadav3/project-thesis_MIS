@@ -23,50 +23,11 @@ function SupervisorMasterThesis() {
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('DEFAULT');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
-  const [showUpload, setShowUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkPreview, setBulkPreview] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-  const handleFileUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) { toast.warning('Select a file'); return; }
-    setBulkLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setBulkPreview(data);
-    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
-    finally { setBulkLoading(false); }
-  };
-
-  const handleBulkConfirm = async () => {
-    if (!bulkPreview?.preview) return;
-    setBulkLoading(true);
-    try {
-      const rows = bulkPreview.preview.map(p => ({
-        row: p.row, name: p.name, roll: p.roll, title: p.title,
-        batch: p.batch, cluster: p.cluster, programId: p.programId,
-        studentMatch: p.studentMatch, supervisorMatch: p.supervisorMatch, supervisorWillCreate: p.supervisorWillCreate,
-        externalMidTermMatch: p.externalMidTermMatch, externalMidTermWillCreate: p.externalMidTermWillCreate,
-        externalFinalMatch: p.externalFinalMatch, externalFinalWillCreate: p.externalFinalWillCreate,
-      }));
-      const res = await api.post('/theses/bulk-import/confirm', { rows });
-      const created = res.data?.created ?? bulkPreview.stats.matched;
-      const skipInfo = res.data?.skipped?.length ? ` (${res.data.skipped.length} skipped: ${res.data.skipped.map(s => s.reason).join('; ')})` : '';
-      toast.success(`${created} theses imported${skipInfo}`);
-      setShowUpload(false);
-      setBulkPreview(null);
-      setSelectedFile(null);
-      setBulkYearId('');
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Import failed'); }
-    finally { setBulkLoading(false); }
-  };
 
   const loadData = useCallback(() => {
     const controller = new AbortController();
@@ -74,30 +35,61 @@ function SupervisorMasterThesis() {
     setLoading(true);
     Promise.all([
       api.get('/supervisors/theses', { signal }).then(({ data }) => setTheses(data)),
-
     ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
-    return () => controller.abort();
+    return controller;
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    const controller = loadData();
+    return () => controller.abort();
+  }, [loadData]);
 
   const filteredTheses = useMemo(() => {
     return theses.filter(t => {
       const studentName = `${t.student?.firstName || ''} ${t.student?.lastName || ''}`;
-      const searchStr = (studentName + ' ' + (t.title || '')).toLowerCase();
+      const searchStr = (studentName + ' ' + (t.title || '') + ' ' + (t.student?.rollNumber || '')).toLowerCase();
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesType = typeFilter === 'ALL' || t.projectType === typeFilter;
+      return matchesSearch && matchesStatus && matchesType;
     });
-  }, [theses, searchTerm, statusFilter]);
+  }, [theses, searchTerm, statusFilter, typeFilter]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
+      if (sortBy === 'DATE_DESC') {
+        const dateA = new Date(a.createdAt || a.startDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.startDate || 0).getTime();
+        return dateB - dateA;
+      }
+      if (sortBy === 'DATE_ASC') {
+        const dateA = new Date(a.createdAt || a.startDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.startDate || 0).getTime();
+        return dateA - dateB;
+      }
+      if (sortBy === 'ROLL_ASC') {
+        const rollA = a.student?.rollNumber || '';
+        const rollB = b.student?.rollNumber || '';
+        return rollA.localeCompare(rollB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortBy === 'ROLL_DESC') {
+        const rollA = a.student?.rollNumber || '';
+        const rollB = b.student?.rollNumber || '';
+        return rollB.localeCompare(rollA, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortBy === 'NAME_ASC') {
+        const nameA = `${a.student?.firstName || ''} ${a.student?.lastName || ''}`.trim();
+        const nameB = `${b.student?.firstName || ''} ${b.student?.lastName || ''}`.trim();
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'TITLE_ASC') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
       if (a.status === 'COMPLETED' && b.status !== 'COMPLETED') return 1;
       if (a.status !== 'COMPLETED' && b.status === 'COMPLETED') return -1;
       return a.id - b.id;
     });
-  }, [filteredTheses]);
+  }, [filteredTheses, sortBy]);
 
   const totalPages = Math.ceil(sortedTheses.length / PAGE_SIZE);
   const paginatedTheses = sortedTheses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -161,7 +153,7 @@ function SupervisorMasterThesis() {
                   <span className="detail-label">Type</span>
                   <span className="badge badge-info">
                     <span className="dot" />
-                    Thesis
+                    {showDetail.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -268,6 +260,25 @@ function SupervisorMasterThesis() {
 
         <div className="filter-bar">
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
+          <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={[
+            { value: 'THESIS', label: 'Thesis' },
+            { value: 'PROJECT', label: 'Project' },
+          ]} allLabel="All Types" />
+          <FilterDropdown
+            label="Sort By"
+            value={sortBy}
+            onChange={setSortBy}
+            options={[
+              { value: 'DEFAULT', label: 'Default (Status)' },
+              { value: 'DATE_DESC', label: 'Date Added (Newest)' },
+              { value: 'DATE_ASC', label: 'Date Added (Oldest)' },
+              { value: 'ROLL_ASC', label: 'Roll Number (Ascending)' },
+              { value: 'ROLL_DESC', label: 'Roll Number (Descending)' },
+              { value: 'NAME_ASC', label: 'Student Name (A–Z)' },
+              { value: 'TITLE_ASC', label: 'Title (A–Z)' },
+            ]}
+            allLabel="Default Sorting"
+          />
         </div>
 
         {loading ? (
@@ -304,7 +315,14 @@ function SupervisorMasterThesis() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.student?.rollNumber || '—'}</td>
-                    <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
+                    <td style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                          {t.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
+                        </span>
+                        <span>{t.title}</span>
+                      </div>
+                    </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13, wordBreak: 'break-all' }}>{t.student?.email || '—'}</td>
                     <td>
                       <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>

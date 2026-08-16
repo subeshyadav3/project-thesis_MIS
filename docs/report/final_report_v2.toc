@@ -1,0 +1,52 @@
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion Page of Approval}{ii}{chapter*.1}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion Copyright}{iii}{chapter*.2}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion Acknowledgements}{iv}{chapter*.3}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion Abstract}{v}{chapter*.4}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion Contents}{vi}{chapter*.5}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion List of Figures}{vii}{chapter*.6}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion List of Tables}{viii}{chapter*.7}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }\leftprotrusion List of Abbreviations}{ix}{chapter*.8}%
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Background}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Problem Statement}{1}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Objectives}{2}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Scope \& Limitations}{3}{section.1.4}%
+\contentsline {chapter}{\numberline {2}Literature Review}{4}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Related Work}{4}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Related Theory}{4}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Single-Page Application (SPA) Architecture}{4}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}RESTful API \& JWT Authentication}{4}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Object-Relational Mapping (ORM) with Prisma}{5}{subsection.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.4}Server-Side Headless PDF Generation with Puppeteer}{5}{subsection.2.2.4}%
+\contentsline {subsection}{\numberline {2.2.5}Role-Based Access Control (RBAC)}{5}{subsection.2.2.5}%
+\contentsline {chapter}{\numberline {3}Methodology}{6}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Requirement Analysis \& Feasibility Study}{6}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Software Development Lifecycle (Agile Scrum)}{7}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Data Model Design}{7}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Security \& RBAC Implementation}{8}{section.3.4}%
+\contentsline {chapter}{\numberline {4}System Design}{9}{chapter.4}%
+\contentsline {section}{\numberline {4.1}System Architecture}{9}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Module Breakdown}{10}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Use Case Analysis}{10}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Entity-Relationship (ER) Diagram}{12}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Data Flow Diagram (DFD Level 1)}{12}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Sequence Diagrams}{13}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Excel Bulk Import Workflow}{13}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Evaluation Marks Submission \& PDF Generation}{15}{subsection.4.6.2}%
+\contentsline {section}{\numberline {4.7}Project Schedule (Gantt Chart)}{17}{section.4.7}%
+\contentsline {chapter}{\numberline {5}Experimental Setup \& Implementation}{18}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Development Environment}{18}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Backend API Structure}{18}{section.5.2}%
+\contentsline {section}{\numberline {5.3}PDF Generation Engine}{19}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Bulk Excel Import}{20}{section.5.4}%
+\contentsline {chapter}{\numberline {6}Results \& Discussion}{21}{chapter.6}%
+\contentsline {section}{\numberline {6.1}System Implementation}{21}{section.6.1}%
+\contentsline {section}{\numberline {6.2}PDF Evaluation Sheet Generation}{21}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Testing, Validation \& Mark Accuracy}{21}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Comparative Analysis}{22}{section.6.4}%
+\contentsline {chapter}{\numberline {7}Conclusions}{23}{chapter.7}%
+\contentsline {chapter}{\numberline {8}Limitations and Future Enhancement}{24}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Limitations}{24}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Future Enhancements}{24}{section.8.2}%
+\contentsline {chapter}{References}{24}{section.8.2}%
+\contentsline {chapter}{Appendices}{25}{chapter*.20}%

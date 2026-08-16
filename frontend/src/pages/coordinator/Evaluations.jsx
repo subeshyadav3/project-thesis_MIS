@@ -29,6 +29,12 @@ const TYPE_OPTIONS = [
   { value: 'MAJOR', label: 'Major' },
 ];
 
+const MASTER_TYPE_OPTIONS = [
+  { value: 'ALL', label: 'All Types' },
+  { value: 'THESIS', label: 'Thesis' },
+  { value: 'PROJECT', label: 'Project' },
+];
+
 const EVAL_STATUS = {
   COMPLETE: 'Evaluated',
   PARTIAL: 'In Progress',
@@ -98,7 +104,7 @@ function Evaluations() {
     .reduce((sum, b) => sum + (b.evaluation?.marks ?? 0), 0);
 
   const getMaxTotal = (item) => {
-    if (viewMode === 'master') return 200;
+    if (viewMode === 'master') return item.projectType === 'PROJECT' ? 100 : 300;
     return item.projectType === 'MAJOR' ? 100 : 50;
   };
 
@@ -123,7 +129,7 @@ function Evaluations() {
       ...item,
       name: viewMode === 'bachelor' ? item.name : `${item.student?.firstName} ${item.student?.lastName}`,
       project: viewMode === 'bachelor' ? item.projectTitle : item.title,
-      projectType: viewMode === 'bachelor' ? (item.projectType || 'MINOR') : 'MASTER',
+      projectType: viewMode === 'bachelor' ? (item.projectType || 'MINOR') : (item.projectType || 'THESIS'),
       members: viewMode === 'bachelor'
         ? item.members?.map(m => `${m.student?.firstName} ${m.student?.lastName}`).join(', ')
         : `${item.student?.firstName} ${item.student?.lastName}`,
@@ -143,8 +149,8 @@ function Evaluations() {
         const status = computeStatus(item);
         if (status !== statusFilter) return false;
       }
-      // Type filter (bachelor only)
-      if (viewMode === 'bachelor' && typeFilter !== 'ALL') {
+      // Type filter (bachelor: MINOR/MAJOR, master: THESIS/PROJECT)
+      if (typeFilter !== 'ALL') {
         if (item.projectType !== typeFilter) return false;
       }
       // Search filter across name/project/members/rolls
@@ -267,13 +273,11 @@ function Evaluations() {
               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          {viewMode === 'bachelor' && (
-            <div className="filter-item" style={{ margin: 0 }}>
-              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-                {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          )}
+          <div className="filter-item" style={{ margin: 0 }}>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+              {(viewMode === 'bachelor' ? TYPE_OPTIONS : MASTER_TYPE_OPTIONS).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
             {filteredItems.length} of {processedItems.length} shown
           </div>

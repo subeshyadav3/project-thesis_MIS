@@ -9,6 +9,7 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildGroupWhereForCoordinator, resolveCoordinatorScope, isGroupVisibleToCoordinator, canManageGroupAsCoordinator } = require('../utils/coordinatorScope');
+const { assertValidStatusTransition } = require('../utils/statusTransitions');
 const { computeCurrentYearSemesterFromBatch } = require('../utils/computeYearSemester');
 
 const normalizeBatch = (batch) => {
@@ -643,8 +644,18 @@ exports.bulkImportConfirm = async (req, res) => {
         }
 
         try {
+          const pt = (projectType === 'MAJOR' || projectType === 'MINOR') ? projectType : 'MINOR';
+          const annType = pt === 'MAJOR' ? 'MAJOR' : 'MINOR';
           const activeAnnouncement = await tx.announcement.findFirst({
-            where: { type: { in: ['MINOR', 'MAJOR', 'GROUP'] } },
+            where: {
+              type: annType,
+              isActive: true,
+              allowGroupFormation: true,
+              OR: [
+                { programIds: { isEmpty: true } },
+                { programIds: { has: resolvedProgramId } },
+              ],
+            },
             orderBy: { createdAt: 'desc' },
           });
           if (activeAnnouncement) {
@@ -848,12 +859,31 @@ exports.updateGroupStatus = async (req, res) => {
         return res.status(403).json({ error: 'Access denied. Group is outside your coordinator scope.' });
       }
     }
+    const transition = assertValidStatusTransition('group', existing.status, req.body.status);
+    if (!transition.valid) return res.status(400).json({ error: transition.error });
+
+    // Don't let a project be finalised while any evaluation component still has
+    // an un-entered score — an incomplete grade sheet shouldn't be marked complete.
+    if (req.body.status === 'COMPLETED') {
+      const [components, evaluations] = await Promise.all([
+        prisma.evaluationComponent.findMany({ where: { groupId: existing.id }, select: { id: true } }),
+        prisma.evaluation.findMany({ where: { groupId: existing.id }, select: { componentId: true, marks: true } }),
+      ]);
+      if (!components.length) {
+        return res.status(400).json({ error: 'Cannot mark project complete: no evaluation components are set up.' });
+      }
+      const scored = new Map(evaluations.filter(e => e.marks != null).map(e => [e.componentId, true]));
+      const missing = components.filter(c => !scored.get(c.id)).length;
+      if (missing) {
+        return res.status(400).json({ error: `Cannot mark project complete: ${missing} evaluation component(s) still have no marks entered.` });
+      }
+    }
+
     const group = await prisma.projectGroup.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },
     });
-    if (existing.status !== req.body.status) {
-      try {
+    if (existing.status !== req.body.status) {      try {
         await notifSvc.notifyStatusChange({
           groupId: group.id, oldStatus: existing.status, newStatus: req.body.status,
           itemTitle: existing.projectTitle, changerId: req.user.id,

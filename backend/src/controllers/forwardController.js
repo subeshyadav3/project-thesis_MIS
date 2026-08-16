@@ -18,8 +18,8 @@ exports.forwardToExamDept = async (req, res) => {
       }
     }
 
-    const groupWhere = { status: 'COMPLETED' };
-    const thesisWhere = { status: 'COMPLETED' };
+    const groupWhere = { status: 'COMPLETED', forwardedToExamDept: false };
+    const thesisWhere = { status: 'COMPLETED', forwardedToExamDept: false };
     if (programId) {
       groupWhere.programId = programId;
       thesisWhere.student = { programId };
@@ -73,12 +73,20 @@ exports.forwardToExamDept = async (req, res) => {
     };
 
     const apiUrl = process.env.EXAM_DEPT_API_URL;
+    const markForwarded = async () => {
+      const ids = [
+        ...groups.map(g => prisma.projectGroup.update({ where: { id: g.id }, data: { forwardedToExamDept: true } })),
+        ...theses.map(t => prisma.thesis.update({ where: { id: t.id }, data: { forwardedToExamDept: true } })),
+      ];
+      if (ids.length) await Promise.all(ids);
+    };
     if (!apiUrl) {
       console.warn('EXAM_DEPT_API_URL not set — results not forwarded to external endpoint');
       audit.log({ action: 'FORWARD_SKIPPED', entity: 'Results', details: 'EXAM_DEPT_API_URL not configured, results saved locally', performedById: req.user.id });
       // Still log the forward locally
       const coordinatorIds = await notifSvc.getCoordinatorIds();
       await notifSvc.notifyMany(coordinatorIds, 'RESULTS_FORWARDED', `Results prepared for forwarding (${payload.results.length} items). Exam Dept API not configured.`);
+      if (payload.results.length) await markForwarded();
       return res.json({ message: 'Results processed locally', items: payload.results.length, forwarded: false });
     }
 
@@ -87,6 +95,7 @@ exports.forwardToExamDept = async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       timeout: 10000,
     });
+    if (payload.results.length) await markForwarded();
     audit.log({ action: 'FORWARD', entity: 'Results', details: 'Forwarded results to Examination Department', performedById: req.user.id });
     const coordinatorIds = await notifSvc.getCoordinatorIds();
     await notifSvc.notifyMany(coordinatorIds, 'RESULTS_FORWARDED', `Results have been forwarded to the Examination Department`);

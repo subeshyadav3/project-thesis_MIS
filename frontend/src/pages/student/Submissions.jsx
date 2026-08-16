@@ -22,41 +22,11 @@ function StudentSubmissions() {
   const toast = useToast();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const stages = ['PROPOSAL', 'MID_TERM', 'FINAL'];
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      api.get('/students/groups').then(({ data }) => setGroups(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load groups'); setGroups([]); }),
-      api.get('/students/theses').then(({ data }) => setTheses(data)).catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); }),
-    ]);
-  }, []);
-
-  // Auto-select the correct tab once data loads: prefer 'theses' if only theses exist, else 'groups'
-  useEffect(() => {
-    if (groups.length === 0 && theses.length > 0) {
-      setActiveTab('theses');
-    } else {
-      setActiveTab('groups');
-    }
-    setLoading(false);
-  }, [groups.length, theses.length]);
-
-  useEffect(() => {
-    if (!selectedId) { setProposals([]); setAnnouncement(null); return; }
-    const isGroup = activeTab === 'groups';
-    const endpoint = isGroup ? `/students/groups/${selectedId}` : `/students/theses/${selectedId}`;
-    api.get(endpoint)
-      .then(({ data }) => {
-        setProposals(data.proposals || []);
-        setAnnouncement(data.announcement || null);
-      })
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load proposals'); setProposals([]); setAnnouncement(null); });
-  }, [selectedId, activeTab]);
-
   const items = activeTab === 'groups' ? groups : theses;
   const itemLabel = activeTab === 'groups' ? 'Project' : 'Thesis';
   const selectedItem = items.find(i => i.id === selectedId);
+  const isMasterProject = activeTab === 'theses' && selectedItem?.projectType === 'PROJECT';
+  const stages = isMasterProject ? ['PROPOSAL', 'FINAL'] : ['PROPOSAL', 'MID_TERM', 'FINAL'];
   const completed = selectedItem?.status === 'COMPLETED';
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -15,40 +15,14 @@ function ExternalEvaluationsList() {
   const [activeTab, setActiveTab] = useState('groups');
   const [loading, setLoading] = useState(true);
   const [pdfPreviewItem, setPdfPreviewItem] = useState(null);
-  const [showUpload, setShowUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadProjectType, setUploadProjectType] = useState('MINOR');
-  const [uploading, setUploading] = useState(false);
-  const handleFileUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) { toast.warning('Select a file'); return; }
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      if (activeTab === 'groups') {
-        formData.append('projectType', uploadProjectType);
-        await api.post('/groups/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        toast.success('Groups imported successfully');
-      } else {
-        const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        toast.success(`${data.stats?.matched || 0} theses matched`);
-      }
-      setShowUpload(false);
-      setSelectedFile(null);
-      loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Upload failed'); }
-    finally { setUploading(false); }
-  };
-
-  const loadData = () => {
+  const loadData = useCallback((signal) => {
     setLoading(true);
     Promise.all([
-      api.get('/external-examiners/groups').then(({ data }) => setGroups(data)).catch(() => {}),
-      api.get('/external-examiners/theses').then(({ data }) => setTheses(data)).catch(() => {}),
-    ]).catch((err) => toast.error(err.response?.data?.error || 'Failed to load data'))
+      api.get('/external-examiners/groups', { signal }).then(({ data }) => setGroups(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
+      api.get('/external-examiners/theses', { signal }).then(({ data }) => setTheses(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
       .finally(() => setLoading(false));
-  };
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const toast = useToast();
   const navigate = useNavigate();
@@ -56,16 +30,9 @@ function ExternalEvaluationsList() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const signal = controller.signal;
-    setLoading(true);
-    Promise.all([
-      api.get('/external-examiners/groups', { signal }).then(({ data }) => setGroups(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
-      api.get('/external-examiners/theses', { signal }).then(({ data }) => setTheses(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
-      api.get('/departments/academic-years', { signal }).then(({ data }) => setAcademicYears(data)).catch(() => {}),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
-      .finally(() => setLoading(false));
+    loadData(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [loadData]);
 
   const groupsWithStatus = useMemo(() => {
     return groups.map(g => {

@@ -100,172 +100,301 @@ process.on('SIGINT', () => { shutdownBrowser(); });
 
 function buildPageHeader() {
   return `
-    <div style="text-align:center;margin-bottom:16px;font-size:13px;">
-      <div style="font-weight:700;">TRIBHUVAN UNIVERSITY</div>
-      <div style="font-weight:700;">INSTITUTE OF ENGINEERING</div>
-      <div style="font-weight:700;">PULCHOWK CAMPUS</div>
+    <div style="text-align:center;margin-bottom:12px;font-family:'Times New Roman', Times, serif;">
+      <div style="font-weight:700;font-size:14pt;line-height:1.25;">TRIBHUVAN UNIVERSITY</div>
+      <div style="font-weight:700;font-size:13pt;line-height:1.25;">INSTITUTE OF ENGINEERING</div>
+      <div style="font-weight:700;font-size:13pt;line-height:1.25;">PULCHOWK CAMPUS</div>
     </div>`;
 }
 
 function buildNote() {
-  return `<p style="font-size:12px;margin:4px 0;"><strong>Note:</strong> 100%: Outstanding, 90%: Excellent, 75%: Good, 60%: Satisfactory, 50%: Poor, &lt; 50%: Fail</p>`;
+  return `<div style="font-size:10pt;margin:6px 0;font-family:'Times New Roman', Times, serif;"><strong>Note:</strong> 100%: Outstanding, 90%: Excellent, 75%: Good, 60%: Satisfactory, 50%: Poor, &lt; 50%: Fail</div>`;
 }
 
 function buildBlankLines(count) {
   let out = '';
-  for (let i = 0; i < count; i++) out += '<div style="height:1.2em;"></div>';
+  for (let i = 0; i < count; i++) out += '<div style="height:1.2em;border-bottom:1px dotted #ccc;margin-bottom:2px;"></div>';
   return out;
 }
 
-function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions, supervisorDesignation) {
+function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, comments, feedbackComments, feedbackSuggestions, supervisorDesignation, programName, phase = 'midterm') {
   const totalMarks = supCriteria.reduce((s, c) => s + (c.marks || 0), 0);
-  const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined);
+  const hasMarks = supCriteria.some(c => c.marks !== null && c.marks !== undefined && c.marks !== '');
+  const pageMax = supCriteria.reduce((s, c) => s + c.max, 0) || 100;
+  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
 
   const criteriaRows = supCriteria.map((c, i) => `
     <tr>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${i + 1}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(c.name)}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.max}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${i + 1}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(c.name)}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.max}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${c.marks !== null && c.marks !== undefined && c.marks !== '' ? c.marks : ''}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
     </tr>`).join('');
 
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
   return `
-    ${buildPageHeader()}
-    <div style="font-weight:700;font-size:13px;text-align:center;">Mid-Term Evaluation Form for Thesis Program</div>
-    <div style="font-size:12px;text-align:center;margin-bottom:8px;">(to be filled by supervisor)</div>
-    <div style="font-size:12px;margin:4px 0;"><strong>Credit: 16 | Full Marks: 100</strong></div>
+    <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+      ${buildPageHeader()}
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">${phaseLabel} Evaluation Form for</div>
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">Thesis Program: <span style="font-weight:normal;">${esc(programName || '')}</span></div>
+        <div style="font-size:10.5pt;margin-top:2px;">(to be filled by supervisor)</div>
+      </div>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
-      <tr><td style="width:120px;"><strong>Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Name of Student:</strong></td><td>${esc(studentName)}</td></tr>
-      <tr><td><strong>Roll No:</strong></td><td>${esc(rollNo)}</td></tr>
-      <tr><td><strong>Supervisor:</strong></td><td>${esc(supervisor)}</td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
-      <thead><tr>
-        <th style="text-align:center;padding:4px;">S.No.</th>
-        <th style="text-align:left;padding:4px;">Marking Parameters</th>
-        <th style="text-align:center;padding:4px;">Full Marks</th>
-        <th style="text-align:center;padding:4px;">Marks Obtained</th>
-        <th style="text-align:center;padding:4px;">Remarks</th>
-      </tr></thead>
-      <tbody>
-        ${criteriaRows}
+      <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
         <tr>
-          <td></td>
-          <td style="font-weight:700;">Total Marks</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">100</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">${hasMarks ? totalMarks : ''}</td>
-          <td></td>
+          <td style="font-weight:bold;width:50%;">Credit: 16</td>
+          <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
         </tr>
-      </tbody>
-    </table>
-    ${buildNote()}
+        <tr><td colspan="2" style="padding-top:4px;"><strong>Title:</strong> ${esc(title)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Name of Student:</strong> ${esc(studentName)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Roll No:</strong> ${esc(rollNo)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>
+      </table>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
-      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</td></tr>
-    </table>
+      <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+        <thead>
+          <tr style="background-color:#fafafa;">
+            <th style="width:8%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+            <th style="width:52%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Marking Parameters</th>
+            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${criteriaRows}
+          <tr>
+            <td style="border:1px solid #000;"></td>
+            <td style="font-weight:bold;padding:5px 8px;border:1px solid #000;">Total Marks</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${pageMax}</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? totalMarks : ''}</td>
+            <td style="border:1px solid #000;"></td>
+          </tr>
+        </tbody>
+      </table>
 
-    <div style="margin-top:8px;font-size:12px;">
-      <strong>Comments:</strong>
-      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
-    </div>
-    <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>
-      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
-    </div>
+      ${buildNote()}
 
-    <div style="font-size:12px;margin-top:16px;">
-      <strong>Examiner:</strong><br/>
-      <strong>Name:</strong> ${esc(supervisor)}<br/>
-      <strong>Post:</strong> ${esc(supervisorDesignation || 'Supervisor')}<br/>
-      <strong>Organization:</strong> IOE<br/>
-      <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-      <strong>Signature:</strong><br/>
+      <div style="font-size:11pt;margin:8px 0 6px 0;">
+        <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
+      </div>
+
+      <div style="margin-top:8px;font-size:11pt;">
+        <strong>Comments:</strong>
+        ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+      </div>
+
+      <div style="margin-top:6px;font-size:11pt;">
+        <strong>Suggestions &amp; recommendations:</strong>
+        ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+      </div>
+
+      <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(supervisor)}</div>
+          <div>Post: ${esc(supervisorDesignation || 'Supervisor')}</div>
+          <div>Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
+      </div>
     </div>`;
 }
 
-function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation) {
+function buildExternalPage(title, studentName, rollNo, extCriteria, comments, feedbackComments, feedbackSuggestions, phase, extName, extDesignation, projectType, programName, supervisor) {
   const totalMarks = extCriteria.reduce((s, c) => s + (c.marks || 0), 0);
-  const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined);
+  const hasMarks = extCriteria.some(c => c.marks !== null && c.marks !== undefined && c.marks !== '');
+  const pageMax = extCriteria.reduce((s, c) => s + c.max, 0) || 100;
 
-  const criteriaRows = extCriteria.map((c, i) => `
-    <tr>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${i + 1}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(c.name)}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.max}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${c.marks !== null && c.marks !== undefined ? c.marks : ''}</td>
-    </tr>`).join('');
+  const isProject = projectType === 'PROJECT';
+  const isFinal = phase === 'final';
+  const phaseLabel = isFinal ? 'Final' : 'Mid-Term';
+  const credit = isProject ? 4 : 16;
 
   const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
   const suggestionText = feedbackSuggestions || '';
 
-  const phaseLabel = phase === 'final' ? 'Final' : 'Mid-Term';
-  const titleLabel = phase === 'final' ? 'M. Sc. - Thesis Evaluation: External (Final)' : 'M. Sc. - Project Evaluation: External';
+  if (isFinal || isProject) {
+    // Exact layout from External_evaluation_sheets Project.docx
+    const criteriaRows = extCriteria.map((c, i) => `
+      <tr>
+        <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${i + 1}</td>
+        <td style="padding:5px 8px;border:1px solid #000;">${esc(c.name)}</td>
+        <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.max}</td>
+        <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${c.marks !== null && c.marks !== undefined && c.marks !== '' ? c.marks : ''}</td>
+      </tr>`).join('');
+
+    return `
+      <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+        ${buildPageHeader()}
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:12pt;line-height:1.3;">M. Sc.  - ${isProject ? 'Project' : 'Thesis'} Evaluation: External</div>
+        </div>
+
+        <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
+          <tr>
+            <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
+            <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
+          </tr>
+          <tr><td colspan="2" style="padding-top:4px;"><strong>${isProject ? 'Project Title:' : 'Title:'}</strong> ${esc(title)}</td></tr>
+          <tr><td colspan="2" style="padding-top:2px;"><strong>Student  (Name):</strong> ${esc(studentName)}, Roll No.: ${esc(rollNo)}</td></tr>
+          ${supervisor ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>` : ''}
+        </table>
+
+        <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+          <thead>
+            <tr style="background-color:#fafafa;">
+              <th style="width:8%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+              <th style="width:58%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Marking Parameters</th>
+              <th style="width:17%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+              <th style="width:17%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${criteriaRows}
+            <tr>
+              <td style="border:1px solid #000;"></td>
+              <td style="font-weight:bold;padding:5px 8px;border:1px solid #000;">Total Marks</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${pageMax}</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? totalMarks : ''}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${buildNote()}
+
+        <div style="font-size:11pt;margin-8px 0 6px 0;">
+          <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
+        </div>
+
+        <div style="margin-top:8px;font-size:11pt;">
+          <strong>Comments:</strong>
+          ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+        </div>
+
+        <div style="margin-top:6px;font-size:11pt;">
+          <strong>Suggestions &amp; recommendations:</strong>
+          ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+        </div>
+
+        <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+          <div style="font-weight:bold;margin-bottom:4px;">Examiner :</div>
+          <div style="padding-left:18px;">
+            <div>Name: ${esc(extName || '')}</div>
+            <div>Designation : ${esc(extDesignation || '')}</div>
+            <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+              <tr>
+                <td style="width:50%;">Date : ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                <td style="width:50%;">Signature : _____________________</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Exact layout from External_evaluation_sheets_Thesis.docx
+  const criteriaRows = extCriteria.map((c, i) => `
+    <tr>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${i + 1}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(c.name)}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.max}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${c.marks !== null && c.marks !== undefined && c.marks !== '' ? c.marks : ''}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
+    </tr>`).join('');
 
   return `
-    ${buildPageHeader()}
-    <div style="font-weight:700;font-size:13px;text-align:center;">${titleLabel}</div>
-    <div style="font-size:12px;margin:4px 0;"><strong>Credit: 4 | Full Marks: 100</strong></div>
+    <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+      ${buildPageHeader()}
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">${phaseLabel} Evaluation Form for</div>
+        <div style="font-weight:700;font-size:12pt;line-height:1.3;">Thesis Program: <span style="font-weight:normal;">${esc(programName || '')}</span></div>
+        <div style="font-size:10.5pt;margin-top:2px;">(to be filled by external examiner)</div>
+      </div>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;" cellpadding="2">
-      <tr><td style="width:120px;"><strong>Project Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Student (Name):</strong></td><td>${esc(studentName)}, <strong>Roll No.:</strong> ${esc(rollNo)}</td></tr>
-    </table>
-
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
-      <thead><tr>
-        <th style="text-align:center;padding:4px;">S.No.</th>
-        <th style="text-align:left;padding:4px;">Marking Parameters</th>
-        <th style="text-align:center;padding:4px;">Full Marks</th>
-        <th style="text-align:center;padding:4px;">Marks Obtained</th>
-      </tr></thead>
-      <tbody>
-        ${criteriaRows}
+      <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
         <tr>
-          <td></td>
-          <td style="font-weight:700;">Total Marks</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">100</td>
-          <td style="text-align:center;padding:4px;font-weight:700;">${hasMarks ? totalMarks : ''}</td>
+          <td style="font-weight:bold;width:50%;">Credit: 16</td>
+          <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${pageMax}</td>
         </tr>
-      </tbody>
-    </table>
-    ${buildNote()}
+        <tr><td colspan="2" style="padding-top:4px;"><strong>Title:</strong> ${esc(title)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Name of Student:</strong> ${esc(studentName)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Roll No:</strong> ${esc(rollNo)}</td></tr>
+        <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor || '')}</td></tr>
+      </table>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
-      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</td></tr>
-    </table>
+      <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+        <thead>
+          <tr style="background-color:#fafafa;">
+            <th style="width:8%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+            <th style="width:52%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Marking Parameters</th>
+            <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+            <th style="width:14%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${criteriaRows}
+          <tr>
+            <td style="border:1px solid #000;"></td>
+            <td style="font-weight:bold;padding:5px 8px;border:1px solid #000;">Total Marks</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${pageMax}</td>
+            <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? totalMarks : ''}</td>
+            <td style="border:1px solid #000;"></td>
+          </tr>
+        </tbody>
+      </table>
 
-    <div style="margin-top:8px;font-size:12px;">
-      <strong>Comments:</strong>
-      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
-    </div>
-    <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>
-      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
-    </div>
+      ${buildNote()}
 
-    <div style="font-size:12px;margin-top:16px;">
-      <strong>Examiner:</strong><br/>
-      <strong>Name:</strong> ${esc(extName || '')}<br/>
-      <strong>Designation:</strong> ${esc(extDesignation || '')}<br/>
-      <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-      <strong>Signature:</strong><br/>
+      <div style="font-size:11pt;margin:8px 0 6px 0;">
+        <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalMarks)) : '&nbsp;'}</span>
+      </div>
+
+      <div style="margin-top:8px;font-size:11pt;">
+        <strong>Comments:</strong>
+        ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+      </div>
+
+      <div style="margin-top:6px;font-size:11pt;">
+        <strong>Suggestions &amp; recommendations:</strong>
+        ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+      </div>
+
+      <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(extName || '')}</div>
+          <div>Post: ${esc(extDesignation || '')}</div>
+          <div>University/Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:8px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
+      </div>
     </div>`;
 }
 
 /**
  * Build the master thesis evaluation HTML.
  * @param {Object} data - thesis data
- * @param {'supervisor'|'external'|'both'} [scope='both'] - which evaluator pages to include
+ * @param {'supervisor'|'external'|'both'|'external-midterm'|'external-final'|'external-both'} [scope='both'] - which evaluator pages to include
  */
 function buildMasterFormat(data, scope = 'both') {
-  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal } = data;
+  const { title, name, supervisor, supervisorDesignation, evaluations, student, externalMidTerm, externalFinal, projectType, programName } = data;
+  const projectLabel = projectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
 
   const supEvals = evaluations.filter(e => e.evaluatorRole === 'Supervisor');
   const midEvals = evaluations.filter(e => e.evaluationType === 'EXTERNAL_MIDTERM');
@@ -312,37 +441,95 @@ function buildMasterFormat(data, scope = 'both') {
   const finalExtName = externalFinal ? `${externalFinal.firstName} ${externalFinal.lastName}`.trim() : '';
   const finalExtDesignation = externalFinal?.designation || '';
 
-  if (includeSup) {
+  if (projectType === 'PROJECT') {
+    // Master Project has exactly ONE external evaluation sheet (100 marks) per External_evaluation_sheets Project.docx
+    const projCriteria = finalCriteria.length ? finalCriteria : (midCriteria.length ? midCriteria : legacyExt);
+    const projComments = finalComments.length ? finalComments : midComments;
+    const projFeedbackComments = finalFeedbackComments || midFeedbackComments;
+    const projFeedbackSuggestions = finalFeedbackSuggestions || midFeedbackSuggestions;
+    const projExtName = finalExtName || midExtName;
+    const projExtDesignation = finalExtDesignation || midExtDesignation;
+
     pages += `
-    <div style="page-break-after:always;">
-      ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation)}
+    <div class="page-sheet">
+      ${buildExternalPage(title, studentName, rollNo, projCriteria, projComments, projFeedbackComments, projFeedbackSuggestions, 'final', projExtName, projExtDesignation, projectType, programName, supervisor)}
     </div>`;
-  }
-  if (includeExt) {
-    pages += `
-    <div${includeSup ? ' style="page-break-after:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation)}
-    </div>`;
-  }
-  if (includeExtFinal) {
-    pages += `
-    <div${includeSup || includeExt ? ' style="page-break-before:always;"' : ''}>
-      ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation)}
-    </div>`;
+  } else {
+    // Master Thesis has Supervisor, External Mid-Term, and External Final
+    if (includeSup) {
+      pages += `
+      <div class="page-sheet">
+        ${buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria, supComments, supFeedbackComments, supFeedbackSuggestions, supervisorDesignation, programName, 'midterm')}
+      </div>`;
+    }
+    if (includeExt) {
+      pages += `
+      <div class="page-sheet">
+        ${buildExternalPage(title, studentName, rollNo, midCriteria, midComments, midFeedbackComments, midFeedbackSuggestions, 'midterm', midExtName, midExtDesignation, projectType, programName, supervisor)}
+      </div>`;
+    }
+    if (includeExtFinal) {
+      pages += `
+      <div class="page-sheet">
+        ${buildExternalPage(title, studentName, rollNo, finalCriteria, finalComments, finalFeedbackComments, finalFeedbackSuggestions, 'final', finalExtName, finalExtDesignation, projectType, programName, supervisor)}
+      </div>`;
+    }
   }
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Thesis Evaluation - ${esc(title)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
-    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      color: #000;
+      font-size: 11pt;
+      line-height: 1.35;
+      margin: 0;
+      padding: 20px;
+      background: #eef2f6;
+    }
+    .page-sheet {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      max-width: 210mm;
+      margin: 0 auto 28px auto;
+      padding: 20mm 15mm;
+      box-sizing: border-box;
+      min-height: 297mm;
+      page-break-after: always;
+    }
+    .page-sheet:last-child {
+      margin-bottom: 0;
+      page-break-after: auto;
+    }
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .page-sheet {
+        border: none;
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0;
+        padding: 0;
+        max-width: 100%;
+        min-height: auto;
+      }
+    }
   </style></head><body>
     ${pages}
   </body></html>`;
 }
 
 function buildBachelorFormat(data) {
-  const { title, name, supervisor, members, evaluations, projectType, total, maxTotal } = data;
+  const { title, name, supervisor, members, evaluations, projectType, total, maxTotal, programName } = data;
   const isMajor = projectType === 'MAJOR';
   const projectLabel = isMajor ? 'Major Project' : 'Minor Project';
   const credit = isMajor ? '6' : '3';
@@ -352,15 +539,15 @@ function buildBachelorFormat(data) {
 
   let sn = 0;
   const bodyRows = evaluations.map((e) => {
-    const marks = e.marks !== null && e.marks !== undefined ? e.marks : '';
+    const marks = e.marks !== null && e.marks !== undefined && e.marks !== '' ? e.marks : '';
     sn++;
     return `<tr>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${sn}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(e.name)}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(e.evaluatorRole)}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;">${e.maxMarks}</td>
-      <td style="text-align:center;padding:4px;border:1px solid #000;font-weight:700;">${marks}</td>
-      <td style="padding:4px;border:1px solid #000;">${esc(e.comment || '')}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${sn}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(e.name)}</td>
+      <td style="padding:5px 8px;border:1px solid #000;">${esc(e.evaluatorRole)}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${e.maxMarks}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;font-weight:bold;">${marks}</td>
+      <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${esc(e.comment || '')}</td>
     </tr>`;
   }).join('');
 
@@ -374,78 +561,145 @@ function buildBachelorFormat(data) {
   const examiners = evaluations.filter(e => e.submittedBy && !seen.has(e.submittedBy) && seen.add(e.submittedBy));
 
   const examinerBlocks = examiners.length
-    ? examiners.map(e => `
-      <div style="font-size:12px;margin-top:${e === examiners[0] ? 16 : 12}px;">
-        <strong>Examiner:</strong><br/>
-        <strong>Name:</strong> ${esc(e.submittedBy)}<br/>
-        <strong>Post:</strong> ${esc(e.evaluatorRole)}<br/>
-        <strong>Organization:</strong> IOE<br/>
-        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-        <strong>Signature:</strong><br/>
+    ? examiners.map((e, idx) => `
+      <div style="font-size:11pt;margin-top:${idx === 0 ? 14 : 10}px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(e.submittedBy)}</div>
+          <div>Post: ${esc(e.evaluatorRole || 'Examiner')}</div>
+          <div>Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
       </div>`).join('')
     : `
-      <div style="font-size:12px;margin-top:16px;">
-        <strong>Examiner:</strong><br/>
-        <strong>Name:</strong><br/>
-        <strong>Post:</strong><br/>
-        <strong>Organization:</strong> IOE<br/>
-        <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br/>
-        <strong>Signature:</strong><br/>
+      <div style="font-size:11pt;margin-top:14px;page-break-inside:avoid;">
+        <div style="font-weight:bold;margin-bottom:4px;">Examiner:</div>
+        <div style="padding-left:18px;">
+          <div>Name: ${esc(supervisor)}</div>
+          <div>Post: Supervisor</div>
+          <div>Organization: IOE</div>
+          <table style="width:100%;font-size:11pt;margin-top:6px;border-collapse:collapse;" cellpadding="0">
+            <tr>
+              <td style="width:50%;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+              <td style="width:50%;">Signature: _____________________</td>
+            </tr>
+          </table>
+        </div>
       </div>`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evaluation - ${esc(title)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${projectLabel} Evaluation - ${esc(title)}</title>
   <style>
-    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      color: #000;
+      font-size: 11pt;
+      line-height: 1.35;
+      margin: 0;
+      padding: 20px;
+      background: #eef2f6;
+    }
+    .page-sheet {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      max-width: 210mm;
+      margin: 0 auto 28px auto;
+      padding: 20mm 15mm;
+      box-sizing: border-box;
+      min-height: 297mm;
+      page-break-after: always;
+    }
+    .page-sheet:last-child {
+      margin-bottom: 0;
+      page-break-after: auto;
+    }
     table { border-color: #000; }
     td, th { border-color: #000; vertical-align: top; }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .page-sheet {
+        border: none;
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0;
+        padding: 0;
+        max-width: 100%;
+        min-height: auto;
+      }
+    }
   </style></head><body>
-    <div style="text-align:center;margin-bottom:16px;font-size:13px;">
-      <div style="font-weight:700;">TRIBHUVAN UNIVERSITY</div>
-      <div style="font-weight:700;">INSTITUTE OF ENGINEERING</div>
-      <div style="font-weight:700;">PULCHOWK CAMPUS</div>
-      <div style="font-weight:700;margin-top:8px;">${projectLabel} Evaluation</div>
-    </div>
-    <table style="width:100%;font-size:12px;" cellpadding="2">
-      <tr><td style="width:140px;"><strong>Title:</strong></td><td>${esc(title)}</td></tr>
-      <tr><td><strong>Group / Student:</strong></td><td>${esc(name)}</td></tr>
-      <tr><td><strong>Supervisor:</strong></td><td>${esc(supervisor)}</td></tr>
-      <tr><td><strong>Credit:</strong></td><td>${credit} | Full Marks: ${maxTotal}</td></tr>
-      ${members ? `<tr><td><strong>Members:</strong></td><td>${members}</td></tr>` : ''}
-    </table>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;" border="1" cellpadding="4">
-      <thead><tr>
-        <th style="text-align:center;padding:4px;">S.N.</th>
-        <th style="text-align:left;padding:4px;">Component</th>
-        <th style="text-align:left;padding:4px;">Evaluator</th>
-        <th style="text-align:center;padding:4px;">Max</th>
-        <th style="text-align:center;padding:4px;">Marks</th>
-        <th style="text-align:left;padding:4px;">Remarks</th>
-      </tr></thead>
-      <tbody>
-        ${bodyRows}
-        <tr>
-          <td colspan="3" style="text-align:right;padding:4px;font-weight:700;border:1px solid #000;">Total</td>
-          <td style="text-align:center;padding:4px;font-weight:700;border:1px solid #000;">${maxTotal}</td>
-          <td style="text-align:center;padding:4px;font-weight:700;border:1px solid #000;">${total}</td>
-          <td style="border:1px solid #000;"></td>
-        </tr>
-      </tbody>
-    </table>
-    ${buildNote()}
+    <div class="page-sheet">
+      <div style="font-family:'Times New Roman', Times, serif; color:#000; font-size:11pt; line-height:1.35; padding: 0 4px;">
+        ${buildPageHeader()}
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:12pt;line-height:1.3;">Bachelor Degree - ${projectLabel} Evaluation Form</div>
+          ${programName ? `<div style="font-weight:700;font-size:12pt;line-height:1.3;">Program: <span style="font-weight:normal;">${esc(programName)}</span></div>` : ''}
+        </div>
 
-    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px;" cellpadding="2">
-      <tr><td style="width:220px;"><strong>Total Marks Obtained (in words):</strong></td><td style="border-bottom:1px solid #000;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</td></tr>
-    </table>
+        <table style="width:100%;font-size:11pt;border-collapse:collapse;margin-bottom:8px;" cellpadding="2">
+          <tr>
+            <td style="font-weight:bold;width:50%;">Credit: ${credit}</td>
+            <td style="font-weight:bold;width:50%;text-align:right;">Full Marks: ${maxTotal}</td>
+          </tr>
+          <tr><td colspan="2" style="padding-top:4px;"><strong>Project Title:</strong> ${esc(title)}</td></tr>
+          <tr><td colspan="2" style="padding-top:2px;"><strong>Group:</strong> ${esc(name)}</td></tr>
+          <tr><td colspan="2" style="padding-top:2px;"><strong>Supervisor:</strong> ${esc(supervisor)}</td></tr>
+          ${members ? `<tr><td colspan="2" style="padding-top:2px;"><strong>Members:</strong> ${esc(members)}</td></tr>` : ''}
+        </table>
 
-    <div style="margin-top:8px;font-size:12px;">
-      <strong>Comments:</strong>
-      ${commentText ? `<p style="margin:2px 0;">${esc(commentText)}</p>` : buildBlankLines(4)}
+        <table style="width:100%;border-collapse:collapse;font-size:10.5pt;margin:8px 0;" border="1" cellpadding="4">
+          <thead>
+            <tr style="background-color:#fafafa;">
+              <th style="width:6%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">S. No.</th>
+              <th style="width:40%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Component</th>
+              <th style="width:20%;text-align:left;padding:5px 8px;border:1px solid #000;font-weight:bold;">Evaluator</th>
+              <th style="width:10%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Full Marks</th>
+              <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Marks Obtained</th>
+              <th style="width:12%;text-align:center;padding:5px;border:1px solid #000;font-weight:bold;">Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+            <tr>
+              <td colspan="3" style="font-weight:bold;padding:5px 8px;border:1px solid #000;text-align:right;">Total Marks</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${maxTotal}</td>
+              <td style="text-align:center;padding:5px;font-weight:bold;border:1px solid #000;">${hasMarks ? total : ''}</td>
+              <td style="border:1px solid #000;"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${buildNote()}
+
+        <div style="font-size:11pt;margin:8px 0 6px 0;">
+          <strong>Total Marks Obtained (in words):</strong> <span style="display:inline-block;min-width:280px;border-bottom:1px solid #000;padding:0 6px;">${hasMarks ? esc(numberToWords(totalNum)) : '&nbsp;'}</span>
+        </div>
+
+        <div style="margin-top:8px;font-size:11pt;">
+          <strong>Comments:</strong>
+          ${commentText ? `<div style="min-height:36px;padding:4px 0;font-style:italic;">${esc(commentText)}</div>` : buildBlankLines(3)}
+        </div>
+
+        <div style="margin-top:6px;font-size:11pt;">
+          <strong>Suggestions &amp; recommendations:</strong>
+          ${suggestionText ? `<div style="min-height:48px;padding:4px 0;font-style:italic;">${esc(suggestionText)}</div>` : buildBlankLines(4)}
+        </div>
+
+        ${examinerBlocks}
+      </div>
     </div>
-    <div style="font-size:12px;">
-      <strong>Suggestions &amp; recommendations:</strong>
-      ${suggestionText ? `<p style="margin:2px 0;">${esc(suggestionText)}</p>` : buildBlankLines(8)}
-    </div>
-    ${examinerBlocks}
   </body></html>`;
 }
 
@@ -494,57 +748,142 @@ async function checkPrintAccess(req, res, type, id) {
   return true;
 }
 
+/** Boolean access check (no response side effects) for bulk downloads. */
+async function canAccessItem(req, type, id) {
+  if (req.user.role === 'MAINTAINER') return true;
+  if (req.user.role === 'COORDINATOR') {
+    const scope = await resolveCoordinatorScope(req.user);
+    const item = type === 'group'
+      ? await prisma.projectGroup.findUnique({
+          where: { id },
+          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
+        })
+      : await prisma.thesis.findUnique({
+          where: { id },
+          select: {
+            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+            student: { select: { programId: true } },
+            examinerAssignments: { select: { externalExaminerId: true } },
+          },
+        });
+    if (!item) return false;
+    const isAssignedExaminer = type === 'group'
+      ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
+      : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
+    const canManage = type === 'group'
+      ? await canManageGroupAsCoordinator(item, scope, req.user)
+      : await canManageThesisAsCoordinator(item, scope, req.user);
+    return canManage || item.supervisorId === req.user.id || isAssignedExaminer;
+  }
+  return true;
+}
+
+async function buildThesisHtml(id, scope = 'both') {
+  const thesis = await prisma.thesis.findUnique({
+    where: { id },
+    include: {
+      program: { select: { name: true, code: true } },
+      student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } },
+      supervisor: { select: { firstName: true, lastName: true, designation: true } },
+      externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
+      externalFinal: { select: { firstName: true, lastName: true, designation: true } },
+      evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+      evaluationComponents: true,
+    },
+  });
+  if (!thesis) return null;
+
+  const programName = thesis.program?.name || thesis.student?.program?.name || '';
+
+  const evalData = thesis.evaluationComponents.map(c => {
+    const e = thesis.evaluations.find(ev => ev.componentId === c.id);
+    return {
+      name: c.name,
+      evaluationType: c.evaluationType,
+      evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+        : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
+        : 'Coordinator',
+      maxMarks: c.maxMarks,
+      marks: e?.marks ?? null,
+      comment: e?.comment || null,
+      comments: e?.comments || null,
+      suggestions: e?.suggestions || null,
+      submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+    };
+  });
+
+  return buildMasterFormat({
+    title: thesis.title,
+    name: `${thesis.student.firstName} ${thesis.student.lastName}`,
+    supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+    supervisorDesignation: thesis.supervisor?.designation || '',
+    evaluations: evalData,
+    student: thesis.student || null,
+    externalMidTerm: thesis.externalMidTerm || null,
+    externalFinal: thesis.externalFinal || null,
+    projectType: thesis.projectType,
+    programName,
+  }, scope);
+}
+
+async function buildGroupHtml(id) {
+  const group = await prisma.projectGroup.findUnique({
+    where: { id },
+    include: {
+      program: { select: { name: true, code: true } },
+      supervisor: { select: { firstName: true, lastName: true } },
+      members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } } } },
+      evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
+      evaluationComponents: true,
+    },
+  });
+  if (!group) return null;
+
+  const projectType = group.projectType;
+  const maxTotal = projectType === 'MAJOR' ? 100 : 50;
+  const total = group.evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+  const programName = group.program?.name || group.members?.[0]?.student?.program?.name || '';
+
+  const memberList = group.members.map(m =>
+    `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
+  ).join(', ');
+
+  const evalData = group.evaluationComponents.map(c => {
+    const e = group.evaluations.find(ev => ev.componentId === c.id);
+    return {
+      name: c.name,
+      evaluatorRole: c.evaluatorRole === 'COORDINATOR' ? 'Coordinator'
+        : c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
+        : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner' : c.evaluatorRole,
+      maxMarks: c.maxMarks,
+      marks: e?.marks ?? null,
+      comment: e?.comment || null,
+      comments: e?.comments || null,
+      suggestions: e?.suggestions || null,
+      submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
+    };
+  });
+
+  return buildBachelorFormat({
+    title: group.projectTitle,
+    name: group.name,
+    supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
+    members: memberList,
+    evaluations: evalData,
+    projectType,
+    total: total.toFixed(1),
+    maxTotal,
+    programName,
+  });
+}
+
 exports.printGroupEvaluation = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const granted = await checkPrintAccess(req, res, 'group', id);
     if (!granted) return;
-    const group = await prisma.projectGroup.findUnique({
-      where: { id },
-      include: {
-        supervisor: { select: { firstName: true, lastName: true } },
-        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
-        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
-        evaluationComponents: true,
-      },
-    });
-    if (!group) return res.status(404).json({ error: 'Group not found' });
-
-    const evaluations = group.evaluations;
-    const projectType = group.projectType;
-    const maxTotal = projectType === 'MAJOR' ? 100 : 50;
-    const total = evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
-
-    const memberList = group.members.map(m =>
-      `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
-    ).join(', ');
-
-    const evalData = group.evaluationComponents.map(c => {
-      const e = evaluations.find(ev => ev.componentId === c.id);
-      return {
-        name: c.name,
-        evaluatorRole: c.evaluatorRole === 'COORDINATOR' ? 'Coordinator'
-          : c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
-          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'Internal Examiner' : c.evaluatorRole,
-        maxMarks: c.maxMarks,
-        marks: e?.marks ?? null,
-        comment: e?.comment || null,
-        comments: e?.comments || null,
-        suggestions: e?.suggestions || null,
-        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
-      };
-    });
-
-    const html = buildBachelorFormat({
-      title: group.projectTitle,
-      name: group.name,
-      supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
-      members: memberList,
-      evaluations: evalData,
-      projectType,
-      total: total.toFixed(1),
-      maxTotal,
-    });
+    const html = await buildGroupHtml(id);
+    if (!html) return res.status(404).json({ error: 'Group not found' });
 
     const pdf = await generatePdf(html);
     sendPdf(res, pdf, `evaluation_${id}.pdf`);
@@ -559,55 +898,46 @@ exports.printThesisEvaluation = async (req, res) => {
     const id = parseInt(req.params.id);
     const granted = await checkPrintAccess(req, res, 'thesis', id);
     if (!granted) return;
-    const thesis = await prisma.thesis.findUnique({
-      where: { id },
-      include: {
-        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
-        supervisor: { select: { firstName: true, lastName: true, designation: true } },
-        externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
-        externalFinal: { select: { firstName: true, lastName: true, designation: true } },
-        evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
-        evaluationComponents: true,
-      },
-    });
-    if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
-
-    const evaluations = thesis.evaluations;
-
-    const evalData = thesis.evaluationComponents.map(c => {
-      const e = evaluations.find(ev => ev.componentId === c.id);
-      return {
-        name: c.name,
-        evaluationType: c.evaluationType,
-        evaluatorRole: c.evaluatorRole === 'SUPERVISOR' ? 'Supervisor'
-          : c.evaluatorRole === 'EXTERNAL_EXAMINER' ? 'External Examiner'
-          : 'Coordinator',
-        maxMarks: c.maxMarks,
-        marks: e?.marks ?? null,
-        comment: e?.comment || null,
-        comments: e?.comments || null,
-        suggestions: e?.suggestions || null,
-        submittedBy: e?.submittedBy ? `${e.submittedBy.firstName} ${e.submittedBy.lastName}` : null,
-      };
-    });
-
     const scope = req.query.scope || 'both';
-    const html = buildMasterFormat({
-      title: thesis.title,
-      name: `${thesis.student.firstName} ${thesis.student.lastName}`,
-      supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
-      supervisorDesignation: thesis.supervisor?.designation || '',
-      evaluations: evalData,
-      student: thesis.student || null,
-      externalMidTerm: thesis.externalMidTerm || null,
-      externalFinal: thesis.externalFinal || null,
-    }, scope);
+    const html = await buildThesisHtml(id, scope);
+    if (!html) return res.status(404).json({ error: 'Thesis not found' });
 
     const pdf = await generatePdf(html);
     const scopeLabel = scope === 'supervisor' ? 'supervisor' : scope === 'external' ? 'external' : scope === 'external-midterm' ? 'external-midterm' : scope === 'external-final' ? 'external-final' : 'full';
     sendPdf(res, pdf, `thesis_evaluation_${id}_${scopeLabel}.pdf`);
   } catch (error) {
     console.error('printThesisEvaluation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.bulkEvaluationPdf = async (req, res) => {
+  try {
+    const { type, ids, scope } = req.body || {};
+    const kind = type === 'group' ? 'group' : 'thesis';
+    const idList = (Array.isArray(ids) ? ids : []).map(Number).filter(Boolean);
+    if (!idList.length) return res.status(400).json({ error: 'No items selected' });
+
+    const pages = [];
+    for (const id of idList) {
+      if (!(await canAccessItem(req, kind, id))) continue;
+      const html = kind === 'group' ? await buildGroupHtml(id) : await buildThesisHtml(id, scope || 'both');
+      if (!html) continue;
+      pages.push(`<div style="page-break-after:always;">${html}</div>`);
+    }
+    if (!pages.length) return res.status(403).json({ error: 'None of the selected items are within your access scope.' });
+
+    const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bulk Evaluation PDFs</title>
+  <style>
+    body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12px; line-height: 1.4; margin: 0; padding: 0; }
+    table { border-color: #000; }
+    td, th { border-color: #000; vertical-align: top; }
+  </style></head><body>${pages.join('')}</body></html>`;
+
+    const pdf = await generatePdf(doc);
+    sendPdf(res, pdf, `${kind === 'group' ? 'projects' : 'theses'}_evaluations_${Date.now()}.pdf`);
+  } catch (error) {
+    console.error('bulkEvaluationPdf error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -621,8 +951,9 @@ exports.previewGroupEvaluation = async (req, res) => {
     const group = await prisma.projectGroup.findUnique({
       where: { id },
       include: {
+        program: { select: { name: true, code: true } },
         supervisor: { select: { firstName: true, lastName: true } },
-        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } } } },
+        members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
       },
@@ -633,6 +964,7 @@ exports.previewGroupEvaluation = async (req, res) => {
     const projectType = group.projectType;
     const maxTotal = projectType === 'MAJOR' ? 100 : 50;
     const total = evaluations.reduce((s, e) => s + (e.marks ?? 0), 0);
+    const programName = group.program?.name || group.members?.[0]?.student?.program?.name || '';
 
     const memberList = group.members.map(m =>
       `${esc(m.student.firstName)} ${esc(m.student.lastName)} (${esc(m.rollNumber)})`
@@ -663,6 +995,7 @@ exports.previewGroupEvaluation = async (req, res) => {
       projectType,
       total: total.toFixed(1),
       maxTotal,
+      programName,
     });
 
     res.setHeader('Content-Type', 'text/html');
@@ -681,7 +1014,8 @@ exports.previewThesisEvaluation = async (req, res) => {
     const thesis = await prisma.thesis.findUnique({
       where: { id },
       include: {
-        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true } },
+        program: { select: { name: true, code: true } },
+        student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } },
         supervisor: { select: { firstName: true, lastName: true, designation: true } },
         externalMidTerm: { select: { firstName: true, lastName: true, designation: true } },
         externalFinal: { select: { firstName: true, lastName: true, designation: true } },
@@ -690,6 +1024,8 @@ exports.previewThesisEvaluation = async (req, res) => {
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });
+
+    const programName = thesis.program?.name || thesis.student?.program?.name || '';
 
     const evaluations = thesis.evaluations;
 
@@ -720,6 +1056,8 @@ exports.previewThesisEvaluation = async (req, res) => {
       student: thesis.student || null,
       externalMidTerm: thesis.externalMidTerm || null,
       externalFinal: thesis.externalFinal || null,
+      projectType: thesis.projectType,
+      programName,
     }, scope);
 
     res.setHeader('Content-Type', 'text/html');

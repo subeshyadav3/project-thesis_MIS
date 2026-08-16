@@ -118,6 +118,7 @@ export default function AuditLog() {
                     <th>Entity</th>
                     <th>Details</th>
                     <th>Performed By</th>
+                    <th>Program</th>
                     <th>Date</th>
                   </tr>
                 </thead>
@@ -128,6 +129,7 @@ export default function AuditLog() {
                       <td>{log.entity}{log.entityId ? ` #${log.entityId}` : ''}</td>
                       <td title={log.details || ''} style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || '—'}</td>
                       <td>{log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : 'System'}</td>
+                      <td>{log.program ? log.program.code : '—'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}

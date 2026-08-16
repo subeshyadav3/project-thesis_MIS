@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
@@ -25,26 +25,33 @@ function UserManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', confirmLabel: 'Confirm', onConfirm: () => {}, danger: false });
+  const [selectedIds, setSelectedIds] = useState([]);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isCoordinator = user.role === 'COORDINATOR';
   const isMaintainer = user.role === 'MAINTAINER';
   const isMasterCoordinator = isCoordinator && user.program?.degreeType === 'MASTER';
+  // Degree type auto-derives from the coordinator's program (backend enforces the
+  // same level), so the form preselects it; a Master coordinator → MASTER, a
+  // Bachelor coordinator → BACHELOR. Maintainer keeps BACHELOR as a default.
+  const studentDegreeType = isCoordinator ? (isMasterCoordinator ? 'MASTER' : 'BACHELOR') : 'BACHELOR';
   const toast = useToast();
 
   const allowedRoles = isCoordinator ? COORDINATOR_ALLOWED_ROLES : ['MAINTAINER', 'COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
 
-  const loadUsers = () => {
+  const loadUsers = useCallback(() => {
     setLoading(true);
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {}).finally(() => setLoading(false));
-  };
+    api.get('/users').then(({ data }) => setUsers(data)).catch(() => toast.error('Failed to load users')).finally(() => setLoading(false));
+  }, []);
   useEffect(() => {
     loadUsers();
-    api.get('/departments/programs').then(({ data }) => setPrograms(data)).catch(() => {});
-    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => {});
-  }, []);
+    api.get('/departments/programs').then(({ data }) => setPrograms(data)).catch(() => toast.error('Failed to load programs'));
+    api.get('/departments').then(({ data }) => setDepartments(data)).catch(() => toast.error('Failed to load departments'));
+  }, [loadUsers]);
 
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filters]);
+  // Clear selections when the visible set changes
+  useEffect(() => { setSelectedIds([]); }, [searchTerm, filters, currentPage]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,7 +78,7 @@ function UserManagement() {
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+      setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: studentDegreeType, programId: '', rollNumber: '', designation: '' });
       loadUsers();
     } catch (err) {
       toast.error(err.response?.data?.error || 'An error occurred');
@@ -114,6 +121,58 @@ function UserManagement() {
     });
   };
 
+  const handleBulkDelete = () => {
+    const targets = users.filter(u => selectedIds.includes(u.id));
+    if (targets.length === 0) return;
+    const names = targets.slice(0, 5).map(u => `${u.firstName} ${u.lastName}`).join(', ') + (targets.length > 5 ? ` +${targets.length - 5} more` : '');
+    setConfirmDialog({
+      open: true,
+      title: `Delete ${targets.length} users`,
+      message: `Are you sure you want to delete ${targets.length} user(s)? This action cannot be undone.`,
+      confirmLabel: 'Delete All',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const { data } = await api.post('/users/bulk-delete', { ids: selectedIds });
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          if (data.deleted?.length) toast.success(`${data.deleted.length} user(s) deleted successfully`);
+          const errors = data.errors || [];
+          if (errors.length) {
+            const summary = errors.slice(0, 3).map(e => {
+              let msg = e.error;
+              if (e.details) {
+                const links = [];
+                if (e.details.groups) links.push(`${e.details.groups} group(s)`);
+                if (e.details.theses) links.push(`${e.details.theses} thesis(es)`);
+                if (e.details.supervisedGroups) links.push(`${e.details.supervisedGroups} supervised group(s)`);
+                if (e.details.supervisedTheses) links.push(`${e.details.supervisedTheses} supervised thesis(es)`);
+                if (e.details.examinerAssignments) links.push(`${e.details.examinerAssignments} examiner assignment(s)`);
+                if (links.length) msg += ` — ${links.join(', ')}`;
+              }
+              return `${e.name || `User #${e.id}`}: ${msg}`;
+            }).join('. ');
+            toast.error(`${errors.length} not deleted — ${summary}${errors.length > 3 ? '...' : ''}`);
+          }
+          setSelectedIds([]);
+          loadUsers();
+        } catch (err) {
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+          toast.error(err.response?.data?.error || 'Error deleting users');
+        }
+      },
+    });
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectPage = () => {
+    const pageIds = paginatedUsers.map(u => u.id);
+    const allSelected = pageIds.every(id => selectedIds.includes(id));
+    setSelectedIds(prev => allSelected ? prev.filter(id => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])]);
+  };
+
   const openEdit = (u) => {
     setEditUser(u);
     setForm({
@@ -132,7 +191,7 @@ function UserManagement() {
 
   const openCreate = () => {
     setEditUser(null);
-    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: 'BACHELOR', programId: '', rollNumber: '', designation: '' });
+    setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: studentDegreeType, programId: '', rollNumber: '', designation: '' });
     setShowModal(true);
   };
 
@@ -232,6 +291,11 @@ function UserManagement() {
             </div>
           </div>
           <div className="table-toolbar-right">
+            {selectedIds.length > 0 && (
+              <button className="btn btn-sm btn-danger" onClick={handleBulkDelete}>
+                <Icon name="delete_sweep" className="material-symbols-outlined" /> Delete Selected ({selectedIds.length})
+              </button>
+            )}
             <span className="font-label text-xs font-semibold text-on-surface-variant">{filteredUsers.length} users</span>
           </div>
         </div>
@@ -295,6 +359,9 @@ function UserManagement() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input type="checkbox" checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedIds.includes(u.id))} onChange={toggleSelectPage} />
+                  </th>
                   <th>User</th>
                   <th>Email / Roll</th>
                   <th>Role</th>
@@ -307,7 +374,10 @@ function UserManagement() {
               </thead>
               <tbody>
                 {paginatedUsers.map(u => (
-                  <tr key={u.id}>
+                  <tr key={u.id} className={selectedIds.includes(u.id) ? 'selected-row' : ''}>
+                    <td>
+                      <input type="checkbox" checked={selectedIds.includes(u.id)} onChange={() => toggleSelect(u.id)} />
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="default-badge">
@@ -426,7 +496,21 @@ function UserManagement() {
               </div>
               <div className="form-group">
                 <label>Email</label>
-                <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required placeholder="email@example.com" />
+                <input
+                  type="email"
+                  value={form.role === 'STUDENT' ? (form.rollNumber ? `${form.rollNumber.toLowerCase()}@pcampus.edu.np` : '') : form.email}
+                  onChange={e => setForm({...form, email: e.target.value})}
+                  required
+                  disabled={form.role === 'STUDENT'}
+                  placeholder={form.role === 'STUDENT' ? 'auto-generated from roll number' : 'e.g. ram.yadav@pcampus.edu.np'}
+                  pattern={form.role === 'STUDENT' ? undefined : '[a-zA-Z0-9._%+-]+@pcampus\\.edu\\.np'}
+                  title={form.role === 'STUDENT' ? 'Student email is auto-generated from the roll number' : 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)'}
+                />
+                <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
+                  {form.role === 'STUDENT'
+                    ? 'Auto-generated as {rollNumber}@pcampus.edu.np (typed email is ignored)'
+                    : 'Must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)'}
+                </span>
               </div>
               <div className="form-group">
                 <label>Password {editUser && '(leave blank to keep)'}</label>
@@ -434,7 +518,15 @@ function UserManagement() {
               </div>
               <div className="form-group">
                 <label>Role</label>
-                <select value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
+                <select
+                  value={form.role}
+                  onChange={e => setForm({
+                    ...form,
+                    role: e.target.value,
+                    // Preselect the coordinator's own degree level when adding a student
+                    ...(e.target.value === 'STUDENT' ? { degreeType: studentDegreeType } : {}),
+                  })}
+                >
                   {allowedRoles.map(r => (
                     <option key={r} value={r}>{r.replace('_', ' ')}</option>
                   ))}
@@ -472,7 +564,7 @@ function UserManagement() {
                 <>
                   <div className="form-group">
                     <label>Degree Type</label>
-                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})}>
+                    <select value={form.degreeType} onChange={e => setForm({...form, degreeType: e.target.value})} disabled={isCoordinator}>
                       <option value="BACHELOR">Bachelor</option>
                       <option value="MASTER">Master</option>
                     </select>

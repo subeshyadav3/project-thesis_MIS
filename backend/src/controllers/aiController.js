@@ -1,5 +1,7 @@
 
 const prisma = require('../utils/prisma');
+const { parseId } = require('../utils/params');
+const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -183,7 +185,8 @@ async function loadCandidates(req, proposalId, scope) {
 
 exports.summarize = async (req, res) => {
   try {
-    const proposalId = parseInt(req.params.id);
+    const proposalId = parseId(req, res);
+    if (proposalId === null) return;
     const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
     if (!proposal) return res.status(404).json({ error: 'Document not found' });
     const filePath = getStoragePath(proposal.documentUrl);
@@ -194,14 +197,15 @@ exports.summarize = async (req, res) => {
       custom_prompt: req.body?.custom_prompt || undefined,
     }, res);
   } catch (e) {
-    console.error('AI summarize error:', e.message);
+    logger.error('AI summarize error:', e.message);
     if (!res.headersSent) res.status(500).json({ error: e.message || 'AI service unavailable' });
   }
 };
 
 exports.evaluate = async (req, res) => {
   try {
-    const proposalId = parseInt(req.params.id);
+    const proposalId = parseId(req, res);
+    if (proposalId === null) return;
     const { criteria: rawCriteria, custom_instructions } = req.body;
     if (!rawCriteria || !Array.isArray(rawCriteria) || rawCriteria.length === 0) {
       return res.status(400).json({ error: 'criteria array is required' });
@@ -222,14 +226,15 @@ exports.evaluate = async (req, res) => {
       custom_instructions: custom_instructions || undefined,
     }, res);
   } catch (e) {
-    console.error('AI evaluate error:', e.message);
+    logger.error('AI evaluate error:', e.message);
     if (!res.headersSent) res.status(500).json({ error: e.message || 'AI service unavailable' });
   }
 };
 
 exports.ask = async (req, res) => {
   try {
-    const proposalId = parseInt(req.params.id);
+    const proposalId = parseId(req, res);
+    if (proposalId === null) return;
     const { question } = req.body;
     if (!question?.trim()) return res.status(400).json({ error: 'question is required' });
     const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
@@ -242,81 +247,17 @@ exports.ask = async (req, res) => {
       document_type: proposal.documentType || 'PROPOSAL',
     }, res);
   } catch (e) {
-    console.error('AI ask error:', e.message);
+    logger.error('AI ask error:', e.message);
     if (!res.headersSent) res.status(500).json({ error: e.message || 'AI service unavailable' });
   }
 };
 
-exports.embed = async (req, res) => {
-  try {
-    const proposalId = parseInt(req.params.id);
-    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
-    if (!proposal) return res.status(404).json({ error: 'Document not found' });
 
-    const filePath = getStoragePath(proposal.documentUrl);
-    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Document file not found' });
-
-    await prisma.documentEmbedding.upsert({
-      where: { proposalId },
-      update: { status: 'PENDING', error: null },
-      create: { proposalId, status: 'PENDING', model: 'ai-service', documentType: proposal.documentType || 'PROPOSAL' },
-    });
-
-    let data;
-    try {
-      const text = await extractText(filePath);
-      data = await callAI('/api/ai/embed', {
-        proposal_id: proposalId,
-        document_text: text,
-        document_type: proposal.documentType || 'PROPOSAL',
-      });
-    } catch (e) {
-      await prisma.documentEmbedding.update({
-        where: { proposalId },
-        data: { status: 'FAILED', error: String(e.message || e).slice(0, 250) },
-      });
-      throw e;
-    }
-
-    const stored = await prisma.documentEmbedding.update({
-      where: { proposalId },
-      data: {
-        status: 'OK',
-        vector: data.vector || [],
-        model: 'ai-service',
-        charCount: data.char_count || 0,
-        documentType: proposal.documentType || 'PROPOSAL',
-        error: null,
-      },
-    });
-
-    res.json({
-      vector_dim: data.vector_dim,
-      char_count: stored.charCount,
-      embedding_id: stored.id,
-      status: stored.status,
-    });
-  } catch (e) {
-    console.error('AI embed error:', e.message);
-    res.status(500).json({ error: e.message || 'AI service unavailable' });
-  }
-};
-
-exports.listCandidates = async (req, res) => {
-  try {
-    const proposalId = parseInt(req.params.id);
-    const scope = (req.query.scope || 'all').toString();
-    const result = await loadCandidates(req, proposalId, scope);
-    res.json(result);
-  } catch (e) {
-    console.error('listCandidates error:', e.message);
-    res.status(500).json({ error: e.message || 'Failed to list candidates' });
-  }
-};
 
 exports.similarity = async (req, res) => {
   try {
-    const proposalId = parseInt(req.params.id);
+    const proposalId = parseId(req, res);
+    if (proposalId === null) return;
     const { scope = 'all', top_k = 5, threshold = 0, candidate_ids = null } = req.body || {};
     const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
     if (!proposal) return res.status(404).json({ error: 'Document not found' });
@@ -348,7 +289,7 @@ exports.similarity = async (req, res) => {
 
     res.json({ scope, compared: data.compared || candidates.length, matches: enriched });
   } catch (e) {
-    console.error('AI similarity error:', e.message);
+    logger.error('AI similarity error:', e.message);
     res.status(500).json({ error: e.message || 'AI service unavailable' });
   }
 };

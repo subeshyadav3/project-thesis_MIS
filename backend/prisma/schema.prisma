@@ -25,6 +25,11 @@ enum DegreeType {
   MASTER
 }
 
+enum MasterProjectType {
+  PROJECT
+  THESIS
+}
+
 enum GroupStatus {
   PENDING
   ACTIVE
@@ -87,9 +92,9 @@ model Announcement {
   studentIds      Int[]               @default([])
   batch           String?
   academicYearId  Int
-  academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id])
+  academicYear    AcademicYear        @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   departmentId    Int
-  department      Department          @relation(fields: [departmentId], references: [id])
+  department      Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   startDate       DateTime?
   expirationDate  DateTime?
   allowGroupFormation Boolean          @default(false)
@@ -220,12 +225,13 @@ model Program {
   cluster      String?
   coordinatorId Int?    @unique
   coordinator   User?    @relation("CoordinatorProgram", fields: [coordinatorId], references: [id])
-  department   Department  @relation(fields: [departmentId], references: [id])
+  department   Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   createdAt    DateTime    @default(now())
 
   students User[]        @relation("StudentProgram")
   groups   ProjectGroup[]
   theses   Thesis[]
+  auditLogs AuditLog[]
 }
 
 model AcademicYear {
@@ -233,7 +239,7 @@ model AcademicYear {
   year         String
   semester     String
   departmentId Int
-  department   Department   @relation(fields: [departmentId], references: [id])
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   isActive     Boolean      @default(false)
   createdAt    DateTime     @default(now())
 
@@ -258,6 +264,7 @@ model ProjectGroup {
   supervisor     User?               @relation("SupervisedGroups", fields: [supervisorId], references: [id])
   programId      Int?
   program        Program?            @relation(fields: [programId], references: [id])
+  forwardedToExamDept Boolean        @default(false)
   academicYearId Int?
   academicYear   AcademicYear?       @relation(fields: [academicYearId], references: [id])
   announcementId Int?
@@ -300,7 +307,7 @@ model Thesis {
   id             Int          @id @default(autoincrement())
   title          String
   description    String       @default("")
-  projectType    String       @default("MASTER")
+  projectType    MasterProjectType @default(THESIS)
   studentId      Int
   student        User         @relation("StudentTheses", fields: [studentId], references: [id])
   status         ThesisStatus @default(PENDING)
@@ -316,6 +323,7 @@ model Thesis {
   crossProgramRequestedBy   User?   @relation("CrossProgramRequester", fields: [crossProgramRequestedById], references: [id], onDelete: SetNull)
   programId      Int?
   program        Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  forwardedToExamDept Boolean @default(false)
   cluster        String?
   batch          String?
   startDate      DateTime?
@@ -526,11 +534,14 @@ model AuditLog {
   details     String?
   performedById Int?
   performedBy User?    @relation(fields: [performedById], references: [id])
+  programId   Int?
+  program     Program? @relation(fields: [programId], references: [id])
   createdAt   DateTime @default(now())
 
   @@index([entity])
   @@index([entityId])
   @@index([performedById])
+  @@index([programId])
   @@index([createdAt])
 }
 

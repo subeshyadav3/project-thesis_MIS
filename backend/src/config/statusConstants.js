@@ -1,0 +1,39 @@
+
+/**
+ * Shared domain statuses. Single source of truth so a typo can never
+ * silently break a filter or a transition check.
+ */
+const GROUP_STATUS = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  OVERDUE: 'OVERDUE',
+  REJECTED: 'REJECTED',
+};
+
+const THESIS_STATUS = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  OVERDUE: 'OVERDUE',
+  REJECTED: 'REJECTED',
+};
+
+const PROPOSAL_STATUS = {
+  VISIBLE: 'VISIBLE',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  REJECTED: 'REJECTED',
+};
+
+const SUPERVISOR_ASSIGNMENT_STATUS = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+};
+
+module.exports = {
+  GROUP_STATUS,
+  THESIS_STATUS,
+  PROPOSAL_STATUS,
+  SUPERVISOR_ASSIGNMENT_STATUS,
+};

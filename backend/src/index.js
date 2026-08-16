@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const logger = require('./utils/logger');
 const rateLimit = require('express-rate-limit');
 const { authenticate } = require('./middleware/auth');
 
@@ -28,6 +29,7 @@ const proposalCommentRoutes = require('./routes/proposalComments');
 const studentGroupRoutes = require('./routes/studentGroups');
 const aiRoutes = require('./routes/ai');
 const chatbotRoutes = require('./routes/chatbot');
+const filesAuditRoutes = require('./routes/files-audit');
 const errorHandler = require('./middleware/errorHandler');
 const uploadController = require('./controllers/uploadController');
 
@@ -78,6 +80,7 @@ app.use('/api/student-groups', studentGroupRoutes);
 app.use('/api/proposals', proposalCommentRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/files-audit', filesAuditRoutes);
 app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
 app.delete('/api/upload/proposal/:proposalId', authenticate, uploadController.deleteProposal);
 
@@ -93,20 +96,57 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
+    const url = `/api/files/${type}/${filename}`;
+    const proposal = await prisma.proposal.findFirst({ where: { documentUrl: url } });
+    const { canAccessProposal } = require('./utils/fileAccessPolicy');
+    if (proposal) {
+      if (!(await canAccessProposal(req.user, proposal))) return res.status(403).json({ error: 'Access denied' });
+    } else if (req.user.role === 'STUDENT') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     let filePath = path.join(__dirname, '..', 'storage', type, filename);
     if (!fs.existsSync(filePath)) {
       // Some uploads were historically stored under the sibling folder while their URL
       // referenced this one. Fall back so those links still resolve.
       const altType = type === 'theses' ? 'groups' : 'theses';
       const altPath = path.join(__dirname, '..', 'storage', altType, filename);
-      if (fs.existsSync(altPath)) return res.sendFile(altPath);
+      if (fs.existsSync(altPath)) {
+        res.sendFile(altPath);
+        return logDocumentView(req, type, filename);
+      }
       return res.status(404).json({ error: 'File not found' });
     }
     res.sendFile(filePath);
+    logDocumentView(req, type, filename);
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/** Audit document views/downloads by staff (students viewing their own docs are skipped). */
+async function logDocumentView(req, type, filename) {
+  try {
+    if (req.user.role === 'STUDENT') return;
+    const audit = require('./services/auditService');
+    const prisma = require('./utils/prisma');
+const logger = require('./utils/logger');
+    const url = `/api/files/${type}/${filename}`;
+    const proposal = await prisma.proposal.findFirst({
+      where: { documentUrl: url },
+      select: { id: true, thesis: { select: { title: true } }, group: { select: { projectTitle: true } } },
+    });
+    const itemTitle = proposal?.thesis?.title || proposal?.group?.projectTitle || filename;
+    audit.log({
+      action: 'VIEW',
+      entity: proposal ? 'Proposal' : 'Document',
+      entityId: proposal ? proposal.id : null,
+      details: `${req.user.role === 'COORDINATOR' ? 'Coordinator' : req.user.role === 'SUPERVISOR' ? 'Supervisor' : 'Examiner'} downloaded "${itemTitle}" (${filename})`,
+      performedById: req.user.id,
+    });
+  } catch (e) {
+    logger.error('document view audit error:', e.message);
+  }
+}
 
 app.get('/api/stats', authenticate, async (req, res) => {
   try {
@@ -156,7 +196,15 @@ app.get('/api/stats', authenticate, async (req, res) => {
     const supervisorAssignmentAccepted = supervisorAssignmentAcceptedThesis + supervisorAssignmentAcceptedGroup;
     const supervisorAssignmentRejected = supervisorAssignmentRejectedThesis + supervisorAssignmentRejectedGroup;
     const formCreatedTheses = await prisma.thesis.count({ where: { ...thesisFilter, createdVia: 'FORM' } });
-    const pendingLateProposals = await prisma.proposal.count({ where: { status: 'PENDING_APPROVAL' } });
+    const pendingLateProposals = await prisma.proposal.count({
+      where: {
+        status: 'PENDING_APPROVAL',
+        OR: [
+          { thesis: thesisFilter },
+          { group: { ...yearFilter, ...programFilter } },
+        ],
+      },
+    });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
       pendingGroups, activeGroups, completedGroups, pendingTheses, activeTheses, completedTheses,
@@ -192,5 +240,5 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });

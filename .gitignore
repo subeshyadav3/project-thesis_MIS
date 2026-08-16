@@ -5,7 +5,6 @@ node_modules/
 .env
 .env.local
 .env.*.local
-.env.example
 
 # Build output
 dist/
@@ -41,12 +40,12 @@ __pycache__/
 **/generate_sample_excel.js
 **/sample_*.xlsx
 
-# Planning docs
-PLAN.md
+# graphify — regenerable artifacts, not committed
+graphify-out/
 
-# MiMoCode internal
-.mimocode/
-
-# Kimchi internal
-.kimchi/
+# Agents
+.Agents
+AGENTS.MD
+.opencode
 backend/nul
+.gitattributes

@@ -44,7 +44,7 @@ function MasterThesis() {
   const [showDetail, setShowDetail] = useState(null);
   const [detailMode, setDetailMode] = useState('view');
   const todayStr = new Date().toISOString().split('T')[0];
-  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+  const [createForm, setCreateForm] = useState({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', projectType: 'THESIS', startDate: todayStr, endDate: '' });
   const [creating, setCreating] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [editStartDate, setEditStartDate] = useState('');
@@ -53,10 +53,12 @@ function MasterThesis() {
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, danger: false });
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [supervisorFilter, setSupervisorFilter] = useState('ALL');
   const [assignmentFilter, setAssignmentFilter] = useState('ALL');
   const [programScopeFilter, setProgramScopeFilter] = useState('MY_PROGRAM');
   const [batchFilter, setBatchFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('DEFAULT');
   const [coordinatorProgram, setCoordinatorProgram] = useState(null);
 
   const normalizeBatch = (v) => {
@@ -78,6 +80,14 @@ function MasterThesis() {
   const [createSupSearch, setCreateSupSearch] = useState('');
   const [createSupOpen, setCreateSupOpen] = useState(false);
   const createSupRef = useRef(null);
+  const [createMidTermExamId, setCreateMidTermExamId] = useState('');
+  const [createMidTermExamSearch, setCreateMidTermExamSearch] = useState('');
+  const [createMidTermExamOpen, setCreateMidTermExamOpen] = useState(false);
+  const createMidTermExamRef = useRef(null);
+  const [createFinalExamId, setCreateFinalExamId] = useState('');
+  const [createFinalExamSearch, setCreateFinalExamSearch] = useState('');
+  const [createFinalExamOpen, setCreateFinalExamOpen] = useState(false);
+  const createFinalExamRef = useRef(null);
   const [examiners, setExaminers] = useState([]);
   const [editSupId, setEditSupId] = useState('');
   const [editMidTermExamId, setEditMidTermExamId] = useState('');
@@ -294,14 +304,26 @@ const handleComplete = async (id) => {
     e.preventDefault();
     setCreating(true);
     try {
-      const res = await api.post('/theses', createForm);
+      const isProj = createForm.projectType === 'PROJECT';
+      const payload = {
+        ...createForm,
+        supervisorId: isProj ? null : (createForm.supervisorId || null),
+        externalMidTermId: isProj ? null : (createMidTermExamId || null),
+        externalFinalId: isProj ? (createFinalExamId || null) : (createFinalExamId || null),
+      };
+      const res = await api.post('/theses', payload);
       if (res.data?.crossProgram) {
-        toast.info('Thesis created. The student\'s coordinator has been notified.');
+        toast.info('Record created. The student\'s coordinator has been notified.');
       } else {
-        toast.success('Thesis created successfully');
+        toast.success(`${isProj ? 'Master Project' : 'Master Thesis'} created successfully`);
       }
       setShowCreate(false);
-      setCreateForm({ title: '', studentId: '', supervisorId: '', status: 'ACTIVE', startDate: todayStr, endDate: '' });
+      setCreateForm({ title: '', studentId: '', supervisorId: '', cluster: '', status: 'ACTIVE', projectType: 'THESIS', startDate: todayStr, endDate: '' });
+      setCreateMidTermExamId('');
+      setCreateMidTermExamSearch('');
+      setCreateFinalExamId('');
+      setCreateFinalExamSearch('');
+      setCreateSupSearch('');
       loadData();
     } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
     finally { setCreating(false); }
@@ -386,6 +408,7 @@ const handleComplete = async (id) => {
         (t.student?.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.student?.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+      const matchesType = typeFilter === 'ALL' || t.projectType === typeFilter;
       const matchesSupervisor = supervisorFilter === 'ALL'
         ? true
         : supervisorFilter === 'NONE'
@@ -407,16 +430,45 @@ const handleComplete = async (id) => {
         return normalizeBatch(b) === batchFilter;
       })();
 
-      return matchesSearch && matchesStatus && matchesSupervisor && matchesAssignment && matchesBatch;
+      return matchesSearch && matchesStatus && matchesType && matchesSupervisor && matchesAssignment && matchesBatch;
     });
-  }, [theses, searchQuery, statusFilter, supervisorFilter, assignmentFilter, programScopeFilter, batchFilter, coordinatorProgram]);
+  }, [theses, searchQuery, statusFilter, typeFilter, supervisorFilter, assignmentFilter, programScopeFilter, batchFilter, coordinatorProgram]);
 
   const sortedTheses = useMemo(() => {
     return [...filteredTheses].sort((a, b) => {
+      if (sortBy === 'DATE_DESC') {
+        const dateA = new Date(a.createdAt || a.startDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.startDate || 0).getTime();
+        return dateB - dateA;
+      }
+      if (sortBy === 'DATE_ASC') {
+        const dateA = new Date(a.createdAt || a.startDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.startDate || 0).getTime();
+        return dateA - dateB;
+      }
+      if (sortBy === 'ROLL_ASC') {
+        const rollA = a.student?.rollNumber || '';
+        const rollB = b.student?.rollNumber || '';
+        return rollA.localeCompare(rollB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortBy === 'ROLL_DESC') {
+        const rollA = a.student?.rollNumber || '';
+        const rollB = b.student?.rollNumber || '';
+        return rollB.localeCompare(rollA, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      if (sortBy === 'NAME_ASC') {
+        const nameA = `${a.student?.firstName || ''} ${a.student?.lastName || ''}`.trim();
+        const nameB = `${b.student?.firstName || ''} ${b.student?.lastName || ''}`.trim();
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'TITLE_ASC') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      // DEFAULT: Status order
       const statusOrder = { PENDING: 0, ACTIVE: 1, OVERDUE: 1, COMPLETED: 2 };
       return (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
     });
-  }, [filteredTheses]);
+  }, [filteredTheses, sortBy]);
 
   const totalPages = Math.ceil(sortedTheses.length / PAGE_SIZE);
   const paginatedTheses = sortedTheses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -468,7 +520,7 @@ const handleComplete = async (id) => {
       </button>
       <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
         <Icon name="add" className="material-symbols-outlined" />
-        Add Thesis
+        Add Project
       </button>
       <button className="btn btn-outline btn-sm" onClick={async () => {
         try {
@@ -549,7 +601,7 @@ return (
                   <span className="detail-label">Type</span>
                   <span className="badge badge-info">
                     <span className="dot" />
-                    Thesis
+                    {showDetail.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
                   </span>
                 </div>
                 <div className="detail-item" style={{ gridColumn: 'span 2' }}>
@@ -609,30 +661,47 @@ return (
                     {showDetail.status || 'PENDING'}
                   </span>
                 </div>
-                <div className="detail-item">
-                  <span className="detail-label">External (Mid-Term)</span>
-                  <span>
-                    {showDetail.externalMidTerm ? (
-                      <>{showDetail.externalMidTerm.firstName} {showDetail.externalMidTerm.lastName}</>
-                    ) : (
-                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
-                        <span className="dot" />Not Assigned
+                {showDetail.projectType !== 'PROJECT' ? (
+                  <>
+                    <div className="detail-item">
+                      <span className="detail-label">External (Mid-Term)</span>
+                      <span>
+                        {showDetail.externalMidTerm ? (
+                          <>{showDetail.externalMidTerm.firstName} {showDetail.externalMidTerm.lastName}</>
+                        ) : (
+                          <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                            <span className="dot" />Not Assigned
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">External (Final)</span>
-                  <span>
-                    {showDetail.externalFinal ? (
-                      <>{showDetail.externalFinal.firstName} {showDetail.externalFinal.lastName}</>
-                    ) : (
-                      <span className="badge badge-pending" style={{ fontSize: 10 }}>
-                        <span className="dot" />Not Assigned
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">External (Final)</span>
+                      <span>
+                        {showDetail.externalFinal ? (
+                          <>{showDetail.externalFinal.firstName} {showDetail.externalFinal.lastName}</>
+                        ) : (
+                          <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                            <span className="dot" />Not Assigned
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="detail-item">
+                    <span className="detail-label">External Examiner</span>
+                    <span>
+                      {showDetail.externalFinal || showDetail.externalMidTerm ? (
+                        <>{(showDetail.externalFinal || showDetail.externalMidTerm).firstName} {(showDetail.externalFinal || showDetail.externalMidTerm).lastName}</>
+                      ) : (
+                        <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                          <span className="dot" />Not Assigned
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -752,56 +821,58 @@ return (
                       )}
                     </div>
                   </div>
-                  <div className="form-group" ref={editMidTermExamRef} style={{ flex: 1, minWidth: 250 }}>
-                    <label>External Examiner (Mid-Term)</label>
-                    <div className="sup-dropdown-trigger">
-                      <div className="sup-search-wrapper" onClick={() => setEditMidTermExamOpen(true)}>
-                        <Icon name="search" className="material-symbols-outlined" />
-                        <input
-                          type="text"
-                          placeholder={editMidTermExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editMidTermExamId)) : 'No mid-term examiner'}
-                          value={editMidTermExamSearch}
-                          onChange={e => { setEditMidTermExamSearch(e.target.value); setEditMidTermExamOpen(true); }}
-                          onFocus={() => setEditMidTermExamOpen(true)}
-                        />
-                        {editMidTermExamId && (
-                          <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditMidTermExamId(''); setEditMidTermExamSearch(''); }}>
-                            <Icon name="close" className="material-symbols-outlined" />
-                          </button>
-                        )}
-                        <Icon name={editMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
-                      </div>
-                      {editMidTermExamOpen && (
-                        <div className="sup-dropdown">
-                          {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
-                            <div className="sup-dropdown-empty">No examiners found</div>
-                          ) : (
-                            examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
-                              const selected = editMidTermExamId === e.id.toString();
-                              return (
-                                <div
-                                  key={e.id}
-                                  className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                                  onClick={() => { setEditMidTermExamId(e.id.toString()); setEditMidTermExamSearch(''); setEditMidTermExamOpen(false); }}
-                                >
-                                  <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
-                                  <div className="sup-dropdown-item-info">
-                                    <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
-                                    <div className="sup-dropdown-item-email">{e.email}</div>
-                                  </div>
-                                  <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
-                                    {e.active ? 'Active' : 'Inactive'}
-                                  </div>
-                                </div>
-                              );
-                            })
+                  {showDetail.projectType !== 'PROJECT' && (
+                    <div className="form-group" ref={editMidTermExamRef} style={{ flex: 1, minWidth: 250 }}>
+                      <label>External Examiner (Mid-Term)</label>
+                      <div className="sup-dropdown-trigger">
+                        <div className="sup-search-wrapper" onClick={() => setEditMidTermExamOpen(true)}>
+                          <Icon name="search" className="material-symbols-outlined" />
+                          <input
+                            type="text"
+                            placeholder={editMidTermExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === editMidTermExamId)) : 'No mid-term examiner'}
+                            value={editMidTermExamSearch}
+                            onChange={e => { setEditMidTermExamSearch(e.target.value); setEditMidTermExamOpen(true); }}
+                            onFocus={() => setEditMidTermExamOpen(true)}
+                          />
+                          {editMidTermExamId && (
+                            <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setEditMidTermExamId(''); setEditMidTermExamSearch(''); }}>
+                              <Icon name="close" className="material-symbols-outlined" />
+                            </button>
                           )}
+                          <Icon name={editMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                         </div>
-                      )}
+                        {editMidTermExamOpen && (
+                          <div className="sup-dropdown">
+                            {examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).length === 0 ? (
+                              <div className="sup-dropdown-empty">No examiners found</div>
+                            ) : (
+                              examiners.filter(e => e.id.toString() !== editSupId && `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(editMidTermExamSearch.toLowerCase())).map(e => {
+                                const selected = editMidTermExamId === e.id.toString();
+                                return (
+                                  <div
+                                    key={e.id}
+                                    className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                    onClick={() => { setEditMidTermExamId(e.id.toString()); setEditMidTermExamSearch(''); setEditMidTermExamOpen(false); }}
+                                  >
+                                    <div className="sup-dropdown-item-avatar">{e.firstName?.[0]}{e.lastName?.[0]}</div>
+                                    <div className="sup-dropdown-item-info">
+                                      <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
+                                      <div className="sup-dropdown-item-email">{e.email}</div>
+                                    </div>
+                                    <div style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: e.active ? 'var(--color-success-container)' : 'var(--color-error-container)', color: e.active ? 'var(--color-on-success-container)' : 'var(--color-on-error-container)' }}>
+                                      {e.active ? 'Active' : 'Inactive'}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="form-group" ref={editFinalExamRef} style={{ flex: 1, minWidth: 250 }}>
-                    <label>External Examiner (Final)</label>
+                    <label>{showDetail.projectType === 'PROJECT' ? 'External Examiner' : 'External Examiner (Final)'}</label>
                     <div className="sup-dropdown-trigger">
                       <div className="sup-search-wrapper" onClick={() => setEditFinalExamOpen(true)}>
                         <Icon name="search" className="material-symbols-outlined" />
@@ -989,6 +1060,32 @@ return (
               <Icon name="delete" className="material-symbols-outlined" />
               Delete
             </button>
+            <button className="btn btn-sm btn-primary" onClick={() => {
+              const selected = selectedTheses;
+              if (selected.length === 0) return toast.warning('No theses selected');
+              setConfirmDialog({
+                open: true,
+                title: 'Download Evaluation PDFs',
+                message: `Download evaluation PDFs for ${selected.length} selected thesis(es)?`,
+                confirmLabel: 'Download',
+                onConfirm: async () => {
+                  try {
+                    const { data } = await api.post('/print/bulk-pdf', { type: 'thesis', ids: selected }, { responseType: 'blob' });
+                    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `theses_evaluations_${Date.now()}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success('Evaluation PDFs downloaded');
+                    setConfirmDialog(prev => ({ ...prev, open: false }));
+                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                },
+              });
+            }}>
+              <Icon name="download" className="material-symbols-outlined" />
+              Download PDFs
+            </button>
           </div>
         </div>
       )}
@@ -1014,10 +1111,29 @@ return (
             ]}
             allLabel="All Department Theses"
           />
+          <FilterDropdown label="Type" value={typeFilter} onChange={setTypeFilter} options={[
+            { value: 'THESIS', label: 'Thesis' },
+            { value: 'PROJECT', label: 'Project' },
+          ]} allLabel="All Types" />
           <FilterDropdown label="Assignment" value={assignmentFilter} onChange={setAssignmentFilter} options={THESIS_ASSIGNMENT_OPTIONS} allLabel="All Assignments" />
           <FilterDropdown label="Batch" value={batchFilter} onChange={setBatchFilter} options={batchOptions} allLabel="All Batches" />
           <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} allLabel="All Statuses" />
           <FilterDropdown label="Supervisor" value={supervisorFilter} onChange={setSupervisorFilter} options={supervisorOptions} allLabel="All Supervisors" />
+          <FilterDropdown
+            label="Sort By"
+            value={sortBy}
+            onChange={setSortBy}
+            options={[
+              { value: 'DEFAULT', label: 'Default (Status)' },
+              { value: 'DATE_DESC', label: 'Date Added (Newest)' },
+              { value: 'DATE_ASC', label: 'Date Added (Oldest)' },
+              { value: 'ROLL_ASC', label: 'Roll Number (Ascending)' },
+              { value: 'ROLL_DESC', label: 'Roll Number (Descending)' },
+              { value: 'NAME_ASC', label: 'Student Name (A–Z)' },
+              { value: 'TITLE_ASC', label: 'Title (A–Z)' },
+            ]}
+            allLabel="Default Sorting"
+          />
         </div>
 
         {loading ? (
@@ -1069,7 +1185,14 @@ return (
                         </span>
                       </div>
                     </td>
-                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.title}</td>
+                    <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                          {t.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                      </div>
+                    </td>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px' }}>
                       {t.supervisor ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1224,14 +1347,21 @@ return (
                 <Icon name="add" className="material-symbols-outlined" />
               </div>
               <div className="modal-header-text">
-                <h2>Create Thesis</h2>
-                <p>Add a new master's thesis record</p>
+                <h2>Create Thesis / Project</h2>
+                <p>Add a new master's thesis or project record</p>
               </div>
             </div>
             <form onSubmit={handleCreate}>
               <div className="form-group">
-                <label>Thesis Title</label>
-                <input value={createForm.title} onChange={e => setCreateForm({...createForm, title: e.target.value})} required placeholder="Enter thesis title" />
+                <label>Type</label>
+                <select value={createForm.projectType || 'THESIS'} onChange={e => setCreateForm({...createForm, projectType: e.target.value})}>
+                  <option value="THESIS">Thesis</option>
+                  <option value="PROJECT">Project</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Title</label>
+                <input value={createForm.title} onChange={e => setCreateForm({...createForm, title: e.target.value})} required placeholder="Enter thesis / project title" />
               </div>
               <div className="form-group">
                 <label>Research Project Cluster / Area <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
@@ -1318,87 +1448,143 @@ return (
                 <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
                 <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
-              <div className="form-group" ref={createSupRef}>
-                <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                <div className="sup-dropdown-trigger">
-                  <div className="sup-search-wrapper" onClick={() => setCreateSupOpen(true)}>
-                    <Icon name="search" className="material-symbols-outlined" />
-                    <input
-                      type="text"
-                      placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
-                      value={createSupSearch}
-                      onChange={e => { setCreateSupSearch(e.target.value); setCreateSupOpen(true); }}
-                      onFocus={() => setCreateSupOpen(true)}
-                    />
-                    {createForm.supervisorId && (
-                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, supervisorId: ''}); setCreateSupSearch(''); }}>
-                        <Icon name="close" className="material-symbols-outlined" />
-                      </button>
-                    )}
-                    <Icon name={createSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
-                  </div>
-                  {createSupOpen && (
-                    <div className="sup-dropdown">
-                      {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
-                        <div className="sup-dropdown-empty">No supervisors found</div>
-                      ) : (
-                        allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
-                          const selected = createForm.supervisorId === s.id.toString();
-                          return (
-                            <div
-                              key={s.id}
-                              className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                              onClick={() => { setCreateForm({...createForm, supervisorId: s.id.toString()}); setCreateSupSearch(''); setCreateSupOpen(false); }}
-                            >
-                              <div className="sup-dropdown-item-avatar">
-                                {s.firstName?.[0]}{s.lastName?.[0]}
-                              </div>
-                              <div className="sup-dropdown-item-info">
-                                <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
-                                <div className="sup-dropdown-item-email">{s.email}</div>
-                              </div>
-                              {selected && (
-                                <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
-                              )}
-                            </div>
-                          );
-                        })
+              {createForm.projectType !== 'PROJECT' && (
+                <div className="form-group" ref={createSupRef}>
+                  <label>Supervisor <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                  <div className="sup-dropdown-trigger">
+                    <div className="sup-search-wrapper" onClick={() => setCreateSupOpen(true)}>
+                      <Icon name="search" className="material-symbols-outlined" />
+                      <input
+                        type="text"
+                        placeholder={createForm.supervisorId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search supervisor...')(allSupervisors.find(s => s.id.toString() === createForm.supervisorId)) : 'Search supervisor...'}
+                        value={createSupSearch}
+                        onChange={e => { setCreateSupSearch(e.target.value); setCreateSupOpen(true); }}
+                        onFocus={() => setCreateSupOpen(true)}
+                      />
+                      {createForm.supervisorId && (
+                        <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, supervisorId: ''}); setCreateSupSearch(''); }}>
+                          <Icon name="close" className="material-symbols-outlined" />
+                        </button>
                       )}
+                      <Icon name={createSupOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                     </div>
-                  )}
+                    {createSupOpen && (
+                      <div className="sup-dropdown">
+                        {allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).length === 0 ? (
+                          <div className="sup-dropdown-empty">No supervisors found</div>
+                        ) : (
+                          allSupervisors.filter(s => `${s.designation ? s.designation + ' ' : ''}${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(createSupSearch.toLowerCase())).map(s => {
+                            const selected = createForm.supervisorId === s.id.toString();
+                            return (
+                              <div
+                                key={s.id}
+                                className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                onClick={() => { setCreateForm({...createForm, supervisorId: s.id.toString()}); setCreateSupSearch(''); setCreateSupOpen(false); }}
+                              >
+                                <div className="sup-dropdown-item-avatar">
+                                  {s.firstName?.[0]}{s.lastName?.[0]}
+                                </div>
+                                <div className="sup-dropdown-item-info">
+                                  <div className="sup-dropdown-item-name">{s.designation ? s.designation + ' ' : ''}{s.firstName} {s.lastName}</div>
+                                  <div className="sup-dropdown-item-email">{s.email}</div>
+                                </div>
+                                {selected && (
+                                  <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="form-group" ref={examRef}>
-                <label>Internal Examiner <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+              )}
+
+              {createForm.projectType !== 'PROJECT' && (
+                <div className="form-group" ref={createMidTermExamRef}>
+                  <label>External Examiner (Mid-Term) <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
+                  <div className="sup-dropdown-trigger">
+                    <div className="sup-search-wrapper" onClick={() => setCreateMidTermExamOpen(true)}>
+                      <Icon name="search" className="material-symbols-outlined" />
+                      <input
+                        type="text"
+                        placeholder={createMidTermExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search mid-term examiner...')(examiners.find(e => e.id.toString() === createMidTermExamId)) : 'Search mid-term examiner...'}
+                        value={createMidTermExamSearch}
+                        onChange={e => { setCreateMidTermExamSearch(e.target.value); setCreateMidTermExamOpen(true); }}
+                        onFocus={() => setCreateMidTermExamOpen(true)}
+                      />
+                      {createMidTermExamId && (
+                        <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateMidTermExamId(''); setCreateMidTermExamSearch(''); }}>
+                          <Icon name="close" className="material-symbols-outlined" />
+                        </button>
+                      )}
+                      <Icon name={createMidTermExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
+                    </div>
+                    {createMidTermExamOpen && (
+                      <div className="sup-dropdown">
+                        {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(createMidTermExamSearch.toLowerCase())).length === 0 ? (
+                          <div className="sup-dropdown-empty">No examiners found</div>
+                        ) : (
+                          examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(createMidTermExamSearch.toLowerCase())).map(e => {
+                            const selected = createMidTermExamId === e.id.toString();
+                            return (
+                              <div
+                                key={e.id}
+                                className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
+                                onClick={() => { setCreateMidTermExamId(e.id.toString()); setCreateMidTermExamSearch(''); setCreateMidTermExamOpen(false); }}
+                              >
+                                <div className="sup-dropdown-item-avatar">
+                                  {e.firstName?.[0]}{e.lastName?.[0]}
+                                </div>
+                                <div className="sup-dropdown-item-info">
+                                  <div className="sup-dropdown-item-name">{e.designation ? e.designation + ' ' : ''}{e.firstName} {e.lastName}</div>
+                                  <div className="sup-dropdown-item-email">{e.email}</div>
+                                </div>
+                                {selected && (
+                                  <Icon name="check_circle" className="material-symbols-outlined sup-dropdown-item-check" />
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group" ref={createFinalExamRef}>
+                <label>{createForm.projectType === 'PROJECT' ? 'External Examiner' : 'External Examiner (Final)'} <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
                 <div className="sup-dropdown-trigger">
-                  <div className="sup-search-wrapper" onClick={() => setExamOpen(true)}>
+                  <div className="sup-search-wrapper" onClick={() => setCreateFinalExamOpen(true)}>
                     <Icon name="search" className="material-symbols-outlined" />
                     <input
                       type="text"
-                      placeholder={createForm.examinerId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createForm.examinerId)) : 'Search examiner...'}
-                      value={examSearch}
-                      onChange={e => { setExamSearch(e.target.value); setExamOpen(true); }}
-                      onFocus={() => setExamOpen(true)}
+                      placeholder={createFinalExamId ? ((found) => found ? `${found.designation ? found.designation + ' ' : ''}${found.firstName} ${found.lastName}` : 'Search examiner...')(examiners.find(e => e.id.toString() === createFinalExamId)) : 'Search examiner...'}
+                      value={createFinalExamSearch}
+                      onChange={e => { setCreateFinalExamSearch(e.target.value); setCreateFinalExamOpen(true); }}
+                      onFocus={() => setCreateFinalExamOpen(true)}
                     />
-                    {createForm.examinerId && (
-                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateForm({...createForm, examinerId: ''}); setExamSearch(''); }}>
+                    {createFinalExamId && (
+                      <button className="sup-clear" onClick={(e) => { e.stopPropagation(); setCreateFinalExamId(''); setCreateFinalExamSearch(''); }}>
                         <Icon name="close" className="material-symbols-outlined" />
                       </button>
                     )}
-                    <Icon name={examOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
+                    <Icon name={createFinalExamOpen ? 'arrow_drop_up' : 'arrow_drop_down'} className="material-symbols-outlined sup-dropdown-arrow" />
                   </div>
-                  {examOpen && (
+                  {createFinalExamOpen && (
                     <div className="sup-dropdown">
-                      {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).length === 0 ? (
+                      {examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(createFinalExamSearch.toLowerCase())).length === 0 ? (
                         <div className="sup-dropdown-empty">No examiners found</div>
                       ) : (
-                        examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(examSearch.toLowerCase())).map(e => {
-                          const selected = createForm.examinerId === e.id.toString();
+                        examiners.filter(e => `${e.designation ? e.designation + ' ' : ''}${e.firstName} ${e.lastName} ${e.email}`.toLowerCase().includes(createFinalExamSearch.toLowerCase())).map(e => {
+                          const selected = createFinalExamId === e.id.toString();
                           return (
                             <div
                               key={e.id}
                               className={`sup-dropdown-item ${selected ? 'sup-dropdown-item-selected' : ''}`}
-                              onClick={() => { setCreateForm({...createForm, examinerId: e.id.toString()}); setExamSearch(''); setExamOpen(false); }}
+                              onClick={() => { setCreateFinalExamId(e.id.toString()); setCreateFinalExamSearch(''); setCreateFinalExamOpen(false); }}
                             >
                               <div className="sup-dropdown-item-avatar">
                                 {e.firstName?.[0]}{e.lastName?.[0]}

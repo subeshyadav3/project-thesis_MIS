@@ -21,7 +21,7 @@ const SCHEMES = {
       { type: 'EXTERNAL_EXAMINER', name: 'Internal Examiner', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
     ],
   },
-  MASTER: {
+  THESIS: {
     name: 'Master Thesis',
     totalMaxMarks: 300,
     components: [
@@ -31,13 +31,28 @@ const SCHEMES = {
       { type: 'SUPERVISOR', name: 'Understanding of thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
       { type: 'SUPERVISOR', name: 'Student effort and performance', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
       { type: 'SUPERVISOR', name: 'Organization of study', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'SUPERVISOR' },
-      // External (Mid-Term) criteria (5 × 20 = 100)
-      { type: 'EXTERNAL_MIDTERM', name: 'Literature Review & Background Study', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Research Methodology & Design', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Preliminary Work & Implementation Progress', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Presentation & Communication', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
-      { type: 'EXTERNAL_MIDTERM', name: 'Overall Progress & Planning', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      // External (Mid-Term) criteria per official PULCHOWK form (8 criteria, total 100)
+      { type: 'EXTERNAL_MIDTERM', name: 'Quality of presentation', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Problem Formulation / identification / conceptualization', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Methodology/Approach', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Literature review', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Understanding of thesis work and related theory', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Answering to questions', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Completeness of thesis work', maxMarks: 20, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_MIDTERM', name: 'Planning of organization of thesis work', maxMarks: 10, stage: 'MID_TERM', evaluatorRole: 'EXTERNAL_EXAMINER' },
       // External (Final) criteria (5 × 20 = 100)
+      { type: 'EXTERNAL_FINAL', name: 'Presentation Skills and Flow of Slides', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Defense & Question Handling', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Understanding of Thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Research Quality & Originality', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+      { type: 'EXTERNAL_FINAL', name: 'Report Writing', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
+    ],
+  },
+  PROJECT: {
+    name: 'Master Project',
+    totalMaxMarks: 100,
+    components: [
+      // External Examiner criteria (5 × 20 = 100) per official PULCHOWK form
       { type: 'EXTERNAL_FINAL', name: 'Presentation Skills and Flow of Slides', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
       { type: 'EXTERNAL_FINAL', name: 'Defense & Question Handling', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },
       { type: 'EXTERNAL_FINAL', name: 'Understanding of Thesis work & related theory', maxMarks: 20, stage: 'FINAL', evaluatorRole: 'EXTERNAL_EXAMINER' },

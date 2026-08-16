@@ -21,6 +21,7 @@ function Sidebar({ user, isOpen, onClose }) {
     { path: '/maintainer/users', label: 'User Management', icon: 'groups' },
     { path: '/maintainer/departments', label: 'Departments', icon: 'account_balance' },
     { path: '/maintainer/audit-log', label: 'Audit Logs', icon: 'history' },
+    { path: '/maintainer/files-audit', label: 'File Activity', icon: 'folder_open' },
   ];
 
   const degreeType = user?.program?.degreeType;
@@ -102,7 +103,12 @@ function Sidebar({ user, isOpen, onClose }) {
       <div className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-area">
-            <img src="https://ioe.tu.edu.np/assets/logo.png" alt="IOE Logo" className="sidebar-logo" />
+            <img
+              src="/ioe_logo.png"
+              onError={(e) => { e.currentTarget.src = 'https://ioe.tu.edu.np/assets/logo.png'; }}
+              alt="IOE Logo"
+              className="sidebar-logo"
+            />
             <div className="logo-text">
               <h2>TPMS</h2>
               <p>Thesis/Project Management System</p>

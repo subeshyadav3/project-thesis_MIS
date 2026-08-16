@@ -9,6 +9,7 @@ const { getDefaultComponents } = require('../config/evaluationScheme');
 const fuzzyMatch = require('../utils/fuzzyMatch');
 const { markOverdueItems } = require('../utils/checkOverdue');
 const { buildThesisWhereForCoordinator, resolveCoordinatorScope, isThesisVisibleToCoordinator, canManageThesisAsCoordinator } = require('../utils/coordinatorScope');
+const { assertValidStatusTransition } = require('../utils/statusTransitions');
 const { getEngagement } = require('../services/engagementGuard');
 
 const normalizeBatch = (batch) => {
@@ -79,7 +80,7 @@ exports.getThesis = async (req, res) => {
     if (!thesis.evaluationComponents || thesis.evaluationComponents.length === 0) {
       try {
         const { getDefaultComponents } = require('../config/evaluationScheme');
-        const defaults = getDefaultComponents('MASTER');
+        const defaults = getDefaultComponents(thesis.projectType || 'THESIS');
         for (const comp of defaults) {
           await prisma.evaluationComponent.create({
             data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
@@ -108,10 +109,11 @@ exports.getThesis = async (req, res) => {
 
 exports.createThesis = async (req, res) => {
   try {
-    const { title, studentId, supervisorId, status } = req.body;
+    const { title, studentId, supervisorId, status, projectType } = req.body;
     if (!title || !studentId) {
       return res.status(400).json({ error: 'title and studentId are required' });
     }
+    const resolvedProjectType = projectType === 'PROJECT' ? 'PROJECT' : 'THESIS';
     const student = await prisma.user.findUnique({ where: { id: parseInt(studentId) }, include: { program: true } });
     if (!student || student.role !== 'STUDENT' || student.degreeType !== 'MASTER') {
       return res.status(400).json({ error: 'studentId must belong to a master student' });
@@ -147,14 +149,19 @@ exports.createThesis = async (req, res) => {
       if (match) derivedBatch = match[1];
     }
 
-    const supId = supervisorId ? parseInt(supervisorId) : null;
+    const supId = resolvedProjectType === 'PROJECT' ? null : (supervisorId ? parseInt(supervisorId) : null);
+    const extMidId = resolvedProjectType === 'PROJECT' ? null : (req.body.externalMidTermId ? parseInt(req.body.externalMidTermId) : null);
+    const extFinId = req.body.externalFinalId ? parseInt(req.body.externalFinalId) : (req.body.examinerId ? parseInt(req.body.examinerId) : null);
+
     const thesis = await prisma.thesis.create({
       data: {
         title,
-        projectType: 'MASTER',
+        projectType: resolvedProjectType,
         studentId: parseInt(studentId),
         supervisorId: supId,
         supervisorAssignmentStatus: supId ? 'PENDING' : null,
+        externalMidTermId: extMidId,
+        externalFinalId: extFinId,
         programId: student.programId || requestingCoordinatorProgram?.id || null,
         crossProgramRequestedById: isCrossProgram ? req.user.id : null,
         createdVia: 'MANUAL',
@@ -169,15 +176,28 @@ exports.createThesis = async (req, res) => {
       try {
         const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
         await notifSvc.notify(supId, 'SUPERVISOR_ASSIGNMENT',
-          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master Thesis) — pending your acceptance.`, `/theses/${thesis.id}`);
+          `${assignerName} assigned you as supervisor for "${thesis.title}" (Master ${resolvedProjectType === 'PROJECT' ? 'Project' : 'Thesis'}) — pending your acceptance.`, `/theses/${thesis.id}`);
       } catch (e) { console.error('notify supervisor error:', e.message); }
     }
-    const defaults = getDefaultComponents('MASTER');
+
+    if (extMidId) {
+      await prisma.examinerAssignment.create({
+        data: { externalExaminerId: extMidId, thesisId: thesis.id, assignedById: req.user.id },
+      }).catch(() => {});
+    }
+    if (extFinId && extFinId !== extMidId) {
+      await prisma.examinerAssignment.create({
+        data: { externalExaminerId: extFinId, thesisId: thesis.id, assignedById: req.user.id },
+      }).catch(() => {});
+    }
+
+    const defaults = getDefaultComponents(resolvedProjectType);
     for (const comp of defaults) {
       await prisma.evaluationComponent.create({
         data: { ...comp, thesisId: thesis.id, createdById: req.user.id },
       });
     }
+
     // Check if the linked announcement's expirationDate has passed
     if (thesis.announcementId) {
       await markOverdueItems().catch(e => console.error('markOverdueItems error:', e.message));
@@ -259,12 +279,15 @@ exports.bulkImportPreview = async (req, res) => {
     const preview = [];
     let matchCount = 0;
     let unmatchCount = 0;
+    const defaultProjectType = (req.body.projectType || 'THESIS').toUpperCase() === 'PROJECT' ? 'PROJECT' : 'THESIS';
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const name = (row['Name'] || row['name'] || '').toString().trim();
       const roll = (row['Roll'] || row['roll'] || row['Roll Numbers'] || '').toString().trim();
       const title = (row['Title'] || row['title'] || row['Project Title'] || '').toString().trim();
+      const rawType = (row['Type'] || row['type'] || row['Project Type'] || row['projectType'] || '').toString().trim().toUpperCase();
+      const rowProjectType = (rawType === 'PROJECT' || rawType === 'MASTER PROJECT') ? 'PROJECT' : (rawType === 'THESIS' || rawType === 'MASTER THESIS') ? 'THESIS' : defaultProjectType;
       let batch = (row['Batch'] || row['batch'] || row['Academic Year'] || row['academicYear'] || '').toString().trim();
       const cluster = (row['Cluster'] || row['cluster'] || '').toString().trim();
       const programValue = (row['Program'] || row['program'] || '').toString().trim();
@@ -390,6 +413,7 @@ exports.bulkImportPreview = async (req, res) => {
         name,
         roll,
         title,
+        projectType: rowProjectType,
         batch,
         cluster,
         program: importedProgram ? { id: importedProgram.id, code: importedProgram.code, name: importedProgram.name, cluster: importedProgram.cluster } : null,
@@ -450,6 +474,8 @@ exports.bulkImportConfirm = async (req, res) => {
       const title = _edits?.title ?? origTitle;
       const batch = normalizeBatch(_edits?.batch ?? origBatch);
       const cluster = _edits?.cluster ?? origCluster;
+      const projectType = _edits?.projectType ?? row.projectType ?? 'THESIS';
+      const resolvedProjectType = projectType === 'PROJECT' ? 'PROJECT' : 'THESIS';
 
       if (!studentMatch?.id && !row.studentMatch?.id) {
         // Try auto-creating the student from _edits.student or row.name
@@ -622,7 +648,7 @@ exports.bulkImportConfirm = async (req, res) => {
         const newThesis = await tx.thesis.create({
           data: {
             title,
-            projectType: 'MASTER',
+            projectType: resolvedProjectType,
             studentId: effectiveStudentId,
             status: 'ACTIVE',
             supervisorId: resolvedSupervisorId,
@@ -636,7 +662,7 @@ exports.bulkImportConfirm = async (req, res) => {
         });
 
         // Create default evaluation components
-        const defaults = getDefaultComponents('MASTER');
+const defaults = getDefaultComponents(resolvedProjectType);
         for (const comp of defaults) {
           await tx.evaluationComponent.create({
             data: { ...comp, thesisId: newThesis.id, createdById: req.user.id },
@@ -775,6 +801,26 @@ exports.updateThesisStatus = async (req, res) => {
       }
     }
     const oldThesis = await prisma.thesis.findUnique({ where: { id }, select: { status: true, title: true } });
+    const transition = assertValidStatusTransition('thesis', oldThesis?.status, req.body.status);
+    if (!transition.valid) return res.status(400).json({ error: transition.error });
+
+    // Don't let a thesis be finalised while any evaluation component still has
+    // an un-entered score — an incomplete grade sheet shouldn't be marked complete.
+    if (req.body.status === 'COMPLETED') {
+      const [components, evaluations] = await Promise.all([
+        prisma.evaluationComponent.findMany({ where: { thesisId: id }, select: { id: true } }),
+        prisma.evaluation.findMany({ where: { thesisId: id }, select: { componentId: true, marks: true } }),
+      ]);
+      if (!components.length) {
+        return res.status(400).json({ error: 'Cannot mark thesis complete: no evaluation components are set up.' });
+      }
+      const scored = new Map(evaluations.filter(e => e.marks != null).map(e => [e.componentId, true]));
+      const missing = components.filter(c => !scored.get(c.id)).length;
+      if (missing) {
+        return res.status(400).json({ error: `Cannot mark thesis complete: ${missing} evaluation component(s) still have no marks entered.` });
+      }
+    }
+
     const thesis = await prisma.thesis.update({
       where: { id: parseInt(req.params.id) },
       data: { status: req.body.status },

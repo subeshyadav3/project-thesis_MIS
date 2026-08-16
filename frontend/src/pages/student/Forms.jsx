@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 const FIELD_TYPES = { TEXT: 'text', TEXTAREA: 'textarea', NUMBER: 'number', DATE: 'date', EMAIL: 'email' };
 
 const DEFAULT_STUDENT_FORM_FIELDS = [
+  { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis', 'Project'] },
   { key: 'program', label: 'Program', type: 'select', required: true, options: ['MSDSA', 'MSCSK', 'MSICE', 'MSNCS'] },
   { key: 'cluster', label: 'Research Project Cluster / Area', type: 'select', required: true, options: ['AI/ML and image processing', 'Audio, NLP and data/text analytics', 'Electronic devices, circuits and communication', 'Computer networks and security'] },
   { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'select', required: true, options: ['Yes', 'No'] },
@@ -31,6 +32,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
       title: initialData.title || '',
       description: initialData.description || '',
       program: initialData.program || user.program?.code || '',
+      projectType: initialData.projectType || 'Thesis',
     };
     fields.forEach(f => {
       if (f.key) init[f.key] = initialData[f.key] !== undefined ? initialData[f.key] : '';
@@ -43,7 +45,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
   const handleSubmit = async () => {
     const title = (form.title || '').trim();
     const description = (form.description || form.remarks || form.title || '').trim();
-    if (!title) return toast.error('Thesis concept title is required');
+    if (!title) return toast.error('Concept title is required');
 
     for (const f of fields) {
       if (f.required && !form[f.key]) {
@@ -68,7 +70,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
             <Icon name="description" className="material-symbols-outlined" />
           </div>
           <div className="modal-header-text">
-            <h2>{announcement.formSubmitted?.submitted ? 'Edit Thesis Concept Form' : 'MSc Concept Note Proposal Form'}</h2>
+            <h2>{announcement.formSubmitted?.submitted ? 'Edit Concept Form' : (announcement.title?.toLowerCase().includes('project') ? 'MSc Project Concept Proposal Form' : 'MSc Thesis / Project Concept Proposal Form')}</h2>
             <p>{announcement.title}</p>
           </div>
           <button className="modal-close-btn" onClick={onClose} aria-label="Close">

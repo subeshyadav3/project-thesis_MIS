@@ -1,5 +1,6 @@
 
 const prisma = require('../utils/prisma');
+const logger = require('../utils/logger');
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -17,7 +18,7 @@ async function notify(userId, type, message, linkTo) {
   try {
     return await prisma.notification.create({ data: { userId, type, message, linkTo: linkTo || null } });
   } catch (e) {
-    console.error('notify error:', e.message);
+    logger.error('notify error:', e.message);
     return null;
   }
 }
@@ -33,7 +34,7 @@ async function notifyMany(userIds, type, message) {
       data: ids.map(userId => ({ userId, type, message })),
     });
   } catch (e) {
-    console.error('notifyMany error:', e.message);
+    logger.error('notifyMany error:', e.message);
   }
 }
 
@@ -132,7 +133,7 @@ async function notifyMarksSubmitted({ groupId, thesisId, componentName, marks, m
     existing.count += 1;
     if (existing.names.length < 8) existing.names.push(`${componentName}: ${marksStr}`);
     clearTimeout(existing.timer);
-    existing.timer = setTimeout(() => flush(existing), 800);
+    existing.timer = setTimeout(() => flush(existing), 800); existing.timer.unref?.();
   } else {
     const entry = {
       count: 1,
@@ -140,7 +141,7 @@ async function notifyMarksSubmitted({ groupId, thesisId, componentName, marks, m
       names: [`${componentName}: ${marksStr}`],
       timer: null,
     };
-    entry.timer = setTimeout(() => flush(entry), 800);
+    entry.timer = setTimeout(() => flush(entry), 800); entry.timer.unref?.();
     pendingMarksBatches.set(batchKey, entry);
   }
   return null;

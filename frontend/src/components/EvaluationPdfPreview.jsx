@@ -23,15 +23,21 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
       return 'external-both';
     }
     if (initialScope === 'external') {
-      if (user.role === 'EXTERNAL_EXAMINER' && item) {
+      if (item) {
+        if (item.projectType === 'PROJECT') return 'external-final';
         if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
         if (item.externalMidTerm?.id === user.id && item.externalFinal?.id !== user.id) return 'external';
       }
       // Fallback: pick the one that has an assignment for this user
-      if (user.role === 'EXTERNAL_EXAMINER' && item) {
+      if (item) {
         if (item.externalMidTerm?.id === user.id) return 'external';
         if (item.externalFinal?.id === user.id) return 'external-final';
       }
+    }
+    if (!initialScope && item) {
+      if (item.projectType === 'PROJECT') return 'external-final';
+      if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
+      if (item.externalMidTerm?.id === user.id && item.externalFinal?.id !== user.id) return 'external';
     }
     return initialScope;
   }, [initialScope, user.role, user.id, item]);
@@ -50,7 +56,8 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
     const detailEndpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
     try {
       const detail = await api.get(detailEndpoint);
-      setItem(detail.data);      const previewEndpoint = type === 'group'
+      setItem(detail.data);
+      const previewEndpoint = type === 'group'
         ? `/print/preview/group/${id}?_t=${Date.now()}`
         : `/print/preview/thesis/${id}?scope=${pdfScope}&_t=${Date.now()}`;
       const previewRes = await api.get(previewEndpoint, { responseType: 'text' });
@@ -65,21 +72,40 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   // --- Filter components based on scope + user role ---
   const editableComponents = useMemo(() => {
     const components = item?.evaluationComponents || [];
+    const isAssignedSupervisor = item?.supervisor?.id === user.id || item?.supervisorId === user.id;
+    const isAssignedExternalMid = item?.externalMidTerm?.id === user.id;
+    const isAssignedExternalFinal = item?.externalFinal?.id === user.id || item?.examinerAssignments?.some(a => a.externalExaminerId === user.id);
+    const isAssignedExaminer = user.role === 'EXTERNAL_EXAMINER' || isAssignedExternalMid || isAssignedExternalFinal;
+
     const scopeFiltered = type === 'thesis' && pdfScope !== 'both'
       ? components.filter(c =>
           pdfScope === 'supervisor'
             ? c.evaluatorRole === 'SUPERVISOR'
             : pdfScope === 'external'
-              ? c.evaluationType === 'EXTERNAL_MIDTERM'
+              ? (c.evaluationType === 'EXTERNAL_MIDTERM' || (item?.projectType === 'PROJECT' && c.evaluatorRole === 'EXTERNAL_EXAMINER'))
               : pdfScope === 'external-both'
-                ? (c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL')
-              : c.evaluationType === 'EXTERNAL_FINAL'
+                ? (c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER')
+              : (c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER')
         )
       : components;
-    return ['COORDINATOR', 'MAINTAINER'].includes(user.role)
-      ? scopeFiltered
-      : scopeFiltered.filter(c => c.evaluatorRole === user.role);
-  }, [item, user.role, type, pdfScope]);
+
+    if (['COORDINATOR', 'MAINTAINER'].includes(user.role)) {
+      return scopeFiltered;
+    }
+
+    return scopeFiltered.filter(c => {
+      if (c.evaluatorRole === 'SUPERVISOR') {
+        return isAssignedSupervisor || user.role === 'SUPERVISOR';
+      }
+      if (c.evaluationType === 'EXTERNAL_MIDTERM') {
+        return isAssignedExternalMid || user.role === 'EXTERNAL_EXAMINER';
+      }
+      if (c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER') {
+        return isAssignedExternalFinal || isAssignedExaminer || user.role === 'EXTERNAL_EXAMINER';
+      }
+      return c.evaluatorRole === user.role;
+    });
+  }, [item, user.role, user.id, type, pdfScope]);
 
   const evaluationFor = (componentId) => (item?.evaluations || []).find(e => e.componentId === componentId);
 
@@ -197,8 +223,8 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>{type === 'group' ? item?.projectTitle || 'Project' : item?.title || 'Thesis'}</h3>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{type === 'group' ? item?.name : `${item?.student?.firstName || ''} ${item?.student?.lastName || ''}`}</p>
 
-            {/* Scope selector: only for master thesis, hidden when locked or hidden by parent */}
-            {type === 'thesis' && !isScopeLocked && !hideScopeSelector && (
+            {/* Scope selector: only for master thesis, hidden when locked, hidden by parent, or for master project */}
+            {type === 'thesis' && item?.projectType !== 'PROJECT' && !isScopeLocked && !hideScopeSelector && (
               <div style={{ marginBottom: 14, padding: 10, background: 'var(--color-surface-container-low)', borderRadius: 8, border: '1px solid var(--color-outline-variant)' }}>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Print scope</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
