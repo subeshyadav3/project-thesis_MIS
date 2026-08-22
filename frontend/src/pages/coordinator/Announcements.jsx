@@ -6,6 +6,7 @@ import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import useClickOutside from '../../hooks/useClickOutside';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
@@ -71,15 +72,7 @@ function MatrixSupervisorSelect({ value, onChange, supervisors }) {
     setOpen(!open);
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target) && !e.target.closest('.matrix-sup-portal')) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(ref, () => setOpen(false), true, '.matrix-sup-portal');
 
   const filtered = supervisors.filter(s => {
     if (!search.trim()) return true;
@@ -269,11 +262,7 @@ function CoordinatorAnnouncements() {
     return [...batches].filter(Boolean).sort((a, b) => b.localeCompare(a));
   }, [allStudents]);
 
-  useEffect(() => {
-    const f = (e) => { if (studentRef.current && !studentRef.current.contains(e.target)) setStudentOpen(false); };
-    if (studentOpen) document.addEventListener('mousedown', f);
-    return () => document.removeEventListener('mousedown', f);
-  }, [studentOpen]);
+  useClickOutside(studentRef, () => setStudentOpen(false), studentOpen);
 
   const activeAnnouncements = announcements.filter(a => !a.expiresAt || new Date(a.expiresAt) > new Date());
   const expiredAnnouncements = announcements.filter(a => a.expiresAt && new Date(a.expiresAt) <= new Date());

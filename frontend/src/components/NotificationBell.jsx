@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from './ui';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import useClickOutside from '../hooks/useClickOutside';
 
 const TYPE_ICON = {
   PROPOSAL_UPLOAD: 'upload_file',
@@ -53,15 +54,7 @@ function NotificationBell() {
     if (open && notifications.length === 0) fetchAll();
   }, [open]);
 
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(dropdownRef, () => setOpen(false));
 
   const handleMarkRead = async (id, e) => {
     e.stopPropagation();

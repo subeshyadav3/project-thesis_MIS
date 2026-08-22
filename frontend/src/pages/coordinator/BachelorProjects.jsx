@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import useClickOutside from '../../hooks/useClickOutside';
 import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
 
 const PAGE_SIZE = 10;
@@ -148,65 +149,17 @@ function BachelorProjects() {
 
   useEffect(() => { loadData(); }, [loadData]);
   
-useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (createSupRef.current && !createSupRef.current.contains(e.target)) {
-        setCreateSupOpen(false);
-      }
-    };
-    if (createSupOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [createSupOpen]);
+useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
 
-  useEffect(() => {
-    const handleEditSupOutside = (e) => {
-      if (editSupRef.current && !editSupRef.current.contains(e.target)) {
-        setEditSupOpen(false);
-      }
-    };
-    if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
-    return () => document.removeEventListener('mousedown', handleEditSupOutside);
-  }, [editSupOpen]);
+  useClickOutside(editSupRef, () => setEditSupOpen(false), editSupOpen);
 
-  useEffect(() => {
-    const handleEditStudentOutside = (e) => {
-      if (editStudentRef.current && !editStudentRef.current.contains(e.target)) {
-        setEditStudentOpen(false);
-      }
-    };
-    if (editStudentOpen) document.addEventListener('mousedown', handleEditStudentOutside);
-    return () => document.removeEventListener('mousedown', handleEditStudentOutside);
-  }, [editStudentOpen]);
+  useClickOutside(editStudentRef, () => setEditStudentOpen(false), editStudentOpen);
 
-  useEffect(() => {
-    const handleEditExamOutside = (e) => {
-      if (editExamRef.current && !editExamRef.current.contains(e.target)) {
-        setEditExamOpen(false);
-      }
-    };
-    if (editExamOpen) document.addEventListener('mousedown', handleEditExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditExamOutside);
-  }, [editExamOpen]);
+  useClickOutside(editExamRef, () => setEditExamOpen(false), editExamOpen);
 
-  useEffect(() => {
-    const handleExamOutside = (e) => {
-      if (examRef.current && !examRef.current.contains(e.target)) {
-        setExamOpen(false);
-      }
-    };
-    if (examOpen) document.addEventListener('mousedown', handleExamOutside);
-    return () => document.removeEventListener('mousedown', handleExamOutside);
-  }, [examOpen]);
+  useClickOutside(examRef, () => setExamOpen(false), examOpen);
 
-  useEffect(() => {
-    const handleStudentOutside = (e) => {
-      if (newStudentRef.current && !newStudentRef.current.contains(e.target)) {
-        setNewStudentOpen(false);
-      }
-    };
-    if (newStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
-    return () => document.removeEventListener('mousedown', handleStudentOutside);
-  }, [newStudentOpen]);
+  useClickOutside(newStudentRef, () => setNewStudentOpen(false), newStudentOpen);
 
   useEffect(() => {
     const handleClick = () => setActionMenuRow(null);

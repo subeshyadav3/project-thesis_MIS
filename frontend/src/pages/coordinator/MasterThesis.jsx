@@ -11,6 +11,7 @@ import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import useClickOutside from '../../hooks/useClickOutside';
 
 const PAGE_SIZE = 10;
 
@@ -174,65 +175,17 @@ function MasterThesis() {
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (createSupRef.current && !createSupRef.current.contains(e.target)) {
-        setCreateSupOpen(false);
-      }
-    };
-    if (createSupOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [createSupOpen]);
+useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
 
-  useEffect(() => {
-    const handleEditSupOutside = (e) => {
-      if (editSupRef.current && !editSupRef.current.contains(e.target)) {
-        setEditSupOpen(false);
-      }
-    };
-    if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
-    return () => document.removeEventListener('mousedown', handleEditSupOutside);
-  }, [editSupOpen]);
+  useClickOutside(editSupRef, () => setEditSupOpen(false), editSupOpen);
 
-  useEffect(() => {
-    const handleEditMidTermExamOutside = (e) => {
-      if (editMidTermExamRef.current && !editMidTermExamRef.current.contains(e.target)) {
-        setEditMidTermExamOpen(false);
-      }
-    };
-    if (editMidTermExamOpen) document.addEventListener('mousedown', handleEditMidTermExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditMidTermExamOutside);
-  }, [editMidTermExamOpen]);
+  useClickOutside(editMidTermExamRef, () => setEditMidTermExamOpen(false), editMidTermExamOpen);
 
-  useEffect(() => {
-    const handleEditFinalExamOutside = (e) => {
-      if (editFinalExamRef.current && !editFinalExamRef.current.contains(e.target)) {
-        setEditFinalExamOpen(false);
-      }
-    };
-    if (editFinalExamOpen) document.addEventListener('mousedown', handleEditFinalExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditFinalExamOutside);
-  }, [editFinalExamOpen]);
+  useClickOutside(editFinalExamRef, () => setEditFinalExamOpen(false), editFinalExamOpen);
 
-  useEffect(() => {
-    const handleExamOutside = (e) => {
-      if (examRef.current && !examRef.current.contains(e.target)) {
-        setExamOpen(false);
-      }
-    };
-    if (examOpen) document.addEventListener('mousedown', handleExamOutside);
-    return () => document.removeEventListener('mousedown', handleExamOutside);
-  }, [examOpen]);
+  useClickOutside(examRef, () => setExamOpen(false), examOpen);
 
-  useEffect(() => {
-    const handleStudentOutside = (e) => {
-      if (createStudentRef.current && !createStudentRef.current.contains(e.target)) {
-        setCreateStudentOpen(false);
-      }
-    };
-    if (createStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
-    return () => document.removeEventListener('mousedown', handleStudentOutside);
-  }, [createStudentOpen]);
+  useClickOutside(createStudentRef, () => setCreateStudentOpen(false), createStudentOpen);
 
   // Close action menu on outside click — use 'click' not 'mousedown'
   // so React's synthetic onClick on menu items fires first (bubbles up),

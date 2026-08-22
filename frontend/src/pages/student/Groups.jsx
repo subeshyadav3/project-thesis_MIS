@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
+import useClickOutside from '../../hooks/useClickOutside';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 
@@ -15,11 +16,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
   const [memberOpen, setMemberOpen] = useState(false);
   const memberRef = useRef(null);
 
-  useEffect(() => {
-    const f = (e) => { if (memberRef.current && !memberRef.current.contains(e.target)) setMemberOpen(false); };
-    if (memberOpen) document.addEventListener('mousedown', f);
-    return () => document.removeEventListener('mousedown', f);
-  }, [memberOpen]);
+  useClickOutside(memberRef, () => setMemberOpen(false), memberOpen);
 
   const selectMember = (student) => {
     if (!selectedMembers.includes(student.id)) {
