@@ -8,6 +8,7 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import { getApiMessage } from '../../utils/helpers';
 import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
 
 const STATUS_COLORS = { pending: '#f97316', active: '#4f46e5', completed: '#16a34a' };
 
@@ -379,7 +380,7 @@ function CoordinatorDashboard() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{p.submittedBy?.rollNumber || ''} {p.submittedBy?.program?.code ? `· ${p.submittedBy.program.code}` : ''}</div>
                     </td>
                     <td style={{ fontSize: 13 }}>{p.thesis?.title || '—'}</td>
-                    <td style={{ fontSize: 13 }}>{new Date(p.createdAt).toLocaleString()}</td>
+                    <td style={{ fontSize: 13 }}><DualDate date={p.createdAt} time /></td>
                     <td>
                       {p.documentUrl ? (
                         <a href={p.documentUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline">

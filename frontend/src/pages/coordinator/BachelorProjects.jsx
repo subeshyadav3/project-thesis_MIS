@@ -12,7 +12,7 @@ import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import useClickOutside from '../../hooks/useClickOutside';
 import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
-import { getApiMessage } from '../../utils/helpers';
+import {getApiMessage,fmtDate} from '../../utils/helpers';
 import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
@@ -691,7 +691,7 @@ const filteredGroups = useMemo(() => {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
+                  <span>{showDetail.createdAt ? fmtDate(showDetail.createdAt) : '—'}</span>
                 </div>
                 <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
                   <span className="detail-label">Description</span>

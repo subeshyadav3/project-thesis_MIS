@@ -5,7 +5,9 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
-import { getApiMessage } from '../../utils/helpers';
+import {getApiMessage} from '../../utils/helpers';
+import { fmtBs } from '../../utils/nepaliDate';
+import DualDate from '../../components/DualDate';
 
 const FIELD_TYPES = { TEXT: 'text', TEXTAREA: 'textarea', NUMBER: 'number', DATE: 'date', EMAIL: 'email' };
 
@@ -84,7 +86,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
             <div className="alert alert-warning" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 'var(--border-radius-sm)' }}>
               <Icon name="warning" className="material-symbols-outlined" style={{ fontSize: 18 }} />
               <div>
-                <strong>Late submission.</strong> The form deadline ({new Date(announcement.expirationDate).toLocaleDateString()}) has passed. Your proposal will require coordinator approval before it becomes visible.
+                <strong>Late submission.</strong> The form deadline (<DualDate date={announcement.expirationDate} />) has passed. Your proposal will require coordinator approval before it becomes visible.
               </div>
             </div>
           )}
@@ -265,7 +267,7 @@ function StudentForms() {
                         <span className="badge badge-active">
                           <Icon name="event" className="material-symbols-outlined" style={{ fontSize: 13 }} />
                           {a.expirationDate
-                            ? `Deadline: ${new Date(a.expirationDate).toLocaleDateString()}`
+                            ? `Deadline: $<DualDate date={a.expirationDate} />`
                             : 'No deadline set'}
                         </span>
                         {a.batch && <span>Batch: {a.batch}</span>}

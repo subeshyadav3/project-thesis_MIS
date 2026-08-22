@@ -6,6 +6,7 @@ import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import DualDate from '../../components/DualDate';
 import useClickOutside from '../../hooks/useClickOutside';
 import { getApiMessage } from '../../utils/helpers';
 import StatusBadge from '../../components/StatusBadge';
@@ -13,7 +14,6 @@ import StatusBadge from '../../components/StatusBadge';
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
 
-const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
 const MASTER_THESIS_FORM_FIELDS = [
   { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis'] },
@@ -232,6 +232,7 @@ function CoordinatorAnnouncements() {
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDeleteResponse, setConfirmDeleteResponse] = useState(null);
   const studentRef = useRef(null);
   const toast = useToast();
 
@@ -512,9 +513,15 @@ function CoordinatorAnnouncements() {
                           </div>
                         </td>
                         <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                          {a.startDate || a.expirationDate
-                            ? `${fmtDate(a.startDate)} → ${fmtDate(a.expirationDate)}`
-                            : '—'}
+                          {a.startDate || a.expirationDate ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <DualDate date={a.startDate} />
+                              <span style={{ color: 'var(--color-outline)' }}>→</span>
+                              <DualDate date={a.expirationDate} />
+                            </div>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td>
                           {active ? (
@@ -1379,19 +1386,7 @@ function CoordinatorAnnouncements() {
                                           style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
                                           disabled={savingResponse}
                                           title="Delete submission"
-                                          onClick={async () => {
-                                            if (!window.confirm('Are you sure you want to delete this submission? It will be removed from students, supervisors, and project records everywhere.')) return;
-                                            setSavingResponse(true);
-                                            try {
-                                              await api.delete(`/announcements/responses/${response.id}`);
-                                              toast.success('Submission deleted');
-                                              loadResponses(viewResponses);
-                                            } catch (err) {
-                                              toast.error(getApiMessage(err) || 'Failed to delete');
-                                            } finally {
-                                              setSavingResponse(false);
-                                            }
-                                          }}
+                                          onClick={() => setConfirmDeleteResponse(response)}
                                         >
                                           <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 13 }} />
                                         </button>
@@ -1666,6 +1661,28 @@ function CoordinatorAnnouncements() {
           onCancel={() => setConfirmDelete(null)}
           confirmLabel="Delete"
           danger
+        />
+
+        <ConfirmDialog
+          open={!!confirmDeleteResponse}
+          title="Delete submission"
+          message={`Remove ${confirmDeleteResponse?.student?.firstName || 'this'} ${confirmDeleteResponse?.student?.lastName || 'submission'}'s submission? It will be deleted from students, supervisors, and project records everywhere.`}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setConfirmDeleteResponse(null)}
+          onConfirm={async () => {
+            setSavingResponse(true);
+            try {
+              await api.delete(`/announcements/responses/${confirmDeleteResponse.id}`);
+              toast.success('Submission deleted');
+              setConfirmDeleteResponse(null);
+              if (viewResponses) loadResponses(viewResponses);
+            } catch (err) {
+              toast.error(getApiMessage(err) || 'Failed to delete');
+            } finally {
+              setSavingResponse(false);
+            }
+          }}
         />
       </PageLayout>
     </ErrorBoundary>

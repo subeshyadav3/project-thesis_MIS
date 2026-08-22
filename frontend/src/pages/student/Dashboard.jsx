@@ -6,6 +6,8 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
+
 
 function StudentDashboard() {
   const [groups, setGroups] = useState([]);
@@ -181,7 +183,7 @@ function StudentDashboard() {
                     <Icon name={n.read ? 'check_circle' : 'notifications'} className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--color-on-surface-variant)' }} />
                     <div style={{ flex: 1, fontSize: 13 }}>{n.message}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                      {new Date(n.createdAt).toLocaleDateString()}
+                      <DualDate date={n.createdAt} />
                     </div>
                   </div>
                 ))}

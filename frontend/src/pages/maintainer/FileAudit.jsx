@@ -7,6 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import { getApiMessage } from '../../utils/helpers';
+import DualDate from '../../components/DualDate';
 
 const ACTION_LABEL = {
   UPLOAD: 'Uploaded',
@@ -93,7 +94,7 @@ function FileAudit() {
                       ) : '—'}
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                      {new Date(e.createdAt).toLocaleString()}
+                      <DualDate date={e.createdAt} time />
                     </td>
                   </tr>
                 ))}

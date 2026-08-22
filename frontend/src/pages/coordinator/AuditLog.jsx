@@ -7,6 +7,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import Pagination from '../../components/Pagination';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import DualDate from '../../components/DualDate';
 
 export default function AuditLog() {
   const [logs, setLogs] = useState([]);
@@ -130,7 +131,7 @@ export default function AuditLog() {
                       <td title={log.details || ''} style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.details || '—'}</td>
                       <td>{log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : 'System'}</td>
                       <td>{log.program ? log.program.code : '—'}</td>
-                      <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.createdAt).toLocaleString()}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}><DualDate date={log.createdAt} time /></td>
                     </tr>
                   ))}
                 </tbody>

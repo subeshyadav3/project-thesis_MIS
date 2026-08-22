@@ -6,7 +6,8 @@ import AiAssistantModal from './AiAssistantModal';
 import ConfirmDialog from './ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
-import { getApiMessage } from '../utils/helpers';
+import {getApiMessage,Time} from '../utils/helpers';
+import DualDate from '../components/DualDate';
 
 const STAGE_LABEL = {
   PROPOSAL: 'Proposal',
@@ -236,7 +237,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user,
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', marginTop: 2 }}>
                               {doc.submittedBy ? `${doc.submittedBy.firstName} ${doc.submittedBy.lastName}` : 'Student'}
-                              {' · '}{new Date(doc.createdAt).toLocaleDateString()} {new Date(doc.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {' · '}<DualDate date={doc.createdAt} time />
                             </div>
                           </div>
                         </div>
@@ -308,7 +309,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user,
                                       {comment.author?.firstName} {comment.author?.lastName} · {roleStyle.label}
                                     </span>
                                     <span style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>
-                                      {new Date(comment.createdAt).toLocaleDateString()} {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      <DualDate date={comment.createdAt} time />
                                     </span>
                                     <div style={{ flex: 1 }} />
                                     {canEdit && (

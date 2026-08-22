@@ -12,7 +12,8 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import api from '../../services/api';
-import { getApiMessage } from '../../utils/helpers';
+import {getApiMessage,fmtDate} from '../../utils/helpers';
+import DualDate from '../../components/DualDate';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -463,8 +464,8 @@ function ProjectDetail() {
                       : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                   } />
                 )}
-                {item?.startDate && <InfoRow label="Start Date" value={new Date(item.startDate).toLocaleDateString()} />}
-                <InfoRow label="End Date" value={item?.endDate ? new Date(item.endDate).toLocaleDateString() : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not Added</span>} />
+                {item?.startDate && <InfoRow label="Start Date" value=<DualDate date={item.startDate} /> />}
+                <InfoRow label="End Date" value={item?.endDate ? fmtDate(item.endDate) : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not Added</span>} />
                 {item?.description && <InfoRow label="Description" value={item.description} />}
               </div>
             </div>              {/* Evaluation breakdown — only user's own components for non-coordinators */}
@@ -804,7 +805,7 @@ function ProjectDetail() {
                           {r.content.length > 200 ? r.content.slice(0, 200) + '...' : r.content}
                         </p>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          Issued {new Date(r.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          Issued <DualDate date={r.createdAt} />
                           {' at '}
                           {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
