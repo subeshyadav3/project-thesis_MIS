@@ -10,6 +10,7 @@ import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -261,10 +262,7 @@ function SupervisorList() {
                             {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
                           </td>
                           <td>
-                            <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
-                              <span className="dot" />
-                              {g.status || 'PENDING'}
-                            </span>
+                            <StatusBadge status={g.status} />
                           </td>
                         </tr>
                       ))}
@@ -293,10 +291,7 @@ function SupervisorList() {
                           <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
                           <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
                           <td>
-                            <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
-                              <span className="dot" />
-                              {t.status || 'PENDING'}
-                            </span>
+                            <StatusBadge status={t.status} />
                           </td>
                         </tr>
                       ))}

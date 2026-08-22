@@ -13,6 +13,7 @@ import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUpload
 import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
 import GroupBulkUploadModal from '../../components/GroupBulkUploadModal';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -303,7 +304,7 @@ function ExaminerList() {
                             {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
                           </td>
                           <td>
-                            <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}><span className="dot" />{g.status || 'PENDING'}</span>
+                            <StatusBadge status={g.status} />
                           </td>
                         </tr>
                       ))}
@@ -328,7 +329,7 @@ function ExaminerList() {
                           <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
                           <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
                           <td>
-                            <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}><span className="dot" />{t.status || 'PENDING'}</span>
+                            <StatusBadge status={t.status} />
                           </td>
                         </tr>
                       ))}

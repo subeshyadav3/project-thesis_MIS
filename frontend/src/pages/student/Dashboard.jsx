@@ -5,6 +5,7 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
+import StatusBadge from '../../components/StatusBadge';
 
 function StudentDashboard() {
   const [groups, setGroups] = useState([]);
@@ -109,9 +110,7 @@ function StudentDashboard() {
                           {g.name} · {g.batch || '—'}
                         </div>
                       </div>
-                      <span className={`badge badge-${g.status?.toLowerCase() === 'active' ? 'active' : g.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>
-                        <span className="dot" />{g.status}
-                      </span>
+                      <StatusBadge status={g.status} sm />
                     </div>
                   </Link>
                 ))}
@@ -148,9 +147,7 @@ function StudentDashboard() {
                           {t.batch ? `Batch ${t.batch}` : '—'}
                         </div>
                       </div>
-                      <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`} style={{ fontSize: 10 }}>
-                        <span className="dot" />{t.status}
-                      </span>
+                      <StatusBadge status={t.status} sm />
                     </div>
                   </Link>
                 ))}

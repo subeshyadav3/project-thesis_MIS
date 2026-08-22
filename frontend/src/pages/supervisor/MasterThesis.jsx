@@ -12,6 +12,7 @@ import SearchInput from '../../components/SearchInput';
 import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -145,10 +146,7 @@ function SupervisorMasterThesis() {
               <div className="detail-grid">
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Type</span>
@@ -326,10 +324,7 @@ function SupervisorMasterThesis() {
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13, wordBreak: 'break-all' }}>{t.student?.email || '—'}</td>
                     <td>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
-                        <span className="dot" />
-                        {t.status || 'PENDING'}
-                      </span>
+                      <StatusBadge status={t.status} />
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                       {t.batch ? `Batch ${t.batch}` : '—'}

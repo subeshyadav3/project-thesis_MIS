@@ -12,6 +12,7 @@ import SearchInput from '../../components/SearchInput';
 import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -112,10 +113,7 @@ function SupervisorBachelorProjects() {
               <div className="detail-grid">
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Type</span>
@@ -296,10 +294,7 @@ function SupervisorBachelorProjects() {
                       </span>
                     </td>
                     <td>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
-                        <span className="dot" />
-                        {g.status || 'PENDING'}
-                      </span>
+                      <StatusBadge status={g.status} />
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                       {g.batch || '—'}

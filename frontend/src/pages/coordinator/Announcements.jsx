@@ -8,6 +8,7 @@ import SearchInput from '../../components/SearchInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import useClickOutside from '../../hooks/useClickOutside';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
@@ -956,7 +957,7 @@ function CoordinatorAnnouncements() {
                               <tr key={t.id}>
                                 <td>{t.title}</td>
                                 <td>{t.student ? `${t.student.firstName} ${t.student.lastName}` : '—'}</td>
-                                <td><span className="badge badge-pending">{t.status}</span></td>
+                                <td><StatusBadge status={t.status} /></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <button className="btn btn-sm btn-primary" onClick={() => handleApprove(t, 'thesis')}>
                                     <Icon name="check_circle" className="material-symbols-outlined" /> Approve
@@ -973,7 +974,7 @@ function CoordinatorAnnouncements() {
                               <tr key={g.id}>
                                 <td>{g.projectTitle || g.name}</td>
                                 <td>{g.members?.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}</td>
-                                <td><span className="badge badge-pending">{g.status}</span></td>
+                                <td><StatusBadge status={g.status} /></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <button className="btn btn-sm btn-primary" onClick={() => handleApprove(g, 'group')}>
                                     <Icon name="check_circle" className="material-symbols-outlined" /> Approve

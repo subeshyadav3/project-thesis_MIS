@@ -8,6 +8,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
 import useClickOutside from '../../hooks/useClickOutside';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 
@@ -406,7 +407,7 @@ function StudentGroups() {
                           <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
                           <td><span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`}>{g.projectType}</span></td>
                           <td style={{ fontSize: 13 }}>{g.members?.map(m => `${m.student?.firstName} ${m.student?.lastName}`).join(', ')}</td>
-                          <td><span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}><span className="dot" />{g.status}</span></td>
+                          <td><StatusBadge status={g.status} /></td>
                           <td style={{ textAlign: 'right' }}>
                             <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
                               {g.status === 'PENDING' && g.members?.[0]?.student?.id === user.id && (

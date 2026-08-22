@@ -13,6 +13,7 @@ import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import useClickOutside from '../../hooks/useClickOutside';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -610,10 +611,7 @@ return (
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
                 {showDetail.projectType !== 'PROJECT' ? (
                   <>

@@ -13,6 +13,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import useClickOutside from '../../hooks/useClickOutside';
 import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
 import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -705,10 +706,7 @@ const filteredGroups = useMemo(() => {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
               </div>
             </div>
