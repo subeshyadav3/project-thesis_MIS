@@ -3,7 +3,7 @@ import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
-import { getApiMessage } from '../../utils/helpers';
+import { getApiMessage, timeAgo } from '../../utils/helpers';
 
 function StudentNotifications() {
   const [notifications, setNotifications] = useState([]);
@@ -70,7 +70,7 @@ function StudentNotifications() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: n.read ? 400 : 600 }}>{n.message}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 4 }}>
-                  {new Date(n.createdAt).toLocaleDateString()} {new Date(n.createdAt).toLocaleTimeString()}
+                  {timeAgo(n.createdAt)}
                 </div>
               </div>
               {!n.read && (
