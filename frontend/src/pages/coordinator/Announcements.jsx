@@ -13,6 +13,8 @@ import StatusBadge from '../../components/StatusBadge';
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
 
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+
 const MASTER_THESIS_FORM_FIELDS = [
   { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis'] },
   { key: 'program', label: 'Program', type: 'select', required: true },
@@ -469,8 +471,7 @@ function CoordinatorAnnouncements() {
                     <th>Title</th>
                     <th>Type</th>
                     <th>Audience</th>
-                    <th>Form Groups?</th>
-                    {user.program?.degreeType !== 'BACHELOR' && <th>Form?</th>}
+                    <th>Capabilities</th>
                     <th>Period</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
@@ -495,12 +496,25 @@ function CoordinatorAnnouncements() {
                         </td>
                         <td><span className={`badge badge-${a.type === 'THESIS' ? 'warning' : a.type === 'MINOR' ? 'info' : a.type === 'MAJOR' ? 'warning' : 'default'}`}>{TYPE_LABELS[a.type] || a.type}</span></td>
                         <td style={{ fontSize: 13 }}>{AUDIENCE_LABELS[a.audience]}</td>
-                        <td>{hasGF ? <span className="badge badge-active"><span className="dot" /> Yes (max {a.groupSizeMax})</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
-                        {user.program?.degreeType !== 'BACHELOR' && (
-                          <td>{a.formEnabled ? <span className="badge badge-warning"><span className="dot" /> Form {(a.formFields?.length || 0) > 0 ? `(+${a.formFields.length})` : ''}</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
-                        )}
-                        <td style={{ fontSize: 12 }}>
-                          {a.startDate ? new Date(a.startDate).toLocaleDateString() : '—'} ~ {a.expirationDate ? new Date(a.expirationDate).toLocaleDateString() : '—'}
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {hasGF && (
+                              <span className="badge badge-active" title={`Group formation is open (max ${a.groupSizeMax} members)`}>
+                                <span className="dot" />Groups · max {a.groupSizeMax}
+                              </span>
+                            )}
+                            {a.formEnabled && (
+                              <span className="badge badge-warning" title={`Registration form${a.formFields?.length ? ` with ${a.formFields.length} extra field(s)` : ''}`}>
+                                <span className="dot" />Form{a.formFields?.length ? ` (+${a.formFields.length})` : ''}
+                              </span>
+                            )}
+                            {!hasGF && !a.formEnabled && <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}
+                          </div>
+                        </td>
+                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {a.startDate || a.expirationDate
+                            ? `${fmtDate(a.startDate)} → ${fmtDate(a.expirationDate)}`
+                            : '—'}
                         </td>
                         <td>
                           {active ? (
@@ -513,23 +527,30 @@ function CoordinatorAnnouncements() {
                             <span className="badge badge-pending">Expired</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
-                            <Icon name="edit" className="material-symbols-outlined" />
-                          </button>
-                          <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
-                            <Icon name="delete" className="material-symbols-outlined" />
-                          </button>
-                          {(a.formEnabled || a.allowGroupFormation) && (
-                            <button className="btn btn-sm btn-outline" onClick={() => loadResponses(a)}>
-                              <Icon name="fact_check" className="material-symbols-outlined" /> Responses
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                            <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
+                              <Icon name="edit" className="material-symbols-outlined" />
                             </button>
-                          )}
-                          {active && (
-                            <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)}>
-                              <Icon name="cancel" className="material-symbols-outlined" /> Deactivate
+                            <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
+                              <Icon name="delete" className="material-symbols-outlined" />
                             </button>
-                          )}
+                            {(a.formEnabled || a.allowGroupFormation) && (
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() => loadResponses(a)}
+                                title={a.allowGroupFormation ? 'Open group formation responses & finalize teams' : 'View registration form responses'}
+                              >
+                                <Icon name="fact_check" className="material-symbols-outlined" />
+                                {a.allowGroupFormation ? 'Formation' : 'Responses'}
+                              </button>
+                            )}
+                            {active && (
+                              <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)} title="End this announcement now">
+                                <Icon name="cancel" className="material-symbols-outlined" /> End
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
