@@ -12,6 +12,7 @@ import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import useClickOutside from '../../hooks/useClickOutside';
 import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
+import { getApiMessage } from '../../utils/helpers';
 
 const PAGE_SIZE = 10;
 
@@ -115,7 +116,7 @@ function BachelorProjects() {
       setEditStudentOpen(false);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to add member');
+      toast.error(getApiMessage(err) || 'Failed to add member');
     }
   };
 
@@ -126,7 +127,7 @@ function BachelorProjects() {
       setShowDetail(prev => ({ ...prev, members: res.data.members }));
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to remove member');
+      toast.error(getApiMessage(err) || 'Failed to remove member');
     }
   };
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
@@ -176,7 +177,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       setGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: newStatus } : g));
       toast.success(`Status updated to ${newStatus}`);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Status update failed');
+      toast.error(getApiMessage(err) || 'Status update failed');
     } finally {
       setUpdatingStatus(null);
     }
@@ -222,7 +223,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       const { data } = await api.post('/groups/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setBulkPreview(data);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally {
       setBulkLoading(false);
     }
@@ -283,7 +284,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       resetUploadModal();
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
+      toast.error(getApiMessage(err) || 'Import failed');
     } finally {
       setBulkLoading(false);
     }
@@ -308,7 +309,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       toast.success('Group marked as completed');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Status update failed'); }
   };
 
   const confirmDeleteGroup = (id) => {
@@ -330,7 +331,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       toast.success('Group deleted');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Delete failed'); }
   };
 
   const handleEditSave = async (groupId) => {
@@ -390,7 +391,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       setShowDetail(null);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Save failed');
+      toast.error(getApiMessage(err) || 'Save failed');
     }
   };
 
@@ -422,7 +423,7 @@ useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
       setShowCreate(false);
       setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Create failed'); }
   };
 
   const addStudentField = () => {
@@ -1115,7 +1116,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk assign failed');
+                toast.error(getApiMessage(err) || 'Bulk assign failed');
               }
             }}>Assign</button>
             <button className="btn btn-sm btn-success" onClick={async () => {
@@ -1127,7 +1128,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk activate failed');
+                toast.error(getApiMessage(err) || 'Bulk activate failed');
               }
             }}>
               <Icon name="play_arrow" className="material-symbols-outlined" />
@@ -1143,7 +1144,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 setBulkEndDate('');
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Failed to set end date'); }
             }}>
               <Icon name="calendar_month" className="material-symbols-outlined" />
               Set End Date
@@ -1157,7 +1158,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk complete failed');
+                toast.error(getApiMessage(err) || 'Bulk complete failed');
               }
             }}>
               <Icon name="check_circle" className="material-symbols-outlined" />
@@ -1178,7 +1179,7 @@ const filteredGroups = useMemo(() => {
                     setConfirmDialog(prev => ({ ...prev, open: false }));
                     loadData();
                   } catch (err) {
-                    toast.error(err.response?.data?.error || 'Bulk delete failed');
+                    toast.error(getApiMessage(err) || 'Bulk delete failed');
                   }
                 },
                 danger: true,
@@ -1206,7 +1207,7 @@ const filteredGroups = useMemo(() => {
                     URL.revokeObjectURL(url);
                     toast.success('Evaluation PDFs downloaded');
                     setConfirmDialog(prev => ({ ...prev, open: false }));
-                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                  } catch (err) { toast.error(getApiMessage(err) || 'Failed to download PDFs'); }
                 },
               });
             }}>

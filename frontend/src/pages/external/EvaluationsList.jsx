@@ -8,6 +8,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import { getApiMessage } from '../../utils/helpers';
 
 function ExternalEvaluationsList() {
   const [groups, setGroups] = useState([]);
@@ -20,7 +21,7 @@ function ExternalEvaluationsList() {
     Promise.all([
       api.get('/external-examiners/groups', { signal }).then(({ data }) => setGroups(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
       api.get('/external-examiners/theses', { signal }).then(({ data }) => setTheses(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); })
       .finally(() => setLoading(false));
   }, []);
   const [searchQuery, setSearchQuery] = useState('');

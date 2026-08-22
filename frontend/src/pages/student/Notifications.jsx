@@ -3,6 +3,7 @@ import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { getApiMessage } from '../../utils/helpers';
 
 function StudentNotifications() {
   const [notifications, setNotifications] = useState([]);
@@ -14,7 +15,7 @@ function StudentNotifications() {
     setLoading(true);
     api.get('/notifications')
       .then(({ data }) => setNotifications(data))
-      .catch((err) => { toast.error(err.response?.data?.error || 'Failed to load notifications'); })
+      .catch((err) => { toast.error(getApiMessage(err) || 'Failed to load notifications'); })
       .finally(() => setLoading(false));
   };
 
@@ -26,7 +27,7 @@ function StudentNotifications() {
       toast.success('Marked as read');
       loadNotifications();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to mark as read');
+      toast.error(getApiMessage(err) || 'Failed to mark as read');
     }
   };
 
@@ -36,7 +37,7 @@ function StudentNotifications() {
       toast.success('All notifications marked as read');
       loadNotifications();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
+      toast.error(getApiMessage(err) || 'Failed');
     }
   };
 

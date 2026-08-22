@@ -3,6 +3,7 @@ import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import BulkPendingUsersModal from './BulkPendingUsersModal';
+import { getApiMessage } from '../utils/helpers';
 
 /**
  * Shared master thesis Excel bulk import (preview → confirm → review users).
@@ -62,7 +63,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
       const { data } = await api.post('/theses/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setBulkPreview(data);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally {
       setBulkLoading(false);
     }
@@ -112,7 +113,7 @@ export default function MasterThesisBulkUploadModal({ open, onClose, onSuccess, 
       resetAndClose();
       if (onSuccess) onSuccess();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
+      toast.error(getApiMessage(err) || 'Import failed');
     } finally {
       setBulkLoading(false);
     }

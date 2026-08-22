@@ -8,6 +8,7 @@ import { downloadFile } from '../../utils/download';
 import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import { getApiMessage } from '../../utils/helpers';
 
 function StudentSubmissions() {
   const [groups, setGroups] = useState([]);
@@ -58,7 +59,7 @@ function StudentSubmissions() {
       const { data } = await api.get(endpoint);
       setProposals(data.proposals || []);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally {
       setUploading(prev => ({ ...prev, [stage]: false }));
     }

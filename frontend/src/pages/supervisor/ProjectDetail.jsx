@@ -12,6 +12,7 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import api from '../../services/api';
+import { getApiMessage } from '../../utils/helpers';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -58,7 +59,7 @@ function ProjectDetail() {
     const endpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
     api.get(endpoint, { signal })
       .then(({ data }) => setItem(data))
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load project'); });
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load project'); });
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint, { signal })
       .then(({ data }) => {
@@ -66,7 +67,7 @@ function ProjectDetail() {
         setComponents(data.components || []);
         setEvaluations(data.evaluations || []);
       })
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load evaluations'); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load evaluations'); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
@@ -137,7 +138,7 @@ function ProjectDetail() {
       toast.success(`✓ ${component.name} marks saved`);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || `Failed to save ${component.name}`);
+      toast.error(getApiMessage(err) || `Failed to save ${component.name}`);
     }
   };
 
@@ -172,7 +173,7 @@ function ProjectDetail() {
       toast.success('Feedback saved');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save feedback');
+      toast.error(getApiMessage(err) || 'Failed to save feedback');
     } finally { setSavingFeedback(false); }
   };
 
@@ -184,7 +185,7 @@ function ProjectDetail() {
       toast.success(`${type === 'group' ? 'Project' : 'Thesis'} completed`);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to finalize');
+      toast.error(getApiMessage(err) || 'Failed to finalize');
     } finally { setFinalizing(false); }
   };
 
@@ -200,7 +201,7 @@ function ProjectDetail() {
       toast.success('Proposal uploaded');
       setUploadFile(null); setUploadStage(''); loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally { setUploading(false); }
   };
 
@@ -213,7 +214,7 @@ function ProjectDetail() {
       toast.success('Recommendation issued — auto-generated from template');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
+      toast.error(getApiMessage(err) || 'Failed');
     } finally { setIssuingRecommendation(false); }
   };
 
@@ -223,7 +224,7 @@ function ProjectDetail() {
       toast.success('Recommendation deleted');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete');
+      toast.error(getApiMessage(err) || 'Failed to delete');
     }
   };
 
@@ -244,7 +245,7 @@ function ProjectDetail() {
           toast.success(`${type === 'group' ? 'Project' : 'Thesis'} deleted successfully`);
           navigate(type === 'group' ? '/coordinator/projects' : '/coordinator/thesis');
         } catch (err) {
-          toast.error(err.response?.data?.error || 'Failed to delete');
+          toast.error(getApiMessage(err) || 'Failed to delete');
         }
       },
     });

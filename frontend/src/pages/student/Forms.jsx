@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
+import { getApiMessage } from '../../utils/helpers';
 
 const FIELD_TYPES = { TEXT: 'text', TEXTAREA: 'textarea', NUMBER: 'number', DATE: 'date', EMAIL: 'email' };
 
@@ -139,7 +140,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
                             setForm(prev => ({ ...prev, [f.key]: url }));
                             toast.success('PDF document uploaded successfully!');
                           } catch (err) {
-                            toast.error(err.response?.data?.error || 'Failed to upload PDF document');
+                            toast.error(getApiMessage(err) || 'Failed to upload PDF document');
                           }
                         }
                       }}
@@ -223,7 +224,7 @@ function StudentForms() {
       setSelected(null);
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to submit form');
+      toast.error(getApiMessage(err) || 'Failed to submit form');
       throw err;
     }
   };

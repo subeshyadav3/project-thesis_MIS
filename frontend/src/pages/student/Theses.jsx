@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import { getApiMessage } from '../../utils/helpers';
 
 function StudentTheses() {
   const [theses, setTheses] = useState([]);
@@ -22,7 +23,7 @@ function StudentTheses() {
         u.studentType = 'master';
         localStorage.setItem('user', JSON.stringify(u));
       })
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); })
+      .catch(err => { toast.error(getApiMessage(err) || 'Failed to load theses'); setTheses([]); })
       .finally(() => setLoading(false));
   }, []);
 

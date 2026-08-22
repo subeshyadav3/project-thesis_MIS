@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 function SupervisionActions({ item, type, onDone }) {
   const [rejecting, setRejecting] = useState(false);
@@ -29,7 +30,7 @@ function SupervisionActions({ item, type, onDone }) {
       toast.success('Supervision accepted');
       onDone && onDone();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to accept supervision');
+      toast.error(getApiMessage(err) || 'Failed to accept supervision');
     } finally {
       setBusy(false);
     }
@@ -48,7 +49,7 @@ function SupervisionActions({ item, type, onDone }) {
       setReason('');
       onDone && onDone();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to decline supervision');
+      toast.error(getApiMessage(err) || 'Failed to decline supervision');
     } finally {
       setBusy(false);
     }

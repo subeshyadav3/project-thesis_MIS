@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from './ui';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { getApiMessage } from '../utils/helpers';
 
 const PRESET_CRITERIA = {
   'Minor Project': [
@@ -418,7 +419,7 @@ export default function AiAssistantModal({ proposal, onClose }) {
         if (tabRef.current === 'similarity') setResult(null);
         return;
       }
-      toast.error(err.response?.data?.error || 'AI service unavailable. Is the AI server running?');
+      toast.error(getApiMessage(err) || 'AI service unavailable. Is the AI server running?');
       setCachedResults(prev => { const n = { ...prev }; delete n.similarity; return n; });
       if (tabRef.current === 'similarity') setResult(null);
     } finally {

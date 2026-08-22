@@ -6,6 +6,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import { formatYearSemester } from '../utils/romanNumerals';
+import { getApiMessage } from '../utils/helpers';
 
 function Profile() {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ function Profile() {
       setShowResetForm(false);
       setResetForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to update password');
+      toast.error(getApiMessage(err) || 'Failed to update password');
     } finally {
       setResetting(false);
     }

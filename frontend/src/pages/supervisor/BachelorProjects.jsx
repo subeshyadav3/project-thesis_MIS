@@ -11,6 +11,7 @@ import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
+import { getApiMessage } from '../../utils/helpers';
 
 const PAGE_SIZE = 10;
 
@@ -33,7 +34,7 @@ function SupervisorBachelorProjects() {
     setLoading(true);
     api.get('/supervisors/groups', { signal })
       .then(({ data }) => setGroups(data))
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); })
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);

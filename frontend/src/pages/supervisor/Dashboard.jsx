@@ -5,6 +5,7 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import SupervisionActions from '../../components/SupervisionActions';
+import { getApiMessage } from '../../utils/helpers';
 
 function statusColor(s) {
   if (s === 'COMPLETED') return 'var(--color-success)';
@@ -25,7 +26,7 @@ function SupervisorDashboard() {
       api.get('/supervisors/groups').then(({ data }) => setGroups(data)).catch(() => []),
       api.get('/supervisors/theses').then(({ data }) => setTheses(data)).catch(() => []),
     ]).catch((err) => {
-      toast.error(err.response?.data?.error || 'Failed to load assignments');
+      toast.error(getApiMessage(err) || 'Failed to load assignments');
     }).finally(() => setLoading(false));
   };
 

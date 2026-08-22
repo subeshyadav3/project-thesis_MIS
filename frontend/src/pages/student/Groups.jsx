@@ -7,6 +7,7 @@ import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
 import useClickOutside from '../../hooks/useClickOutside';
+import { getApiMessage } from '../../utils/helpers';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 
@@ -94,7 +95,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
               setCreateForm(prev => ({ ...prev, pdfUrl: url }));
               toast.success('Proposal PDF attached!');
             } catch (err) {
-              toast.error(err.response?.data?.error || 'Failed to upload PDF');
+              toast.error(getApiMessage(err) || 'Failed to upload PDF');
             }
           }}
         />
@@ -253,7 +254,7 @@ function StudentGroups() {
       setSelectedMembers([]);
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to create group');
+      toast.error(getApiMessage(err) || 'Failed to create group');
     }
   };
 
@@ -282,7 +283,7 @@ function StudentGroups() {
       toast.success('Joined group!');
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to join');
+      toast.error(getApiMessage(err) || 'Failed to join');
     }
   };
 
@@ -291,7 +292,7 @@ function StudentGroups() {
       await api.post(`/student-groups/${groupId}/invite`, { inviteeId });
       toast.success('Invitation sent!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to invite');
+      toast.error(getApiMessage(err) || 'Failed to invite');
     }
   };
 
@@ -301,7 +302,7 @@ function StudentGroups() {
       toast.success(action === 'ACCEPT' ? 'Invitation accepted!' : 'Declined');
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
+      toast.error(getApiMessage(err) || 'Failed');
     }
   };
 
@@ -311,7 +312,7 @@ function StudentGroups() {
       toast.success('Group deleted');
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete group');
+      toast.error(getApiMessage(err) || 'Failed to delete group');
     } finally {
       setConfirmDeleteGroupId(null);
     }

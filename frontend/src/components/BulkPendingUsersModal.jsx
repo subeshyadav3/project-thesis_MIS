@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 function generateEmail({ firstName, lastName, role }) {
   const base = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/[^a-z.]/g, '');
@@ -119,7 +120,7 @@ export default function BulkPendingUsersModal({ open, previewRows, type, departm
       toast.success(msg.join(' · '));
       onComplete(updatedRows);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to create users');
+      toast.error(getApiMessage(err) || 'Failed to create users');
     } finally {
       setCreating(false);
     }

@@ -3,6 +3,7 @@ import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import BulkPendingUsersModal from './BulkPendingUsersModal';
+import { getApiMessage } from '../utils/helpers';
 
 export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
   const toast = useToast();
@@ -53,7 +54,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
       const { data } = await api.post('/groups/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setBulkPreview(data);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally {
       setBulkLoading(false);
     }
@@ -108,7 +109,7 @@ export default function GroupBulkUploadModal({ open, onClose, onSuccess }) {
       resetModal();
       onSuccess?.();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
+      toast.error(getApiMessage(err) || 'Import failed');
     } finally {
       setBulkLoading(false);
     }

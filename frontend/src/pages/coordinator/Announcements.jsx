@@ -7,6 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import useClickOutside from '../../hooks/useClickOutside';
+import { getApiMessage } from '../../utils/helpers';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
@@ -313,7 +314,7 @@ function CoordinatorAnnouncements() {
       setSelectedStudents([]);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save');
+      toast.error(getApiMessage(err) || 'Failed to save');
     } finally {
       setSubmitting(false);
     }
@@ -349,7 +350,7 @@ function CoordinatorAnnouncements() {
       toast.success('Announcement deleted');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete');
+      toast.error(getApiMessage(err) || 'Failed to delete');
     } finally {
       setConfirmDelete(null);
     }
@@ -360,7 +361,7 @@ function CoordinatorAnnouncements() {
       await api.put(`/announcements/${id}/deactivate`);
       toast.success('Announcement deactivated');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Failed'); }
   };
 
   const loadSubmissions = async (ann) => {
@@ -388,7 +389,7 @@ function CoordinatorAnnouncements() {
       toast.success('Submission approved');
       loadSubmissions(viewAnnouncement);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to approve');
+      toast.error(getApiMessage(err) || 'Failed to approve');
     }
   };
 
@@ -1071,7 +1072,7 @@ function CoordinatorAnnouncements() {
                                 setSelectedResponseIds([]);
                                 loadResponses(viewResponses);
                               } catch (err) {
-                                toast.error(err.response?.data?.error || 'Failed to batch finalize');
+                                toast.error(getApiMessage(err) || 'Failed to batch finalize');
                               } finally {
                                 setSavingResponse(false);
                               }
@@ -1315,7 +1316,7 @@ function CoordinatorAnnouncements() {
                                             await api.put(`/announcements/responses/${response.id}`, { formData: edit });
                                             toast.success('Row saved');
                                           } catch (err) {
-                                            toast.error(err.response?.data?.error || 'Failed to save');
+                                            toast.error(getApiMessage(err) || 'Failed to save');
                                           } finally {
                                             setSavingResponse(false);
                                           }
@@ -1340,7 +1341,7 @@ function CoordinatorAnnouncements() {
                                               toast.success('Thesis finalized & created!');
                                               loadResponses(viewResponses);
                                             } catch (err) {
-                                              toast.error(err.response?.data?.error || 'Failed to finalize');
+                                              toast.error(getApiMessage(err) || 'Failed to finalize');
                                             } finally {
                                               setSavingResponse(false);
                                             }
@@ -1364,7 +1365,7 @@ function CoordinatorAnnouncements() {
                                               toast.success('Submission deleted');
                                               loadResponses(viewResponses);
                                             } catch (err) {
-                                              toast.error(err.response?.data?.error || 'Failed to delete');
+                                              toast.error(getApiMessage(err) || 'Failed to delete');
                                             } finally {
                                               setSavingResponse(false);
                                             }
@@ -1497,7 +1498,7 @@ function CoordinatorAnnouncements() {
                       setEditingResponse(null);
                       if (viewResponses) loadResponses(viewResponses);
                     } catch (err) {
-                      toast.error(err.response?.data?.error || 'Failed to update response');
+                      toast.error(getApiMessage(err) || 'Failed to update response');
                     } finally {
                       setSavingResponse(false);
                     }
@@ -1624,7 +1625,7 @@ function CoordinatorAnnouncements() {
                       setFinalizingResponse(null);
                       if (viewResponses) loadResponses(viewResponses);
                     } catch (err) {
-                      toast.error(err.response?.data?.error || 'Failed to finalize response');
+                      toast.error(getApiMessage(err) || 'Failed to finalize response');
                     }
                   }}
                 >

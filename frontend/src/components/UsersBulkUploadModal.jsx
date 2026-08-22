@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 const ROLE_OPTIONS = [
   { value: 'STUDENT', label: 'Student', href: '/student_users_template.xlsx', columns: 'email, password, firstName, lastName, rollNumber, programCode, degreeType' },
@@ -57,7 +58,7 @@ export default function UsersBulkUploadModal({
       toast.success(data.message || `Created ${data.created} user(s)`);
       if (onSuccess) onSuccess();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally {
       setUploading(false);
     }

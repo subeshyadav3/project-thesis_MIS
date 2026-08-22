@@ -9,6 +9,7 @@ import { downloadFile } from '../../utils/download';
 import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import { getApiMessage } from '../../utils/helpers';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -35,7 +36,7 @@ function StudentProjectDetail() {
     const endpoint = isGroup ? `/students/groups/${id}` : `/students/theses/${id}`;
     api.get(endpoint)
       .then(({ data }) => setAssignment(data))
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load assignment'); setAssignment(null); });
+      .catch(err => { toast.error(getApiMessage(err) || 'Failed to load assignment'); setAssignment(null); });
 
     // Also pull evaluations (for progress overview) — silently handle permission errors
     const evalEndpoint = isGroup ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;

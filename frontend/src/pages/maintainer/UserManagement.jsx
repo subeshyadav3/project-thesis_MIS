@@ -7,6 +7,7 @@ import Pagination from '../../components/Pagination';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { formatYearSemester } from '../../utils/romanNumerals';
 import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
+import { getApiMessage } from '../../utils/helpers';
 
 const COORDINATOR_ALLOWED_ROLES = ['SUPERVISOR', 'EXTERNAL_EXAMINER', 'STUDENT'];
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -81,7 +82,7 @@ function UserManagement() {
       setForm({ email: '', password: '', firstName: '', lastName: '', role: 'STUDENT', degreeType: studentDegreeType, programId: '', rollNumber: '', designation: '' });
       loadUsers();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'An error occurred');
+      toast.error(getApiMessage(err) || 'An error occurred');
     }
   };
 
@@ -104,7 +105,7 @@ function UserManagement() {
           loadUsers();
         } catch (err) {
           const details = err.response?.data?.details;
-          let errorMsg = err.response?.data?.error || 'Error deleting user';
+          let errorMsg = getApiMessage(err) || 'Error deleting user';
           if (details) {
             const links = [];
             if (details.groups) links.push(`${details.groups} group(s)`);
@@ -157,7 +158,7 @@ function UserManagement() {
           loadUsers();
         } catch (err) {
           setConfirmDialog((prev) => ({ ...prev, open: false }));
-          toast.error(err.response?.data?.error || 'Error deleting users');
+          toast.error(getApiMessage(err) || 'Error deleting users');
         }
       },
     });

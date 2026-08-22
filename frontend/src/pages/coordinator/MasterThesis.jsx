@@ -12,6 +12,7 @@ import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUpload
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import useClickOutside from '../../hooks/useClickOutside';
+import { getApiMessage } from '../../utils/helpers';
 
 const PAGE_SIZE = 10;
 
@@ -131,7 +132,7 @@ function MasterThesis() {
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
       api.get('/auth/me', { signal }).then(({ data }) => setCoordinatorProgram(data.program || null)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -169,7 +170,7 @@ function MasterThesis() {
       setTheses(prev => prev.map(t => t.id === thesisId ? { ...t, status: newStatus } : t));
       toast.success(`Status updated to ${newStatus}`);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Status update failed');
+      toast.error(getApiMessage(err) || 'Status update failed');
     } finally {
       setUpdatingStatus(null);
     }
@@ -204,7 +205,7 @@ const handleComplete = async (id) => {
       toast.success('Thesis marked as completed');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Status update failed'); }
   };
 
   const confirmDeleteThesis = (id) => {
@@ -226,7 +227,7 @@ const handleComplete = async (id) => {
       toast.success('Thesis deleted');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Delete failed'); }
   };
 
   const toggleSelectAll = () => {
@@ -278,7 +279,7 @@ const handleComplete = async (id) => {
       setCreateFinalExamSearch('');
       setCreateSupSearch('');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Create failed'); }
     finally { setCreating(false); }
   };
 
@@ -341,7 +342,7 @@ const handleComplete = async (id) => {
       setShowDetail(null);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Save failed');
+      toast.error(getApiMessage(err) || 'Save failed');
     }
   };
 
@@ -939,7 +940,7 @@ return (
                 toast.success(`Assigned supervisor to ${selectedTheses.length} theses`);
                 setSelectedTheses([]);
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Bulk assign failed'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Bulk assign failed'); }
             }}>Assign Supervisor</button>
             <button className="btn btn-sm btn-success" onClick={async () => {
               const pending = selectedTheses.filter(id => {
@@ -952,7 +953,7 @@ return (
                 toast.success(`Activated ${pending.length} theses`);
                 setSelectedTheses([]);
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Bulk activate failed'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Bulk activate failed'); }
             }}>
               <Icon name="play_arrow" className="material-symbols-outlined" />
               Make Active
@@ -966,7 +967,7 @@ return (
                 setSelectedTheses([]);
                 setBulkEndDate('');
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Failed to set end date'); }
             }}>
               <Icon name="calendar_month" className="material-symbols-outlined" />
               Set End Date
@@ -983,7 +984,7 @@ return (
                 setSelectedTheses([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk complete failed');
+                toast.error(getApiMessage(err) || 'Bulk complete failed');
               }
             }}>
               <Icon name="check_circle" className="material-symbols-outlined" />
@@ -1005,7 +1006,7 @@ return (
                     setSelectedTheses([]);
                     setConfirmDialog(prev => ({ ...prev, open: false }));
                     loadData();
-                  } catch (err) { toast.error(err.response?.data?.error || 'Bulk delete failed'); }
+                  } catch (err) { toast.error(getApiMessage(err) || 'Bulk delete failed'); }
                 },
                 danger: true,
               });
@@ -1032,7 +1033,7 @@ return (
                     URL.revokeObjectURL(url);
                     toast.success('Evaluation PDFs downloaded');
                     setConfirmDialog(prev => ({ ...prev, open: false }));
-                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                  } catch (err) { toast.error(getApiMessage(err) || 'Failed to download PDFs'); }
                 },
               });
             }}>

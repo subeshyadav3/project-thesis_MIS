@@ -6,6 +6,7 @@ import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import { getApiMessage } from '../../utils/helpers';
 
 const ACTION_LABEL = {
   UPLOAD: 'Uploaded',
@@ -31,7 +32,7 @@ function FileAudit() {
     setLoading(true);
     api.get('/files-audit', { params: { limit: 200 }, signal: controller.signal })
       .then(({ data }) => setEntries(data))
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load file audit log'); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load file audit log'); })
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);

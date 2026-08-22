@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import { getApiMessage } from '../../utils/helpers';
 
 function StudentProjects() {
   const [groups, setGroups] = useState([]);
@@ -22,7 +23,7 @@ function StudentProjects() {
         u.studentType = 'bachelor';
         localStorage.setItem('user', JSON.stringify(u));
       })
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load projects'); setGroups([]); })
+      .catch(err => { toast.error(getApiMessage(err) || 'Failed to load projects'); setGroups([]); })
       .finally(() => setLoading(false));
   }, []);
 

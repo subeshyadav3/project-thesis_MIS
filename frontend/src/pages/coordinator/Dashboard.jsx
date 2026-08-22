@@ -5,6 +5,7 @@ import { Icon } from '../../components/ui';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { getApiMessage } from '../../utils/helpers';
 
 const STATUS_COLORS = { pending: '#f97316', active: '#4f46e5', completed: '#16a34a' };
 
@@ -106,7 +107,7 @@ function CoordinatorDashboard() {
       loadLate();
       api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to approve');
+      toast.error(getApiMessage(err) || 'Failed to approve');
     } finally {
       setBusyId(null);
     }
@@ -126,7 +127,7 @@ function CoordinatorDashboard() {
       loadLate();
       api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to reject');
+      toast.error(getApiMessage(err) || 'Failed to reject');
     } finally {
       setBusyId(null);
     }

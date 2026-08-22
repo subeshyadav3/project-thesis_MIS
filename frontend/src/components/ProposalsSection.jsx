@@ -6,6 +6,7 @@ import AiAssistantModal from './AiAssistantModal';
 import ConfirmDialog from './ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 const STAGE_LABEL = {
   PROPOSAL: 'Proposal',
@@ -88,7 +89,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user,
       setCommentInputs(prev => ({ ...prev, [proposalId]: '' }));
       loadComments(proposalId);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to add feedback');
+      toast.error(getApiMessage(err) || 'Failed to add feedback');
     } finally {
       setSavingComments(prev => ({ ...prev, [proposalId]: false }));
     }
@@ -105,7 +106,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user,
       setEditInputs(prev => ({ ...prev, [commentId]: '' }));
       loadComments(proposalId);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to update feedback');
+      toast.error(getApiMessage(err) || 'Failed to update feedback');
     } finally {
       setSavingComments(prev => ({ ...prev, [commentId]: false }));
     }
@@ -120,7 +121,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user,
       toast.success('Feedback deleted');
       loadComments(confirmDelete.proposalId);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete feedback');
+      toast.error(getApiMessage(err) || 'Failed to delete feedback');
     } finally {
       setDeletingComment(null);
       setConfirmDelete(null);
@@ -137,7 +138,7 @@ function ProposalsSection({ proposals = [], title = 'Submitted Documents', user,
       if (viewerDoc?.url === confirmDeleteDoc.url) setViewerDoc(null);
       if (onRefresh) onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete document');
+      toast.error(getApiMessage(err) || 'Failed to delete document');
     } finally {
       setDeletingDoc(null);
       setConfirmDeleteDoc(null);

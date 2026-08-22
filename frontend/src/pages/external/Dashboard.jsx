@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { getApiMessage } from '../../utils/helpers';
 
 function ExternalDashboard() {
   const [groups, setGroups] = useState([]);
@@ -18,7 +19,7 @@ function ExternalDashboard() {
       api.get('/external-examiners/groups').then(({ data }) => setGroups(data)),
       api.get('/external-examiners/theses').then(({ data }) => setTheses(data)),
     ]).catch((err) => {
-      toast.error(err.response?.data?.error || 'Failed to load assignments');
+      toast.error(getApiMessage(err) || 'Failed to load assignments');
     }).finally(() => setLoading(false));
   }, []);
 

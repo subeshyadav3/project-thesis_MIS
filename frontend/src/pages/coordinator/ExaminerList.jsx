@@ -12,6 +12,7 @@ import { TableSkeleton } from '../../components/Skeleton';
 import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
 import GroupBulkUploadModal from '../../components/GroupBulkUploadModal';
+import { getApiMessage } from '../../utils/helpers';
 
 const PAGE_SIZE = 10;
 
@@ -86,7 +87,7 @@ function ExaminerList() {
       setShowCreate(false);
       setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Create failed'); }
     setSubmitting(false);
   };
 
@@ -101,7 +102,7 @@ function ExaminerList() {
           await api.delete(`/users/${id}`);
           toast.success('Internal Examiner removed');
           loadData();
-        } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+        } catch (err) { toast.error(getApiMessage(err) || 'Delete failed'); }
         setConfirmDialog(prev => ({ ...prev, open: false }));
       },
     });
@@ -130,7 +131,7 @@ function ExaminerList() {
       setShowEdit(null);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Update failed');
+      toast.error(getApiMessage(err) || 'Update failed');
       loadData();
     }
     setSubmitting(false);
