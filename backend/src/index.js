@@ -89,8 +89,7 @@ app.use('/api/files-audit', filesAuditRoutes);
 app.post('/api/upload/proposal', authenticate, upload.single('file'), uploadController.uploadProposal);
 app.delete('/api/upload/proposal/:proposalId', authenticate, uploadController.deleteProposal);
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('./utils/prisma');
 const fs = require('fs');
 
 app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
@@ -177,39 +176,48 @@ app.get('/api/stats', authenticate, async (req, res) => {
     const studentProgramFilter = programId ? { programId } : {};
     const deptThesisFilter = departmentId && !programId ? { OR: [{ student: { program: { departmentId } } }, { program: { departmentId } }] } : {};
     const thesisFilter = programId ? { OR: [{ student: { programId } }, { programId }] } : deptThesisFilter;
-    const totalGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter } });
-    const totalTheses = await prisma.thesis.count({ where: thesisFilter });
-    const totalSupervisors = await prisma.user.count({ where: { role: 'SUPERVISOR', ...deptUserFilter } });
-    const totalCoordinators = await prisma.user.count({ where: { role: 'COORDINATOR' } });
-    const totalStudents = await prisma.user.count({ where: { role: 'STUDENT', ...deptUserFilter, ...studentProgramFilter } });
-    const pendingGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'PENDING' } });
-    const activeGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'ACTIVE' } });
-    const completedGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'COMPLETED' } });
-    const pendingTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'PENDING' } });
-    const activeTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'ACTIVE' } });
-    const completedTheses = await prisma.thesis.count({ where: { ...thesisFilter, status: 'COMPLETED' } });
-    const minorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MINOR' } });
-    const majorGroups = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MAJOR' } });
-    const supervisorAssignmentPendingThesis = await prisma.thesis.count({ where: { ...thesisFilter, supervisorAssignmentStatus: 'PENDING' } });
-    const supervisorAssignmentAcceptedThesis = await prisma.thesis.count({ where: { ...thesisFilter, supervisorAssignmentStatus: 'ACCEPTED' } });
-    const supervisorAssignmentRejectedThesis = await prisma.thesis.count({ where: { ...thesisFilter, supervisorAssignmentStatus: 'REJECTED' } });
-    const supervisorAssignmentPendingGroup = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, supervisorAssignmentStatus: 'PENDING' } });
-    const supervisorAssignmentAcceptedGroup = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, supervisorAssignmentStatus: 'ACCEPTED' } });
-    const supervisorAssignmentRejectedGroup = await prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, supervisorAssignmentStatus: 'REJECTED' } });
-
+    const [
+      totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
+      pendingGroups, activeGroups, completedGroups,
+      pendingTheses, activeTheses, completedTheses,
+      minorGroups, majorGroups,
+      supervisorAssignmentPendingThesis, supervisorAssignmentAcceptedThesis, supervisorAssignmentRejectedThesis,
+      supervisorAssignmentPendingGroup, supervisorAssignmentAcceptedGroup, supervisorAssignmentRejectedGroup,
+      formCreatedTheses, pendingLateProposals,
+    ] = await Promise.all([
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter } }),
+      prisma.thesis.count({ where: thesisFilter }),
+      prisma.user.count({ where: { role: 'SUPERVISOR', ...deptUserFilter } }),
+      prisma.user.count({ where: { role: 'COORDINATOR' } }),
+      prisma.user.count({ where: { role: 'STUDENT', ...deptUserFilter, ...studentProgramFilter } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'PENDING' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'ACTIVE' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, status: 'COMPLETED' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, status: 'PENDING' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, status: 'ACTIVE' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, status: 'COMPLETED' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MINOR' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, projectType: 'MAJOR' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, supervisorAssignmentStatus: 'PENDING' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, supervisorAssignmentStatus: 'ACCEPTED' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, supervisorAssignmentStatus: 'REJECTED' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, supervisorAssignmentStatus: 'PENDING' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, supervisorAssignmentStatus: 'ACCEPTED' } }),
+      prisma.projectGroup.count({ where: { ...yearFilter, ...programFilter, supervisorAssignmentStatus: 'REJECTED' } }),
+      prisma.thesis.count({ where: { ...thesisFilter, createdVia: 'FORM' } }),
+      prisma.proposal.count({
+        where: {
+          status: 'PENDING_APPROVAL',
+          OR: [
+            { thesis: thesisFilter },
+            { group: { ...yearFilter, ...programFilter } },
+          ],
+        },
+      }),
+    ]);
     const supervisorAssignmentPending = supervisorAssignmentPendingThesis + supervisorAssignmentPendingGroup;
     const supervisorAssignmentAccepted = supervisorAssignmentAcceptedThesis + supervisorAssignmentAcceptedGroup;
     const supervisorAssignmentRejected = supervisorAssignmentRejectedThesis + supervisorAssignmentRejectedGroup;
-    const formCreatedTheses = await prisma.thesis.count({ where: { ...thesisFilter, createdVia: 'FORM' } });
-    const pendingLateProposals = await prisma.proposal.count({
-      where: {
-        status: 'PENDING_APPROVAL',
-        OR: [
-          { thesis: thesisFilter },
-          { group: { ...yearFilter, ...programFilter } },
-        ],
-      },
-    });
     res.json({
       totalGroups, totalTheses, totalSupervisors, totalCoordinators, totalStudents,
       pendingGroups, activeGroups, completedGroups, pendingTheses, activeTheses, completedTheses,
