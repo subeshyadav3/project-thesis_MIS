@@ -465,7 +465,7 @@ function ProjectDetail() {
                   } />
                 )}
                 {item?.startDate && <InfoRow label="Start Date" value=<DualDate date={item.startDate} /> />}
-                <InfoRow label="End Date" value={item?.endDate ? fmtDate(item.endDate) : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not Added</span>} />
+                <InfoRow label="End Date" value={item?.endDate ? <DualDate date={item.endDate} /> : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not Added</span>} />
                 {item?.description && <InfoRow label="Description" value={item.description} />}
               </div>
             </div>              {/* Evaluation breakdown — only user's own components for non-coordinators */}

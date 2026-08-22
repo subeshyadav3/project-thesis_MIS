@@ -13,6 +13,7 @@ import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
 import {getApiMessage,fmtDate} from '../../utils/helpers';
 import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
 
 const PAGE_SIZE = 10;
 
@@ -169,7 +170,7 @@ function SupervisorMasterThesis() {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span>{showDetail.createdAt ? fmtDate(showDetail.createdAt) : '—'}</span>
+                  <span><DualDate date={showDetail.createdAt} /></span>
                 </div>
               </div>
             </div>

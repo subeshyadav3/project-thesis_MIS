@@ -10,6 +10,7 @@ import DualDate from '../../components/DualDate';
 import useClickOutside from '../../hooks/useClickOutside';
 import { getApiMessage } from '../../utils/helpers';
 import StatusBadge from '../../components/StatusBadge';
+import BsDateInput from '../../components/BsDateInput';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
@@ -723,12 +724,12 @@ function CoordinatorAnnouncements() {
                         </div>
                         <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                           <label style={{ fontSize: 12 }}>Start Date (optional)</label>
-                          <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
+                          <BsDateInput value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
                           <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
                         </div>
                         <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                           <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
-                          <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
+                          <BsDateInput value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
                           <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
                         </div>
                         <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
@@ -828,11 +829,11 @@ function CoordinatorAnnouncements() {
                         <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                             <label style={{ fontSize: 12 }}>Start Date (optional)</label>
-                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                            <BsDateInput value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
                           </div>
                           <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                             <label style={{ fontSize: 12 }}>Form Deadline (optional)</label>
-                            <input type="date" value={form.expirationDate} onChange={e => setForm({ ...form, expirationDate: e.target.value })} />
+                            <BsDateInput value={form.expirationDate} onChange={e => setForm({ ...form, expirationDate: e.target.value })} />
                             <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
                               Submissions after this date are marked late
                             </p>

@@ -14,6 +14,8 @@ import useClickOutside from '../../hooks/useClickOutside';
 import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
 import {getApiMessage,fmtDate} from '../../utils/helpers';
 import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
+import BsDateInput from '../../components/BsDateInput';
 
 const PAGE_SIZE = 10;
 
@@ -691,7 +693,7 @@ const filteredGroups = useMemo(() => {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span>{showDetail.createdAt ? fmtDate(showDetail.createdAt) : '—'}</span>
+                  <span><DualDate date={showDetail.createdAt} /></span>
                 </div>
                 <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
                   <span className="detail-label">Description</span>
@@ -935,11 +937,11 @@ const filteredGroups = useMemo(() => {
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>Start Date</label>
-                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                    <BsDateInput className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                    <input type="date" className="form-input" value={editEndDate} onChange={e => { setEditEndDate(e.target.value); }} />
+                    <BsDateInput className="form-input" value={editEndDate} onChange={e => { setEditEndDate(e.target.value); }} />
                     {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
@@ -1132,7 +1134,7 @@ const filteredGroups = useMemo(() => {
               <Icon name="play_arrow" className="material-symbols-outlined" />
               Make Active
             </button>
-            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <BsDateInput className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
             <button className="btn btn-sm btn-primary" onClick={async () => {
               if (!bulkEndDate) return toast.warning('Select an end date first');
               try {
@@ -1773,11 +1775,11 @@ const filteredGroups = useMemo(() => {
               </div>
               <div className="form-group">
                 <label>Start Date</label>
-                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+                <BsDateInput value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
+                <BsDateInput value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
 
               <div className="form-group" ref={createSupRef}>
