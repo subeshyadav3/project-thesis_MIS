@@ -31,17 +31,24 @@ export function timeAgo(dateStr) {
   return fmtBs(dateStr) || d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** "12 Aug 2026" */
+/** Format as Nepali BS date (e.g. "Bhadra 6, 2083"), falling back to AD format. */
 export function fmtDate(dateStr) {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const bs = fmtBs(dateStr);
+  if (bs) return bs;
+  const d = new Date(dateStr);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** "12 Aug 2026, 14:05" */
+/** Format as Nepali BS date + time (e.g. "Bhadra 6, 2083, 14:05"). */
 export function fmtDateTime(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const isValid = !Number.isNaN(d.getTime());
+  const bs = fmtBs(dateStr);
+  const timeStr = isValid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  if (bs) return timeStr ? `${bs}, ${timeStr}` : bs;
+  return isValid ? `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, ${timeStr}` : '—';
 }
 
 export default { getCurrentUser, getApiMessage, timeAgo, fmtDate, fmtDateTime };

@@ -805,9 +805,7 @@ function ProjectDetail() {
                           {r.content.length > 200 ? r.content.slice(0, 200) + '...' : r.content}
                         </p>
                         <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                          Issued <DualDate date={r.createdAt} />
-                          {' at '}
-                          {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          Issued <DualDate date={r.createdAt} time />
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>

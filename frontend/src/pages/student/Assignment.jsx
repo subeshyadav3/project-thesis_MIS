@@ -305,7 +305,11 @@ function StudentProjectDetail() {
                     color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                   }}>
                     <Icon name={info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                    {info.expired ? `Due date passed: $<DualDate date={assignment.endDate} />` : `Due: ${info.label}`}
+                    {info.expired ? (
+                      <span>Due date passed: <DualDate date={assignment.endDate} /></span>
+                    ) : (
+                      `Due: ${info.label}`
+                    )}
                   </div>
                 );
               })()}

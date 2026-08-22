@@ -1,16 +1,29 @@
-import { fmtBs } from '../utils/nepaliDate';
+import { fmtBs, parseAdDate } from '../utils/nepaliDate';
 
-/** Bikram Sambat date, e.g. "Shrawan 30, 2083" (optionally with clock time). */
-export default function DualDate({ date, time }) {
+/** Bikram Sambat date, e.g. "Bhadra 6, 2083" (optionally with clock time). */
+export default function DualDate({ date, time, showAd = false }) {
   if (!date) return <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>;
   const bs = fmtBs(date);
+  const d = parseAdDate(date);
+  const isValid = d !== null;
+
   if (!bs) {
-    const d = new Date(date);
-    return <span>{Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>;
+    return <span>{isValid ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span>;
   }
-  if (time) {
-    const t = new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return <span>{`${bs}, ${t}`}</span>;
+
+  const timeStr = (time && isValid) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const displayBs = timeStr ? `${bs}, ${timeStr}` : bs;
+
+  if (showAd && isValid) {
+    const adStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return (
+      <span className="dual-date" title={`BS: ${displayBs} | AD: ${adStr}`}>
+        <span className="dual-date-bs">{displayBs}</span>
+        <span className="dual-date-ad">({adStr})</span>
+      </span>
+    );
   }
-  return <span>{bs}</span>;
+
+  const tooltip = isValid ? `AD: ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
+  return <span title={tooltip}>{displayBs}</span>;
 }

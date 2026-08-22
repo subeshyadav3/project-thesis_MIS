@@ -2,7 +2,7 @@ import React from 'react';
 import {
   AlertCircle, ArrowLeft, ArrowLeftRight, ArrowRight, Award, BadgeCheck, Ban,
   Bell, BellOff, BookOpen, Bot, Brain, Building2, Calendar, Check, CheckCheck,
-  CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp,
+  CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp,
   Circle, CircleStop, CircleX, ClipboardCheck, Clock, Download, EllipsisVertical,
   ExternalLink, Eye, FastForward, FileText, FileUp, Flag, Folder, FolderX,
   GraduationCap, Hourglass, Info, Key, Landmark, LayoutDashboard, LayoutGrid,
@@ -21,6 +21,7 @@ const iconMap = {
   add_business: Store,
   admin_panel_settings: ShieldCheck,
   arrow_back: ArrowLeft,
+  arrow_drop_down: ChevronDown,
   arrow_drop_up: ChevronUp,
   arrow_forward: ArrowRight,
   assignment: FileText,
@@ -102,10 +103,15 @@ const iconMap = {
   description: FileText,
   edit_note: Pencil,
   error_outline: AlertCircle,
+  event: Calendar,
+  expand_less: ChevronUp,
+  expand_more: ChevronDown,
   folder: Folder,
   folder_off: FolderX,
   group: Users,
   history: RotateCcw,
+  keyboard_arrow_down: ChevronDown,
+  keyboard_arrow_up: ChevronUp,
   light_mode: Sun,
   lock_reset: RefreshCw,
   notifications_off: BellOff,
@@ -116,8 +122,10 @@ const iconMap = {
   question_answer: MessageSquare,
   radio_button_unchecked: Circle,
   reviews: Star,
+  schedule: Clock,
   summarize: ListChecks,
   swap_horiz: ArrowLeftRight,
+  today: Calendar,
 };
 
 export const Icon = ({ name, className = '', ...rest }) => {

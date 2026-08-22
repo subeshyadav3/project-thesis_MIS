@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import {Time} from '../utils/helpers';
 import DualDate from '../components/DualDate';
 
 const COMMENT_ROLE_COLORS = {

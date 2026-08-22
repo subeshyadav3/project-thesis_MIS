@@ -4562,3 +4562,207 @@ body.dark .toast { background: var(--color-surface-container-low); color: var(--
   color: var(--color-on-surface-variant);
   margin-top: 3px;
 }
+
+/* ─── Nepali Calendar Date Picker (BS) ─── */
+.bs-datepicker-container {
+  display: block;
+  font-family: inherit;
+}
+
+.bs-datepicker-input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-surface);
+  border: 1px solid var(--color-outline, #cbd5e1);
+  border-radius: var(--border-radius-md, 8px);
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.bs-datepicker-input:hover:not(.disabled) {
+  border-color: var(--color-primary);
+}
+
+.bs-datepicker-input.focused {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-container, rgba(37, 99, 235, 0.2));
+  outline: none;
+}
+
+.bs-datepicker-input.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-surface-container-low);
+  pointer-events: none;
+}
+
+.bs-datepicker-clear-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.bs-datepicker-clear-btn:hover {
+  background: var(--color-surface-container-high);
+  color: var(--color-error, #ef4444);
+}
+
+.bs-calendar-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 1100;
+  min-width: 290px;
+  width: 100%;
+  max-width: 330px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-outline-variant, #e2e8f0);
+  border-radius: var(--border-radius-lg, 12px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  box-sizing: border-box;
+  animation: bsCalendarFadeIn 0.15s ease-out;
+}
+
+@keyframes bsCalendarFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bs-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.bs-cal-nav-btn {
+  background: var(--color-surface-container-low, #f8fafc);
+  border: 1px solid var(--color-outline-variant, #e2e8f0);
+  border-radius: var(--border-radius-sm, 6px);
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-on-surface);
+  transition: background 0.15s;
+}
+
+.bs-cal-nav-btn:hover {
+  background: var(--color-surface-container-high, #e2e8f0);
+}
+
+.bs-cal-selectors {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+
+.bs-cal-select {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-outline-variant, #cbd5e1);
+  border-radius: var(--border-radius-sm, 6px);
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  cursor: pointer;
+  outline: none;
+}
+
+.bs-cal-select:focus {
+  border-color: var(--color-primary);
+}
+
+.bs-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.bs-cal-weekday-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-on-surface-variant);
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.bs-cal-saturday {
+  color: var(--color-error, #ef4444) !important;
+}
+
+.bs-cal-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.bs-cal-day-cell.empty {
+  height: 32px;
+}
+
+.bs-cal-day-btn {
+  height: 32px;
+  width: 100%;
+  border: none;
+  background: none;
+  border-radius: var(--border-radius-sm, 6px);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  padding: 0;
+}
+
+.bs-cal-day-btn:hover {
+  background: var(--color-surface-container-high, #f1f5f9);
+}
+
+.bs-cal-day-btn.today {
+  font-weight: 700;
+  border: 1px dashed var(--color-primary);
+}
+
+.bs-cal-day-btn.saturday {
+  color: var(--color-error, #ef4444);
+}
+
+.bs-cal-day-btn.selected {
+  background: var(--color-primary, #2563eb) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border: none !important;
+}
+
+.bs-cal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-outline-variant, #e2e8f0);
+}
