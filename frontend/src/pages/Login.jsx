@@ -3,6 +3,7 @@ import { Icon } from '../components/ui';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { getApiMessage } from '../utils/helpers';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -24,7 +25,7 @@ function Login() {
       const rolePath = data.user.role === 'EXTERNAL_EXAMINER' ? 'external' : data.user.role.toLowerCase();
       navigate(`/${rolePath}`);
     } catch (err) {
-      const msg = err.response?.data?.error || 'Login failed';
+      const msg = getApiMessage(err) || 'Login failed';
       setError(msg);
       toast.error(msg);
     } finally {

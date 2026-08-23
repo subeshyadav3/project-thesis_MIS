@@ -6,9 +6,15 @@ import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import DualDate from '../../components/DualDate';
+import useClickOutside from '../../hooks/useClickOutside';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
+import BsDateInput from '../../components/BsDateInput';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Master Thesis', MASTER_PROJECT: 'Master Project' };
 const AUDIENCE_LABELS = { ALL: 'All Students', PROGRAMS: 'By Program', DEGREE: 'By Degree', STUDENTS: 'Specific Students' };
+
 
 const MASTER_THESIS_FORM_FIELDS = [
   { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis'] },
@@ -71,15 +77,7 @@ function MatrixSupervisorSelect({ value, onChange, supervisors }) {
     setOpen(!open);
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target) && !e.target.closest('.matrix-sup-portal')) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(ref, () => setOpen(false), true, '.matrix-sup-portal');
 
   const filtered = supervisors.filter(s => {
     if (!search.trim()) return true;
@@ -235,6 +233,7 @@ function CoordinatorAnnouncements() {
   const [submissions, setSubmissions] = useState({ groups: [], theses: [] });
   const [subLoading, setSubLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDeleteResponse, setConfirmDeleteResponse] = useState(null);
   const studentRef = useRef(null);
   const toast = useToast();
 
@@ -269,11 +268,7 @@ function CoordinatorAnnouncements() {
     return [...batches].filter(Boolean).sort((a, b) => b.localeCompare(a));
   }, [allStudents]);
 
-  useEffect(() => {
-    const f = (e) => { if (studentRef.current && !studentRef.current.contains(e.target)) setStudentOpen(false); };
-    if (studentOpen) document.addEventListener('mousedown', f);
-    return () => document.removeEventListener('mousedown', f);
-  }, [studentOpen]);
+  useClickOutside(studentRef, () => setStudentOpen(false), studentOpen);
 
   const activeAnnouncements = announcements.filter(a => !a.expiresAt || new Date(a.expiresAt) > new Date());
   const expiredAnnouncements = announcements.filter(a => a.expiresAt && new Date(a.expiresAt) <= new Date());
@@ -324,7 +319,7 @@ function CoordinatorAnnouncements() {
       setSelectedStudents([]);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save');
+      toast.error(getApiMessage(err) || 'Failed to save');
     } finally {
       setSubmitting(false);
     }
@@ -360,7 +355,7 @@ function CoordinatorAnnouncements() {
       toast.success('Announcement deleted');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete');
+      toast.error(getApiMessage(err) || 'Failed to delete');
     } finally {
       setConfirmDelete(null);
     }
@@ -371,7 +366,7 @@ function CoordinatorAnnouncements() {
       await api.put(`/announcements/${id}/deactivate`);
       toast.success('Announcement deactivated');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Failed'); }
   };
 
   const loadSubmissions = async (ann) => {
@@ -399,7 +394,7 @@ function CoordinatorAnnouncements() {
       toast.success('Submission approved');
       loadSubmissions(viewAnnouncement);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to approve');
+      toast.error(getApiMessage(err) || 'Failed to approve');
     }
   };
 
@@ -478,8 +473,7 @@ function CoordinatorAnnouncements() {
                     <th>Title</th>
                     <th>Type</th>
                     <th>Audience</th>
-                    <th>Form Groups?</th>
-                    {user.program?.degreeType !== 'BACHELOR' && <th>Form?</th>}
+                    <th>Capabilities</th>
                     <th>Period</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
@@ -504,12 +498,31 @@ function CoordinatorAnnouncements() {
                         </td>
                         <td><span className={`badge badge-${a.type === 'THESIS' ? 'warning' : a.type === 'MINOR' ? 'info' : a.type === 'MAJOR' ? 'warning' : 'default'}`}>{TYPE_LABELS[a.type] || a.type}</span></td>
                         <td style={{ fontSize: 13 }}>{AUDIENCE_LABELS[a.audience]}</td>
-                        <td>{hasGF ? <span className="badge badge-active"><span className="dot" /> Yes (max {a.groupSizeMax})</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
-                        {user.program?.degreeType !== 'BACHELOR' && (
-                          <td>{a.formEnabled ? <span className="badge badge-warning"><span className="dot" /> Form {(a.formFields?.length || 0) > 0 ? `(+${a.formFields.length})` : ''}</span> : <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}</td>
-                        )}
-                        <td style={{ fontSize: 12 }}>
-                          {a.startDate ? new Date(a.startDate).toLocaleDateString() : '—'} ~ {a.expirationDate ? new Date(a.expirationDate).toLocaleDateString() : '—'}
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {hasGF && (
+                              <span className="badge badge-active" title={`Group formation is open (max ${a.groupSizeMax} members)`}>
+                                <span className="dot" />Groups · max {a.groupSizeMax}
+                              </span>
+                            )}
+                            {a.formEnabled && (
+                              <span className="badge badge-warning" title={`Registration form${a.formFields?.length ? ` with ${a.formFields.length} extra field(s)` : ''}`}>
+                                <span className="dot" />Form{a.formFields?.length ? ` (+${a.formFields.length})` : ''}
+                              </span>
+                            )}
+                            {!hasGF && !a.formEnabled && <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>}
+                          </div>
+                        </td>
+                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {a.startDate || a.expirationDate ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <DualDate date={a.startDate} />
+                              <span style={{ color: 'var(--color-outline)' }}>→</span>
+                              <DualDate date={a.expirationDate} />
+                            </div>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td>
                           {active ? (
@@ -522,23 +535,30 @@ function CoordinatorAnnouncements() {
                             <span className="badge badge-pending">Expired</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
-                            <Icon name="edit" className="material-symbols-outlined" />
-                          </button>
-                          <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
-                            <Icon name="delete" className="material-symbols-outlined" />
-                          </button>
-                          {(a.formEnabled || a.allowGroupFormation) && (
-                            <button className="btn btn-sm btn-outline" onClick={() => loadResponses(a)}>
-                              <Icon name="fact_check" className="material-symbols-outlined" /> Responses
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                            <button className="btn btn-sm btn-outline" onClick={() => handleEdit(a)} title="Edit">
+                              <Icon name="edit" className="material-symbols-outlined" />
                             </button>
-                          )}
-                          {active && (
-                            <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)}>
-                              <Icon name="cancel" className="material-symbols-outlined" /> Deactivate
+                            <button className="btn btn-sm btn-outline" onClick={() => setConfirmDelete(a)} title="Delete" style={{ color: 'var(--color-error)' }}>
+                              <Icon name="delete" className="material-symbols-outlined" />
                             </button>
-                          )}
+                            {(a.formEnabled || a.allowGroupFormation) && (
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() => loadResponses(a)}
+                                title={a.allowGroupFormation ? 'Open group formation responses & finalize teams' : 'View registration form responses'}
+                              >
+                                <Icon name="fact_check" className="material-symbols-outlined" />
+                                {a.allowGroupFormation ? 'Formation' : 'Responses'}
+                              </button>
+                            )}
+                            {active && (
+                              <button className="btn btn-sm btn-outline" onClick={() => deactivate(a.id)} title="End this announcement now">
+                                <Icon name="cancel" className="material-symbols-outlined" /> End
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -704,12 +724,12 @@ function CoordinatorAnnouncements() {
                         </div>
                         <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                           <label style={{ fontSize: 12 }}>Start Date (optional)</label>
-                          <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
+                          <BsDateInput value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} />
                           <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Defaults to today if not set</p>
                         </div>
                         <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                           <label style={{ fontSize: 12 }}>Expiration Date (optional)</label>
-                          <input type="date" value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
+                          <BsDateInput value={form.expirationDate} onChange={e => setForm({...form, expirationDate: e.target.value})} />
                           <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>Items become OVERDUE after this date</p>
                         </div>
                         <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
@@ -809,11 +829,11 @@ function CoordinatorAnnouncements() {
                         <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                             <label style={{ fontSize: 12 }}>Start Date (optional)</label>
-                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+                            <BsDateInput value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
                           </div>
                           <div className="form-group" style={{ flex: '1 1 calc(50% - 6px)', minWidth: 160, margin: 0 }}>
                             <label style={{ fontSize: 12 }}>Form Deadline (optional)</label>
-                            <input type="date" value={form.expirationDate} onChange={e => setForm({ ...form, expirationDate: e.target.value })} />
+                            <BsDateInput value={form.expirationDate} onChange={e => setForm({ ...form, expirationDate: e.target.value })} />
                             <p style={{ fontSize: 10, color: 'var(--color-on-surface-variant)', margin: '2px 0 0' }}>
                               Submissions after this date are marked late
                             </p>
@@ -966,7 +986,7 @@ function CoordinatorAnnouncements() {
                               <tr key={t.id}>
                                 <td>{t.title}</td>
                                 <td>{t.student ? `${t.student.firstName} ${t.student.lastName}` : '—'}</td>
-                                <td><span className="badge badge-pending">{t.status}</span></td>
+                                <td><StatusBadge status={t.status} /></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <button className="btn btn-sm btn-primary" onClick={() => handleApprove(t, 'thesis')}>
                                     <Icon name="check_circle" className="material-symbols-outlined" /> Approve
@@ -983,7 +1003,7 @@ function CoordinatorAnnouncements() {
                               <tr key={g.id}>
                                 <td>{g.projectTitle || g.name}</td>
                                 <td>{g.members?.map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}</td>
-                                <td><span className="badge badge-pending">{g.status}</span></td>
+                                <td><StatusBadge status={g.status} /></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <button className="btn btn-sm btn-primary" onClick={() => handleApprove(g, 'group')}>
                                     <Icon name="check_circle" className="material-symbols-outlined" /> Approve
@@ -1082,7 +1102,7 @@ function CoordinatorAnnouncements() {
                                 setSelectedResponseIds([]);
                                 loadResponses(viewResponses);
                               } catch (err) {
-                                toast.error(err.response?.data?.error || 'Failed to batch finalize');
+                                toast.error(getApiMessage(err) || 'Failed to batch finalize');
                               } finally {
                                 setSavingResponse(false);
                               }
@@ -1326,7 +1346,7 @@ function CoordinatorAnnouncements() {
                                             await api.put(`/announcements/responses/${response.id}`, { formData: edit });
                                             toast.success('Row saved');
                                           } catch (err) {
-                                            toast.error(err.response?.data?.error || 'Failed to save');
+                                            toast.error(getApiMessage(err) || 'Failed to save');
                                           } finally {
                                             setSavingResponse(false);
                                           }
@@ -1351,7 +1371,7 @@ function CoordinatorAnnouncements() {
                                               toast.success('Thesis finalized & created!');
                                               loadResponses(viewResponses);
                                             } catch (err) {
-                                              toast.error(err.response?.data?.error || 'Failed to finalize');
+                                              toast.error(getApiMessage(err) || 'Failed to finalize');
                                             } finally {
                                               setSavingResponse(false);
                                             }
@@ -1367,19 +1387,7 @@ function CoordinatorAnnouncements() {
                                           style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
                                           disabled={savingResponse}
                                           title="Delete submission"
-                                          onClick={async () => {
-                                            if (!window.confirm('Are you sure you want to delete this submission? It will be removed from students, supervisors, and project records everywhere.')) return;
-                                            setSavingResponse(true);
-                                            try {
-                                              await api.delete(`/announcements/responses/${response.id}`);
-                                              toast.success('Submission deleted');
-                                              loadResponses(viewResponses);
-                                            } catch (err) {
-                                              toast.error(err.response?.data?.error || 'Failed to delete');
-                                            } finally {
-                                              setSavingResponse(false);
-                                            }
-                                          }}
+                                          onClick={() => setConfirmDeleteResponse(response)}
                                         >
                                           <Icon name="delete" className="material-symbols-outlined" style={{ fontSize: 13 }} />
                                         </button>
@@ -1508,7 +1516,7 @@ function CoordinatorAnnouncements() {
                       setEditingResponse(null);
                       if (viewResponses) loadResponses(viewResponses);
                     } catch (err) {
-                      toast.error(err.response?.data?.error || 'Failed to update response');
+                      toast.error(getApiMessage(err) || 'Failed to update response');
                     } finally {
                       setSavingResponse(false);
                     }
@@ -1635,7 +1643,7 @@ function CoordinatorAnnouncements() {
                       setFinalizingResponse(null);
                       if (viewResponses) loadResponses(viewResponses);
                     } catch (err) {
-                      toast.error(err.response?.data?.error || 'Failed to finalize response');
+                      toast.error(getApiMessage(err) || 'Failed to finalize response');
                     }
                   }}
                 >
@@ -1654,6 +1662,28 @@ function CoordinatorAnnouncements() {
           onCancel={() => setConfirmDelete(null)}
           confirmLabel="Delete"
           danger
+        />
+
+        <ConfirmDialog
+          open={!!confirmDeleteResponse}
+          title="Delete submission"
+          message={`Remove ${confirmDeleteResponse?.student?.firstName || 'this'} ${confirmDeleteResponse?.student?.lastName || 'submission'}'s submission? It will be deleted from students, supervisors, and project records everywhere.`}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setConfirmDeleteResponse(null)}
+          onConfirm={async () => {
+            setSavingResponse(true);
+            try {
+              await api.delete(`/announcements/responses/${confirmDeleteResponse.id}`);
+              toast.success('Submission deleted');
+              setConfirmDeleteResponse(null);
+              if (viewResponses) loadResponses(viewResponses);
+            } catch (err) {
+              toast.error(getApiMessage(err) || 'Failed to delete');
+            } finally {
+              setSavingResponse(false);
+            }
+          }}
         />
       </PageLayout>
     </ErrorBoundary>

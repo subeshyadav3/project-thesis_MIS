@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import SearchInput from '../../components/SearchInput';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import { getApiMessage } from '../../utils/helpers';
 
 const ASSIGN_LABELS = {
   PENDING: { label: 'Awaiting acceptance', cls: 'warning' },
@@ -62,7 +63,7 @@ function SupervisorAssignments() {
       toast.success('Supervisor assigned');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to assign');
+      toast.error(getApiMessage(err) || 'Failed to assign');
     } finally {
       setSavingId(null);
     }

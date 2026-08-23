@@ -7,6 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import { getApiMessage } from '../../utils/helpers';
 
 function DepartmentManagement() {
   const [departments, setDepartments] = useState([]);
@@ -82,7 +83,7 @@ function DepartmentManagement() {
       setDeptForm({ name: '', code: '', coordinatorId: '' });
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error saving department');
+      toast.error(getApiMessage(err) || 'Error saving department');
     } finally {
       setSaving(false);
     }
@@ -100,7 +101,7 @@ function DepartmentManagement() {
           toast.success('Department deleted successfully');
           loadData();
         } catch (err) {
-          toast.error(err.response?.data?.error || 'Failed to delete department');
+          toast.error(getApiMessage(err) || 'Failed to delete department');
         }
       },
     });
@@ -127,7 +128,7 @@ function DepartmentManagement() {
       setProgForm({ name: '', code: '', departmentId: '', degreeType: 'BACHELOR' });
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error saving program');
+      toast.error(getApiMessage(err) || 'Error saving program');
     } finally {
       setSaving(false);
     }
@@ -145,7 +146,7 @@ function DepartmentManagement() {
           toast.success('Program deleted successfully');
           loadData();
         } catch (err) {
-          toast.error(err.response?.data?.error || 'Failed to delete program');
+          toast.error(getApiMessage(err) || 'Failed to delete program');
         }
       },
     });
@@ -172,7 +173,7 @@ function DepartmentManagement() {
       setYearForm({ year: '', semester: '', departmentId: '', isActive: false });
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error saving academic year');
+      toast.error(getApiMessage(err) || 'Error saving academic year');
     } finally {
       setSaving(false);
     }
@@ -184,7 +185,7 @@ function DepartmentManagement() {
       toast.success(`Academic year ${year.year} ${year.isActive ? 'deactivated' : 'activated'}`);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to toggle academic year status');
+      toast.error(getApiMessage(err) || 'Failed to toggle academic year status');
     }
   };
 
@@ -200,7 +201,7 @@ function DepartmentManagement() {
           toast.success('Academic year deleted successfully');
           loadData();
         } catch (err) {
-          toast.error(err.response?.data?.error || 'Failed to delete academic year');
+          toast.error(getApiMessage(err) || 'Failed to delete academic year');
         }
       },
     });

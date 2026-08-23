@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from './ui';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import useClickOutside from '../hooks/useClickOutside';
+import { timeAgo } from '../utils/helpers';
 
 const TYPE_ICON = {
   PROPOSAL_UPLOAD: 'upload_file',
@@ -53,15 +55,7 @@ function NotificationBell() {
     if (open && notifications.length === 0) fetchAll();
   }, [open]);
 
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(dropdownRef, () => setOpen(false));
 
   const handleMarkRead = async (id, e) => {
     e.stopPropagation();
@@ -80,16 +74,7 @@ function NotificationBell() {
     } catch {}
   };
 
-  const formatTime = (dateStr) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diff = (now - d) / 1000;
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return d.toLocaleDateString();
-  };
+  const formatTime = timeAgo;
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const notificationsPath = user.role === 'EXTERNAL_EXAMINER'

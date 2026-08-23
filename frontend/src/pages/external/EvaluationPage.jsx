@@ -7,6 +7,7 @@ import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import { getApiMessage } from '../../utils/helpers';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -34,7 +35,7 @@ function ExternalExaminerEvaluationPage() {
     const endpoint = type === 'group' ? `/groups/${id}` : `/theses/${id}`;
     api.get(endpoint, { signal })
       .then(({ data }) => setItem(data))
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); });
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); });
     const evalEndpoint = type === 'group' ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
     api.get(evalEndpoint, { signal })
       .then(({ data }) => {
@@ -51,7 +52,7 @@ function ExternalExaminerEvaluationPage() {
         });
         setFeedbackState(fb);
       })
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); })
       .finally(() => setLoading(false));
   }, [id, type]);
 
@@ -84,7 +85,7 @@ function ExternalExaminerEvaluationPage() {
       toast.success(`${component.name} marks saved`);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || `Failed to save ${component.name}`);
+      toast.error(getApiMessage(err) || `Failed to save ${component.name}`);
     }
   };
 
@@ -111,7 +112,7 @@ function ExternalExaminerEvaluationPage() {
       toast.success('Feedback saved');
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save feedback');
+      toast.error(getApiMessage(err) || 'Failed to save feedback');
     } finally {
       setSavingFeedback(false);
     }

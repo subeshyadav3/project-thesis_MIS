@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Icon } from '../../components/ui';
+
+const PieChartCard = lazy(() => import('../../components/PieChartCard'));
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
 
 const STATUS_COLORS = { pending: '#f97316', active: '#4f46e5', completed: '#16a34a' };
 
@@ -106,7 +110,7 @@ function CoordinatorDashboard() {
       loadLate();
       api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to approve');
+      toast.error(getApiMessage(err) || 'Failed to approve');
     } finally {
       setBusyId(null);
     }
@@ -126,7 +130,7 @@ function CoordinatorDashboard() {
       loadLate();
       api.get('/stats').then(({ data }) => setStats(data)).catch(() => {});
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to reject');
+      toast.error(getApiMessage(err) || 'Failed to reject');
     } finally {
       setBusyId(null);
     }
@@ -251,54 +255,18 @@ function CoordinatorDashboard() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, alignItems: 'stretch' }}>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className="card-header"><h3>Program Status Distribution</h3></div>
-          <div style={{ flex: 1, minHeight: 220 }}>
-            {chartData.length ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={52} outerRadius={82} paddingAngle={2} strokeWidth={0}>
-                    {chartData.map((d) => <Cell key={d.name} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)', borderRadius: 8, color: 'var(--color-on-surface)', fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="empty-state"><p>No data yet</p></div>
-            )}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', padding: '10px 0 4px' }}>
-            {chartData.map((d) => (
-              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-on-surface)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color }} />
-                {d.name} <b>{d.value}</b>
-              </div>
-            ))}
-          </div>
-        </div>
+        {chartData.length ? (
+          <Suspense fallback={<div className="card empty-state"><p>Loading charts…</p></div>}>
+            <PieChartCard title="Program Status Distribution" data={chartData} minHeight={220} />
+          </Suspense>
+        ) : (
+          <div className="card"><div className="empty-state"><p>No data yet</p></div></div>
+        )}
 
         {isMaster && assignmentChartData.length > 0 && (
-          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="card-header"><h3>Supervisor Assignments</h3></div>
-            <div style={{ flex: 1, minHeight: 180 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={assignmentChartData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={42} outerRadius={72} paddingAngle={2} strokeWidth={0}>
-                    {assignmentChartData.map((d) => <Cell key={d.name} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)', borderRadius: 8, color: 'var(--color-on-surface)', fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 14, flexWrap: 'wrap', padding: '6px 0 4px' }}>
-              {assignmentChartData.map((d) => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color }} />
-                  {d.name} <b>{d.value}</b>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Suspense fallback={<div className="card empty-state"><p>Loading charts…</p></div>}>
+            <PieChartCard title="Supervisor Assignments" data={assignmentChartData} minHeight={180} innerRadius={42} outerRadius={72} />
+          </Suspense>
         )}
 
         <div className="card">
@@ -353,7 +321,7 @@ function CoordinatorDashboard() {
                   </div>
                 </div>
                 <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11 }}>{t.status}</span>
+                  <StatusBadge status={t.status} sm />
                   <Link to={`/supervisor/project/thesis/${t.id}`} style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Manage Thesis →</Link>
                 </div>
               </div>
@@ -384,7 +352,7 @@ function CoordinatorDashboard() {
                   </div>
                 </div>
                 <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11 }}>{g.status}</span>
+                  <StatusBadge status={g.status} sm />
                   <Link to={`/supervisor/project/group/${g.id}`} style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Manage Group →</Link>
                 </div>
               </div>
@@ -412,7 +380,7 @@ function CoordinatorDashboard() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{p.submittedBy?.rollNumber || ''} {p.submittedBy?.program?.code ? `· ${p.submittedBy.program.code}` : ''}</div>
                     </td>
                     <td style={{ fontSize: 13 }}>{p.thesis?.title || '—'}</td>
-                    <td style={{ fontSize: 13 }}>{new Date(p.createdAt).toLocaleString()}</td>
+                    <td style={{ fontSize: 13 }}><DualDate date={p.createdAt} time /></td>
                     <td>
                       {p.documentUrl ? (
                         <a href={p.documentUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline">

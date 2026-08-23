@@ -5,6 +5,7 @@ import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import DualDate from '../../components/DualDate';
 
 function MaintainerDashboard() {
   const [stats, setStats] = useState(null);
@@ -361,7 +362,7 @@ function MaintainerDashboard() {
                       </td>
                       <td>{log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : 'System'}</td>
                       <td style={{ whiteSpace: 'nowrap', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
-                        {new Date(log.createdAt).toLocaleString()}
+                        <DualDate date={log.createdAt} time />
                       </td>
                     </tr>
                   ))}

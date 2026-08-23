@@ -6,6 +6,9 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
+import useClickOutside from '../../hooks/useClickOutside';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const TYPE_LABELS = { GENERAL: 'General', MINOR: 'Minor Project', MAJOR: 'Major Project', THESIS: 'Thesis' };
 
@@ -15,11 +18,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
   const [memberOpen, setMemberOpen] = useState(false);
   const memberRef = useRef(null);
 
-  useEffect(() => {
-    const f = (e) => { if (memberRef.current && !memberRef.current.contains(e.target)) setMemberOpen(false); };
-    if (memberOpen) document.addEventListener('mousedown', f);
-    return () => document.removeEventListener('mousedown', f);
-  }, [memberOpen]);
+  useClickOutside(memberRef, () => setMemberOpen(false), memberOpen);
 
   const selectMember = (student) => {
     if (!selectedMembers.includes(student.id)) {
@@ -97,7 +96,7 @@ function CreateGroupForm({ announcement, user, createForm, setCreateForm, select
               setCreateForm(prev => ({ ...prev, pdfUrl: url }));
               toast.success('Proposal PDF attached!');
             } catch (err) {
-              toast.error(err.response?.data?.error || 'Failed to upload PDF');
+              toast.error(getApiMessage(err) || 'Failed to upload PDF');
             }
           }}
         />
@@ -256,7 +255,7 @@ function StudentGroups() {
       setSelectedMembers([]);
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to create group');
+      toast.error(getApiMessage(err) || 'Failed to create group');
     }
   };
 
@@ -285,7 +284,7 @@ function StudentGroups() {
       toast.success('Joined group!');
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to join');
+      toast.error(getApiMessage(err) || 'Failed to join');
     }
   };
 
@@ -294,7 +293,7 @@ function StudentGroups() {
       await api.post(`/student-groups/${groupId}/invite`, { inviteeId });
       toast.success('Invitation sent!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to invite');
+      toast.error(getApiMessage(err) || 'Failed to invite');
     }
   };
 
@@ -304,7 +303,7 @@ function StudentGroups() {
       toast.success(action === 'ACCEPT' ? 'Invitation accepted!' : 'Declined');
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
+      toast.error(getApiMessage(err) || 'Failed');
     }
   };
 
@@ -314,7 +313,7 @@ function StudentGroups() {
       toast.success('Group deleted');
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete group');
+      toast.error(getApiMessage(err) || 'Failed to delete group');
     } finally {
       setConfirmDeleteGroupId(null);
     }
@@ -408,7 +407,7 @@ function StudentGroups() {
                           <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
                           <td><span className={`badge badge-${g.projectType === 'MAJOR' ? 'warning' : 'info'}`}>{g.projectType}</span></td>
                           <td style={{ fontSize: 13 }}>{g.members?.map(m => `${m.student?.firstName} ${m.student?.lastName}`).join(', ')}</td>
-                          <td><span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}><span className="dot" />{g.status}</span></td>
+                          <td><StatusBadge status={g.status} /></td>
                           <td style={{ textAlign: 'right' }}>
                             <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
                               {g.status === 'PENDING' && g.members?.[0]?.student?.id === user.id && (

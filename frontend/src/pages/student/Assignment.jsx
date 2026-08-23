@@ -9,6 +9,9 @@ import { downloadFile } from '../../utils/download';
 import ProposalCommentsViewer from '../../components/ProposalCommentsViewer';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import {getApiMessage} from '../../utils/helpers';
+import { fmtBs } from '../../utils/nepaliDate';
+import DualDate from '../../components/DualDate';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -35,7 +38,7 @@ function StudentProjectDetail() {
     const endpoint = isGroup ? `/students/groups/${id}` : `/students/theses/${id}`;
     api.get(endpoint)
       .then(({ data }) => setAssignment(data))
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load assignment'); setAssignment(null); });
+      .catch(err => { toast.error(getApiMessage(err) || 'Failed to load assignment'); setAssignment(null); });
 
     // Also pull evaluations (for progress overview) — silently handle permission errors
     const evalEndpoint = isGroup ? `/evaluations/group/${id}` : `/evaluations/thesis/${id}`;
@@ -302,7 +305,11 @@ function StudentProjectDetail() {
                     color: info.expired ? 'var(--color-on-error-container)' : info.urgent ? 'var(--color-on-warning-container)' : 'var(--color-on-surface-variant)',
                   }}>
                     <Icon name={info.expired ? 'error' : info.urgent ? 'warning' : 'schedule'} className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                    {info.expired ? `Due date passed: ${new Date(assignment.endDate).toLocaleDateString()}` : `Due: ${info.label}`}
+                    {info.expired ? (
+                      <span>Due date passed: <DualDate date={assignment.endDate} /></span>
+                    ) : (
+                      `Due: ${info.label}`
+                    )}
                   </div>
                 );
               })()}
@@ -369,7 +376,7 @@ function StudentProjectDetail() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tabLabel}_Document.{tabExt}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                      {tabProposal.submittedBy?.firstName} {tabProposal.submittedBy?.lastName} · {new Date(tabProposal.createdAt).toLocaleDateString()}
+                      {tabProposal.submittedBy?.firstName} {tabProposal.submittedBy?.lastName} · <DualDate date={tabProposal.createdAt} />
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
@@ -402,7 +409,7 @@ function StudentProjectDetail() {
                       <Icon name="person" className="material-symbols-outlined" style={{ fontSize: 14 }} />
                       {e.submittedBy?.firstName} {e.submittedBy?.lastName}
                       <span style={{ marginLeft: 4 }}>·</span>
-                      <span>{new Date(e.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                      <span><DualDate date={e.createdAt} /></span>
                     </div>
                   </div>
                 ))}
@@ -465,7 +472,7 @@ function StudentProjectDetail() {
                     )}
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <Icon name="calendar_today" className="material-symbols-outlined" style={{ fontSize: 14 }} />
-                      {new Date(r.createdAt).toLocaleDateString()}
+                      <DualDate date={r.createdAt} />
                     </span>
                   </div>
                 </div>

@@ -8,6 +8,8 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 function ExternalEvaluationsList() {
   const [groups, setGroups] = useState([]);
@@ -20,7 +22,7 @@ function ExternalEvaluationsList() {
     Promise.all([
       api.get('/external-examiners/groups', { signal }).then(({ data }) => setGroups(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
       api.get('/external-examiners/theses', { signal }).then(({ data }) => setTheses(data)).catch((err) => { if (err.name === 'CanceledError') return; }),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); })
       .finally(() => setLoading(false));
   }, []);
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,7 +131,7 @@ function ExternalEvaluationsList() {
                       <tr key={g.id} onClick={() => navigate(`/external/evaluate/group/${g.id}`)} style={{ cursor: 'pointer' }}>
                         <td><div className="default-badge">{g.name?.slice(0, 2).toUpperCase()}</div><span style={{ fontWeight: 500 }}>{g.name}</span></td>
                         <td style={{ color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</td>
-                        <td><span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}><span className="dot" />{g.status}</span></td>
+                        <td><StatusBadge status={g.status} /></td>
                         <td>
                           <span className={`badge ${g.evalStatus === 'COMPLETED' ? 'badge-success' : ''}`} style={{ fontSize: 11 }}>
                             {g.evalStatus === 'COMPLETED' ? 'Completed' : g.hasMarks ? 'Draft' : 'Pending'}
@@ -193,7 +195,7 @@ function ExternalEvaluationsList() {
                             <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 12 }}>—</span>
                           )}
                         </td>
-                        <td><span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}><span className="dot" />{t.status}</span></td>
+                        <td><StatusBadge status={t.status} /></td>
                         <td>
                           <span className={`badge ${t.evalStatus === 'COMPLETED' ? 'badge-success' : ''}`} style={{ fontSize: 11 }}>
                             {t.evalStatus === 'COMPLETED' ? 'Completed' : t.hasMarks ? 'Draft' : 'Pending'}

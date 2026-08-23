@@ -6,6 +6,8 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 function StudentTheses() {
   const [theses, setTheses] = useState([]);
@@ -22,7 +24,7 @@ function StudentTheses() {
         u.studentType = 'master';
         localStorage.setItem('user', JSON.stringify(u));
       })
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load theses'); setTheses([]); })
+      .catch(err => { toast.error(getApiMessage(err) || 'Failed to load theses'); setTheses([]); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -80,9 +82,7 @@ function StudentTheses() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className={`badge badge-${t.status?.toLowerCase() === 'active' ? 'active' : t.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`}>
-                    <span className="dot" />{t.status}
-                  </span>
+                  <StatusBadge status={t.status} />
                   {t.endDate && (() => {
                     const info = getDeadlineInfo(t.endDate);
                     if (!info) return null;

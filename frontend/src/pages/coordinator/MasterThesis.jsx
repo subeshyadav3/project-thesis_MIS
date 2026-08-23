@@ -11,6 +11,11 @@ import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import MasterThesisBulkUploadModal from '../../components/MasterThesisBulkUploadModal';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import useClickOutside from '../../hooks/useClickOutside';
+import {getApiMessage,fmtDate} from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
+import BsDateInput from '../../components/BsDateInput';
 
 const PAGE_SIZE = 10;
 
@@ -130,7 +135,7 @@ function MasterThesis() {
       api.get('/users/role/external_examiner?all=true', { signal }).then(({ data }) => setExaminers(data)),
       api.get('/users/role/STUDENT?all=true&degreeType=MASTER', { signal }).then(({ data }) => setStudents(data)),
       api.get('/auth/me', { signal }).then(({ data }) => setCoordinatorProgram(data.program || null)),
-    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    ]).catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
 
@@ -168,71 +173,23 @@ function MasterThesis() {
       setTheses(prev => prev.map(t => t.id === thesisId ? { ...t, status: newStatus } : t));
       toast.success(`Status updated to ${newStatus}`);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Status update failed');
+      toast.error(getApiMessage(err) || 'Status update failed');
     } finally {
       setUpdatingStatus(null);
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (createSupRef.current && !createSupRef.current.contains(e.target)) {
-        setCreateSupOpen(false);
-      }
-    };
-    if (createSupOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [createSupOpen]);
+useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
 
-  useEffect(() => {
-    const handleEditSupOutside = (e) => {
-      if (editSupRef.current && !editSupRef.current.contains(e.target)) {
-        setEditSupOpen(false);
-      }
-    };
-    if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
-    return () => document.removeEventListener('mousedown', handleEditSupOutside);
-  }, [editSupOpen]);
+  useClickOutside(editSupRef, () => setEditSupOpen(false), editSupOpen);
 
-  useEffect(() => {
-    const handleEditMidTermExamOutside = (e) => {
-      if (editMidTermExamRef.current && !editMidTermExamRef.current.contains(e.target)) {
-        setEditMidTermExamOpen(false);
-      }
-    };
-    if (editMidTermExamOpen) document.addEventListener('mousedown', handleEditMidTermExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditMidTermExamOutside);
-  }, [editMidTermExamOpen]);
+  useClickOutside(editMidTermExamRef, () => setEditMidTermExamOpen(false), editMidTermExamOpen);
 
-  useEffect(() => {
-    const handleEditFinalExamOutside = (e) => {
-      if (editFinalExamRef.current && !editFinalExamRef.current.contains(e.target)) {
-        setEditFinalExamOpen(false);
-      }
-    };
-    if (editFinalExamOpen) document.addEventListener('mousedown', handleEditFinalExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditFinalExamOutside);
-  }, [editFinalExamOpen]);
+  useClickOutside(editFinalExamRef, () => setEditFinalExamOpen(false), editFinalExamOpen);
 
-  useEffect(() => {
-    const handleExamOutside = (e) => {
-      if (examRef.current && !examRef.current.contains(e.target)) {
-        setExamOpen(false);
-      }
-    };
-    if (examOpen) document.addEventListener('mousedown', handleExamOutside);
-    return () => document.removeEventListener('mousedown', handleExamOutside);
-  }, [examOpen]);
+  useClickOutside(examRef, () => setExamOpen(false), examOpen);
 
-  useEffect(() => {
-    const handleStudentOutside = (e) => {
-      if (createStudentRef.current && !createStudentRef.current.contains(e.target)) {
-        setCreateStudentOpen(false);
-      }
-    };
-    if (createStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
-    return () => document.removeEventListener('mousedown', handleStudentOutside);
-  }, [createStudentOpen]);
+  useClickOutside(createStudentRef, () => setCreateStudentOpen(false), createStudentOpen);
 
   // Close action menu on outside click — use 'click' not 'mousedown'
   // so React's synthetic onClick on menu items fires first (bubbles up),
@@ -251,7 +208,7 @@ const handleComplete = async (id) => {
       toast.success('Thesis marked as completed');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Status update failed'); }
   };
 
   const confirmDeleteThesis = (id) => {
@@ -273,7 +230,7 @@ const handleComplete = async (id) => {
       toast.success('Thesis deleted');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Delete failed'); }
   };
 
   const toggleSelectAll = () => {
@@ -325,7 +282,7 @@ const handleComplete = async (id) => {
       setCreateFinalExamSearch('');
       setCreateSupSearch('');
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Create failed'); }
     finally { setCreating(false); }
   };
 
@@ -388,7 +345,7 @@ const handleComplete = async (id) => {
       setShowDetail(null);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Save failed');
+      toast.error(getApiMessage(err) || 'Save failed');
     }
   };
 
@@ -624,7 +581,7 @@ return (
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
+                  <span><DualDate date={showDetail.createdAt} /></span>
                 </div>
                 <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
                   <span className="detail-label">Description</span>
@@ -656,10 +613,7 @@ return (
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
                 {showDetail.projectType !== 'PROJECT' ? (
                   <>
@@ -766,11 +720,11 @@ return (
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>Start Date</label>
-                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                    <BsDateInput className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                    <input type="date" className="form-input" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+                    <BsDateInput className="form-input" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
                     {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
@@ -986,7 +940,7 @@ return (
                 toast.success(`Assigned supervisor to ${selectedTheses.length} theses`);
                 setSelectedTheses([]);
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Bulk assign failed'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Bulk assign failed'); }
             }}>Assign Supervisor</button>
             <button className="btn btn-sm btn-success" onClick={async () => {
               const pending = selectedTheses.filter(id => {
@@ -999,12 +953,12 @@ return (
                 toast.success(`Activated ${pending.length} theses`);
                 setSelectedTheses([]);
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Bulk activate failed'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Bulk activate failed'); }
             }}>
               <Icon name="play_arrow" className="material-symbols-outlined" />
               Make Active
             </button>
-            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <BsDateInput className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
             <button className="btn btn-sm btn-primary" onClick={async () => {
               if (!bulkEndDate) return toast.warning('Select an end date first');
               try {
@@ -1013,7 +967,7 @@ return (
                 setSelectedTheses([]);
                 setBulkEndDate('');
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Failed to set end date'); }
             }}>
               <Icon name="calendar_month" className="material-symbols-outlined" />
               Set End Date
@@ -1030,7 +984,7 @@ return (
                 setSelectedTheses([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk complete failed');
+                toast.error(getApiMessage(err) || 'Bulk complete failed');
               }
             }}>
               <Icon name="check_circle" className="material-symbols-outlined" />
@@ -1052,7 +1006,7 @@ return (
                     setSelectedTheses([]);
                     setConfirmDialog(prev => ({ ...prev, open: false }));
                     loadData();
-                  } catch (err) { toast.error(err.response?.data?.error || 'Bulk delete failed'); }
+                  } catch (err) { toast.error(getApiMessage(err) || 'Bulk delete failed'); }
                 },
                 danger: true,
               });
@@ -1079,7 +1033,7 @@ return (
                     URL.revokeObjectURL(url);
                     toast.success('Evaluation PDFs downloaded');
                     setConfirmDialog(prev => ({ ...prev, open: false }));
-                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                  } catch (err) { toast.error(getApiMessage(err) || 'Failed to download PDFs'); }
                 },
               });
             }}>
@@ -1442,11 +1396,11 @@ return (
               </div>
               <div className="form-group">
                 <label>Start Date</label>
-                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+                <BsDateInput value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
+                <BsDateInput value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
               {createForm.projectType !== 'PROJECT' && (
                 <div className="form-group" ref={createSupRef}>

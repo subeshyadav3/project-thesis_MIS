@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 function ExternalDashboard() {
   const [groups, setGroups] = useState([]);
@@ -18,7 +20,7 @@ function ExternalDashboard() {
       api.get('/external-examiners/groups').then(({ data }) => setGroups(data)),
       api.get('/external-examiners/theses').then(({ data }) => setTheses(data)),
     ]).catch((err) => {
-      toast.error(err.response?.data?.error || 'Failed to load assignments');
+      toast.error(getApiMessage(err) || 'Failed to load assignments');
     }).finally(() => setLoading(false));
   }, []);
 
@@ -75,9 +77,7 @@ function ExternalDashboard() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{g.projectTitle}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
-                        <span className="dot" />{g.status || 'PENDING'}
-                      </span>
+                      <StatusBadge status={g.status} sm />
                       <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }} />
                     </div>
                   </Link>
@@ -121,9 +121,7 @@ function ExternalDashboard() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{t.title}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`} style={{ fontSize: 11, padding: '2px 8px' }}>
-                        <span className="dot" />{t.status || 'PENDING'}
-                      </span>
+                      <StatusBadge status={t.status} sm />
                       <Icon name="chevron_right" className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--color-on-surface-variant)' }} />
                     </div>
                   </Link>

@@ -10,7 +10,12 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import useClickOutside from '../../hooks/useClickOutside';
 import BulkPendingUsersModal from '../../components/BulkPendingUsersModal';
+import {getApiMessage,fmtDate} from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
+import BsDateInput from '../../components/BsDateInput';
 
 const PAGE_SIZE = 10;
 
@@ -114,7 +119,7 @@ function BachelorProjects() {
       setEditStudentOpen(false);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to add member');
+      toast.error(getApiMessage(err) || 'Failed to add member');
     }
   };
 
@@ -125,7 +130,7 @@ function BachelorProjects() {
       setShowDetail(prev => ({ ...prev, members: res.data.members }));
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to remove member');
+      toast.error(getApiMessage(err) || 'Failed to remove member');
     }
   };
   const [bulkSupervisorId, setBulkSupervisorId] = useState('');
@@ -148,65 +153,17 @@ function BachelorProjects() {
 
   useEffect(() => { loadData(); }, [loadData]);
   
-useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (createSupRef.current && !createSupRef.current.contains(e.target)) {
-        setCreateSupOpen(false);
-      }
-    };
-    if (createSupOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [createSupOpen]);
+useClickOutside(createSupRef, () => setCreateSupOpen(false), createSupOpen);
 
-  useEffect(() => {
-    const handleEditSupOutside = (e) => {
-      if (editSupRef.current && !editSupRef.current.contains(e.target)) {
-        setEditSupOpen(false);
-      }
-    };
-    if (editSupOpen) document.addEventListener('mousedown', handleEditSupOutside);
-    return () => document.removeEventListener('mousedown', handleEditSupOutside);
-  }, [editSupOpen]);
+  useClickOutside(editSupRef, () => setEditSupOpen(false), editSupOpen);
 
-  useEffect(() => {
-    const handleEditStudentOutside = (e) => {
-      if (editStudentRef.current && !editStudentRef.current.contains(e.target)) {
-        setEditStudentOpen(false);
-      }
-    };
-    if (editStudentOpen) document.addEventListener('mousedown', handleEditStudentOutside);
-    return () => document.removeEventListener('mousedown', handleEditStudentOutside);
-  }, [editStudentOpen]);
+  useClickOutside(editStudentRef, () => setEditStudentOpen(false), editStudentOpen);
 
-  useEffect(() => {
-    const handleEditExamOutside = (e) => {
-      if (editExamRef.current && !editExamRef.current.contains(e.target)) {
-        setEditExamOpen(false);
-      }
-    };
-    if (editExamOpen) document.addEventListener('mousedown', handleEditExamOutside);
-    return () => document.removeEventListener('mousedown', handleEditExamOutside);
-  }, [editExamOpen]);
+  useClickOutside(editExamRef, () => setEditExamOpen(false), editExamOpen);
 
-  useEffect(() => {
-    const handleExamOutside = (e) => {
-      if (examRef.current && !examRef.current.contains(e.target)) {
-        setExamOpen(false);
-      }
-    };
-    if (examOpen) document.addEventListener('mousedown', handleExamOutside);
-    return () => document.removeEventListener('mousedown', handleExamOutside);
-  }, [examOpen]);
+  useClickOutside(examRef, () => setExamOpen(false), examOpen);
 
-  useEffect(() => {
-    const handleStudentOutside = (e) => {
-      if (newStudentRef.current && !newStudentRef.current.contains(e.target)) {
-        setNewStudentOpen(false);
-      }
-    };
-    if (newStudentOpen) document.addEventListener('mousedown', handleStudentOutside);
-    return () => document.removeEventListener('mousedown', handleStudentOutside);
-  }, [newStudentOpen]);
+  useClickOutside(newStudentRef, () => setNewStudentOpen(false), newStudentOpen);
 
   useEffect(() => {
     const handleClick = () => setActionMenuRow(null);
@@ -223,7 +180,7 @@ useEffect(() => {
       setGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: newStatus } : g));
       toast.success(`Status updated to ${newStatus}`);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Status update failed');
+      toast.error(getApiMessage(err) || 'Status update failed');
     } finally {
       setUpdatingStatus(null);
     }
@@ -269,7 +226,7 @@ useEffect(() => {
       const { data } = await api.post('/groups/bulk-import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setBulkPreview(data);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+      toast.error(getApiMessage(err) || 'Upload failed');
     } finally {
       setBulkLoading(false);
     }
@@ -330,7 +287,7 @@ useEffect(() => {
       resetUploadModal();
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
+      toast.error(getApiMessage(err) || 'Import failed');
     } finally {
       setBulkLoading(false);
     }
@@ -355,7 +312,7 @@ useEffect(() => {
       toast.success('Group marked as completed');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Status update failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Status update failed'); }
   };
 
   const confirmDeleteGroup = (id) => {
@@ -377,7 +334,7 @@ useEffect(() => {
       toast.success('Group deleted');
       setShowDetail(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Delete failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Delete failed'); }
   };
 
   const handleEditSave = async (groupId) => {
@@ -437,7 +394,7 @@ useEffect(() => {
       setShowDetail(null);
       loadData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Save failed');
+      toast.error(getApiMessage(err) || 'Save failed');
     }
   };
 
@@ -469,7 +426,7 @@ useEffect(() => {
       setShowCreate(false);
       setCreateForm({ name: '', projectTitle: '', projectType: 'MINOR', cluster: '', status: 'ACTIVE', startDate: todayStr, endDate: '', supervisorId: '', examinerId: '', batch: '', students: [{ firstName: '', lastName: '', rollNumber: '', studentId: '' }] });
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Create failed'); }
   };
 
   const addStudentField = () => {
@@ -736,7 +693,7 @@ const filteredGroups = useMemo(() => {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
+                  <span><DualDate date={showDetail.createdAt} /></span>
                 </div>
                 <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
                   <span className="detail-label">Description</span>
@@ -751,10 +708,7 @@ const filteredGroups = useMemo(() => {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
               </div>
             </div>
@@ -983,11 +937,11 @@ const filteredGroups = useMemo(() => {
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>Start Date</label>
-                    <input type="date" className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
+                    <BsDateInput className="form-input" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} />
                   </div>
                   <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
                     <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                    <input type="date" className="form-input" value={editEndDate} onChange={e => { setEditEndDate(e.target.value); }} />
+                    <BsDateInput className="form-input" value={editEndDate} onChange={e => { setEditEndDate(e.target.value); }} />
                     {!editEndDate && <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>Not Added</span>}
                   </div>
                   <div className="form-group" ref={editSupRef} style={{ flex: 1, minWidth: 250 }}>
@@ -1162,7 +1116,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk assign failed');
+                toast.error(getApiMessage(err) || 'Bulk assign failed');
               }
             }}>Assign</button>
             <button className="btn btn-sm btn-success" onClick={async () => {
@@ -1174,13 +1128,13 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk activate failed');
+                toast.error(getApiMessage(err) || 'Bulk activate failed');
               }
             }}>
               <Icon name="play_arrow" className="material-symbols-outlined" />
               Make Active
             </button>
-            <input type="date" className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
+            <BsDateInput className="form-input" value={bulkEndDate} onChange={e => setBulkEndDate(e.target.value)} style={{ width: 140 }} title="Set end date for selected" />
             <button className="btn btn-sm btn-primary" onClick={async () => {
               if (!bulkEndDate) return toast.warning('Select an end date first');
               try {
@@ -1190,7 +1144,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 setBulkEndDate('');
                 loadData();
-              } catch (err) { toast.error(err.response?.data?.error || 'Failed to set end date'); }
+              } catch (err) { toast.error(getApiMessage(err) || 'Failed to set end date'); }
             }}>
               <Icon name="calendar_month" className="material-symbols-outlined" />
               Set End Date
@@ -1204,7 +1158,7 @@ const filteredGroups = useMemo(() => {
                 setSelectedGroups([]);
                 loadData();
               } catch (err) {
-                toast.error(err.response?.data?.error || 'Bulk complete failed');
+                toast.error(getApiMessage(err) || 'Bulk complete failed');
               }
             }}>
               <Icon name="check_circle" className="material-symbols-outlined" />
@@ -1225,7 +1179,7 @@ const filteredGroups = useMemo(() => {
                     setConfirmDialog(prev => ({ ...prev, open: false }));
                     loadData();
                   } catch (err) {
-                    toast.error(err.response?.data?.error || 'Bulk delete failed');
+                    toast.error(getApiMessage(err) || 'Bulk delete failed');
                   }
                 },
                 danger: true,
@@ -1253,7 +1207,7 @@ const filteredGroups = useMemo(() => {
                     URL.revokeObjectURL(url);
                     toast.success('Evaluation PDFs downloaded');
                     setConfirmDialog(prev => ({ ...prev, open: false }));
-                  } catch (err) { toast.error(err.response?.data?.error || 'Failed to download PDFs'); }
+                  } catch (err) { toast.error(getApiMessage(err) || 'Failed to download PDFs'); }
                 },
               });
             }}>
@@ -1821,11 +1775,11 @@ const filteredGroups = useMemo(() => {
               </div>
               <div className="form-group">
                 <label>Start Date</label>
-                <input type="date" value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
+                <BsDateInput value={createForm.startDate} onChange={e => setCreateForm({...createForm, startDate: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>End Date <span style={{ fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>(optional)</span></label>
-                <input type="date" value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
+                <BsDateInput value={createForm.endDate} onChange={e => setCreateForm({...createForm, endDate: e.target.value})} />
               </div>
 
               <div className="form-group" ref={createSupRef}>

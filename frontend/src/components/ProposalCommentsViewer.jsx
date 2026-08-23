@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import DualDate from '../components/DualDate';
 
 const COMMENT_ROLE_COLORS = {
   SUPERVISOR: { bg: '#e8f5e9', color: '#2e7d32', label: 'Supervisor' },
@@ -46,7 +47,7 @@ export default function ProposalCommentsViewer({ proposalId, legacyComment, lega
                   {comment.author?.firstName} {comment.author?.lastName} · {c.label}
                 </span>
                 <span style={{ fontSize: 10, color: 'var(--color-on-surface-variant)' }}>
-                  {new Date(comment.createdAt).toLocaleDateString()} {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <DualDate date={comment.createdAt} time />
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{comment.content}</p>

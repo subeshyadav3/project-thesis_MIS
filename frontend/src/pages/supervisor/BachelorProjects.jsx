@@ -11,6 +11,9 @@ import EvaluationPdfPreview from '../../components/EvaluationPdfPreview';
 import SearchInput from '../../components/SearchInput';
 import SupervisionActions from '../../components/SupervisionActions';
 import { TableSkeleton } from '../../components/Skeleton';
+import {getApiMessage,fmtDate} from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
+import DualDate from '../../components/DualDate';
 
 const PAGE_SIZE = 10;
 
@@ -33,7 +36,7 @@ function SupervisorBachelorProjects() {
     setLoading(true);
     api.get('/supervisors/groups', { signal })
       .then(({ data }) => setGroups(data))
-      .catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); })
+      .catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); })
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -111,10 +114,7 @@ function SupervisorBachelorProjects() {
               <div className="detail-grid">
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
-                  <span className={`badge badge-${showDetail.status?.toLowerCase() || 'pending'}`}>
-                    <span className="dot" />
-                    {showDetail.status || 'PENDING'}
-                  </span>
+                  <StatusBadge status={showDetail.status} />
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Type</span>
@@ -129,7 +129,7 @@ function SupervisorBachelorProjects() {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span>{showDetail.createdAt ? new Date(showDetail.createdAt).toLocaleDateString() : '—'}</span>
+                  <span><DualDate date={showDetail.createdAt} /></span>
                 </div>
               </div>
             </div>
@@ -295,10 +295,7 @@ function SupervisorBachelorProjects() {
                       </span>
                     </td>
                     <td>
-                      <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
-                        <span className="dot" />
-                        {g.status || 'PENDING'}
-                      </span>
+                      <StatusBadge status={g.status} />
                     </td>
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                       {g.batch || '—'}

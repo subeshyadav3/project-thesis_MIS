@@ -3,6 +3,7 @@ import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 function SupervisorAssignmentSection({ type, id, currentSupervisor, supervisorAssignmentStatus, onRefresh, disabled = false }) {
   const [supervisors, setSupervisors] = useState([]);
@@ -33,7 +34,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, supervisorAs
       setSelectedSupId('');
       onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to assign supervisor');
+      toast.error(getApiMessage(err) || 'Failed to assign supervisor');
     } finally {
       setLoading(false);
     }
@@ -49,7 +50,7 @@ function SupervisorAssignmentSection({ type, id, currentSupervisor, supervisorAs
       setShowAssign(true);
       onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to remove supervisor');
+      toast.error(getApiMessage(err) || 'Failed to remove supervisor');
     } finally {
       setRemoving(false);
       setConfirmRemove(false);

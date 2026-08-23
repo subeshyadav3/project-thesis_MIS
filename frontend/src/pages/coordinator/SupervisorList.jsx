@@ -9,6 +9,8 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
 import UsersBulkUploadModal from '../../components/UsersBulkUploadModal';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 const PAGE_SIZE = 10;
 
@@ -45,7 +47,7 @@ function SupervisorList() {
     } else {
       promises.push(api.get('/groups', { signal }).then(({ data }) => setGroups(data)));
     }
-    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(err.response?.data?.error || 'Failed to load data'); }).finally(() => setLoading(false));
+    Promise.all(promises).catch((err) => { if (err.name !== 'CanceledError') toast.error(getApiMessage(err) || 'Failed to load data'); }).finally(() => setLoading(false));
     return () => controller.abort();
   }, [isMasterCoordinator]);
 
@@ -73,7 +75,7 @@ function SupervisorList() {
       setShowCreate(false);
       setCreateForm({ firstName: '', lastName: '', email: '', password: Math.random().toString(36).slice(2, 10), designation: '' });
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Create failed'); }
   };
 
   const handleEditSupervisor = async (e) => {
@@ -97,7 +99,7 @@ function SupervisorList() {
       toast.success('Supervisor updated successfully');
       setShowEdit(null);
       loadData();
-    } catch (err) { toast.error(err.response?.data?.error || 'Update failed'); }
+    } catch (err) { toast.error(getApiMessage(err) || 'Update failed'); }
   };
 
   const openEdit = (sup) => {
@@ -260,10 +262,7 @@ function SupervisorList() {
                             {(g.members || []).filter(m => m.student).map(m => `${m.student.firstName} ${m.student.lastName}`).join(', ') || '—'}
                           </td>
                           <td>
-                            <span className={`badge badge-${g.status?.toLowerCase() || 'pending'}`}>
-                              <span className="dot" />
-                              {g.status || 'PENDING'}
-                            </span>
+                            <StatusBadge status={g.status} />
                           </td>
                         </tr>
                       ))}
@@ -292,10 +291,7 @@ function SupervisorList() {
                           <td style={{ fontWeight: 500 }}>{t.student?.firstName} {t.student?.lastName}</td>
                           <td style={{ color: 'var(--color-on-surface-variant)' }}>{t.title}</td>
                           <td>
-                            <span className={`badge badge-${t.status?.toLowerCase() || 'pending'}`}>
-                              <span className="dot" />
-                              {t.status || 'PENDING'}
-                            </span>
+                            <StatusBadge status={t.status} />
                           </td>
                         </tr>
                       ))}

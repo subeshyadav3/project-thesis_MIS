@@ -5,6 +5,10 @@ import { useToast } from '../../contexts/ToastContext';
 import api from '../../services/api';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { Link } from 'react-router-dom';
+import {getApiMessage} from '../../utils/helpers';
+import { fmtBs } from '../../utils/nepaliDate';
+import DualDate from '../../components/DualDate';
+import BsDateInput from '../../components/BsDateInput';
 
 const FIELD_TYPES = { TEXT: 'text', TEXTAREA: 'textarea', NUMBER: 'number', DATE: 'date', EMAIL: 'email' };
 
@@ -83,7 +87,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
             <div className="alert alert-warning" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 'var(--border-radius-sm)' }}>
               <Icon name="warning" className="material-symbols-outlined" style={{ fontSize: 18 }} />
               <div>
-                <strong>Late submission.</strong> The form deadline ({new Date(announcement.expirationDate).toLocaleDateString()}) has passed. Your proposal will require coordinator approval before it becomes visible.
+                <strong>Late submission.</strong> The form deadline (<DualDate date={announcement.expirationDate} />) has passed. Your proposal will require coordinator approval before it becomes visible.
               </div>
             </div>
           )}
@@ -139,7 +143,7 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
                             setForm(prev => ({ ...prev, [f.key]: url }));
                             toast.success('PDF document uploaded successfully!');
                           } catch (err) {
-                            toast.error(err.response?.data?.error || 'Failed to upload PDF document');
+                            toast.error(getApiMessage(err) || 'Failed to upload PDF document');
                           }
                         }
                       }}
@@ -164,6 +168,13 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
                   </select>
                 ) : f.type === 'textarea' ? (
                   <textarea className="form-input" rows={3} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} placeholder={f.placeholder || ''} />
+                ) : f.type === 'date' || f.type === 'DATE' ? (
+                  <BsDateInput
+                    className="form-input"
+                    value={form[f.key] || ''}
+                    onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    placeholder={f.placeholder || 'Select Nepali Date'}
+                  />
                 ) : (
                   <input
                     className="form-input"
@@ -223,7 +234,7 @@ function StudentForms() {
       setSelected(null);
       loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to submit form');
+      toast.error(getApiMessage(err) || 'Failed to submit form');
       throw err;
     }
   };
@@ -263,9 +274,11 @@ function StudentForms() {
                       <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span className="badge badge-active">
                           <Icon name="event" className="material-symbols-outlined" style={{ fontSize: 13 }} />
-                          {a.expirationDate
-                            ? `Deadline: ${new Date(a.expirationDate).toLocaleDateString()}`
-                            : 'No deadline set'}
+                          {a.expirationDate ? (
+                            <span>Deadline: <DualDate date={a.expirationDate} /></span>
+                          ) : (
+                            'No deadline set'
+                          )}
                         </span>
                         {a.batch && <span>Batch: {a.batch}</span>}
                         {(a.formFields?.length || 0) > 0 && <span>{a.formFields.length} additional field(s)</span>}

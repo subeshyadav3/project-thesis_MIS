@@ -6,6 +6,8 @@ import { useToast } from '../../contexts/ToastContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import api from '../../services/api';
 import { getDeadlineInfo } from '../../utils/deadline';
+import { getApiMessage } from '../../utils/helpers';
+import StatusBadge from '../../components/StatusBadge';
 
 function StudentProjects() {
   const [groups, setGroups] = useState([]);
@@ -22,7 +24,7 @@ function StudentProjects() {
         u.studentType = 'bachelor';
         localStorage.setItem('user', JSON.stringify(u));
       })
-      .catch(err => { toast.error(err.response?.data?.error || 'Failed to load projects'); setGroups([]); })
+      .catch(err => { toast.error(getApiMessage(err) || 'Failed to load projects'); setGroups([]); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -80,9 +82,7 @@ function StudentProjects() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className={`badge badge-${g.status?.toLowerCase() === 'active' ? 'active' : g.status?.toLowerCase() === 'completed' ? 'completed' : 'pending'}`}>
-                    <span className="dot" />{g.status}
-                  </span>
+                  <StatusBadge status={g.status} />
                   {g.endDate && (() => {
                     const info = getDeadlineInfo(g.endDate);
                     if (!info) return null;

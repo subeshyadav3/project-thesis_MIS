@@ -3,6 +3,7 @@ import { Icon } from '../components/ui';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+import { getApiMessage } from '../utils/helpers';
 
 function ResetPassword() {
   const [email, setEmail] = useState('');
@@ -29,7 +30,7 @@ function ResetPassword() {
         toast.success('If the email exists, a reset link has been sent.');
       }
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to send reset email';
+      const msg = getApiMessage(err) || 'Failed to send reset email';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -49,7 +50,7 @@ function ResetPassword() {
       toast.success('Password reset successfully. Please login.');
       navigate('/login');
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to reset password';
+      const msg = getApiMessage(err) || 'Failed to reset password';
       setError(msg);
       toast.error(msg);
     } finally {

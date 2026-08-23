@@ -9,6 +9,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import SearchInput from '../../components/SearchInput';
 import { TableSkeleton } from '../../components/Skeleton';
+import { getApiMessage } from '../../utils/helpers';
 
 const ROLE_LABEL = {
   SUPERVISOR: 'Supervisor',
@@ -83,7 +84,7 @@ function Evaluations() {
       toast.success('Results forwarded to Exam Department successfully');
       setShowForward(false);
     } catch (err) {
-      const msg = err.response?.data?.error || err.message;
+      const msg = getApiMessage(err) || err.message;
       const cleanMsg = typeof msg === 'string' && msg.length > 120 ? msg.slice(0, 120) + '...' : msg;
       toast.error(cleanMsg || 'Failed to forward results.');
     }

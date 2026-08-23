@@ -3,6 +3,7 @@ import { Icon } from './ui';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, disabled = false }) {
   const [examiners, setExaminers] = useState([]);
@@ -34,7 +35,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
       setSelectedExaminerId('');
       onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to assign examiner');
+      toast.error(getApiMessage(err) || 'Failed to assign examiner');
     } finally {
       setLoading(false);
     }
@@ -49,7 +50,7 @@ function ExternalExaminerSection({ type, id, currentExaminer, label, onRefresh, 
       setShowAssign(true);
       onRefresh();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to remove examiner');
+      toast.error(getApiMessage(err) || 'Failed to remove examiner');
     } finally {
       setRemoving(false);
       setConfirmRemove(false);

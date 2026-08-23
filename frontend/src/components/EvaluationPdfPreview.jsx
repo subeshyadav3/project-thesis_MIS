@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from './ui';
 import ConfirmDialog from './ConfirmDialog';
 import api from '../services/api';
+import { getApiMessage } from '../utils/helpers';
 
 const ROLE_LABEL = { SUPERVISOR: 'Supervisor', EXTERNAL_EXAMINER: 'External Examiner', COORDINATOR: 'Coordinator' };
 
@@ -184,7 +185,7 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
-      setError(e.response?.data?.error || e.message || 'Could not save changes.');
+      setError(getApiMessage(e) || e.message || 'Could not save changes.');
     }
     // Always refresh the preview so it reflects latest data (even if some saves failed, partial data may have been saved)
     try { await load(); } catch (_) { /* preview load is best-effort */ }
