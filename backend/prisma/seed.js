@@ -191,8 +191,9 @@ async function main() {
   // ============================================================
   // USERS
   // ============================================================
+  // Maintainer
   const maintainer = await prisma.user.create({
-    data: { email: 'subeshgaming@gmail.com', password: hash, firstName: 'Subesh', lastName: 'Gaming', role: 'MAINTAINER' },
+    data: { email: 'maintainer@pcampus.edu.np', password: hash, firstName: 'Subesh', lastName: 'Gaming', role: 'MAINTAINER' },
   });
 
   const coordDefs = [
@@ -250,9 +251,10 @@ async function main() {
   for (const s of studentDefs) {
     const progCode = getProgramFromRoll(s.roll);
     const program = programs[progCode];
+    const studentEmail = s.roll.toUpperCase() === '082MSNCS01' ? 'subeshgaming@gmail.com' : `${s.roll.toLowerCase()}@pcampus.edu.np`;
     students.push(await prisma.user.create({
       data: {
-        email: `${s.roll.toLowerCase()}@pcampus.edu.np`,
+        email: studentEmail,
         password: hash,
         firstName: s.fn,
         lastName: s.ln,

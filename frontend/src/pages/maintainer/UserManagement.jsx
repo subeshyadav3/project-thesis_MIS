@@ -499,18 +499,15 @@ function UserManagement() {
                 <label>Email</label>
                 <input
                   type="email"
-                  value={form.role === 'STUDENT' ? (form.rollNumber ? `${form.rollNumber.toLowerCase()}@pcampus.edu.np` : '') : form.email}
+                  value={form.email}
                   onChange={e => setForm({...form, email: e.target.value})}
                   required
-                  disabled={form.role === 'STUDENT'}
-                  placeholder={form.role === 'STUDENT' ? 'auto-generated from roll number' : 'e.g. ram.yadav@pcampus.edu.np'}
-                  pattern={form.role === 'STUDENT' ? undefined : '[a-zA-Z0-9._%+-]+@pcampus\\.edu\\.np'}
-                  title={form.role === 'STUDENT' ? 'Student email is auto-generated from the roll number' : 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)'}
+                  placeholder={form.role === 'STUDENT' ? 'e.g. 082msncs01@pcampus.edu.np' : 'e.g. ram.yadav@pcampus.edu.np'}
+                  pattern="[a-zA-Z0-9._%+-]+@(pcampus\.edu\.np|ioe\.edu\.np)"
+                  title="Email must end with @pcampus.edu.np or @ioe.edu.np"
                 />
                 <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
-                  {form.role === 'STUDENT'
-                    ? 'Auto-generated as {rollNumber}@pcampus.edu.np (typed email is ignored)'
-                    : 'Must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)'}
+                  Must end with @pcampus.edu.np or @ioe.edu.np (e.g. {form.role === 'STUDENT' ? '082msncs01@pcampus.edu.np' : 'ram.yadav@pcampus.edu.np'})
                 </span>
               </div>
               <div className="form-group">
@@ -573,7 +570,20 @@ function UserManagement() {
                   <div className="form-row" style={{ display: 'flex', gap: 12 }}>
                     <div className="form-group" style={{ flex: 1 }}>
                       <label>Roll Number</label>
-                      <input value={form.rollNumber} onChange={e => setForm({...form, rollNumber: e.target.value})} placeholder="e.g. 080BCT001" />
+                      <input
+                        value={form.rollNumber}
+                        onChange={e => {
+                          const newRoll = e.target.value;
+                          const prevDerived = form.rollNumber ? `${form.rollNumber.toLowerCase()}@pcampus.edu.np` : '';
+                          const shouldAutoFillEmail = !form.email || form.email === prevDerived;
+                          setForm({
+                            ...form,
+                            rollNumber: newRoll,
+                            ...(shouldAutoFillEmail ? { email: newRoll ? `${newRoll.toLowerCase()}@pcampus.edu.np` : '' } : {})
+                          });
+                        }}
+                        placeholder="e.g. 080BCT001"
+                      />
                       <span style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>
                         Batch & year/semester auto-assigned from roll number
                       </span>

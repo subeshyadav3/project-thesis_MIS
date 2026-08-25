@@ -24,12 +24,12 @@ node prisma/seed.js
 | **Master Coordinator (Lead)** | `msncs.coordinator@pcampus.edu.np` | Dr. Anil Thapa (MSNCS Coordinator) | Master 3rd Sem Projects, Thesis Calls, Interactive Responses Matrix |
 | **Bachelor Coordinator (Lead)** | `bct.coordinator@pcampus.edu.np` | Ram Prasad (BCT Coordinator) | 3rd Year Minor (2080), 4th Year Major (2079), Graduated (2078) |
 | **MSDSA Coordinator** | `msdsa.coordinator@pcampus.edu.np` | Dr. Gopal Adhikari (MSDSA Coordinator) | Master Data Science & Analytics |
-| **Maintainer / Admin** | `subeshgaming@gmail.com` | Subesh Gaming | Full system administration & audit |
+| **Maintainer / Admin** | `maintainer@pcampus.edu.np` | Subesh Gaming | Full system administration & audit |
 | **Faculty Supervisor** | `prabesh.bhattarai@pcampus.edu.np` | Assoc. Prof. Dr. Prabesh Bhattarai | Live grading & feedback submission |
 | **Faculty Supervisor** | `anita.gurung@pcampus.edu.np` | Asst. Prof. Dr. Anita Gurung | Live grading & feedback submission |
 | **External Examiner (Campus)** | `hari.adhikari@pcampus.edu.np` | Prof. Dr. Hari Adhikari | Defense evaluation scoring |
 | **External Examiner (IOE)** | `prajwal.ghimire@ioe.edu.np` | Dr. Prajwal Ghimire | External defense evaluation scoring |
-| **Master Student (3rd Sem - 2082)** | `082msncs01@pcampus.edu.np` | Aarav Thakur (MSNCS Batch 2082) | Active 4-Cr Project & Concept Proposal edit |
+| **Master Student (3rd Sem - 2082)** | `subeshgaming@gmail.com` | Roll: `082MSNCS01` (Batch 2082) | Active 4-Cr Project & Concept Proposal edit (Testing Email) |
 | **Master Student (4th Sem - 2081)** | `081msncs01@pcampus.edu.np` | Milan Parajuli (MSNCS Batch 2081) | Active 16-Cr Master Thesis defense |
 | **Master Graduated Archive (2080)** | `080msncs01@pcampus.edu.np` | Prakash Bastola (MSNCS Batch 2080) | Completed Master Thesis (300 marks) |
 | **Bachelor 3rd Year Minor (2080)** | `080bct001@pcampus.edu.np` | Aashish Khadka (BCT Batch 2080) | Active Minor Project Group |
