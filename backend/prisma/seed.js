@@ -78,43 +78,31 @@ function nextName() {
   return { firstName: fn, lastName: ln };
 }
 
-// ── Batch definitions ──────────────────────────────────────────────────
-// Bachelor Minor: 080 (2080 BS)
-// Bachelor Major: 079 (2079 BS)
-// Master: 082 (2082 BS)
+// ── Academic Batches ───────────────────────────────────────────────────
+// Bachelor timeline:
+// • 083 (2083 BS - 1st Year): Coursework only (NO projects)
+// • 082 (2082 BS - 2nd Year): Coursework only (NO projects)
+// • 080 (2080 BS - 3rd Year): Minor Project (Active/In-progress)
+// • 079 (2079 BS - 4th Year): Major Project (Active/Defending)
+// • 078 (2078 BS - Graduated): Major Project (Completed with full defense records)
+//
+// Master timeline:
+// • 083 (2083 BS - 1st Year): Coursework only (NO thesis/project)
+// • 082 (2082 BS - 3rd Sem): Master Project 4-Cr (Active) + Thesis Concept Form Call
+// • 081 (2081 BS - 4th Sem): Master Thesis 16-Cr (Active/Final Defense)
+// • 080 & 079 (2080 & 2079 BS - Graduated): Theses & Projects (Completed with full 300/100 mark records)
 const BATCH_DEFS = [
-  {
-    batch: '079',
-    bsYear: 2079,
-    counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 },
-  },
-  {
-    batch: '080',
-    bsYear: 2080,
-    counts: { BCT: 30, BEI: 16, MSNCS: 8, MSICE: 6, MSDSA: 8, MSCSK: 6 },
-  },
-  {
-    batch: '081',
-    bsYear: 2081,
-    counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 },
-  },
-  {
-    batch: '082',
-    bsYear: 2082,
-    counts: { BCT: 18, BEI: 8, MSNCS: 12, MSICE: 8, MSDSA: 12, MSCSK: 8 },
-  },
-  {
-    batch: '083',
-    bsYear: 2083,
-    counts: { BCT: 12, BEI: 6, MSNCS: 4, MSICE: 3, MSDSA: 4, MSCSK: 3 },
-  },
+  { batch: '078', bsYear: 2078, counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 } },
+  { batch: '079', bsYear: 2079, counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 } },
+  { batch: '080', bsYear: 2080, counts: { BCT: 30, BEI: 16, MSNCS: 8, MSICE: 6, MSDSA: 8, MSCSK: 6 } },
+  { batch: '081', bsYear: 2081, counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 } },
+  { batch: '082', bsYear: 2082, counts: { BCT: 18, BEI: 8, MSNCS: 12, MSICE: 8, MSDSA: 12, MSCSK: 8 } },
+  { batch: '083', bsYear: 2083, counts: { BCT: 12, BEI: 6, MSNCS: 4, MSICE: 3, MSDSA: 4, MSCSK: 3 } },
 ];
 
-// ── Student definition generator ───────────────────────────────────────
 function generateStudentDefs() {
   const defs = [];
   for (const bd of BATCH_DEFS) {
-    // Bachelor students
     for (const prog of BACHELOR_PROGRAMS) {
       for (let i = 1; i <= bd.counts[prog.code]; i++) {
         const { firstName, lastName } = nextName();
@@ -127,7 +115,6 @@ function generateStudentDefs() {
         });
       }
     }
-    // Master students
     for (const prog of MASTER_PROGRAMS) {
       for (let i = 1; i <= bd.counts[prog.code]; i++) {
         const { firstName, lastName } = nextName();
@@ -145,7 +132,7 @@ function generateStudentDefs() {
 }
 
 async function main() {
-  console.log('Seeding database with presentation-ready showcase dataset...');
+  console.log('Seeding database with timeline-accurate academic dataset...');
 
   // ── Clean slate ──
   await prisma.recommendation.deleteMany();
@@ -200,13 +187,10 @@ async function main() {
   const ayMap = {};
   for (const bd of BATCH_DEFS) {
     const ay = await prisma.academicYear.create({
-      data: { year: bd.batch, semester: 'Regular', departmentId: eceDept.id, isActive: ['080', '082'].includes(bd.batch) },
+      data: { year: bd.batch, semester: 'Regular', departmentId: eceDept.id, isActive: ['079', '080', '081', '082'].includes(bd.batch) },
     });
     ayMap[bd.batch] = ay;
   }
-  ayMap['078'] = await prisma.academicYear.create({
-    data: { year: '078', semester: 'Regular', departmentId: eceDept.id, isActive: false },
-  });
   console.log(`Created ${Object.keys(ayMap).length} academic years (078–083)`);
 
   // ============================================================
@@ -293,7 +277,7 @@ async function main() {
       },
     }));
   }
-  console.log(`Created ${students.length} students across 5 batches (All standard @pcampus.edu.np emails)`);
+  console.log(`Created ${students.length} students across 6 batches`);
 
   // Helper to create evaluation components
   async function attachComponents({ groupId, thesisId, projectType }) {
@@ -318,11 +302,11 @@ async function main() {
     });
   }
 
-  // Helper to create standard sample proposal PDF
+  // Helper to create sample proposal PDF
   async function createSampleProposalPDF({ filename, title, description, studentName, rollNumber, programName, batch }) {
     const pdfBuf = await generateFormProposalPDF({
       title,
-      description: description || 'This proposal outlines the architectural foundation, methodology, milestones, and deliverables.',
+      description: description || 'Comprehensive project architecture, methodology, milestone schedule, and expected deliverables.',
       studentName,
       rollNumber,
       programName,
@@ -337,24 +321,26 @@ async function main() {
   await createSampleProposalPDF({
     filename: 'thesis_proposal.pdf',
     title: 'Research Proposal Framework for Master Degree Program',
-    description: 'Comprehensive research methodology and experimental setup.',
     studentName: 'Research Scholar',
-    rollNumber: '082MSNCS01',
+    rollNumber: '081MSNCS01',
     programName: 'MSc in Network and Cyber Security',
-    batch: '2082',
+    batch: '2081',
   });
   await createSampleProposalPDF({
     filename: 'project_proposal.pdf',
     title: 'Project Proposal Design for Master 4-Credit Course',
-    description: 'Architecture design, component specification, and evaluation roadmap.',
     studentName: 'Project Scholar',
-    rollNumber: '082MSNCS02',
+    rollNumber: '082MSNCS01',
     programName: 'MSc in Network and Cyber Security',
     batch: '2082',
   });
 
   // ============================================================
-  // BACHELOR GROUPS (Minor: 2080 Batch, Major: 2079 Batch)
+  // BACHELOR GROUPS
+  // • 083 & 082 batches: 1st & 2nd year -> NO minor or major projects
+  // • 080 batch (3rd Year): Minor Projects (Active / Pending)
+  // • 079 batch (4th Year): Major Projects (Active / Defending)
+  // • 078 batch (Graduated): Major Projects (COMPLETED with full evaluations)
   // ============================================================
   const bachelorGroupTitles = [
     'AI-Powered Code Review Assistant for Nepali Developers',
@@ -374,27 +360,29 @@ async function main() {
   let createdGroups = [];
   let bGroupIdx = 0;
 
-  for (const bd of BATCH_DEFS) {
-    const batchStr = bd.batch;
-    const bsYear = bd.bsYear;
-    const nBCTGroups = Math.min(3, Math.floor(bd.counts.BCT / 3));
+  const bachelorBatches = [
+    { batch: '078', bsYear: 2078, pType: 'MAJOR', status: 'COMPLETED' }, // 4+ years passed -> Graduated
+    { batch: '079', bsYear: 2079, pType: 'MAJOR', status: 'ACTIVE' },    // 4th year -> Active Major Projects
+    { batch: '080', bsYear: 2080, pType: 'MINOR', status: 'ACTIVE' },    // 3rd year -> Active Minor Projects
+  ];
+
+  for (const item of bachelorBatches) {
+    const batchStr = item.batch;
+    const bsYear = item.bsYear;
+    const nBCTGroups = 3;
 
     for (let gi = 0; gi < nBCTGroups; gi++) {
       const bctStudents = findStudents(bsYear, 'BCT');
       const startIdx = gi * 3;
       if (startIdx + 3 > bctStudents.length) break;
       const members = bctStudents.slice(startIdx, startIdx + 3);
-      // Batch 079 is Major Project (2079); Batch 080 is Minor Project (2080)
-      const isMajor = bd.batch === '079';
-      const pType = isMajor ? 'MAJOR' : 'MINOR';
-      const status = (gi === 0 && isMajor) ? 'COMPLETED' : 'ACTIVE';
 
       const group = await prisma.projectGroup.create({
         data: {
           name: `BCT-${batchStr}-Group${gi + 1}`,
           projectTitle: bachelorGroupTitles[bGroupIdx % bachelorGroupTitles.length],
-          projectType: pType,
-          status,
+          projectType: item.pType,
+          status: item.status,
           cluster: ['AIML', 'IPCV', 'NTS', 'EDMES'][gi % 4],
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
@@ -416,7 +404,7 @@ async function main() {
         data: { groupId: group.id, externalExaminerId: extExaminer.id, assignedById: coordinators.BCT.id },
       });
 
-      await attachComponents({ groupId: group.id, projectType: pType });
+      await attachComponents({ groupId: group.id, projectType: item.pType });
       createdGroups.push(group);
       bGroupIdx++;
     }
@@ -424,14 +412,12 @@ async function main() {
     // BEI group
     const beiStudents = findStudents(bsYear, 'BEI');
     if (beiStudents.length >= 2) {
-      const isMajor = bd.batch === '079';
-      const pType = isMajor ? 'MAJOR' : 'MINOR';
       const group = await prisma.projectGroup.create({
         data: {
           name: `BEI-${batchStr}-Group1`,
           projectTitle: 'IoT-based Smart Environmental Monitoring System',
-          projectType: pType,
-          status: 'ACTIVE',
+          projectType: item.pType,
+          status: item.status,
           cluster: 'EDMES',
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
@@ -449,14 +435,18 @@ async function main() {
       await prisma.examinerAssignment.create({
         data: { groupId: group.id, externalExaminerId: externalExaminers[0].id, assignedById: coordinators.BEI.id },
       });
-      await attachComponents({ groupId: group.id, projectType: pType });
+      await attachComponents({ groupId: group.id, projectType: item.pType });
       createdGroups.push(group);
     }
   }
-  console.log(`Created ${createdGroups.length} Bachelor project groups (Minor: 2080, Major: 2079)`);
+  console.log(`Created ${createdGroups.length} Bachelor project groups (Minor: 2080, Major: 2079, Completed: 2078; 2082 & 2083 have 0)`);
 
   // ============================================================
   // MASTER THESES (16 Credits) & MASTER PROJECTS (4 Credits)
+  // • 083 batch: 1st Year -> Coursework only (NO thesis/project)
+  // • 082 batch (3rd Sem): Master Project 4-Cr (Active) + Thesis Concept Form Call
+  // • 081 batch (4th Sem): Master Thesis 16-Cr (Active/Finalizing)
+  // • 080 & 079 batches (Graduated): Completed Master Theses & Projects
   // ============================================================
   const masterThesisTitles = [
     'Automated Intrusion Detection in Software-Defined Networks using Deep Graph Convolutional Networks',
@@ -487,8 +477,16 @@ async function main() {
   let tIdx = 0;
   let pIdx = 0;
 
-  for (const bd of BATCH_DEFS) {
-    const bsYear = bd.bsYear;
+  const masterBatches = [
+    { batch: '078', bsYear: 2078, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' }, // Graduated
+    { batch: '079', bsYear: 2079, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' }, // Graduated
+    { batch: '080', bsYear: 2080, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' }, // Graduated
+    { batch: '081', bsYear: 2081, thesisStatus: 'ACTIVE',    projectStatus: 'COMPLETED' }, // 4th sem Thesis
+    { batch: '082', bsYear: 2082, thesisStatus: 'ACTIVE',    projectStatus: 'ACTIVE' },    // 3rd sem Project
+  ];
+
+  for (const item of masterBatches) {
+    const bsYear = item.bsYear;
     for (const prog of MASTER_PROGRAMS) {
       const progStudents = findStudents(bsYear, prog.code);
       if (!progStudents.length) continue;
@@ -496,7 +494,6 @@ async function main() {
       // Master Thesis (16 Cr)
       const thesisStudent = progStudents[0];
       if (thesisStudent) {
-        const isCompleted = (bd.batch === '079' && prog.code === 'MSNCS') || (bd.batch === '082' && tIdx === 0);
         const sup = supervisors[tIdx % supervisors.length];
         const extMid = externalExaminers[tIdx % externalExaminers.length];
         const extFinal = externalExaminers[(tIdx + 1) % externalExaminers.length];
@@ -506,7 +503,7 @@ async function main() {
             title: masterThesisTitles[tIdx % masterThesisTitles.length],
             projectType: 'THESIS',
             studentId: thesisStudent.id,
-            status: isCompleted ? 'COMPLETED' : 'ACTIVE',
+            status: item.thesisStatus,
             startDate: new Date('2025-02-01'),
             endDate: new Date('2025-08-30'),
             supervisorId: sup.id,
@@ -543,7 +540,6 @@ async function main() {
       // Master Project (4 Cr)
       if (progStudents.length > 1) {
         const projectStudent = progStudents[1];
-        const isCompleted = (bd.batch === '079' && prog.code === 'MSDSA');
         const extFinal = externalExaminers[pIdx % externalExaminers.length];
 
         const mProject = await prisma.thesis.create({
@@ -551,7 +547,7 @@ async function main() {
             title: masterProjectTitles[pIdx % masterProjectTitles.length],
             projectType: 'PROJECT',
             studentId: projectStudent.id,
-            status: isCompleted ? 'COMPLETED' : 'ACTIVE',
+            status: item.projectStatus,
             startDate: new Date('2025-02-01'),
             endDate: new Date('2025-08-30'),
             supervisorId: supervisors[(pIdx + 2) % supervisors.length].id,
@@ -586,14 +582,14 @@ async function main() {
       }
     }
   }
-  console.log(`Created ${createdTheses.length} Master Theses (16 Cr) and ${createdProjects.length} Master Projects (4 Cr)`);
+  console.log(`Created ${createdTheses.length} Master Theses (16 Cr) and ${createdProjects.length} Master Projects (4 Cr) (2083 has 0)`);
 
   // ============================================================
-  // EVALUATIONS & MARKS (Full grading for showcase)
+  // EVALUATIONS & MARKS (Full defense evaluations for graduated/completed cohorts)
   // ============================================================
-  // 1. Fully evaluate completed Bachelor Major group
-  const compGroup = createdGroups.find(g => g.status === 'COMPLETED') || createdGroups[0];
-  if (compGroup) {
+  // 1. Evaluate completed Bachelor Major groups (2078 batch and completed 2079)
+  const completedGroups = createdGroups.filter(g => g.status === 'COMPLETED');
+  for (const compGroup of completedGroups) {
     const comps = await prisma.evaluationComponent.findMany({ where: { groupId: compGroup.id } });
     const cMap = Object.fromEntries(comps.map(c => [c.evaluationType, c]));
     const ext = await prisma.examinerAssignment.findFirst({ where: { groupId: compGroup.id } });
@@ -610,12 +606,12 @@ async function main() {
     }
     if (cMap.SUPERVISOR && compGroup.supervisorId) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 44.0, comments: 'Outstanding dedication and code quality.', suggestions: 'Publish benchmark results.', status: 'COMPLETED', submittedById: compGroup.supervisorId, groupId: compGroup.id },
+        data: { componentId: cMap.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 45.0, comments: 'Outstanding dedication and high software quality.', suggestions: 'Publish benchmark results.', status: 'COMPLETED', submittedById: compGroup.supervisorId, groupId: compGroup.id },
       });
     }
     if (cMap.EXTERNAL_EXAMINER && ext) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 18.0, comments: 'Clear presentation and solid defense of technical choices.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
+        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 18.5, comments: 'Clear presentation and solid defense of technical choices.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
       });
     }
     if (cMap.FINAL_DEFENSE) {
@@ -623,22 +619,22 @@ async function main() {
         data: { componentId: cMap.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 9.0, comments: 'Excellent final project defense.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
       });
     }
-    console.log(`Evaluated completed Bachelor Major Group "${compGroup.name}"`);
   }
+  console.log(`Evaluated ${completedGroups.length} completed Bachelor Major Groups across all 5 grading stages`);
 
-  // 2. Fully evaluate completed Master Thesis (300 Marks: Sup 100 + Ext Mid 100 + Ext Final 100)
-  const compThesis = createdTheses.find(t => t.status === 'COMPLETED') || createdTheses[0];
-  if (compThesis) {
+  // 2. Evaluate completed Master Theses (300 Marks: Sup 100 + Ext Mid 100 + Ext Final 100)
+  const completedTheses = createdTheses.filter(t => t.status === 'COMPLETED');
+  for (const compThesis of completedTheses) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compThesis.id } });
     for (const c of comps) {
       let subId = compThesis.supervisorId || supervisors[0].id;
-      let score = 17.5;
+      let score = 18.0;
       if (c.evaluationType === 'EXTERNAL_MIDTERM') {
         subId = compThesis.externalMidTermId || externalExaminers[0].id;
-        score = c.maxMarks === 20 ? 17.0 : 8.5;
+        score = c.maxMarks === 20 ? 17.5 : 8.5;
       } else if (c.evaluationType === 'EXTERNAL_FINAL') {
         subId = compThesis.externalFinalId || externalExaminers[1].id;
-        score = 18.0;
+        score = 18.5;
       }
       await prisma.evaluation.create({
         data: {
@@ -654,12 +650,12 @@ async function main() {
         },
       });
     }
-    console.log(`Evaluated completed Master Thesis "${compThesis.title}" (300 Marks Scheme)`);
   }
+  console.log(`Evaluated ${completedTheses.length} completed Master Theses (300 Marks Scheme)`);
 
-  // 3. Fully evaluate completed Master Project (100 Marks: 5 criteria x 20)
-  const compProject = createdProjects.find(p => p.status === 'COMPLETED') || createdProjects[0];
-  if (compProject) {
+  // 3. Evaluate completed Master Projects (100 Marks: 5 criteria x 20)
+  const completedProjects = createdProjects.filter(p => p.status === 'COMPLETED');
+  for (const compProject of completedProjects) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compProject.id } });
     const subId = compProject.externalFinalId || externalExaminers[0].id;
     for (const c of comps) {
@@ -677,8 +673,8 @@ async function main() {
         },
       });
     }
-    console.log(`Evaluated completed Master Project "${compProject.title}" (100 Marks Scheme)`);
   }
+  console.log(`Evaluated ${completedProjects.length} completed Master Projects (100 Marks Scheme)`);
 
   // ============================================================
   // ANNOUNCEMENTS & FORMS (Batch 2080 Minor, 2079 Major, 2082 Master)
@@ -688,7 +684,7 @@ async function main() {
   const masterThesisAnn = await prisma.announcement.create({
     data: {
       title: 'M.Sc. Research Thesis Topic Registration & Concept Note (Batch 2082)',
-      message: 'All enrolled M.Sc. students of Batch 2082 (MSNCS, MSDSA, MSICE, MSCSK) must register their research thesis proposal topic and preferred supervisor before the deadline.',
+      message: 'All enrolled M.Sc. students of Batch 2082 (MSNCS, MSDSA, MSICE, MSCSK) in 3rd Semester must register their research thesis proposal topic and preferred supervisor before the deadline.',
       type: 'THESIS',
       audience: 'PROGRAMS',
       degreeType: 'MASTER',
@@ -716,7 +712,7 @@ async function main() {
   const masterProjectAnn = await prisma.announcement.create({
     data: {
       title: 'Master Project Registration (4 Credit Course) - Batch 2082',
-      message: 'M.Sc. students of Batch 2082 undertaking the 4-credit Master Project course should register their project title, cluster, and domain.',
+      message: 'M.Sc. students of Batch 2082 undertaking the 3rd Semester 4-credit Master Project course should register their project title, cluster, and domain.',
       type: 'THESIS',
       audience: 'PROGRAMS',
       degreeType: 'MASTER',
@@ -734,7 +730,7 @@ async function main() {
     },
   });
 
-  // 3. Bachelor Minor Project Call (Batch 2080 - BCT Coordinator)
+  // 3. Bachelor Minor Project Call (Batch 2080 - 3rd Year - BCT Coordinator)
   const bachelorMinorAnn = await prisma.announcement.create({
     data: {
       title: 'Bachelor Minor Project Group Formation & Proposal Call (Batch 2080)',
@@ -759,7 +755,7 @@ async function main() {
     },
   });
 
-  // 4. Bachelor Major Project Call (Batch 2079 - BCT Coordinator)
+  // 4. Bachelor Major Project Call (Batch 2079 - 4th Year - BCT Coordinator)
   const bachelorMajorAnn = await prisma.announcement.create({
     data: {
       title: 'Bachelor Major Project Group Formation & Defense Call (Batch 2079)',
@@ -1015,21 +1011,20 @@ async function main() {
   console.log(`Pre-populated ${demoConceptSubmissions.length} demo form submissions for Master Announcements (Batch 2082)`);
 
   console.log('\n========================================================================');
-  console.log(' SEED COMPLETE — SHOWCASE DATASET READY');
+  console.log(' SEED COMPLETE — TIMELINE-ALIGNED SHOWCASE DATASET READY');
   console.log('========================================================================');
   console.log('• Password for ALL accounts:          "subesh"');
   console.log('• Maintainer Admin:                  subeshgaming@gmail.com');
   console.log('• MSNCS Master Coordinator (Lead):   msncs.coordinator@pcampus.edu.np');
   console.log('• BCT Bachelor Coordinator (Lead):   bct.coordinator@pcampus.edu.np');
-  console.log('• MSDSA Coordinator:                 msdsa.coordinator@pcampus.edu.np');
   console.log('• Faculty Supervisor (Dr. Prabesh):  prabesh.bhattarai@pcampus.edu.np');
-  console.log('• Faculty Supervisor (Dr. Anita):    anita.gurung@pcampus.edu.np');
-  console.log('• External Examiner (Dr. Hari):      hari.adhikari@pcampus.edu.np');
   console.log('• External Examiner (Dr. Prajwal):   prajwal.ghimire@ioe.edu.np');
-  console.log('• Master Student (MSNCS 2082):       082msncs01@pcampus.edu.np');
-  console.log('• Master Student (MSDSA 2082):       082msdsa01@pcampus.edu.np');
-  console.log('• Bachelor Minor Student (2080):     080bct001@pcampus.edu.np');
-  console.log('• Bachelor Major Student (2079):     079bct001@pcampus.edu.np');
+  console.log('• Bachelor 3rd Year Minor (2080):    080bct001@pcampus.edu.np');
+  console.log('• Bachelor 4th Year Major (2079):    079bct001@pcampus.edu.np');
+  console.log('• Bachelor Graduated Archive (2078): 078bct001@pcampus.edu.np');
+  console.log('• Master 3rd Sem Project (2082):     082msncs01@pcampus.edu.np');
+  console.log('• Master 4th Sem Thesis (2081):      081msncs01@pcampus.edu.np');
+  console.log('• Master Graduated Archive (2080):   080msncs01@pcampus.edu.np');
   console.log('========================================================================\n');
 }
 
