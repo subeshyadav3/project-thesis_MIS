@@ -897,10 +897,9 @@ exports.bulkImportUsersExcel = async (req, res) => {
         // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
         // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
         // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
-        // Replace the line below with:
-        //   email = `${rollNumber.toLowerCase()}.${(firstName || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
-        // ───────────────────────────────────────────────────────────────────
-        email = rollNumber.toLowerCase() + '@pcampus.edu.np';
+        if (!email) {
+          email = rollNumber.toLowerCase() + '@pcampus.edu.np';
+        }
         // Roll uniqueness
         if (existingRolls.has(rollNumber.toLowerCase())) {
           errors.push({ row: rowNum, email, error: `Roll number "${rollNumber}" already exists` });
