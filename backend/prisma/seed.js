@@ -316,7 +316,9 @@ async function main() {
   let bGroupIdx = 0;
 
   const bachelorBatches = [
+    { batch: '078', bsYear: 2078, pType: 'MINOR', status: 'COMPLETED' },
     { batch: '078', bsYear: 2078, pType: 'MAJOR', status: 'COMPLETED' },
+    { batch: '079', bsYear: 2079, pType: 'MINOR', status: 'COMPLETED' },
     { batch: '079', bsYear: 2079, pType: 'MAJOR', status: 'ACTIVE' },
     { batch: '080', bsYear: 2080, pType: 'MINOR', status: 'ACTIVE' },
   ];
@@ -569,7 +571,6 @@ async function main() {
     { batch: '079', bsYear: 2079, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
     { batch: '080', bsYear: 2080, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
     { batch: '081', bsYear: 2081, thesisStatus: 'ACTIVE',    projectStatus: 'COMPLETED' },
-    { batch: '082', bsYear: 2082, thesisStatus: 'ACTIVE',    projectStatus: 'ACTIVE' },
   ];
 
   for (const item of masterBatches) {
@@ -578,41 +579,137 @@ async function main() {
       const progStudents = findStudents(bsYear, prog.code);
       if (!progStudents.length) continue;
 
-      // Master Thesis (16 Cr)
-      const thesisStudent = progStudents[0];
-      if (thesisStudent) {
-        const sup = supervisors[tIdx % supervisors.length];
-        const extMid = externalExaminers[tIdx % externalExaminers.length];
-        const extFinal = externalExaminers[(tIdx + 1) % externalExaminers.length];
-        const title = masterThesisTitles[tIdx % masterThesisTitles.length];
+      const student = progStudents[0];
+      if (!student) continue;
 
-        const thesis = await prisma.thesis.create({
+      const sup = supervisors[tIdx % supervisors.length];
+      const extMid = externalExaminers[tIdx % externalExaminers.length];
+      const extFinal = externalExaminers[(tIdx + 1) % externalExaminers.length];
+      const thesisTitle = masterThesisTitles[tIdx % masterThesisTitles.length];
+      const projectTitle = masterProjectTitles[pIdx % masterProjectTitles.length];
+      const studentData = [{ name: `${student.firstName} ${student.lastName}`, rollNumber: student.rollNumber }];
+
+      // 1. 3rd Semester Master Project (4 Cr, Completed for all 078-081)
+      const mProject = await prisma.thesis.create({
+        data: {
+          title: projectTitle,
+          projectType: 'PROJECT',
+          studentId: student.id,
+          status: item.projectStatus,
+          startDate: new Date('2024-02-01'),
+          endDate: new Date('2024-07-30'),
+          supervisorId: sup.id,
+          externalMidTermId: null,
+          externalFinalId: extFinal.id,
+          batch: String(bsYear),
+          cluster: prog.cluster,
+          programId: prog.id,
+        },
+      });
+
+      await attachComponents({ thesisId: mProject.id, projectType: 'PROJECT' });
+      await prisma.examinerAssignment.create({
+        data: { thesisId: mProject.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
+      });
+
+      const projPropPdfBuf = await generateRealisticProposalPDF({
+        title: projectTitle,
+        students: studentData,
+        supervisorName: `${sup.firstName} ${sup.lastName}`,
+        supervisorDesignation: sup.designation,
+        programName: prog.name,
+        batch: String(bsYear),
+        projectType: 'PROJECT',
+      });
+      const projPropFilename = `proposal_project_${mProject.id}.pdf`;
+      fs.writeFileSync(path.join(storageThesesDir, projPropFilename), projPropPdfBuf);
+      await prisma.proposal.create({
+        data: {
+          stage: 'PROPOSAL',
+          documentUrl: `/api/files/theses/${projPropFilename}`,
+          documentType: 'PROPOSAL',
+          status: 'APPROVED',
+          submittedById: student.id,
+          thesisId: mProject.id,
+        },
+      });
+
+      if (item.projectStatus === 'COMPLETED') {
+        const projFinalPdfBuf = await generateRealisticFinalReportPDF({
+          title: projectTitle,
+          students: studentData,
+          supervisorName: `${sup.firstName} ${sup.lastName}`,
+          supervisorDesignation: sup.designation,
+          externalExaminerName: `${extFinal.firstName} ${extFinal.lastName}`,
+          programName: prog.name,
+          batch: String(bsYear),
+          projectType: 'PROJECT',
+        });
+        const projFinalFilename = `final_project_${mProject.id}.pdf`;
+        fs.writeFileSync(path.join(storageThesesDir, projFinalFilename), projFinalPdfBuf);
+        await prisma.proposal.create({
           data: {
-            title,
-            projectType: 'THESIS',
-            studentId: thesisStudent.id,
-            status: item.thesisStatus,
-            startDate: new Date('2025-02-01'),
-            endDate: new Date('2025-08-30'),
-            supervisorId: sup.id,
-            externalMidTermId: extMid.id,
-            externalFinalId: extFinal.id,
-            batch: String(bsYear),
-            cluster: prog.cluster,
-            programId: prog.id,
+            stage: 'FINAL',
+            documentUrl: `/api/files/theses/${projFinalFilename}`,
+            documentType: 'FINAL_REPORT',
+            status: 'APPROVED',
+            submittedById: student.id,
+            thesisId: mProject.id,
           },
         });
+      }
+      createdProjects.push(mProject);
+      pIdx++;
 
-        await attachComponents({ thesisId: thesis.id, projectType: 'THESIS' });
-        await prisma.examinerAssignment.create({
-          data: { thesisId: thesis.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
-        });
+      // 2. 4th Semester Master Thesis (16 Cr, Active for 081, Completed for 078-080)
+      const thesis = await prisma.thesis.create({
+        data: {
+          title: thesisTitle,
+          projectType: 'THESIS',
+          studentId: student.id,
+          status: item.thesisStatus,
+          startDate: new Date('2025-02-01'),
+          endDate: new Date('2025-08-30'),
+          supervisorId: sup.id,
+          externalMidTermId: extMid.id,
+          externalFinalId: extFinal.id,
+          batch: String(bsYear),
+          cluster: prog.cluster,
+          programId: prog.id,
+        },
+      });
 
-        const studentData = [{ name: `${thesisStudent.firstName} ${thesisStudent.lastName}`, rollNumber: thesisStudent.rollNumber }];
+      await attachComponents({ thesisId: thesis.id, projectType: 'THESIS' });
+      await prisma.examinerAssignment.create({
+        data: { thesisId: thesis.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
+      });
 
-        // 1. Proposal PDF
-        const propPdfBuf = await generateRealisticProposalPDF({
-          title,
+      const propPdfBuf = await generateRealisticProposalPDF({
+        title: thesisTitle,
+        students: studentData,
+        supervisorName: `${sup.firstName} ${sup.lastName}`,
+        supervisorDesignation: sup.designation,
+        programName: prog.name,
+        batch: String(bsYear),
+        projectType: 'THESIS',
+      });
+      const propFilename = `proposal_thesis_${thesis.id}.pdf`;
+      fs.writeFileSync(path.join(storageThesesDir, propFilename), propPdfBuf);
+      await prisma.proposal.create({
+        data: {
+          stage: 'PROPOSAL',
+          documentUrl: `/api/files/theses/${propFilename}`,
+          documentType: 'PROPOSAL',
+          status: 'APPROVED',
+          submittedById: student.id,
+          thesisId: thesis.id,
+        },
+      });
+
+      // Midterm Report PDF (Active 4th sem or Completed)
+      if (item.thesisStatus === 'COMPLETED' || item.batch === '081') {
+        const midPdfBuf = await generateRealisticMidtermReportPDF({
+          title: thesisTitle,
           students: studentData,
           supervisorName: `${sup.firstName} ${sup.lastName}`,
           supervisorDesignation: sup.designation,
@@ -620,155 +717,48 @@ async function main() {
           batch: String(bsYear),
           projectType: 'THESIS',
         });
-        const propFilename = `proposal_thesis_${thesis.id}.pdf`;
-        fs.writeFileSync(path.join(storageThesesDir, propFilename), propPdfBuf);
+        const midFilename = `midterm_thesis_${thesis.id}.pdf`;
+        fs.writeFileSync(path.join(storageThesesDir, midFilename), midPdfBuf);
         await prisma.proposal.create({
           data: {
-            stage: 'PROPOSAL',
-            documentUrl: `/api/files/theses/${propFilename}`,
-            documentType: 'PROPOSAL',
+            stage: 'MID_TERM',
+            documentUrl: `/api/files/theses/${midFilename}`,
+            documentType: 'MID_TERM_REPORT',
             status: 'APPROVED',
-            submittedById: thesisStudent.id,
+            submittedById: student.id,
             thesisId: thesis.id,
           },
         });
-
-        // 2. Midterm Report PDF (Active 4th sem or Completed)
-        if (item.thesisStatus === 'COMPLETED' || item.batch === '081') {
-          const midPdfBuf = await generateRealisticMidtermReportPDF({
-            title,
-            students: studentData,
-            supervisorName: `${sup.firstName} ${sup.lastName}`,
-            supervisorDesignation: sup.designation,
-            programName: prog.name,
-            batch: String(bsYear),
-            projectType: 'THESIS',
-          });
-          const midFilename = `midterm_thesis_${thesis.id}.pdf`;
-          fs.writeFileSync(path.join(storageThesesDir, midFilename), midPdfBuf);
-          await prisma.proposal.create({
-            data: {
-              stage: 'MID_TERM',
-              documentUrl: `/api/files/theses/${midFilename}`,
-              documentType: 'MID_TERM_REPORT',
-              status: 'APPROVED',
-              submittedById: thesisStudent.id,
-              thesisId: thesis.id,
-            },
-          });
-        }
-
-        // 3. Final Report PDF (Completed)
-        if (item.thesisStatus === 'COMPLETED') {
-          const finalPdfBuf = await generateRealisticFinalReportPDF({
-            title,
-            students: studentData,
-            supervisorName: `${sup.firstName} ${sup.lastName}`,
-            supervisorDesignation: sup.designation,
-            externalExaminerName: `${extFinal.firstName} ${extFinal.lastName}`,
-            programName: prog.name,
-            batch: String(bsYear),
-            projectType: 'THESIS',
-          });
-          const finalFilename = `final_thesis_${thesis.id}.pdf`;
-          fs.writeFileSync(path.join(storageThesesDir, finalFilename), finalPdfBuf);
-          await prisma.proposal.create({
-            data: {
-              stage: 'FINAL',
-              documentUrl: `/api/files/theses/${finalFilename}`,
-              documentType: 'FINAL_REPORT',
-              status: 'APPROVED',
-              submittedById: thesisStudent.id,
-              thesisId: thesis.id,
-            },
-          });
-        }
-
-        createdTheses.push(thesis);
-        tIdx++;
       }
 
-      // Master Project (4 Cr)
-      if (progStudents.length > 1) {
-        const projectStudent = progStudents[1];
-        const extFinal = externalExaminers[pIdx % externalExaminers.length];
-        const sup = supervisors[(pIdx + 2) % supervisors.length];
-        const title = masterProjectTitles[pIdx % masterProjectTitles.length];
-
-        const mProject = await prisma.thesis.create({
-          data: {
-            title,
-            projectType: 'PROJECT',
-            studentId: projectStudent.id,
-            status: item.projectStatus,
-            startDate: new Date('2025-02-01'),
-            endDate: new Date('2025-08-30'),
-            supervisorId: sup.id,
-            externalMidTermId: null,
-            externalFinalId: extFinal.id,
-            batch: String(bsYear),
-            cluster: prog.cluster,
-            programId: prog.id,
-          },
-        });
-
-        await attachComponents({ thesisId: mProject.id, projectType: 'PROJECT' });
-        await prisma.examinerAssignment.create({
-          data: { thesisId: mProject.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
-        });
-
-        const studentData = [{ name: `${projectStudent.firstName} ${projectStudent.lastName}`, rollNumber: projectStudent.rollNumber }];
-
-        const propPdfBuf = await generateRealisticProposalPDF({
-          title,
+      // Final Report PDF (Completed)
+      if (item.thesisStatus === 'COMPLETED') {
+        const finalPdfBuf = await generateRealisticFinalReportPDF({
+          title: thesisTitle,
           students: studentData,
           supervisorName: `${sup.firstName} ${sup.lastName}`,
           supervisorDesignation: sup.designation,
+          externalExaminerName: `${extFinal.firstName} ${extFinal.lastName}`,
           programName: prog.name,
           batch: String(bsYear),
-          projectType: 'PROJECT',
+          projectType: 'THESIS',
         });
-        const propFilename = `proposal_project_${mProject.id}.pdf`;
-        fs.writeFileSync(path.join(storageThesesDir, propFilename), propPdfBuf);
+        const finalFilename = `final_thesis_${thesis.id}.pdf`;
+        fs.writeFileSync(path.join(storageThesesDir, finalFilename), finalPdfBuf);
         await prisma.proposal.create({
           data: {
-            stage: 'PROPOSAL',
-            documentUrl: `/api/files/theses/${propFilename}`,
-            documentType: 'PROPOSAL',
+            stage: 'FINAL',
+            documentUrl: `/api/files/theses/${finalFilename}`,
+            documentType: 'FINAL_REPORT',
             status: 'APPROVED',
-            submittedById: projectStudent.id,
-            thesisId: mProject.id,
+            submittedById: student.id,
+            thesisId: thesis.id,
           },
         });
-
-        if (item.projectStatus === 'COMPLETED') {
-          const finalPdfBuf = await generateRealisticFinalReportPDF({
-            title,
-            students: studentData,
-            supervisorName: `${sup.firstName} ${sup.lastName}`,
-            supervisorDesignation: sup.designation,
-            externalExaminerName: `${extFinal.firstName} ${extFinal.lastName}`,
-            programName: prog.name,
-            batch: String(bsYear),
-            projectType: 'PROJECT',
-          });
-          const finalFilename = `final_project_${mProject.id}.pdf`;
-          fs.writeFileSync(path.join(storageThesesDir, finalFilename), finalPdfBuf);
-          await prisma.proposal.create({
-            data: {
-              stage: 'FINAL',
-              documentUrl: `/api/files/theses/${finalFilename}`,
-              documentType: 'FINAL_REPORT',
-              status: 'APPROVED',
-              submittedById: projectStudent.id,
-              thesisId: mProject.id,
-            },
-          });
-        }
-
-        createdProjects.push(mProject);
-        pIdx++;
       }
+
+      createdTheses.push(thesis);
+      tIdx++;
     }
   }
   console.log(`Created ${createdTheses.length} Master Theses and ${createdProjects.length} Master Projects with multi-page PDFs`);
@@ -882,27 +872,6 @@ async function main() {
         { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: false, placeholder: 'Enter secondary supervisor name(s) (optional)' },
         { key: 'pdfUrl', label: 'Concept Note / Proposal Document (PDF, max 10MB)', type: 'file', required: false },
         { key: 'remarks', label: 'Remarks / Abstract (if any)', type: 'textarea', required: false },
-      ],
-      startDate: new Date('2026-01-01'),
-      expirationDate: new Date('2027-06-30'),
-      createdById: coordinators.MSNCS.id,
-    },
-  });
-
-  const masterProjectAnn = await prisma.announcement.create({
-    data: {
-      title: 'Master Project Registration (4 Credit Course) - Batch 2082',
-      message: 'M.Sc. students of Batch 2082 undertaking the 3rd Semester 4-credit Master Project course should register their project title, cluster, and domain.',
-      type: 'THESIS',
-      audience: 'PROGRAMS',
-      degreeType: 'MASTER',
-      programIds: [programs.MSNCS.id, programs.MSDSA.id, programs.MSICE.id, programs.MSCSK.id],
-      batch: '2082',
-      academicYearId: ayMap['082'].id,
-      departmentId: eceDept.id,
-      formEnabled: true,
-      formFields: [
-        { key: 'project_domain', label: 'Project Domain', type: 'text', required: true, placeholder: 'e.g. DevOps, Computer Vision, Cloud Security' },
       ],
       startDate: new Date('2026-01-01'),
       expirationDate: new Date('2027-06-30'),
@@ -1143,47 +1112,45 @@ async function main() {
     }
   ];
 
-  for (const ann of [masterThesisAnn, masterProjectAnn]) {
-    for (const item of demoConceptSubmissions) {
-      const student = master2082Students.find(s => s.rollNumber.toUpperCase() === item.roll.toUpperCase());
-      if (!student) continue;
+  for (const item of demoConceptSubmissions) {
+    const student = master2082Students.find(s => s.rollNumber.toUpperCase() === item.roll.toUpperCase());
+    if (!student) continue;
 
-      const pdfFilename = `proposal_${student.rollNumber.toLowerCase()}_${ann.id}.pdf`;
-      const pdfBuf = await generateRealisticProposalPDF({
-        title: item.title,
-        students: [{ name: `${student.firstName} ${student.lastName}`, rollNumber: student.rollNumber }],
-        supervisorName: item.primary_supervisor || 'Faculty Member',
-        supervisorDesignation: 'Prospective Supervisor',
-        programName: 'Master Degree Program',
-        batch: '2082',
-        projectType: 'THESIS',
-      });
-      fs.writeFileSync(path.join(storageThesesDir, pdfFilename), pdfBuf);
-      const pdfUrl = `/api/files/theses/${pdfFilename}`;
+    const pdfFilename = `proposal_${student.rollNumber.toLowerCase()}_${masterThesisAnn.id}.pdf`;
+    const pdfBuf = await generateRealisticProposalPDF({
+      title: item.title,
+      students: [{ name: `${student.firstName} ${student.lastName}`, rollNumber: student.rollNumber }],
+      supervisorName: item.primary_supervisor || 'Faculty Member',
+      supervisorDesignation: 'Prospective Supervisor',
+      programName: 'Master Degree Program',
+      batch: '2082',
+      projectType: 'THESIS',
+    });
+    fs.writeFileSync(path.join(storageThesesDir, pdfFilename), pdfBuf);
+    const pdfUrl = `/api/files/theses/${pdfFilename}`;
 
-      const formData = {
-        title: item.title,
-        description: item.description,
-        cluster: item.cluster,
-        is_guided: item.is_guided,
-        primary_supervisor: item.primary_supervisor,
-        secondary_supervisor: item.secondary_supervisor,
-        remarks: item.remarks,
-        project_domain: item.project_domain,
-        pdfUrl,
-        pdf_document: pdfUrl,
-      };
+    const formData = {
+      title: item.title,
+      description: item.description,
+      cluster: item.cluster,
+      is_guided: item.is_guided,
+      primary_supervisor: item.primary_supervisor,
+      secondary_supervisor: item.secondary_supervisor,
+      remarks: item.remarks,
+      project_domain: item.project_domain,
+      pdfUrl,
+      pdf_document: pdfUrl,
+    };
 
-      await prisma.formResponse.create({
-        data: {
-          announcementId: ann.id,
-          studentId: student.id,
-          formData,
-          status: item.status,
-          createdAt: new Date(Date.now() - Math.floor(Math.random() * 5 + 1) * 24 * 60 * 60 * 1000),
-        },
-      });
-    }
+    await prisma.formResponse.create({
+      data: {
+        announcementId: masterThesisAnn.id,
+        studentId: student.id,
+        formData,
+        status: item.status,
+        createdAt: new Date(Date.now() - Math.floor(Math.random() * 5 + 1) * 24 * 60 * 60 * 1000),
+      },
+    });
   }
 
   console.log(`Pre-populated ${demoConceptSubmissions.length} demo form submissions with multi-page PDFs`);
