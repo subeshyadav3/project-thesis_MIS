@@ -1,0 +1,155 @@
+\chapter{Methodology and Requirement Analysis}
+
+\section{Software Development Methodology}
+The development of the Thesis and Project Management System (TPMS) was executed following the \textbf{Agile Scrum} software engineering methodology~\citep{rubin2012scrum, pressman2015software}. Agile Scrum was selected due to its iterative, feedback-driven lifecycle, which enabled regular stakeholder consultations with DOECE department coordinators, faculty supervisors, and student representatives.
+
+\subsection{Scrum Workflow and Sprint Cycles}
+The development roadmap was structured into four two-week sprints over an eight-week project lifecycle:
+\begin{itemize}
+    \item \textbf{Sprint 1 (Weeks 1--2) --- Requirements Elicitation and Architectural Modeling:} Analysis of DOECE project evaluation guidelines, creation of database schema models via Prisma DSL, setup of JWT authentication, and establishment of role-based route middleware.
+    \item \textbf{Sprint 2 (Weeks 3--4) --- Group Formation and Proposal Ingestion Subsystems:} Implementation of student team formation, invite/accept state machines, compulsory proposal PDF upload via Multer, and the coordinator responses matrix with deduplication.
+    \item \textbf{Sprint 3 (Weeks 5--6) --- Evaluation Engines, Rubrics, and Grade Sheet Pipeline:} Implementation of stage-wise defense grading rubrics (Minor 50, Major 100, Master 300), conflict-of-interest prevention filters, and Puppeteer-based server-side PDF generation.
+    \item \textbf{Sprint 4 (Weeks 7--8) --- Bulk Ingestion, Audit Trails, Integration Testing, and UAT:} Implementation of Excel bulk parsing with pre-commit anomaly detection, program-scoped audit logging, end-to-end integration testing, and user acceptance trials.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Agile Development Sprint Schedule and Deliverables}
+\label{tab:sprint_schedule}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|c|X|}
+\hline
+\textbf{Sprint} & \textbf{Timeline} & \textbf{Key Deliverables and Milestones} \\
+\hline
+Sprint 1 & Weeks 1--2 & Requirement specifications, Prisma schema, PostgreSQL setup, JWT authentication, DegreeGuard middleware. \\
+\hline
+Sprint 2 & Weeks 3--4 & Team formation subsystem, Engagement Guard, Proposal document storage, Coordinator response matrix deduplication. \\
+\hline
+Sprint 3 & Weeks 5--6 & Evaluation rubrics (Minor/Major/MSc), Conflict-of-Interest guard, Headless Chrome PDF grade sheet generator. \\
+\hline
+Sprint 4 & Weeks 7--8 & Bulk Excel import with anomaly checker, Program-scoped audit logging, System integration, Testing and UAT. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Requirement Analysis}
+
+\subsection{Stakeholder Identification and Role Matrix}
+The system serves five distinct stakeholder personas, each characterized by defined administrative privileges and operational responsibilities, as summarized in Table~\ref{tab:role_matrix}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Stakeholder Personas and Role Responsibility Matrix}
+\label{tab:role_matrix}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{Role} & \textbf{Scope} & \textbf{Core Functional Responsibilities} \\
+\hline
+\textbf{Maintainer} & System-Wide & System configuration, department/program bootstrapping, coordinator account provisioning, global audit log oversight. \\
+\hline
+\textbf{Coordinator} & Program / Dept & Announcement creation, group formation deadlines, proposal matrix review, supervisor/examiner allocation, PDF grade sheet generation. \\
+\hline
+\textbf{Supervisor} & Project-Specific & Proposal review, feedback authoring, milestone tracking, progress evaluation marking across defense stages. \\
+\hline
+\textbf{Student} & Team-Specific & Group formation, invitation management, proposal and report document submissions, real-time evaluation status tracking. \\
+\hline
+\textbf{External Examiner} & Defense Panel & Examination of assigned projects/theses, evaluation rubric scoring, internal/external defense mark submission. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Functional Requirements}
+The functional requirements specify the complete operational behaviors of TPMS:
+
+\begin{enumerate}[label=\textbf{FR\arabic*.}]
+    \item \textbf{Institutional Authentication and Domain Policy:} The system must authenticate users via encrypted passwords (bcrypt hashing) and stateless JWT tokens. Student accounts must enforce the institutional email format \texttt{\{rollNumber\}@pcampus.edu.np}, while faculty accounts must belong to the \texttt{@pcampus.edu.np} domain.
+    
+    \item \textbf{Program Scoping and Degree Isolation:} Bachelor coordinators must have administrative authority restricted strictly to their designated academic program (e.g., BCT or BEI). Master coordinators possess cross-program oversight over all postgraduate research specializations.
+    
+    \item \textbf{Announcement and Group Formation Engine:} Coordinators must be able to publish announcements with configurable deadlines, group size constraints (1--4 members for Bachelor projects; strictly 1 student for Master theses), and custom form builder attributes.
+    
+    \item \textbf{Global Multi-Project Engagement Guard:} The database and application layer must enforce strict constraints preventing any student from participating in multiple active project groups or theses concurrently.
+    
+    \item \textbf{Form Responses Matrix and Group Deduplication:} The coordinator interface must aggregate multi-student group submissions into a single consolidated row per group, providing 1-click fuzzy supervisor matching and inline lifecycle activation.
+    
+    \item \textbf{Cross-Role Faculty Utilization and Conflict-of-Interest Filter:} Faculty members must be able to serve as supervisors and defense examiners across distinct projects. The system must algorithmically filter out assigned supervisors from being selected as internal or external examiners on their own projects.
+    
+    \item \textbf{Multi-Stage Evaluation Rubrics:} The system must support Tribhuvan University DOECE evaluation schemes:
+    \begin{itemize}
+        \item \textit{Bachelor Minor Project (50 Marks):} Supervisor (25), Proposal Defense (5), Mid-Term Defense (5), Final Defense (5), Internal Examiner (10).
+        \item \textit{Bachelor Major Project (100 Marks):} Supervisor (50), Proposal Defense (10), Mid-Term Defense (10), Final Defense (10), Internal Examiner (20).
+        \item \textit{Master Thesis (300 Marks):} Supervisor (100 Marks / 5 criteria), External Mid-Term Examiner (100 Marks / 5 criteria), External Final Examiner (100 Marks / 5 criteria).
+    \end{itemize}
+    
+    \item \textbf{Automated PDF Grade Sheet Generation:} The system must render official, print-ready A4 evaluation sheets branded with the Institute of Engineering, Pulchowk Campus header, student rosters, supervisor designations, automated number-to-words mark conversion, and signature panels.
+    
+    \item \textbf{Bulk Excel Import with Anomaly Detection:} The system must parse standardized Excel rosters, detect intra-file duplicate entries, flag students already engaged in active projects, and validate faculty assignments prior to database insertion.
+    
+    \item \textbf{Program-Scoped Audit Trail:} Every system action (document submission, mark entry, status transition, document view) must be recorded with actor metadata and automatically resolved to its corresponding academic program.
+    
+    \item \textbf{Automated Notification Dispatch:} The system must send real-time in-app alerts and asynchronous email notifications upon invitation dispatch, supervisor assignment, and evaluation publication.
+\end{enumerate}
+
+\subsection{Non-Functional Requirements}
+
+\begin{enumerate}[label=\textbf{NFR\arabic*.}]
+    \item \textbf{Performance and Latency:} REST API response times for transactional operations (authentication, mark entry, status updates) must not exceed 500 ms under standard operational loads. PDF grade sheet generation must execute within 2.5 seconds.
+    \item \textbf{Security and Data Integrity:} Sensitive credentials must be hashed using \texttt{bcrypt} (work factor 10). Passwords must never be returned in API payloads. All mutations must be guarded by JWT signature validation and role authorization middleware.
+    \item \textbf{Concurrency and ACID Guarantees:} Group invitations and mark finalizations must utilize atomic database transactions to eliminate race conditions.
+    \item \textbf{Usability and Responsive Design:} The frontend interface must adhere to the DOECE academic design system, featuring responsive CSS grid/flexbox layouts accessible across desktop, tablet, and mobile browsers.
+    \item \textbf{Maintainability and Extensibility:} The codebase must follow modular MVC patterns in the backend and modular component hierarchies in the frontend.
+\end{enumerate}
+
+\section{Feasibility Study}
+
+\subsection{Technical Feasibility}
+The technology stack utilizes mature, industry-standard open-source frameworks. Node.js and Express.js provide a high-throughput, non-blocking runtime environment. PostgreSQL and Prisma ORM ensure robust relational consistency and type-safe query compilation. React 18 and Vite deliver rapid client-side rendering with hot module replacement. Puppeteer allows deterministic headless Chrome PDF generation on the server. The technical architecture is fully feasible on standard institutional server infrastructure.
+
+\subsection{Operational Feasibility}
+The system directly mirrors the operational workflow of the Department of Electronics and Computer Engineering. By retaining established grading rubrics, examination committee structures, and official evaluation sheet formats, TPMS requires minimal operational retraining for faculty, students, and administrative coordinators.
+
+\subsection{Economic Feasibility}
+TPMS is constructed entirely using open-source software libraries, eliminating software licensing costs. It can be hosted on on-premises departmental servers or cost-effective Linux Virtual Private Servers (VPS), making it economically sustainable for institutional adoption.
+
+\subsection{Schedule Feasibility}
+As demonstrated in the eight-week Gantt schedule (Table~\ref{tab:sprint_schedule}), iterative Agile sprints ensured that core architectural milestones, database modeling, evaluation rubrics, and grade sheet generation were systematically developed, tested, and validated within the allotted academic timeframe.
+
+\section{Technology Stack and Toolchain Justification}
+
+\begin{table}[H]
+\centering
+\small
+\caption{System Technology Stack and Architectural Justification}
+\label{tab:tech_stack}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{Layer / Component} & \textbf{Technology} & \textbf{Engineering Justification} \\
+\hline
+\textbf{Frontend Framework} & React 18 & Component-based architecture, virtual DOM reconciliation, rich ecosystem of custom hooks and Context providers. \\
+\hline
+\textbf{Build Tooling} & Vite 5 & Native ES module bundling, instant Hot Module Replacement (HMR), optimized production asset minification. \\
+\hline
+\textbf{Styling Engine} & CSS3 / Tailwind CSS & Modular design tokens, DOECE academic color palette, responsive flexbox/grid layout utilities. \\
+\hline
+\textbf{Backend Runtime} & Node.js 18.x & Asynchronous, event-driven I/O model suited for concurrent REST API servicing. \\
+\hline
+\textbf{Web Server Framework} & Express.js & Minimalist, robust middleware pipeline for authentication, role verification, and request routing. \\
+\hline
+\textbf{Relational Database} & PostgreSQL 16 & Enterprise ACID compliance, robust indexing, foreign key constraints, and relational reliability. \\
+\hline
+\textbf{ORM Layer} & Prisma 5 & Declarative schema definition, automated schema migrations, compile-time query type safety. \\
+\hline
+\textbf{Document Generation} & Puppeteer & Headless Chromium rendering engine for pixel-perfect server-side HTML-to-PDF compilation. \\
+\hline
+\textbf{Spreadsheet Parsing} & SheetJS (xlsx) & Fast, memory-efficient in-memory parsing of tabular Excel files with multi-sheet validation. \\
+\hline
+\textbf{Authentication} & JWT / bcryptjs & Stateless token verification with salted password hashing. \\
+\hline
+\textbf{File Uploads} & Multer & Multipart/form-data middleware for server-side PDF storage and metadata binding. \\
+\hline
+\end{tabularx}
+\end{table}

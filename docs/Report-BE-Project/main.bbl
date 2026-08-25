@@ -1,0 +1,96 @@
+\begin{thebibliography}{10}
+
+\bibitem{pressman2015software}
+Roger~S. Pressman and Bruce~R. Maxim.
+\newblock {\em Software Engineering: A Practitioner's Approach}.
+\newblock McGraw-Hill Education, New York, 8th edition, 2015.
+
+\bibitem{ko2021systematic}
+Amy~J. Ko, Thomas~D. LaToza, and Margaret~M. Burnett.
+\newblock A systematic review of research on academic project management in
+  engineering education.
+\newblock {\em IEEE Transactions on Education}, 64(3):218--229, 2021.
+
+\bibitem{ferraiolo2007rbac}
+David Ferraiolo, D.~Richard Kuhn, and Ramaswamy Chandramouli.
+\newblock {\em Role-Based Access Control}.
+\newblock Artech House, Norwood, MA, 2nd edition, 2007.
+
+\bibitem{sommerville2016software}
+Ian Sommerville.
+\newblock {\em Software Engineering}.
+\newblock Pearson, Harlow, England, 10th edition, 2016.
+
+\bibitem{fielding2000architectural}
+Roy~Thomas Fielding.
+\newblock {\em Architectural Styles and the Design of Network-based Software
+  Architectures}.
+\newblock PhD thesis, University of California, Irvine, Irvine, CA, USA, 2000.
+
+\bibitem{martin2017clean}
+Robert~C. Martin.
+\newblock {\em Clean Architecture: A Craftsman's Guide to Software Structure
+  and Design}.
+\newblock Prentice Hall, Upper Saddle River, NJ, 2017.
+
+\bibitem{postgresql2024manual}
+{The PostgreSQL Global Development Group}.
+\newblock {PostgreSQL: The World's Most Advanced Open Source Relational
+  Database}.
+\newblock \url{https://www.postgresql.org/docs}, 2024.
+\newblock Accessed: May 2026.
+
+\bibitem{prisma2024orm}
+{Prisma Data, Inc.}
+\newblock {Prisma: Next-Generation ORM for Node.js and TypeScript}.
+\newblock \url{https://www.prisma.io}, 2024.
+\newblock Accessed: May 2026.
+
+\bibitem{jones2015jwt}
+Michael Jones, John Bradley, and Nat Sakimura.
+\newblock {JSON Web Token (JWT)}.
+\newblock RFC 7519, Internet Engineering Task Force (IETF), May 2015.
+
+\bibitem{rubin2012scrum}
+Kenneth~S. Rubin.
+\newblock {\em Essential Scrum: A Practical Guide to the Most Popular Agile
+  Process}.
+\newblock Addison-Wesley, Upper Saddle River, NJ, 2012.
+
+\bibitem{puppeteer2024headless}
+{Google Chrome Developers}.
+\newblock {Puppeteer: Headless Chrome Node.js API}.
+\newblock \url{https://pptr.dev}, 2024.
+\newblock Accessed: May 2026.
+
+\bibitem{ritzer2022moodle}
+Matthew~D. Ritzer.
+\newblock {\em Moodle E-Learning Course Development}.
+\newblock Packt Publishing, Birmingham, UK, 4th edition, 2022.
+
+\bibitem{proquest2024etd}
+{ProQuest LLC}.
+\newblock {ProQuest ETD Administrator}.
+\newblock \url{https://www.proquest.com}, 2024.
+\newblock Accessed: May 2026.
+
+\bibitem{turnitin2024feedback}
+{Turnitin LLC}.
+\newblock {Turnitin Feedback Studio - Academic Integrity Solution}.
+\newblock \url{https://www.turnitin.com}, 2024.
+\newblock Accessed: May 2026.
+
+\bibitem{kaur2014design}
+Gurpreet Kaur and Amandeep Singh.
+\newblock Design and implementation of a web-based project management system
+  for academic institutions.
+\newblock {\em International Journal of Computer Applications}, 105(12):37--41,
+  2014.
+
+\bibitem{sharma2019web}
+Rohit Sharma, Pankaj Kumar, and Sandeep Jain.
+\newblock A web-based thesis management portal for university departments.
+\newblock In {\em Proceedings of the International Conference on Computer
+  Communication and Informatics (ICCCI)}, pages 1--6, Coimbatore, India, 2019.
+
+\end{thebibliography}

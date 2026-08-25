@@ -1,0 +1,105 @@
+\chapter{Literature Review}
+
+\section{Theoretical Background}
+The architectural design, security mechanisms, and data governance models underlying the Thesis and Project Management System (TPMS) draw upon core paradigms in software engineering, distributed systems, and access control.
+
+\subsection{Role-Based Access Control (RBAC) and Capability Models}
+In multi-stakeholder organizational software, access control mechanisms are critical for safeguarding confidential academic records and preventing unauthorized privilege escalation. Role-Based Access Control (RBAC), formalized by \citet{ferraiolo2007rbac}, restricts system access based on assigned organizational roles rather than individual user identities. In an academic institution, roles naturally map to hierarchical and operational designations: \textit{Maintainer}, \textit{Coordinator}, \textit{Supervisor}, \textit{Student}, and \textit{External Examiner}.
+
+Under traditional RBAC, permissions are statically associated with roles, and users are granted memberships in one or more roles. However, in departmental settings, faculty members often exhibit dynamic, capability-based cross-role behavior~\citep{sommerville2016software}. For instance, a professor may function simultaneously as a program coordinator for Master theses, a supervisor for specific undergraduate project groups, and an external defense examiner for projects supervised by other colleagues. To prevent privilege conflicts and administrative deadlock, the access control system must incorporate contextual capability filtering, ensuring that a user acting in an examiner capacity cannot alter supervisory remarks or grade their own supervised candidates.
+
+\subsection{RESTful Architecture and Stateless Web Services}
+Representational State Transfer (REST), formulated by \citet{fielding2000architectural}, provides an architectural style for distributed hypermedia systems. REST governs client-server interaction through a set of architectural constraints: statelessness, client-server separation, cacheability, layered system organization, and a uniform interface utilizing standard HTTP methods (\texttt{GET}, \texttt{POST}, \texttt{PUT}, \texttt{PATCH}, \texttt{DELETE}).
+
+Statelessness mandates that each HTTP request from a client must contain all necessary authentication credentials and contextual data required to service the request. This eliminates server-side session affinity, simplifies load distribution, and enables independent scaling of the backend API service~\citep{martin2017clean}. In TPMS, REST endpoints provide deterministic data exchange between the single-page application (SPA) client and the PostgreSQL relational persistence layer.
+
+\subsection{Object-Relational Mapping (ORM) and Type-Safe Data Persistence}
+Relational Database Management Systems (RDBMS) such as PostgreSQL enforce strict relational integrity, ACID (Atomicity, Consistency, Isolation, Durability) guarantees, and declarative relational querying~\citep{postgresql2024manual}. Object-Relational Mapping (ORM) frameworks bridge the impedance mismatch between object-oriented or procedural application runtimes and tabular relational schemas.
+
+Prisma ORM introduces a declarative schema modeling domain-specific language (DSL) coupled with an automated migration engine and an auto-generated, type-safe query client~\citep{prisma2024orm}. By evaluating relations, cascade policies, and compound indexes at compile time, Prisma eliminates common runtime query exceptions, mitigates SQL injection vulnerabilities through parameterized query generation, and streamlines schema evolution across development cycles.
+
+\subsection{JSON Web Token (JWT) Authentication}
+The JSON Web Token (JWT) open standard (RFC 7519) defines a compact, self-contained mechanism for digitally transmitting verifiable claims between parties~\citep{jones2015jwt}. A JWT comprises three base64url-encoded parts separated by periods:
+\begin{enumerate}
+    \item \textbf{Header:} Specifies the cryptographic signing algorithm (e.g., \texttt{HMAC-SHA256} or \texttt{RS256}) and token type.
+    \item \textbf{Payload:} Encapsulates user identity claims, role designations, program scope identifiers, and expiration timestamps.
+    \item \textbf{Signature:} Computed over the header and payload using a secure server secret key to ensure cryptographic integrity.
+\end{enumerate}
+
+Stateless JWT authentication eliminates database lookups for session validation on every incoming HTTP request, significantly reducing database I/O latency in high-concurrency environments~\citep{pressman2015software}.
+
+\subsection{Agile Scrum Framework in Applied Engineering}
+The Agile Scrum methodology organizes software engineering into bounded, iterative development time-boxes termed \textit{Sprints}, typically lasting two to three weeks~\citep{rubin2012scrum}. Scrum enforces continuous requirement refinement through a prioritized Product Backlog, daily stand-up synchronization, sprint reviews, and iterative retrospectives. This empirical process control model is especially suited for academic platforms where user feedback from coordinators, supervisors, and students directly refines interface workflows and evaluation mechanics~\citep{sommerville2016software}.
+
+\subsection{Automated Server-Side Document Rendering}
+The generation of standardized academic dossiers, transcripts, and evaluation scorecards has traditionally relied on client-side canvas rendering or desktop word processors. Server-side headless browser rendering via Puppeteer~\citep{puppeteer2024headless} provides deterministic, pixel-perfect PDF rendering of dynamic HTML/CSS templates. By executing a headless Chromium instance, the server converts structured database records into vector-quality A4 PDF documents with standardized typographic hierarchy, institutional headers, page breaking rules, and signature panels.
+
+\section{Review of Related Works}
+
+\subsection{General Learning Management Systems (LMS)}
+General-purpose Learning Management Systems such as \textbf{Moodle}, \textbf{Canvas}, and \textbf{Blackboard} are ubiquitous in higher education for course delivery, syllabus management, assignment submission, and quiz grading~\citep{ritzer2022moodle}. Moodle provides flexible grading rubrics and file submission modules. However, LMS architectures are course-centric rather than project-centric. They lack native support for:
+\begin{itemize}
+    \item Multi-student collaborative project group registration with dynamic invite/accept protocols.
+    \item Department-level supervisor allocation matrices and research cluster categorizations.
+    \item Multi-stage defense milestone evaluations distributed across distinct supervisor, committee, and external examiner panels.
+    \item Official examination grade sheet generation formatted according to institutional engineering board specifications.
+\end{itemize}
+
+\subsection{Electronic Thesis and Dissertation (ETD) Platforms}
+Platforms such as \textbf{ProQuest ETD Administrator} provide specialized web portals for postgraduate students to submit final dissertations for university copyright validation, institutional repository publishing, and microfilming~\citep{proquest2024etd}. While highly effective for post-defense archiving and digital library ingestion, ETD platforms are designed exclusively for terminal submission. They do not support the iterative supervision lifecycle, mid-term defense evaluations, supervisor selection workflows, or continuous group progress monitoring.
+
+\subsection{Academic Integrity and Submission Gateways}
+\textbf{Turnitin Feedback Studio} and \textbf{iThenticate} specialize in originality checking, similarity detection, and instructor markup~\citep{turnitin2024feedback}. These platforms provide sophisticated text-matching algorithms against vast scholarly databases. Nevertheless, they serve solely as verification gateways and do not manage academic team formation, project milestones, faculty supervisory workloads, or defense mark compilation.
+
+\subsection{Academic Project Management Systems in Literature}
+Several academic researchers have explored specialized software solutions for capstone project management:
+\begin{itemize}
+    \item \citet{kaur2014design} developed a web-based project management system utilizing PHP and MySQL to manage undergraduate project allocations. While their platform addressed basic student registration and supervisor assignment, it lacked multi-stage evaluation rubrics, automated grade sheet rendering, and conflict-of-interest prevention.
+    \item \citet{sharma2019web} introduced a departmental thesis portal supporting proposal uploads and supervisor commenting. However, the system operated strictly on a two-role paradigm (student and supervisor), omitting departmental coordinator governance, external examiner workflows, and multi-program degree scoping.
+    \item \citet{ko2021systematic} presented a systematic literature review on academic project tools in engineering education, emphasizing that existing software tools frequently fail to bridge the operational divide between administrative tracking and academic assessment.
+\end{itemize}
+
+\section{Comparative Study}
+Table~\ref{tab:literature_comparison} provides a comprehensive comparative evaluation of existing solutions against the features delivered by the Thesis and Project Management System (TPMS).
+
+\begin{table}[H]
+\centering
+\small
+\caption{Comparative Analysis of Academic Management Platforms}
+\label{tab:literature_comparison}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|c|c|c|c|c|}
+\hline
+\textbf{Evaluation Feature / Capability} & \textbf{Moodle} & \textbf{ProQuest} & \textbf{Turnitin} & \textbf{Generic PMS} & \textbf{TPMS (Ours)} \\
+\hline
+Multi-Student Group Formation & Partial & No & No & Yes & \textbf{Yes (1--4 Members)} \\
+Degree Isolation (BE vs. MSc) & No & No & No & No & \textbf{Yes (Strict Scoping)} \\
+Conflict-of-Interest Guard & No & No & No & No & \textbf{Yes (Automated)} \\
+Global Engagement Guard & No & No & No & No & \textbf{Yes (Database Enforced)} \\
+Supervisor Matching Matrix & No & No & No & Partial & \textbf{Yes (Fuzzy Match)} \\
+Multi-Stage Defense Rubrics & Partial & No & No & No & \textbf{Yes (50/100/300 Pts)} \\
+Dual External Examiners (MSc) & No & No & No & No & \textbf{Yes} \\
+Server-Side PDF Grade Sheets & No & No & No & No & \textbf{Yes (Puppeteer A4)} \\
+Excel Bulk Import w/ Anomaly Check & Partial & No & No & Partial & \textbf{Yes (SheetJS)} \\
+Program-Scoped Audit Trail & No & No & No & No & \textbf{Yes (DOECE Standard)} \\
+Institutional Email Enforcement & Partial & No & No & No & \textbf{Yes (@pcampus)} \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Gap Analysis and Research Motivation}
+The comparative analysis reveals substantial functional deficiencies in existing academic platforms when mapped to the rigorous operational requirements of the Department of Electronics and Computer Engineering at Pulchowk Campus:
+
+\begin{enumerate}[label=\textbf{G\arabic*.}]
+    \item \textbf{Absence of Native Degree and Program Scoping:} Existing systems treat all users within a single flat hierarchy. In contrast, DOECE requires Bachelor coordinators to have strict administrative boundaries over their respective programs (BCT vs. BEI), while Master coordinators manage cross-departmental postgraduate specializations.
+    
+    \item \textbf{Lack of Supervisory Conflict-of-Interest Enforcement:} No reviewed commercial or literature-based platform incorporates algorithmic safeguards to ensure that project supervisors cannot evaluate their own students during formal internal/external defense stages.
+    
+    \item \textbf{Inflexible Multi-Tier Evaluation Rubrics:} Existing grading tools fail to accommodate the distinct grading structures required by Tribhuvan University (Minor Project: 50 marks; Major Project: 100 marks; Master Thesis: 300 marks distributed across Supervisor, Mid-Term Defense, Final Defense, and External Examiners).
+    
+    \item \textbf{Lack of Instant Official PDF Grade Sheet Generation:} Departments require official, print-ready grade sheets with institutional seals, textually spelled marks (e.g., ``Forty-Five), and faculty signature rosters. Manual typesetting remains a severe administrative bottleneck.
+    
+    \item \textbf{Lack of Automated Group Deduplication in Submission Matrices:} When multiple students in a group submit proposals, conventional form-handlers generate redundant tabular rows, complicating coordinator assignment workflows.
+\end{enumerate}
+
+These critical gaps motivated the comprehensive architecture, design, and implementation of TPMS as an all-inclusive academic management ecosystem.

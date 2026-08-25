@@ -1,0 +1,268 @@
+\chapter{Implementation Details}
+
+\section{Requirements Specification}
+
+\subsection{Functional Requirements}
+The functional requirements of the Thesis and Project Management System (TPMS) define the specific operations, behaviors, and services the platform provides to its users. Table~\ref{tab:fr} summarizes the functional requirements categorized by system module.
+
+\begin{table}[H]
+\centering
+\caption{Functional Requirements of TPMS}
+\label{tab:fr}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}l p{3.2cm} X@{}}
+\toprule
+\textbf{Req ID} & \textbf{Module} & \textbf{Requirement Description} \\
+\midrule
+\textbf{FR-01} & Authentication & The system shall authenticate users and enforce Role-Based Access Control (RBAC) across all user roles. \\
+
+\textbf{FR-02} & Announcements & Coordinators shall be able to publish project and thesis announcements with defined parameters and deadlines. \\
+
+\textbf{FR-03} & Project Registration & Students shall be able to form project teams by inviting peers and submit project proposals. \\
+
+\textbf{FR-04} & Faculty Allocation & Coordinators shall be able to assign faculty supervisors and designate defense examiners. \\
+
+\textbf{FR-05} & Document Management & Students shall be able to upload project reports, and faculty shall be able to view and review submissions. \\
+
+\textbf{FR-06} & Defense Evaluation & Evaluators shall be able to enter criteria-wise marks based on departmental scoring rubrics. \\
+
+\textbf{FR-07} & Report \& PDF Export & The system shall automatically compute total marks and generate official, print-ready A4 PDF evaluation sheets. \\
+
+\textbf{FR-08} & Bulk Data Import & Coordinators shall be able to onboard student rosters in bulk via structured Excel spreadsheets. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Non-Functional Requirements}
+The non-functional requirements define the quality attributes, usability standards, and security constraints of the system:
+
+\begin{itemize}
+  \item \textbf{Security:} User passwords must be securely hashed using bcrypt before storage, and API routes must be protected using token-based authentication (JWT). All database queries must be parameterized to safeguard against SQL injection.
+  
+  \item \textbf{Usability:} The user interface must be clean, responsive, and easy to navigate, providing dedicated dashboards tailored to each user role (Student, Supervisor, Coordinator).
+  
+  \item \textbf{Data Integrity and Reliability:} The system must maintain data consistency across all project records, preventing duplicate entries and validating inputs before database operations.
+  
+  \item \textbf{Modularity and Maintainability:} The system must follow a modular architecture separating frontend components, backend logic, and database schemas to facilitate future updates and maintenance.
+  
+  \item \textbf{Compatibility:} The web application must be compatible with standard modern web browsers (e.g., Google Chrome, Mozilla Firefox, Microsoft Edge) without requiring third-party browser extensions.
+\end{itemize}
+
+\section{System Overview}
+The implementation of TPMS maps the architectural specifications established in Chapter 3 into a decoupled, three-tier software application. The presentation layer is structured as a component-driven React Single-Page Application (SPA), the application tier is organized into modular Express.js controllers and services, and the persistence layer is modeled in a PostgreSQL relational database managed by Prisma ORM.
+
+Figure~\ref{fig:usecase} illustrates the comprehensive Use Case Diagram of the system, depicting the core functional interactions accessible to each user role: Students, Supervisors, Program Coordinators, External Examiners, and Department Maintainers.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\textwidth]{fig_usecase.jpg}
+\caption{Use Case Diagram of TPMS Across All User Roles}
+\label{fig:usecase}
+\end{figure}
+
+The five principal actors interact with the system as follows:
+\begin{itemize}
+  \item \textbf{Students:} Create project groups or register thesis topics, invite team members, submit proposal documents, and track evaluation milestones.
+  \item \textbf{Supervisors:} Review assigned project proposals, provide document feedback, and submit mid-term and final defense evaluation marks.
+  \item \textbf{External Examiners:} Access assigned defense dossiers and record criteria-wise scores during defense sessions.
+  \item \textbf{Program Coordinators:} Manage batch announcements, perform bulk student onboarding, allocate supervisors and examiners with conflict-of-interest checks, and export composite PDF grade sheets.
+  \item \textbf{Department Maintainers:} Oversee global department configurations, academic degree programs, and system audit logs.
+\end{itemize}
+
+\section{Development Environment}
+The development of TPMS was carried out across a collaborative team environment utilizing standard open-source tools, modern web runtimes, and a relational database. Table~\ref{tab:dev_env} summarizes the hardware, software, and development specifications used during the implementation.
+
+\begin{table}[H]
+\centering
+\caption{Development Environment Specifications}
+\label{tab:dev_env}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}l p{4.2cm} X@{}}
+\toprule
+\textbf{Category} & \textbf{Component / Tool} & \textbf{Specification / Details} \\
+\midrule
+\textbf{Operating System} & Development Platforms & Fedora Linux / Microsoft Windows 11 (64-bit) \\
+
+\textbf{Frontend Stack} & UI Library \& Build Tool & React 18.2.0, Vite 5.1.0, Tailwind CSS \\
+ & Routing \& State Management & React Router DOM 6.22, Axios HTTP Client \\
+ & Icons \& UI Components & Lucide React, Recharts \\
+
+\textbf{Backend Stack} & Runtime \& Framework & Node.js (v18+), Express.js 4.18.2 \\
+ & Security \& Authentication & JSON Web Token (JWT), bcryptjs, Helmet \\
+ & Email Service & Nodemailer (SMTP Transport) \\
+ & Document Processing & SheetJS (xlsx), PDFKit, Puppeteer Core \\
+
+\textbf{Database \& ORM} & Database Engine & PostgreSQL 16 \\
+ & Object-Relational Mapping & Prisma ORM 5.10.0 (with automated migrations) \\
+
+\textbf{Tooling \& Versioning} & Code Editor / IDE & Visual Studio Code \\
+ & API Testing \& Inspection & Postman / REST Client, Prisma Studio \\
+ & Version Control & Git with GitHub Remote Repository \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{System Implementation}
+
+\subsection{Database Schema Design}
+The TPMS persistence layer is implemented in PostgreSQL using Prisma ORM. The relational model consists of 14 normalized tables that manage users, academic programs, student groups, proposals, supervisor assignments, and evaluation records while enforcing strict foreign-key constraints. Figure~\ref{fig:er} illustrates the complete Entity-Relationship (ER) Diagram of the database.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.97\textwidth]{fig_er.jpg}
+\caption{Entity-Relationship (ER) Diagram of TPMS Database}
+\label{fig:er}
+\end{figure}
+
+Key data dictionary specifications for primary application tables are provided in Tables~\ref{tab:user_dd} and \ref{tab:group_dd}.
+
+\begin{table}[H]
+\centering
+\caption{Data Dictionary: \texttt{User} Table}
+\label{tab:user_dd}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}l l l X@{}}
+\toprule
+\textbf{Field Name} & \textbf{Data Type} & \textbf{Constraint} & \textbf{Description} \\
+\midrule
+\texttt{id}          & SERIAL    & Primary Key   & Unique identifier for the user account. \\
+\texttt{email}       & VARCHAR   & UNIQUE, NOT NULL & Institutional email address (\texttt{@pcampus.edu.np}). \\
+\texttt{password}    & VARCHAR   & NOT NULL      & bcrypt hashed password string. \\
+\texttt{name}        & VARCHAR   & NOT NULL      & Full name of the student or faculty member. \\
+\texttt{role}        & ENUM      & NOT NULL      & Assigned role (Student, Supervisor, Coordinator, etc.). \\
+\texttt{rollNumber}  & VARCHAR   & Nullable      & University roll number for student accounts. \\
+\texttt{programId}   & INTEGER   & Foreign Key   & References the associated degree program. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Data Dictionary: \texttt{ProjectGroup} Table}
+\label{tab:group_dd}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}l l l X@{}}
+\toprule
+\textbf{Field Name} & \textbf{Data Type} & \textbf{Constraint} & \textbf{Description} \\
+\midrule
+\texttt{id}              & SERIAL  & Primary Key   & Unique identifier for the project team. \\
+\texttt{projectTitle}    & VARCHAR & NOT NULL      & Approved title of the Bachelor project. \\
+\texttt{projectType}     & ENUM    & DEFAULT: MINOR & Project tier (\texttt{MINOR} or \texttt{MAJOR}). \\
+\texttt{status}          & ENUM    & DEFAULT: PENDING & Lifecycle status (\texttt{PENDING}, \texttt{ACTIVE}, \texttt{COMPLETED}). \\
+\texttt{supervisorId}    & INTEGER & Foreign Key   & References the assigned faculty supervisor. \\
+\texttt{programId}       & INTEGER & Foreign Key   & References the owning department program. \\
+\texttt{academicYearId}  & INTEGER & Foreign Key   & References the active academic year batch. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Data Flow Architecture}
+The flow of information across user roles, backend API services, and database tables is modeled using Data Flow Diagrams. Figure~\ref{fig:dfd} presents the Level-1 Data Flow Diagram (DFD) showing how inputs from students, faculty, and coordinators traverse the core authentication, group registration, allocation, and evaluation processes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.97\textwidth]{fig_dfd.jpg}
+\caption{Data Flow Diagram (DFD Level 1) of TPMS}
+\label{fig:dfd}
+\end{figure}
+
+The diagram identifies core processes: User Authentication, Group and Thesis Registration, Bulk Excel Ingestion, Supervisor Allocation, Defense Evaluation, and PDF Generation, supported by structured database data stores.
+
+\subsection{Bulk Student Data Onboarding Pipeline}
+To avoid manual account creation for large student batches, TPMS provides a spreadsheet ingestion pipeline. Coordinators upload structured class rosters in \texttt{.xlsx} format. The system parses the spreadsheet, validates column headers, checks for intra-file duplicate roll numbers, and verifies against existing database records. Clean records are batch-inserted in a single database transaction.
+
+Figure~\ref{fig:seq_import} illustrates the sequence of interactions involved in the Excel bulk import workflow.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_seq_import.jpg}
+\caption{Sequence Diagram for Bulk Student Excel Onboarding}
+\label{fig:seq_import}
+\end{figure}
+
+\subsection{Evaluation and PDF Generation Engine}
+The evaluation engine supports multi-criteria defense scoring for Minor projects (50 marks), Major projects (100 marks), and Master theses (300 marks). Evaluators enter marks per criterion through an interactive interface. The system validates score limits, automatically computes aggregate marks, and converts total numerical scores to words to eliminate manual calculation errors.
+
+Once marks are submitted, the system dynamically renders official, print-ready A4 PDF evaluation sheets directly from the database records. Figure~\ref{fig:seq_pdf} illustrates the sequence of interactions during mark submission and PDF compilation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_seq_pdf.jpg}
+\caption{Sequence Diagram for Defense Evaluation and PDF Generation}
+\label{fig:seq_pdf}
+\end{figure}
+
+\section{Interface and Visualization}
+The frontend interface of TPMS is implemented as a responsive Single-Page Application (SPA) providing role-specific dashboards, interactive forms, and real-time status indicators across the primary user roles:
+
+\begin{itemize}
+  \item \textbf{Coordinator Management Interface:} Figure~\ref{fig:ui_coordinator} illustrates the coordinator response matrix, allowing program coordinators to monitor submitted projects, filter by academic batch, assign supervisors, and track project lifecycle statuses.
+  
+  \item \textbf{Student Project and Submission View:} Figure~\ref{fig:ui_student} depicts the student workspace, displaying project details, assigned faculty, research cluster domain, and multi-stage milestone submission tabs (Proposal, Mid-Term, Final).
+  
+  \item \textbf{Criteria-Wise Defense Evaluation Interface:} Figure~\ref{fig:ui_eval} demonstrates the defense scoring scorecard used by supervisors and external examiners to submit criteria-wise marks with real-time score calculation.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{project/project_page.png}
+\caption{Coordinator Project Management and Allocation Interface}
+\label{fig:ui_coordinator}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{project/student_project_page.png}
+\caption{Student Project Details and Submission Progress Interface}
+\label{fig:ui_student}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{project/evaluation_page.png}
+\caption{Criteria-Wise Defense Evaluation and Score Entry Interface}
+\label{fig:ui_eval}
+\end{figure}
+
+\section{Deployment and Execution}
+The platform is fully configured and executed within a \textbf{local server environment (Localhost)} for testing and demonstration:
+
+\begin{itemize}
+  \item \textbf{Local Backend Runtime:} The Node.js Express server runs on port 5000, handling API requests, business logic execution, and background PDF compilation.
+  
+  \item \textbf{Local Frontend Runtime:} The React application is served locally via the Vite server on port 5173, communicating asynchronously with the backend API.
+  
+  \item \textbf{Local Database Service:} A local PostgreSQL database instance on port 5432 manages relational tables and migrations via Prisma ORM.
+  
+  \item \textbf{Local Storage Directory:} Uploaded proposal documents, progress reports, and generated A4 PDF evaluation sheets are stored in the local server storage directory (\texttt{/storage}).
+  
+  \item \textbf{SMTP Email Integration:} Automated email notifications are dispatched via an SMTP mail transport service configured through local environment variables.
+\end{itemize}
+
+\section{Challenges and Solutions}
+During the system design and implementation phases, several technical challenges were encountered and successfully resolved, as summarized in Table~\ref{tab:challenges}.
+
+\begin{table}[H]
+\centering
+\caption{Technical Challenges Encountered and Solutions Applied}
+\label{tab:challenges}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}p{4.5cm} X@{}}
+\toprule
+\textbf{Technical Challenge} & \textbf{Applied Solution} \\
+\midrule
+Deduplicating multi-student group submissions in the coordinator dashboard & Implemented a database aggregation query that groups individual member entries by team ID and consolidates complete rosters into single rows. \\
+\addlinespace
+Automated conflict-of-interest prevention during examiner assignment & Built an algorithmic filter that checks project supervisor IDs and dynamically excludes the assigned supervisor from the eligible examiner list. \\
+\addlinespace
+Preventing concurrent double-enrollment across project teams & Implemented database-level validation checks (Engagement Guard) ensuring a student cannot hold multiple active project memberships. \\
+\addlinespace
+Standardized university-format PDF generation with word-equivalent marks & Utilized server-side HTML/CSS template compilation with an automated number-to-words algorithm to render official A4 evaluation sheets. \\
+\bottomrule
+\end{tabularx}
+\end{table}

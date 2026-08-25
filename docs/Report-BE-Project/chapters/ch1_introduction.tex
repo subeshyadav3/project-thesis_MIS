@@ -1,0 +1,76 @@
+\chapter{Introduction}
+\pagenumbering{arabic}
+
+\section{Background}
+Academic project and thesis coursework represent pivotal milestones in engineering curricula at Tribhuvan University (TU), Institute of Engineering (IOE), Pulchowk Campus. Under the Department of Electronics and Computer Engineering (DOECE), undergraduate students enrolled in Bachelor of Computer Engineering (BCT) and Bachelor of Electronics, Communication and Information Engineering (BEI) undertake compulsory Minor and Major projects during their third and fourth academic years. Concurrently, postgraduate scholars across specialized Master of Science programs---including Computer Systems and Knowledge Engineering (MSCSK), Information and Communication Engineering (MSICE), Data Science and Analytics (MSDSA), and Network and Cyber Security (MSNCS)---execute multi-semester research theses.
+
+Historically, the administrative, supervisory, and evaluative management of these academic initiatives has relied almost exclusively on manual, fragmented, and paper-intensive procedures. Departmental coordinators have had to physically gather proposal drafts, manually record group rosters into ad-hoc spreadsheets, collect printed mid-term and final reports, and distribute handwritten evaluation marking rubrics during formal defense sessions. As student enrollment and specialized postgraduate programs have grown, this legacy operational model has created significant administrative strain, operational bottlenecks, scheduling conflicts, and data inconsistencies.
+
+Modern higher education institutions increasingly leverage specialized academic information systems to govern collaborative workflows, ensure institutional accountability, and maintain transparent audit trails~\citep{pressman2015software, ko2021systematic}. The \textbf{Thesis and Project Management System (TPMS)} is developed as an enterprise-grade, web-based platform engineered specifically to digitalize, govern, and streamline the complete lifecycle of Bachelor projects and Master theses at DOECE, Pulchowk Campus. By incorporating strict degree isolation, automated conflict-of-interest prevention, dynamic evaluation rubric computation, server-side grade sheet rendering, and program-scoped audit logging, TPMS replaces disparate manual processes with a unified digital ecosystem.
+
+\section{Problem Statement}
+The prevailing manual and spreadsheet-dependent methodology employed for project and thesis governance at DOECE presents multiple systemic inefficiencies and structural challenges:
+
+\begin{enumerate}[label=\textbf{P\arabic*.}]
+    \item \textbf{Decentralized and Fragmented Record-Keeping:} Project records, student team rosters, supervisor allocations, and proposal drafts reside across disconnected physical binders, local spreadsheets, and unstructured email exchanges. This fragmentation prevents coordinators and department leadership from gaining real-time operational visibility into project progress and milestone completion.
+    
+    \item \textbf{Lack of Systemic Multi-Project Engagement Controls:} In manual systems, cross-checking whether a student has registered in multiple project groups or enrolled simultaneously in conflicting teams requires exhaustive manual auditing across spreadsheets. The absence of automated validation allows accidental double-registration and invalid group compositions.
+    
+    \item \textbf{Vulnerability to Supervisory Conflicts of Interest:} During mid-term and final defense sessions, faculty members who supervise a project must not be designated as external or internal evaluating examiners for that identical project. Manually cross-referencing examiner schedules against supervisor allocations across hundreds of students is error-prone, creating potential ethical and academic evaluation conflicts.
+    
+    \item \textbf{Manual Mark Tabulation and Inconsistent Evaluation Schemes:} Bachelor Minor (50 marks), Bachelor Major (100 marks), and Master Theses (300 marks) adhere to distinct evaluation components distributed across supervisors, defense committees, internal examiners, and external evaluators. Manually compiling scores, verifying sub-criteria limits, and converting marks into official text representations is labor-intensive and susceptible to human calculation errors.
+    
+    \item \textbf{Cumbersome Official Documentation and Grade Sheet Compilation:} Departmental guidelines require official, standardized A4 evaluation sheets bearing institutional letterheads, committee signature panels, and student rosters for submission to the TU Examination Control Division. Manually typesetting these sheets for dozens of groups introduces formatting disparities and substantial delays.
+    
+    \item \textbf{Absence of Immutable Audit Logging and Security Controls:} Manual document handovers and email submissions lack tamper-proof timestamping and role-based access restrictions, making it difficult to verify submission deadlines, document version histories, and faculty actions.
+\end{enumerate}
+
+\section{Objectives}
+
+\subsection{Main Objective}
+The primary objective of this project is to design, develop, and evaluate a secure, role-aware, and production-grade \textbf{Project/Thesis Management System (TPMS)} that automates and digitalizes the end-to-end academic project lifecycle for undergraduate and postgraduate programs under the Department of Electronics and Computer Engineering, Pulchowk Campus.
+
+\subsection{Specific Objectives}
+To achieve the primary objective, the following specific objectives are established:
+\begin{enumerate}[label=\arabic*.]
+    \item To architect a multi-role web platform supporting five distinct stakeholder roles (\textit{Maintainer}, \textit{Coordinator}, \textit{Supervisor}, \textit{Student}, and \textit{External Examiner}) governed by Role-Based Access Control (RBAC) and program-level degree isolation.
+    \item To implement a robust team formation and proposal registration subsystem equipped with an automated \textit{Engagement Guard} to prevent multi-project enrollments and enforce team size limits (1--4 students for Bachelor projects; 1 student for Master theses).
+    \item To develop a centralized Coordinator Response Matrix with live fuzzy supervisor matching, deduplicated group views, and inline lifecycle finalization.
+    \item To build an automated \textit{Conflict-of-Interest Filter} that dynamically excludes assigned project supervisors from acting as internal or external defense examiners on their supervised projects.
+    \item To engineer a dynamic, stage-wise rubric evaluation engine tailored to the DOECE grading schemes for Minor Projects (50 marks), Major Projects (100 marks), and Master Theses (300 marks).
+    \item To integrate a server-side headless browser rendering pipeline for instant, pixel-perfect generation of official TU Pulchowk Campus evaluation sheets and consolidated grade reports with automated number-to-words conversion.
+    \item To construct an Excel-based bulk data ingestion pipeline with pre-validation anomaly detection alongside a program-scoped audit logging mechanism.
+\end{enumerate}
+
+\section{Scope and Limitations}
+
+\subsection{Scope of the Project}
+The operational scope of the TPMS encompasses the academic and administrative activities of DOECE, Pulchowk Campus:
+\begin{itemize}
+    \item \textbf{Academic Programs Covered:} Bachelor of Computer Engineering (BCT), Bachelor of Electronics, Communication and Information Engineering (BEI), MS in Computer Systems and Knowledge Engineering (MSCSK), MS in Information and Communication Engineering (MSICE), MS in Data Science and Analytics (MSDSA), and MS in Network and Cyber Security (MSNCS).
+    \item \textbf{Project Tiers:} Bachelor Minor Projects, Bachelor Major Projects, and Master Research Theses.
+    \item \textbf{Lifecycle Phases:} Department announcement broadcasting, proposal formulation and PDF submission, supervisor/examiner allocation, mid-term progress monitoring, defense rubric marking, automated grade aggregation, and official PDF grade sheet export.
+    \item \textbf{Security and Policy Enforcement:} Institutional email domain policy enforcement (\texttt{@pcampus.edu.np}), JSON Web Token (JWT) session security, and program-scoped data access.
+\end{itemize}
+
+\subsection{Significance of the Project}
+The deployment of TPMS delivers tangible institutional advantages:
+\begin{itemize}
+    \item \textbf{For Students:} Transparent submission tracking, real-time feedback access, deadline notifications, and streamlined group coordination.
+    \item \textbf{For Faculty Supervisors and Examiners:} Unified dashboard for reviewing proposals, monitoring student progress, and submitting structured defense marks without administrative paperwork.
+    \item \textbf{For Departmental Coordinators:} Centralized control over academic announcements, automated supervisor allocation matrices, bulk data onboarding, and instant generation of official examination dossiers.
+    \item \textbf{For Institutional Administration:} Strict adherence to university academic regulations, elimination of duplicate grading errors, and reliable archival of academic research outputs.
+\end{itemize}
+
+\section{Report Organization}
+This report is structured into eight comprehensive chapters:
+\begin{itemize}
+    \item \textbf{Chapter 1 (Introduction):} Presents the project background, problem formulation, main and specific objectives, scope, and institutional significance.
+    \item \textbf{Chapter 2 (Literature Review):} Reviews fundamental software engineering theories, examines contemporary academic management platforms, conducts a comparative feature analysis, and details the gap analysis.
+    \item \textbf{Chapter 3 (Methodology \& Requirement Analysis):} Outlines the Agile Scrum development process, elaborates functional and non-functional requirements, presents feasibility analyses, and details the chosen technology stack.
+    \item \textbf{Chapter 4 (System Design \& Architecture):} Details the multi-tier architectural blueprint, Data Flow Diagrams (DFDs), Unified Modeling Language (UML) diagrams, relational database models, and conflict-of-interest prevention algorithms.
+    \item \textbf{Chapter 5 (Implementation):} Describes the concrete implementation of backend micro-controllers, frontend React views, evaluation engines, PDF rendering pipelines, and data anomaly guards.
+    \item \textbf{Chapter 6 (Results, Testing \& Discussion):} Documents unit, integration, and security testing protocols, presents functional evaluation metrics, displays interface outputs, and discusses operational benchmarks.
+    \item \textbf{Chapter 7 (Limitations \& Future Enhancements):} Discusses existing system constraints and outlines prospective roadmap items, including AI-driven proposal analysis and automated scheduling.
+    \item \textbf{Chapter 8 (Conclusion):} Summarizes the key achievements and contributions of the project.
+\end{itemize}

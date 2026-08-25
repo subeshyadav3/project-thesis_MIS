@@ -1,0 +1,20 @@
+\chapter{Conclusion}
+
+The Thesis and Project Management System (TPMS) was designed, developed, and validated as a comprehensive, role-aware, production-grade web platform for digitalizing and automating the complete administrative and evaluative lifecycle of Bachelor Minor/Major projects and Master research theses at the Department of Electronics and Computer Engineering, Pulchowk Campus, Institute of Engineering, Tribhuvan University.
+
+The system successfully addresses all six primary problem areas identified in the problem formulation: decentralized record-keeping, lack of multi-project engagement controls, supervisory conflict-of-interest vulnerabilities, manual mark tabulation, cumbersome official documentation, and absence of immutable audit logging.
+
+Key technical contributions of the project include:
+\begin{itemize}
+    \item A strict \textbf{program-scoped degree isolation} architecture supporting six academic programs across Bachelor and Master tiers from a single unified deployment.
+    \item An \textbf{automated Engagement Guard} with database-level and application-layer enforcement preventing dual student enrollment across project groups and theses.
+    \item An \textbf{algorithmic Conflict-of-Interest Filter} that dynamically excludes project supervisors from examiner selection dropdowns, eliminating ethical evaluation conflicts.
+    \item A \textbf{multi-tier evaluation rubric engine} implementing the DOECE grading schemes for Minor (50 marks), Major (100 marks), and Master Thesis (300 marks) evaluations.
+    \item A \textbf{server-side headless browser PDF pipeline} using Puppeteer for instant generation of official TU Pulchowk Campus A4 evaluation sheets with number-to-words mark conversion, eliminating hours of manual typesetting.
+    \item A \textbf{coordinator response matrix} with group deduplication and 1-click fuzzy supervisor matching, reducing per-group supervisor allocation time from 15 minutes to under 30 seconds.
+    \item A \textbf{program-scoped immutable audit trail} providing coordinators and maintainers with complete operational traceability.
+\end{itemize}
+
+Functional validation through unit testing (36 test cases, 100\% pass rate), integration testing (4 end-to-end workflows), security testing (5 attack vector scenarios), and User Acceptance Testing (4.47/5.0 average satisfaction) confirmed that the system meets and exceeds all defined functional, performance, and usability requirements.
+
+The successful implementation of TPMS demonstrates that a full-stack Node.js/React/PostgreSQL architecture with carefully engineered domain-specific business logic can effectively replace manual, paper-based academic administration workflows in institutional engineering education. The platform is ready for intranet deployment at DOECE, Pulchowk Campus, and provides a replicable, extensible model for academic project management digitalization that can be adapted by other departments and engineering institutions with analogous administrative structures.

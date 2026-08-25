@@ -1,0 +1,111 @@
+\chapter{Results and Discussion}
+
+\section{Results}
+The developed Thesis and Project Management System (TPMS) was thoroughly evaluated through functional workflow execution, document generation validation, and multi-level system testing.
+
+\subsection{Functional Workflow Execution}
+The platform successfully executed the complete project and thesis lifecycle across the Department of Electronics and Computer Engineering (DOECE):
+\begin{itemize}
+  \item \textbf{Team Formation and Proposal Submission:} Students successfully created project teams, invited group members via roll numbers, and submitted proposals. The duplicate enrollment check reliably prevented students from participating in multiple active groups.
+  
+  \item \textbf{Coordinator Allocation Matrix:} Coordinators accessed the centralized response matrix to filter submissions by cluster, assign project supervisors, and allocate defense examiners with automatic conflict-of-interest exclusion.
+  
+  \item \textbf{Bulk Roster Ingestion:} The spreadsheet import engine parsed class rosters, identified duplicate records during pre-import validation, and onboarded student cohorts in batch operations.
+\end{itemize}
+
+\subsection{Evaluation and PDF Generation Output}
+The criteria-based evaluation engine was tested against departmental grading rubrics across all academic tiers (Minor: 50 marks, Major: 100 marks, Master Thesis: 300 marks). Evaluators entered marks per individual criterion, and the system automatically computed aggregate totals while enforcing upper score bounds.
+
+Figure~\ref{fig:result_pdf} shows the evaluation review interface and the dynamically rendered official A4 PDF evaluation grade sheet, complete with institutional headers, criteria mark breakdown, and signature blocks.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{project/pdf.png}
+\caption{Live Evaluation Review and Official A4 PDF Grade Sheet Generation}
+\label{fig:result_pdf}
+\end{figure}
+
+Figure~\ref{fig:result_analytics} illustrates the program overview dashboard, displaying batch statistics, thesis statuses, and actionable coordinator notifications.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{project/dashboard.png}
+\caption{Program Overview Analytics and Status Distribution Dashboard}
+\label{fig:result_analytics}
+\end{figure}
+
+\subsection{System Verification and Testing Results}
+System correctness and reliability were verified through structured testing phases:
+
+\begin{itemize}
+  \item \textbf{Unit and Component Testing:} Core utility functions, validation middleware, and mark calculation algorithms were tested across positive and negative cases. Table~\ref{tab:unit_tests} summarizes the testing outcomes across system modules.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{System Module Testing Results}
+\label{tab:unit_tests}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}l p{4.5cm} X c@{}}
+\toprule
+\textbf{Module} & \textbf{Verified Functionality} & \textbf{Test Scenario} & \textbf{Outcome} \\
+\midrule
+Authentication    & JWT token issuance \& route protection & Valid login, expired tokens, role checks & Pass \\
+Group Formation   & Team invitation \& duplicate prevention & Member invite, double-enrollment block & Pass \\
+Faculty Allocation& Supervisor \& examiner assignment & Assignment matrix, supervisor exclusion & Pass \\
+Evaluation Engine & Criteria marks entry \& score sum & Boundary check, draft/final submit & Pass \\
+PDF Compilation   & Dynamic A4 document generation & HTML-to-PDF render, words conversion & Pass \\
+Bulk Import       & Excel roster validation & Header check, duplicate roll detection & Pass \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Integration and Security Testing:} End-to-end user workflows spanning team registration, supervisor assignment, mark compilation, and PDF generation executed seamlessly without data inconsistencies. Security tests confirmed that unauthenticated requests and role escalation attempts were blocked with appropriate HTTP status codes.
+  
+  \item \textbf{User Acceptance Testing (UAT):} Department coordinators, faculty supervisors, and students tested the platform using structured task checklists. Participants successfully completed their respective operational workflows, confirming that the user interfaces are intuitive and responsive.
+\end{itemize}
+
+\section{Discussion}
+The implementation of TPMS addresses the primary operational challenges inherent in the traditional paper-based and spreadsheet-driven project management workflow:
+
+\begin{itemize}
+  \item \textbf{Centralization and Real-Time Visibility:} Replacing fragmented physical folders and local spreadsheets with a centralized database gives students, faculty, and coordinators clear visibility into project statuses, submission deadlines, and evaluation outcomes.
+  
+  \item \textbf{Elimination of Manual Tabulation Errors:} By automating criteria-wise mark aggregation and dynamic number-to-words translation, the system prevents arithmetic mistakes and ensures consistent final grade reporting.
+  
+  \item \textbf{Academic Integrity Safeguards:} Enforcing duplicate enrollment prevention and automatic supervisor exclusion during examiner assignments ensures transparent and fair project governance.
+  
+  \item \textbf{Administrative Efficiency:} Automated PDF evaluation sheet compilation and batch spreadsheet onboarding significantly reduce the administrative time required for cohort management.
+\end{itemize}
+
+\section{Comparative Analysis}
+Table~\ref{tab:comparison} presents a comparative overview between the traditional manual project management workflow and the digital TPMS platform.
+
+\begin{table}[H]
+\centering
+\caption{Comparative Analysis: Traditional Workflow vs.\ TPMS}
+\label{tab:comparison}
+\vspace{4pt}
+\small
+\begin{tabularx}{\textwidth}{@{}l p{4.8cm} X@{}}
+\toprule
+\textbf{Feature / Parameter} & \textbf{Traditional Workflow} & \textbf{TPMS Platform} \\
+\midrule
+\textbf{Record Storage} & Dispersed physical binders and local spreadsheets & Centralized relational PostgreSQL database \\
+\addlinespace
+\textbf{Team Formation} & Manual paper submission and registration & Online peer invitations with duplicate checks \\
+\addlinespace
+\textbf{Document Submission} & Printed physical reports and email attachments & Structured online document upload and tracking \\
+\addlinespace
+\textbf{Faculty Allocation} & Manual tracking across loose sheets & Centralized matrix with conflict-of-interest checks \\
+\addlinespace
+\textbf{Mark Calculation} & Manual handwritten score summation & Automated criteria calculation with words conversion \\
+\addlinespace
+\textbf{Grade Sheet Creation} & Manual typesetting per cohort & Dynamic, instant A4 PDF compilation \\
+\addlinespace
+\textbf{Communication} & In-person follow-ups and notice boards & Automated email notifications for key events \\
+\bottomrule
+\end{tabularx}
+\end{table}
