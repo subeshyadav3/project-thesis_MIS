@@ -94,10 +94,20 @@ function Profile() {
                 <span>{roleLabel}</span>
               </div>
               {user.role === 'STUDENT' && (
-                <div className="detail-item">
-                  <span className="detail-label">Degree Type</span>
-                  <span>{user?.degreeType}</span>
-                </div>
+                <>
+                  <div className="detail-item">
+                    <span className="detail-label">Roll Number</span>
+                    <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{user?.rollNumber || '—'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Batch</span>
+                    <span style={{ fontWeight: 600 }}>{user?.batch || user?.rollNumber?.slice(0, 3) || '—'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Degree Type</span>
+                    <span>{user?.degreeType}</span>
+                  </div>
+                </>
               )}
               {user.designation && (
                 <div className="detail-item">
