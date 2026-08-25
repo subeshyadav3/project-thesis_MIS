@@ -3,7 +3,12 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const { getDefaultComponents } = require('../src/config/evaluationScheme');
-const { generateFormProposalPDF } = require('../src/services/pdfService');
+const {
+  generateFormProposalPDF,
+  generateRealisticProposalPDF,
+  generateRealisticMidtermReportPDF,
+  generateRealisticFinalReportPDF,
+} = require('../src/services/pdfService');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
@@ -79,18 +84,6 @@ function nextName() {
 }
 
 // ── Academic Batches ───────────────────────────────────────────────────
-// Bachelor timeline:
-// • 083 (2083 BS - 1st Year): Coursework only (NO projects)
-// • 082 (2082 BS - 2nd Year): Coursework only (NO projects)
-// • 080 (2080 BS - 3rd Year): Minor Project (Active/In-progress)
-// • 079 (2079 BS - 4th Year): Major Project (Active/Defending)
-// • 078 (2078 BS - Graduated): Major Project (Completed with full defense records)
-//
-// Master timeline:
-// • 083 (2083 BS - 1st Year): Coursework only (NO thesis/project)
-// • 082 (2082 BS - 3rd Sem): Master Project 4-Cr (Active) + Thesis Concept Form Call
-// • 081 (2081 BS - 4th Sem): Master Thesis 16-Cr (Active/Final Defense)
-// • 080 & 079 (2080 & 2079 BS - Graduated): Theses & Projects (Completed with full 300/100 mark records)
 const BATCH_DEFS = [
   { batch: '078', bsYear: 2078, counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 } },
   { batch: '079', bsYear: 2079, counts: { BCT: 24, BEI: 12, MSNCS: 6, MSICE: 5, MSDSA: 6, MSCSK: 5 } },
@@ -132,7 +125,7 @@ function generateStudentDefs() {
 }
 
 async function main() {
-  console.log('Seeding database with timeline-accurate academic dataset...');
+  console.log('Seeding database with timeline-accurate academic dataset and rich multi-page sample PDFs...');
 
   // ── Clean slate ──
   await prisma.recommendation.deleteMany();
@@ -153,9 +146,11 @@ async function main() {
   await prisma.externalExaminer.deleteMany();
   await prisma.user.deleteMany();
 
-  // Storage directory setup for proposal documents
-  const storageDir = path.join(__dirname, '..', 'storage', 'theses');
-  if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+  // Storage directories setup for PDF documents
+  const storageThesesDir = path.join(__dirname, '..', 'storage', 'theses');
+  const storageGroupsDir = path.join(__dirname, '..', 'storage', 'groups');
+  if (!fs.existsSync(storageThesesDir)) fs.mkdirSync(storageThesesDir, { recursive: true });
+  if (!fs.existsSync(storageGroupsDir)) fs.mkdirSync(storageGroupsDir, { recursive: true });
 
   // ============================================================
   // DEPARTMENT
@@ -196,12 +191,10 @@ async function main() {
   // ============================================================
   // USERS
   // ============================================================
-  // Maintainer
   const maintainer = await prisma.user.create({
     data: { email: 'subeshgaming@gmail.com', password: hash, firstName: 'Subesh', lastName: 'Gaming', role: 'MAINTAINER' },
   });
 
-  // Coordinators — one per program (BCT for Bachelor, MSNCS for Master focus)
   const coordDefs = [
     { code: 'BCT', fn: 'Ram', ln: 'Prasad', email: 'bct.coordinator@pcampus.edu.np', designation: 'Asst. Prof.' },
     { code: 'BEI', fn: 'Sita', ln: 'Devi', email: 'bei.coordinator@pcampus.edu.np', designation: 'Asst. Prof. Dr.' },
@@ -218,9 +211,7 @@ async function main() {
     coordinators[cd.code] = user;
     await prisma.program.update({ where: { code: cd.code }, data: { coordinatorId: user.id } });
   }
-  console.log(`Created ${coordDefs.length} program coordinators (BCT & MSNCS lead)`);
 
-  // Supervisors
   const supDefs = [
     { fn: 'Prabesh', ln: 'Bhattarai', email: 'prabesh.bhattarai@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
     { fn: 'Ramesh', ln: 'Sharma', email: 'ramesh.sharma@pcampus.edu.np', designation: 'Assoc. Prof.' },
@@ -237,9 +228,7 @@ async function main() {
       data: { email: sup.email, password: hash, firstName: sup.fn, lastName: sup.ln, role: 'SUPERVISOR', designation: sup.designation, departmentId: eceDept.id, canSupervise: true },
     }));
   }
-  console.log(`Created ${supervisors.length} faculty supervisors`);
 
-  // External Examiners
   const externalExamDefs = [
     { fn: 'Hari', ln: 'Adhikari', email: 'hari.adhikari@pcampus.edu.np', designation: 'Prof. Dr.' },
     { fn: 'Suman', ln: 'Bhattarai', email: 'suman.bhattarai@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
@@ -254,7 +243,6 @@ async function main() {
       data: { email: ex.email, password: hash, firstName: ex.fn, lastName: ex.ln, role: 'EXTERNAL_EXAMINER', designation: ex.designation, departmentId: eceDept.id },
     }));
   }
-  console.log(`Created ${externalExaminers.length} external examiners`);
 
   // ── Students ──
   const studentDefs = generateStudentDefs();
@@ -279,7 +267,6 @@ async function main() {
   }
   console.log(`Created ${students.length} students across 6 batches`);
 
-  // Helper to create evaluation components
   async function attachComponents({ groupId, thesisId, projectType }) {
     const defaults = getDefaultComponents(projectType || 'MINOR');
     const out = [];
@@ -292,7 +279,6 @@ async function main() {
     return out;
   }
 
-  // Helper to find students by batch (BS year) and program
   function findStudents(bsYear, programCode) {
     const yearStr = String(bsYear);
     return students.filter(s => {
@@ -302,42 +288,9 @@ async function main() {
     });
   }
 
-  // Helper to create sample proposal PDF
-  async function createSampleProposalPDF({ filename, title, description, studentName, rollNumber, programName, batch }) {
-    const pdfBuf = await generateFormProposalPDF({
-      title,
-      description: description || 'Comprehensive project architecture, methodology, milestone schedule, and expected deliverables.',
-      studentName,
-      rollNumber,
-      programName,
-      batch: batch || '2080',
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    });
-    fs.writeFileSync(path.join(storageDir, filename), pdfBuf);
-    return `/api/files/theses/${filename}`;
-  }
-
-  // Create baseline proposal files
-  await createSampleProposalPDF({
-    filename: 'thesis_proposal.pdf',
-    title: 'Research Proposal Framework for Master Degree Program',
-    studentName: 'Research Scholar',
-    rollNumber: '081MSNCS01',
-    programName: 'MSc in Network and Cyber Security',
-    batch: '2081',
-  });
-  await createSampleProposalPDF({
-    filename: 'project_proposal.pdf',
-    title: 'Project Proposal Design for Master 4-Credit Course',
-    studentName: 'Project Scholar',
-    rollNumber: '082MSNCS01',
-    programName: 'MSc in Network and Cyber Security',
-    batch: '2082',
-  });
-
   // ============================================================
-  // BACHELOR GROUPS
-  // • 083 & 082 batches: 1st & 2nd year -> NO minor or major projects
+  // BACHELOR GROUPS & MULTI-PAGE REPORTS
+  // • 083 & 082 batches: 1st & 2nd year -> NO projects
   // • 080 batch (3rd Year): Minor Projects (Active / Pending)
   // • 079 batch (4th Year): Major Projects (Active / Defending)
   // • 078 batch (Graduated): Major Projects (COMPLETED with full evaluations)
@@ -361,9 +314,9 @@ async function main() {
   let bGroupIdx = 0;
 
   const bachelorBatches = [
-    { batch: '078', bsYear: 2078, pType: 'MAJOR', status: 'COMPLETED' }, // 4+ years passed -> Graduated
-    { batch: '079', bsYear: 2079, pType: 'MAJOR', status: 'ACTIVE' },    // 4th year -> Active Major Projects
-    { batch: '080', bsYear: 2080, pType: 'MINOR', status: 'ACTIVE' },    // 3rd year -> Active Minor Projects
+    { batch: '078', bsYear: 2078, pType: 'MAJOR', status: 'COMPLETED' },
+    { batch: '079', bsYear: 2079, pType: 'MAJOR', status: 'ACTIVE' },
+    { batch: '080', bsYear: 2080, pType: 'MINOR', status: 'ACTIVE' },
   ];
 
   for (const item of bachelorBatches) {
@@ -376,17 +329,20 @@ async function main() {
       const startIdx = gi * 3;
       if (startIdx + 3 > bctStudents.length) break;
       const members = bctStudents.slice(startIdx, startIdx + 3);
+      const sup = supervisors[bGroupIdx % supervisors.length];
+      const ext = externalExaminers[bGroupIdx % externalExaminers.length];
+      const title = bachelorGroupTitles[bGroupIdx % bachelorGroupTitles.length];
 
       const group = await prisma.projectGroup.create({
         data: {
           name: `BCT-${batchStr}-Group${gi + 1}`,
-          projectTitle: bachelorGroupTitles[bGroupIdx % bachelorGroupTitles.length],
+          projectTitle: title,
           projectType: item.pType,
           status: item.status,
           cluster: ['AIML', 'IPCV', 'NTS', 'EDMES'][gi % 4],
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
-          supervisorId: supervisors[bGroupIdx % supervisors.length].id,
+          supervisorId: sup.id,
           programId: programs.BCT.id,
           academicYearId: ayMap[batchStr].id,
           batch: String(bsYear),
@@ -399,12 +355,88 @@ async function main() {
         });
       }
 
-      const extExaminer = externalExaminers[bGroupIdx % externalExaminers.length];
       await prisma.examinerAssignment.create({
-        data: { groupId: group.id, externalExaminerId: extExaminer.id, assignedById: coordinators.BCT.id },
+        data: { groupId: group.id, externalExaminerId: ext.id, assignedById: coordinators.BCT.id },
+      });
+      await attachComponents({ groupId: group.id, projectType: item.pType });
+
+      // ── Generate Multi-Page PDFs and Attach Proposals ──
+      const studentMemberList = members.map(m => ({ name: `${m.firstName} ${m.lastName}`, rollNumber: m.rollNumber }));
+
+      // 1. Proposal PDF (All groups)
+      const propPdfBuf = await generateRealisticProposalPDF({
+        title,
+        students: studentMemberList,
+        supervisorName: `${sup.firstName} ${sup.lastName}`,
+        supervisorDesignation: sup.designation,
+        programName: 'Bachelor in Computer Engineering',
+        batch: String(bsYear),
+        projectType: item.pType,
+      });
+      const propFilename = `proposal_group_${group.id}.pdf`;
+      fs.writeFileSync(path.join(storageGroupsDir, propFilename), propPdfBuf);
+      await prisma.proposal.create({
+        data: {
+          stage: 'PROPOSAL',
+          documentUrl: `/api/files/groups/${propFilename}`,
+          documentType: 'PROPOSAL',
+          status: 'APPROVED',
+          submittedById: members[0].id,
+          groupId: group.id,
+        },
       });
 
-      await attachComponents({ groupId: group.id, projectType: item.pType });
+      // 2. Midterm Report PDF (Batch 079 Major & Batch 078 Completed)
+      if (item.pType === 'MAJOR') {
+        const midPdfBuf = await generateRealisticMidtermReportPDF({
+          title,
+          students: studentMemberList,
+          supervisorName: `${sup.firstName} ${sup.lastName}`,
+          supervisorDesignation: sup.designation,
+          programName: 'Bachelor in Computer Engineering',
+          batch: String(bsYear),
+          projectType: item.pType,
+        });
+        const midFilename = `midterm_group_${group.id}.pdf`;
+        fs.writeFileSync(path.join(storageGroupsDir, midFilename), midPdfBuf);
+        await prisma.proposal.create({
+          data: {
+            stage: 'MID_TERM',
+            documentUrl: `/api/files/groups/${midFilename}`,
+            documentType: 'MID_TERM_REPORT',
+            status: 'APPROVED',
+            submittedById: members[0].id,
+            groupId: group.id,
+          },
+        });
+      }
+
+      // 3. Final Report PDF (Batch 078 Completed)
+      if (item.status === 'COMPLETED') {
+        const finalPdfBuf = await generateRealisticFinalReportPDF({
+          title,
+          students: studentMemberList,
+          supervisorName: `${sup.firstName} ${sup.lastName}`,
+          supervisorDesignation: sup.designation,
+          externalExaminerName: `${ext.firstName} ${ext.lastName}`,
+          programName: 'Bachelor in Computer Engineering',
+          batch: String(bsYear),
+          projectType: item.pType,
+        });
+        const finalFilename = `final_group_${group.id}.pdf`;
+        fs.writeFileSync(path.join(storageGroupsDir, finalFilename), finalPdfBuf);
+        await prisma.proposal.create({
+          data: {
+            stage: 'FINAL',
+            documentUrl: `/api/files/groups/${finalFilename}`,
+            documentType: 'FINAL_REPORT',
+            status: 'APPROVED',
+            submittedById: members[0].id,
+            groupId: group.id,
+          },
+        });
+      }
+
       createdGroups.push(group);
       bGroupIdx++;
     }
@@ -412,41 +444,94 @@ async function main() {
     // BEI group
     const beiStudents = findStudents(bsYear, 'BEI');
     if (beiStudents.length >= 2) {
+      const sup = supervisors[1];
+      const ext = externalExaminers[0];
+      const title = 'IoT-based Smart Environmental Monitoring System';
+
       const group = await prisma.projectGroup.create({
         data: {
           name: `BEI-${batchStr}-Group1`,
-          projectTitle: 'IoT-based Smart Environmental Monitoring System',
+          projectTitle: title,
           projectType: item.pType,
           status: item.status,
           cluster: 'EDMES',
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
-          supervisorId: supervisors[1].id,
+          supervisorId: sup.id,
           programId: programs.BEI.id,
           academicYearId: ayMap[batchStr].id,
           batch: String(bsYear),
         },
       });
+
+      const beiMembers = [];
       for (let mi = 0; mi < Math.min(3, beiStudents.length); mi++) {
+        beiMembers.push(beiStudents[mi]);
         await prisma.groupMember.create({
           data: { studentId: beiStudents[mi].id, groupId: group.id, rollNumber: beiStudents[mi].rollNumber },
         });
       }
+
       await prisma.examinerAssignment.create({
-        data: { groupId: group.id, externalExaminerId: externalExaminers[0].id, assignedById: coordinators.BEI.id },
+        data: { groupId: group.id, externalExaminerId: ext.id, assignedById: coordinators.BEI.id },
       });
       await attachComponents({ groupId: group.id, projectType: item.pType });
+
+      const beiMemberList = beiMembers.map(m => ({ name: `${m.firstName} ${m.lastName}`, rollNumber: m.rollNumber }));
+      const propPdfBuf = await generateRealisticProposalPDF({
+        title,
+        students: beiMemberList,
+        supervisorName: `${sup.firstName} ${sup.lastName}`,
+        supervisorDesignation: sup.designation,
+        programName: 'Bachelor in Electronics & Information',
+        batch: String(bsYear),
+        projectType: item.pType,
+      });
+      const propFilename = `proposal_group_${group.id}.pdf`;
+      fs.writeFileSync(path.join(storageGroupsDir, propFilename), propPdfBuf);
+      await prisma.proposal.create({
+        data: {
+          stage: 'PROPOSAL',
+          documentUrl: `/api/files/groups/${propFilename}`,
+          documentType: 'PROPOSAL',
+          status: 'APPROVED',
+          submittedById: beiMembers[0].id,
+          groupId: group.id,
+        },
+      });
+
+      if (item.status === 'COMPLETED') {
+        const finalPdfBuf = await generateRealisticFinalReportPDF({
+          title,
+          students: beiMemberList,
+          supervisorName: `${sup.firstName} ${sup.lastName}`,
+          supervisorDesignation: sup.designation,
+          externalExaminerName: `${ext.firstName} ${ext.lastName}`,
+          programName: 'Bachelor in Electronics & Information',
+          batch: String(bsYear),
+          projectType: item.pType,
+        });
+        const finalFilename = `final_group_${group.id}.pdf`;
+        fs.writeFileSync(path.join(storageGroupsDir, finalFilename), finalPdfBuf);
+        await prisma.proposal.create({
+          data: {
+            stage: 'FINAL',
+            documentUrl: `/api/files/groups/${finalFilename}`,
+            documentType: 'FINAL_REPORT',
+            status: 'APPROVED',
+            submittedById: beiMembers[0].id,
+            groupId: group.id,
+          },
+        });
+      }
+
       createdGroups.push(group);
     }
   }
-  console.log(`Created ${createdGroups.length} Bachelor project groups (Minor: 2080, Major: 2079, Completed: 2078; 2082 & 2083 have 0)`);
+  console.log(`Created ${createdGroups.length} Bachelor project groups with multi-page PDFs`);
 
   // ============================================================
-  // MASTER THESES (16 Credits) & MASTER PROJECTS (4 Credits)
-  // • 083 batch: 1st Year -> Coursework only (NO thesis/project)
-  // • 082 batch (3rd Sem): Master Project 4-Cr (Active) + Thesis Concept Form Call
-  // • 081 batch (4th Sem): Master Thesis 16-Cr (Active/Finalizing)
-  // • 080 & 079 batches (Graduated): Completed Master Theses & Projects
+  // MASTER THESES & PROJECTS WITH MULTI-PAGE REPORTS
   // ============================================================
   const masterThesisTitles = [
     'Automated Intrusion Detection in Software-Defined Networks using Deep Graph Convolutional Networks',
@@ -478,11 +563,11 @@ async function main() {
   let pIdx = 0;
 
   const masterBatches = [
-    { batch: '078', bsYear: 2078, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' }, // Graduated
-    { batch: '079', bsYear: 2079, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' }, // Graduated
-    { batch: '080', bsYear: 2080, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' }, // Graduated
-    { batch: '081', bsYear: 2081, thesisStatus: 'ACTIVE',    projectStatus: 'COMPLETED' }, // 4th sem Thesis
-    { batch: '082', bsYear: 2082, thesisStatus: 'ACTIVE',    projectStatus: 'ACTIVE' },    // 3rd sem Project
+    { batch: '078', bsYear: 2078, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
+    { batch: '079', bsYear: 2079, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
+    { batch: '080', bsYear: 2080, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
+    { batch: '081', bsYear: 2081, thesisStatus: 'ACTIVE',    projectStatus: 'COMPLETED' },
+    { batch: '082', bsYear: 2082, thesisStatus: 'ACTIVE',    projectStatus: 'ACTIVE' },
   ];
 
   for (const item of masterBatches) {
@@ -497,10 +582,11 @@ async function main() {
         const sup = supervisors[tIdx % supervisors.length];
         const extMid = externalExaminers[tIdx % externalExaminers.length];
         const extFinal = externalExaminers[(tIdx + 1) % externalExaminers.length];
+        const title = masterThesisTitles[tIdx % masterThesisTitles.length];
 
         const thesis = await prisma.thesis.create({
           data: {
-            title: masterThesisTitles[tIdx % masterThesisTitles.length],
+            title,
             projectType: 'THESIS',
             studentId: thesisStudent.id,
             status: item.thesisStatus,
@@ -520,18 +606,81 @@ async function main() {
           data: { thesisId: thesis.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
         });
 
-        const pdfUrl = await createSampleProposalPDF({
-          filename: `thesis_${thesisStudent.rollNumber.toLowerCase()}.pdf`,
-          title: thesis.title,
-          studentName: `${thesisStudent.firstName} ${thesisStudent.lastName}`,
-          rollNumber: thesisStudent.rollNumber,
+        const studentData = [{ name: `${thesisStudent.firstName} ${thesisStudent.lastName}`, rollNumber: thesisStudent.rollNumber }];
+
+        // 1. Proposal PDF
+        const propPdfBuf = await generateRealisticProposalPDF({
+          title,
+          students: studentData,
+          supervisorName: `${sup.firstName} ${sup.lastName}`,
+          supervisorDesignation: sup.designation,
           programName: prog.name,
           batch: String(bsYear),
+          projectType: 'THESIS',
+        });
+        const propFilename = `proposal_thesis_${thesis.id}.pdf`;
+        fs.writeFileSync(path.join(storageThesesDir, propFilename), propPdfBuf);
+        await prisma.proposal.create({
+          data: {
+            stage: 'PROPOSAL',
+            documentUrl: `/api/files/theses/${propFilename}`,
+            documentType: 'PROPOSAL',
+            status: 'APPROVED',
+            submittedById: thesisStudent.id,
+            thesisId: thesis.id,
+          },
         });
 
-        await prisma.proposal.create({
-          data: { stage: 'PROPOSAL', documentUrl: pdfUrl, submittedById: thesisStudent.id, thesisId: thesis.id },
-        });
+        // 2. Midterm Report PDF (Active 4th sem or Completed)
+        if (item.thesisStatus === 'COMPLETED' || item.batch === '081') {
+          const midPdfBuf = await generateRealisticMidtermReportPDF({
+            title,
+            students: studentData,
+            supervisorName: `${sup.firstName} ${sup.lastName}`,
+            supervisorDesignation: sup.designation,
+            programName: prog.name,
+            batch: String(bsYear),
+            projectType: 'THESIS',
+          });
+          const midFilename = `midterm_thesis_${thesis.id}.pdf`;
+          fs.writeFileSync(path.join(storageThesesDir, midFilename), midPdfBuf);
+          await prisma.proposal.create({
+            data: {
+              stage: 'MID_TERM',
+              documentUrl: `/api/files/theses/${midFilename}`,
+              documentType: 'MID_TERM_REPORT',
+              status: 'APPROVED',
+              submittedById: thesisStudent.id,
+              thesisId: thesis.id,
+            },
+          });
+        }
+
+        // 3. Final Report PDF (Completed)
+        if (item.thesisStatus === 'COMPLETED') {
+          const finalPdfBuf = await generateRealisticFinalReportPDF({
+            title,
+            students: studentData,
+            supervisorName: `${sup.firstName} ${sup.lastName}`,
+            supervisorDesignation: sup.designation,
+            externalExaminerName: `${extFinal.firstName} ${extFinal.lastName}`,
+            programName: prog.name,
+            batch: String(bsYear),
+            projectType: 'THESIS',
+          });
+          const finalFilename = `final_thesis_${thesis.id}.pdf`;
+          fs.writeFileSync(path.join(storageThesesDir, finalFilename), finalPdfBuf);
+          await prisma.proposal.create({
+            data: {
+              stage: 'FINAL',
+              documentUrl: `/api/files/theses/${finalFilename}`,
+              documentType: 'FINAL_REPORT',
+              status: 'APPROVED',
+              submittedById: thesisStudent.id,
+              thesisId: thesis.id,
+            },
+          });
+        }
 
         createdTheses.push(thesis);
         tIdx++;
@@ -541,16 +690,18 @@ async function main() {
       if (progStudents.length > 1) {
         const projectStudent = progStudents[1];
         const extFinal = externalExaminers[pIdx % externalExaminers.length];
+        const sup = supervisors[(pIdx + 2) % supervisors.length];
+        const title = masterProjectTitles[pIdx % masterProjectTitles.length];
 
         const mProject = await prisma.thesis.create({
           data: {
-            title: masterProjectTitles[pIdx % masterProjectTitles.length],
+            title,
             projectType: 'PROJECT',
             studentId: projectStudent.id,
             status: item.projectStatus,
             startDate: new Date('2025-02-01'),
             endDate: new Date('2025-08-30'),
-            supervisorId: supervisors[(pIdx + 2) % supervisors.length].id,
+            supervisorId: sup.id,
             externalMidTermId: null,
             externalFinalId: extFinal.id,
             batch: String(bsYear),
@@ -564,30 +715,65 @@ async function main() {
           data: { thesisId: mProject.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
         });
 
-        const pdfUrl = await createSampleProposalPDF({
-          filename: `project_${projectStudent.rollNumber.toLowerCase()}.pdf`,
-          title: mProject.title,
-          studentName: `${projectStudent.firstName} ${projectStudent.lastName}`,
-          rollNumber: projectStudent.rollNumber,
+        const studentData = [{ name: `${projectStudent.firstName} ${projectStudent.lastName}`, rollNumber: projectStudent.rollNumber }];
+
+        const propPdfBuf = await generateRealisticProposalPDF({
+          title,
+          students: studentData,
+          supervisorName: `${sup.firstName} ${sup.lastName}`,
+          supervisorDesignation: sup.designation,
           programName: prog.name,
           batch: String(bsYear),
+          projectType: 'PROJECT',
+        });
+        const propFilename = `proposal_project_${mProject.id}.pdf`;
+        fs.writeFileSync(path.join(storageThesesDir, propFilename), propPdfBuf);
+        await prisma.proposal.create({
+          data: {
+            stage: 'PROPOSAL',
+            documentUrl: `/api/files/theses/${propFilename}`,
+            documentType: 'PROPOSAL',
+            status: 'APPROVED',
+            submittedById: projectStudent.id,
+            thesisId: mProject.id,
+          },
         });
 
-        await prisma.proposal.create({
-          data: { stage: 'PROPOSAL', documentUrl: pdfUrl, submittedById: projectStudent.id, thesisId: mProject.id },
-        });
+        if (item.projectStatus === 'COMPLETED') {
+          const finalPdfBuf = await generateRealisticFinalReportPDF({
+            title,
+            students: studentData,
+            supervisorName: `${sup.firstName} ${sup.lastName}`,
+            supervisorDesignation: sup.designation,
+            externalExaminerName: `${extFinal.firstName} ${extFinal.lastName}`,
+            programName: prog.name,
+            batch: String(bsYear),
+            projectType: 'PROJECT',
+          });
+          const finalFilename = `final_project_${mProject.id}.pdf`;
+          fs.writeFileSync(path.join(storageThesesDir, finalFilename), finalPdfBuf);
+          await prisma.proposal.create({
+            data: {
+              stage: 'FINAL',
+              documentUrl: `/api/files/theses/${finalFilename}`,
+              documentType: 'FINAL_REPORT',
+              status: 'APPROVED',
+              submittedById: projectStudent.id,
+              thesisId: mProject.id,
+            },
+          });
+        }
 
         createdProjects.push(mProject);
         pIdx++;
       }
     }
   }
-  console.log(`Created ${createdTheses.length} Master Theses (16 Cr) and ${createdProjects.length} Master Projects (4 Cr) (2083 has 0)`);
+  console.log(`Created ${createdTheses.length} Master Theses and ${createdProjects.length} Master Projects with multi-page PDFs`);
 
   // ============================================================
-  // EVALUATIONS & MARKS (Full defense evaluations for graduated/completed cohorts)
+  // EVALUATIONS & MARKS (Full defense evaluations for completed cohorts)
   // ============================================================
-  // 1. Evaluate completed Bachelor Major groups (2078 batch and completed 2079)
   const completedGroups = createdGroups.filter(g => g.status === 'COMPLETED');
   for (const compGroup of completedGroups) {
     const comps = await prisma.evaluationComponent.findMany({ where: { groupId: compGroup.id } });
@@ -620,9 +806,7 @@ async function main() {
       });
     }
   }
-  console.log(`Evaluated ${completedGroups.length} completed Bachelor Major Groups across all 5 grading stages`);
 
-  // 2. Evaluate completed Master Theses (300 Marks: Sup 100 + Ext Mid 100 + Ext Final 100)
   const completedTheses = createdTheses.filter(t => t.status === 'COMPLETED');
   for (const compThesis of completedTheses) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compThesis.id } });
@@ -651,9 +835,7 @@ async function main() {
       });
     }
   }
-  console.log(`Evaluated ${completedTheses.length} completed Master Theses (300 Marks Scheme)`);
 
-  // 3. Evaluate completed Master Projects (100 Marks: 5 criteria x 20)
   const completedProjects = createdProjects.filter(p => p.status === 'COMPLETED');
   for (const compProject of completedProjects) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compProject.id } });
@@ -674,13 +856,10 @@ async function main() {
       });
     }
   }
-  console.log(`Evaluated ${completedProjects.length} completed Master Projects (100 Marks Scheme)`);
 
   // ============================================================
   // ANNOUNCEMENTS & FORMS (Batch 2080 Minor, 2079 Major, 2082 Master)
   // ============================================================
-
-  // 1. Master Thesis Registration (Batch 2082 - MSNCS Coordinator)
   const masterThesisAnn = await prisma.announcement.create({
     data: {
       title: 'M.Sc. Research Thesis Topic Registration & Concept Note (Batch 2082)',
@@ -708,7 +887,6 @@ async function main() {
     },
   });
 
-  // 2. Master Project Registration (Batch 2082 - MSNCS Coordinator)
   const masterProjectAnn = await prisma.announcement.create({
     data: {
       title: 'Master Project Registration (4 Credit Course) - Batch 2082',
@@ -730,7 +908,6 @@ async function main() {
     },
   });
 
-  // 3. Bachelor Minor Project Call (Batch 2080 - 3rd Year - BCT Coordinator)
   const bachelorMinorAnn = await prisma.announcement.create({
     data: {
       title: 'Bachelor Minor Project Group Formation & Proposal Call (Batch 2080)',
@@ -755,7 +932,6 @@ async function main() {
     },
   });
 
-  // 4. Bachelor Major Project Call (Batch 2079 - 4th Year - BCT Coordinator)
   const bachelorMajorAnn = await prisma.announcement.create({
     data: {
       title: 'Bachelor Major Project Group Formation & Defense Call (Batch 2079)',
@@ -777,10 +953,8 @@ async function main() {
     },
   });
 
-  console.log('Created presentation announcements for Minor (2080), Major (2079), and Master (2082)');
-
   // ============================================================
-  // PRE-POPULATE DEMO FORM RESPONSES MATRIX FOR MASTER ANNOUNCEMENTS (2082 Batch)
+  // PRE-POPULATE DEMO FORM RESPONSES MATRIX (2082 Batch)
   // ============================================================
   const master2082Students = students.filter(s => s.batch === '2082' && s.degreeType === 'MASTER');
 
@@ -790,7 +964,7 @@ async function main() {
       title: 'Automated Intrusion Detection in Software-Defined Networks using Deep Graph Convolutional Networks',
       cluster: 'Computer networks and security',
       is_guided: 'Yes',
-      primary_supervisor: 'Dr. Prabesh Bhattarai', // Fuzzy title prefix match
+      primary_supervisor: 'Dr. Prabesh Bhattarai',
       secondary_supervisor: 'Ramesh Sharma',
       project_domain: 'Network Security & SDN',
       remarks: 'Consulted Dr. Bhattarai. Dataset from CIC-IDS2018 benchmark.',
@@ -802,7 +976,7 @@ async function main() {
       title: 'Zero-Trust Architecture and Micro-Segmentation for Cloud-Native Kubernetes Clusters',
       cluster: 'Computer networks and security',
       is_guided: 'No',
-      primary_supervisor: 'Prof. Andrew Ng (Stanford/Coursera)', // Non-matching external mentor -> prompts manual coordinator selection
+      primary_supervisor: 'Prof. Andrew Ng (Stanford/Coursera)',
       secondary_supervisor: 'Bishnu Tamang',
       project_domain: 'Cloud Security & DevOps',
       remarks: 'Requested external advisor, needs internal supervisor allocation.',
@@ -814,8 +988,8 @@ async function main() {
       title: 'Privacy-Preserving Federated Learning for IoT Malware Classification',
       cluster: 'Computer networks and security',
       is_guided: 'Yes',
-      primary_supervisor: 'Prof. Anita Gurung', // Fuzzy title prefix match
-      secondary_supervisor: 'Bhattarai', // Fuzzy last name match
+      primary_supervisor: 'Prof. Anita Gurung',
+      secondary_supervisor: 'Bhattarai',
       project_domain: 'IoT Security & Federated Learning',
       remarks: 'Differential privacy parameters aligned with campus IoT lab protocols.',
       status: 'SUBMITTED',
@@ -826,11 +1000,11 @@ async function main() {
       title: 'Post-Quantum Cryptographic Key Exchange for Lightweight Embedded Systems',
       cluster: 'Computer networks and security',
       is_guided: 'No',
-      primary_supervisor: 'Assoc. Prof. Rajendra Neupane', // Fuzzy match
-      secondary_supervisor: 'Dr. Yann LeCun (External Consultant)', // Non-matching
+      primary_supervisor: 'Assoc. Prof. Rajendra Neupane',
+      secondary_supervisor: 'Dr. Yann LeCun (External Consultant)',
       project_domain: 'Applied Cryptography & Embedded Systems',
       remarks: 'Benchmarking Kyber-512 and Dilithium on ARM Cortex-M4 microcontrollers.',
-      status: 'LATE_SUBMITTED', // Demonstrates late submission badge
+      status: 'LATE_SUBMITTED',
       description: 'Benchmarking and optimization of NIST post-quantum cryptographic primitives on resource-constrained embedded nodes.'
     },
     {
@@ -838,8 +1012,8 @@ async function main() {
       title: 'RIS-Assisted 6G Wireless Communication: Channel Estimation and Beamforming',
       cluster: 'Electronic devices, circuits and communication',
       is_guided: 'Yes',
-      primary_supervisor: 'Sagar Acharya', // Exact match
-      secondary_supervisor: 'Maya Khadka (HOD)', // Fuzzy match
+      primary_supervisor: 'Sagar Acharya',
+      secondary_supervisor: 'Maya Khadka (HOD)',
       project_domain: 'Wireless Communications & 6G',
       remarks: 'Co-simulation with MATLAB/Simulink and SDR hardware in campus lab.',
       status: 'SUBMITTED',
@@ -848,10 +1022,10 @@ async function main() {
     {
       roll: '082MSICE02',
       title: 'Energy-Harvesting Cognitive Radio Networks using Deep Reinforcement Learning',
-      cluster: '', // Empty cluster -> Demonstrates inline dropdown selection in matrix
+      cluster: '',
       is_guided: 'No',
-      primary_supervisor: 'Dr. John Doe (Industry Mentor)', // Non-matching
-      secondary_supervisor: 'Sarita', // Fuzzy first name match
+      primary_supervisor: 'Dr. John Doe (Industry Mentor)',
+      secondary_supervisor: 'Sarita',
       project_domain: 'Cognitive Radio & Green Communications',
       remarks: 'Unsure of cluster taxonomy; requesting coordinator guidance.',
       status: 'SUBMITTED',
@@ -862,8 +1036,8 @@ async function main() {
       title: 'FPGA Acceleration of Real-Time Video Super-Resolution for Telemedicine',
       cluster: 'AI/ML and image processing',
       is_guided: 'Yes',
-      primary_supervisor: 'Sarita Poudel', // Exact match
-      secondary_supervisor: 'Dr. Sagar', // Partial match
+      primary_supervisor: 'Sarita Poudel',
+      secondary_supervisor: 'Dr. Sagar',
       project_domain: 'Hardware Acceleration & Computer Vision',
       remarks: 'Targeting Xilinx Zynq UltraScale+ FPGA with Vitis AI runtime.',
       status: 'SUBMITTED',
@@ -874,7 +1048,7 @@ async function main() {
       title: 'Spatiotemporal Graph Neural Networks for Kathmandu Traffic Flow Prediction',
       cluster: 'Audio, NLP and data/text analytics',
       is_guided: 'Yes',
-      primary_supervisor: 'gurung', // Lowercase last name fuzzy match
+      primary_supervisor: 'gurung',
       secondary_supervisor: 'Prabesh Bhattarai',
       project_domain: 'Spatiotemporal Data Mining & GNNs',
       remarks: 'Traffic sensor & GPS telemetry dataset collected from Valley Traffic Police.',
@@ -886,8 +1060,8 @@ async function main() {
       title: 'Causal Inference and Multi-Modal Survival Analysis for Healthcare Outcomes',
       cluster: 'Audio, NLP and data/text analytics',
       is_guided: 'No',
-      primary_supervisor: 'Tamang Sir', // Informal honorific fuzzy match
-      secondary_supervisor: 'Prof. Geoffrey Hinton', // Non-matching
+      primary_supervisor: 'Tamang Sir',
+      secondary_supervisor: 'Prof. Geoffrey Hinton',
       project_domain: 'Healthcare Analytics & Causal ML',
       remarks: 'De-identified MIMIC-IV electronic health records approved.',
       status: 'SUBMITTED',
@@ -898,8 +1072,8 @@ async function main() {
       title: 'Multilingual Low-Resource Neural Machine Translation for Nepali Dialects',
       cluster: 'Audio, NLP and data/text analytics',
       is_guided: 'Yes',
-      primary_supervisor: 'Bishnu Tamang', // Exact match
-      secondary_supervisor: 'Sharma', // Last name fuzzy match
+      primary_supervisor: 'Bishnu Tamang',
+      secondary_supervisor: 'Sharma',
       project_domain: 'Natural Language Processing & LLMs',
       remarks: 'Fine-tuning LLaMA/Mistral with LoRA and custom bilingual corpus.',
       status: 'SUBMITTED',
@@ -910,7 +1084,7 @@ async function main() {
       title: 'Large Language Model Reasoning Verification via Automated Formal Theorem Proving',
       cluster: 'Audio, NLP and data/text analytics',
       is_guided: 'Yes',
-      primary_supervisor: 'Dr. Anita Gurung', // Fuzzy match
+      primary_supervisor: 'Dr. Anita Gurung',
       secondary_supervisor: 'Bishnu Tamang',
       project_domain: 'Formal Methods & Generative AI',
       remarks: 'Integration with Lean 4 and Isabelle interactive theorem provers.',
@@ -922,8 +1096,8 @@ async function main() {
       title: 'Neuro-Symbolic Knowledge Graph Completion for Biomedical Literature',
       cluster: 'Audio, NLP and data/text analytics',
       is_guided: 'Yes',
-      primary_supervisor: 'Ramesh Sharma', // Exact match
-      secondary_supervisor: 'Dr. Prabesh', // Partial first name
+      primary_supervisor: 'Ramesh Sharma',
+      secondary_supervisor: 'Dr. Prabesh',
       project_domain: 'Knowledge Graphs & NLP',
       remarks: 'Extracting entity relations from PubMed open dataset.',
       status: 'SUBMITTED',
@@ -934,11 +1108,11 @@ async function main() {
       title: 'High-Throughput Distributed Graph Analytics Engine on Apache Spark & GraphX',
       cluster: 'Computer networks and security',
       is_guided: 'No',
-      primary_supervisor: 'Bhattarai', // Last name fuzzy match
-      secondary_supervisor: 'External Advisor - Dr. K. R. Joshi (KU)', // Non-matching
+      primary_supervisor: 'Bhattarai',
+      secondary_supervisor: 'External Advisor - Dr. K. R. Joshi (KU)',
       project_domain: 'Big Data Systems & Distributed Computing',
       remarks: 'Benchmarking on 8-node cluster in departmental laboratory.',
-      status: 'LATE_SUBMITTED', // Late submission
+      status: 'LATE_SUBMITTED',
       description: 'Design and partitioning optimizations for petabyte-scale distributed graph centrality and community detection.'
     },
     {
@@ -946,7 +1120,7 @@ async function main() {
       title: '3D Medical Image Segmentation Using Diffusion Models and Transformers',
       cluster: 'AI/ML and image processing',
       is_guided: 'Yes',
-      primary_supervisor: 'Dr. Sarita Poudel', // Fuzzy match
+      primary_supervisor: 'Dr. Sarita Poudel',
       secondary_supervisor: 'Maya Khadka',
       project_domain: 'Medical Imaging & Deep Learning',
       remarks: 'CT and MRI brain tumor segmentation with BraTS 2024 dataset.',
@@ -956,9 +1130,9 @@ async function main() {
     {
       roll: '082MSCSK04',
       title: 'Automated Vulnerability Detection in Smart Contracts via Semantic Graph Embeddings',
-      cluster: '', // Empty cluster -> Demonstrates inline selection
+      cluster: '',
       is_guided: 'No',
-      primary_supervisor: 'Neupane', // Last name fuzzy match
+      primary_supervisor: 'Neupane',
       secondary_supervisor: 'Prabesh Bhattarai',
       project_domain: 'Blockchain & Software Security',
       remarks: 'Dataset of 50,000 verified Ethereum contracts analyzed with Slither.',
@@ -973,15 +1147,17 @@ async function main() {
       if (!student) continue;
 
       const pdfFilename = `proposal_${student.rollNumber.toLowerCase()}_${ann.id}.pdf`;
-      const pdfUrl = await createSampleProposalPDF({
-        filename: pdfFilename,
+      const pdfBuf = await generateRealisticProposalPDF({
         title: item.title,
-        description: item.description,
-        studentName: `${student.firstName} ${student.lastName}`,
-        rollNumber: student.rollNumber,
-        programName: 'Master Program',
+        students: [{ name: `${student.firstName} ${student.lastName}`, rollNumber: student.rollNumber }],
+        supervisorName: item.primary_supervisor || 'Faculty Member',
+        supervisorDesignation: 'Prospective Supervisor',
+        programName: 'Master Degree Program',
         batch: '2082',
+        projectType: 'THESIS',
       });
+      fs.writeFileSync(path.join(storageThesesDir, pdfFilename), pdfBuf);
+      const pdfUrl = `/api/files/theses/${pdfFilename}`;
 
       const formData = {
         title: item.title,
@@ -1008,23 +1184,18 @@ async function main() {
     }
   }
 
-  console.log(`Pre-populated ${demoConceptSubmissions.length} demo form submissions for Master Announcements (Batch 2082)`);
+  console.log(`Pre-populated ${demoConceptSubmissions.length} demo form submissions with multi-page PDFs`);
 
   console.log('\n========================================================================');
-  console.log(' SEED COMPLETE — TIMELINE-ALIGNED SHOWCASE DATASET READY');
+  console.log(' SEED COMPLETE — MULTI-PAGE PDFS & TIMELINE ALIGNED SHOWCASE READY');
   console.log('========================================================================');
   console.log('• Password for ALL accounts:          "subesh"');
-  console.log('• Maintainer Admin:                  subeshgaming@gmail.com');
-  console.log('• MSNCS Master Coordinator (Lead):   msncs.coordinator@pcampus.edu.np');
-  console.log('• BCT Bachelor Coordinator (Lead):   bct.coordinator@pcampus.edu.np');
-  console.log('• Faculty Supervisor (Dr. Prabesh):  prabesh.bhattarai@pcampus.edu.np');
-  console.log('• External Examiner (Dr. Prajwal):   prajwal.ghimire@ioe.edu.np');
-  console.log('• Bachelor 3rd Year Minor (2080):    080bct001@pcampus.edu.np');
-  console.log('• Bachelor 4th Year Major (2079):    079bct001@pcampus.edu.np');
-  console.log('• Bachelor Graduated Archive (2078): 078bct001@pcampus.edu.np');
-  console.log('• Master 3rd Sem Project (2082):     082msncs01@pcampus.edu.np');
-  console.log('• Master 4th Sem Thesis (2081):      081msncs01@pcampus.edu.np');
-  console.log('• Master Graduated Archive (2080):   080msncs01@pcampus.edu.np');
+  console.log('• Bachelor Minor (Batch 2080):       Active Minor Projects + Multi-Page Proposal PDFs');
+  console.log('• Bachelor Major (Batch 2079):       Active Major Projects + Multi-Page Proposal & Midterm PDFs');
+  console.log('• Bachelor Archive (Batch 2078):     Completed Major Projects + Proposal, Midterm, & Final Report PDFs');
+  console.log('• Master Project (Batch 2082):       Active 3rd Sem Projects + Multi-Page Proposal PDFs');
+  console.log('• Master Thesis (Batch 2081):        Active 4th Sem Theses + Multi-Page Proposal & Midterm PDFs');
+  console.log('• Master Archive (Batch 2080-2078):  Completed Theses & Projects + Proposal, Midterm, & Final PDFs');
   console.log('========================================================================\n');
 }
 
