@@ -23,9 +23,9 @@ const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
 
 // Email policy:
 //  - STUDENT emails are ALWAYS auto-derived from the roll number: {rollNumber}@pcampus.edu.np
-//  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER emails must end with @pcampus.edu.np
+//  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER emails must end with @pcampus.edu.np or @ioe.edu.np
 //    (local part is free-form: ramyadav@pcampus.edu.np and ram.yadav@pcampus.edu.np are both valid)
-const PCAMPUS_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@pcampus\.edu\.np$/;
+const PCAMPUS_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@(pcampus\.edu\.np|ioe\.edu\.np)$/;
 const PCAMPUS_DOMAIN_ROLES = ['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
 
 function isPcampusEmail(email) {
@@ -877,9 +877,9 @@ exports.bulkImportUsersExcel = async (req, res) => {
         email = `${fn}.${ln}@pcampus.edu.np`;
       }
 
-      // Enforce @pcampus.edu.np domain for staff accounts
+      // Enforce @pcampus.edu.np or @ioe.edu.np domain for staff accounts
       if (role !== 'STUDENT' && email && !isPcampusEmail(email)) {
-        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np (e.g. name@pcampus.edu.np)' });
+        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np or @ioe.edu.np (e.g. name@pcampus.edu.np)' });
         continue;
       }
 

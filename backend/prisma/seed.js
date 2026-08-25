@@ -1,15 +1,16 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 const { getDefaultComponents } = require('../src/config/evaluationScheme');
+const { generateFormProposalPDF } = require('../src/services/pdfService');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const prisma = new PrismaClient();
-
 const hash = bcrypt.hashSync('subesh', 10);
 
-/** Extract program code from a roll number like "080BCT001" or "080MSNCS01" */
+/** Extract program code from a roll number like "080BCT001" or "082MSNCS01" */
 function getProgramFromRoll(roll) {
   const match = roll.match(/^\d{3}([A-Za-z.]+)\d{2,3}$/);
   if (!match) return null;
@@ -78,6 +79,9 @@ function nextName() {
 }
 
 // ── Batch definitions ──────────────────────────────────────────────────
+// Bachelor Minor: 080 (2080 BS)
+// Bachelor Major: 079 (2079 BS)
+// Master: 082 (2082 BS)
 const BATCH_DEFS = [
   {
     batch: '079',
@@ -97,7 +101,12 @@ const BATCH_DEFS = [
   {
     batch: '082',
     bsYear: 2082,
-    counts: { BCT: 18, BEI: 8, MSNCS: 4, MSICE: 3, MSDSA: 4, MSCSK: 3 },
+    counts: { BCT: 18, BEI: 8, MSNCS: 12, MSICE: 8, MSDSA: 12, MSCSK: 8 },
+  },
+  {
+    batch: '083',
+    bsYear: 2083,
+    counts: { BCT: 12, BEI: 6, MSNCS: 4, MSICE: 3, MSDSA: 4, MSCSK: 3 },
   },
 ];
 
@@ -136,7 +145,7 @@ function generateStudentDefs() {
 }
 
 async function main() {
-  console.log('Seeding database with comprehensive demo dataset...');
+  console.log('Seeding database with presentation-ready showcase dataset...');
 
   // ── Clean slate ──
   await prisma.recommendation.deleteMany();
@@ -156,6 +165,10 @@ async function main() {
   await prisma.department.deleteMany();
   await prisma.externalExaminer.deleteMany();
   await prisma.user.deleteMany();
+
+  // Storage directory setup for proposal documents
+  const storageDir = path.join(__dirname, '..', 'storage', 'theses');
+  if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
 
   // ============================================================
   // DEPARTMENT
@@ -187,14 +200,14 @@ async function main() {
   const ayMap = {};
   for (const bd of BATCH_DEFS) {
     const ay = await prisma.academicYear.create({
-      data: { year: bd.batch, semester: 'Regular', departmentId: eceDept.id, isActive: bd.batch === '080' },
+      data: { year: bd.batch, semester: 'Regular', departmentId: eceDept.id, isActive: ['080', '082'].includes(bd.batch) },
     });
     ayMap[bd.batch] = ay;
   }
   ayMap['078'] = await prisma.academicYear.create({
     data: { year: '078', semester: 'Regular', departmentId: eceDept.id, isActive: false },
   });
-  console.log(`Created ${Object.keys(ayMap).length} academic years (078–082)`);
+  console.log(`Created ${Object.keys(ayMap).length} academic years (078–083)`);
 
   // ============================================================
   // USERS
@@ -204,7 +217,7 @@ async function main() {
     data: { email: 'subeshgaming@gmail.com', password: hash, firstName: 'Subesh', lastName: 'Gaming', role: 'MAINTAINER' },
   });
 
-  // Coordinators — one per program
+  // Coordinators — one per program (BCT for Bachelor, MSNCS for Master focus)
   const coordDefs = [
     { code: 'BCT', fn: 'Ram', ln: 'Prasad', email: 'bct.coordinator@pcampus.edu.np', designation: 'Asst. Prof.' },
     { code: 'BEI', fn: 'Sita', ln: 'Devi', email: 'bei.coordinator@pcampus.edu.np', designation: 'Asst. Prof. Dr.' },
@@ -221,7 +234,7 @@ async function main() {
     coordinators[cd.code] = user;
     await prisma.program.update({ where: { code: cd.code }, data: { coordinatorId: user.id } });
   }
-  console.log(`Created ${coordDefs.length} program coordinators`);
+  console.log(`Created ${coordDefs.length} program coordinators (BCT & MSNCS lead)`);
 
   // Supervisors
   const supDefs = [
@@ -240,7 +253,7 @@ async function main() {
       data: { email: sup.email, password: hash, firstName: sup.fn, lastName: sup.ln, role: 'SUPERVISOR', designation: sup.designation, departmentId: eceDept.id, canSupervise: true },
     }));
   }
-  console.log(`Created ${supervisors.length} supervisors`);
+  console.log(`Created ${supervisors.length} faculty supervisors`);
 
   // External Examiners
   const externalExamDefs = [
@@ -248,6 +261,8 @@ async function main() {
     { fn: 'Suman', ln: 'Bhattarai', email: 'suman.bhattarai@pcampus.edu.np', designation: 'Assoc. Prof. Dr.' },
     { fn: 'Rita', ln: 'Sharma', email: 'rita.sharma@pcampus.edu.np', designation: 'Asst. Prof. Dr.' },
     { fn: 'Kiran', ln: 'Mainali', email: 'kiran.mainali@pcampus.edu.np', designation: 'Prof. Dr.' },
+    { fn: 'Prajwal', ln: 'Ghimire', email: 'prajwal.ghimire@ioe.edu.np', designation: 'Dr.' },
+    { fn: 'Anisha', ln: 'Rana', email: 'anisha.rana@ioe.edu.np', designation: 'Dr.' },
   ];
   const externalExaminers = [];
   for (const ex of externalExamDefs) {
@@ -278,7 +293,7 @@ async function main() {
       },
     }));
   }
-  console.log(`Created ${students.length} students across 4 batches`);
+  console.log(`Created ${students.length} students across 5 batches (All standard @pcampus.edu.np emails)`);
 
   // Helper to create evaluation components
   async function attachComponents({ groupId, thesisId, projectType }) {
@@ -303,8 +318,43 @@ async function main() {
     });
   }
 
+  // Helper to create standard sample proposal PDF
+  async function createSampleProposalPDF({ filename, title, description, studentName, rollNumber, programName, batch }) {
+    const pdfBuf = await generateFormProposalPDF({
+      title,
+      description: description || 'This proposal outlines the architectural foundation, methodology, milestones, and deliverables.',
+      studentName,
+      rollNumber,
+      programName,
+      batch: batch || '2080',
+      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    });
+    fs.writeFileSync(path.join(storageDir, filename), pdfBuf);
+    return `/api/files/theses/${filename}`;
+  }
+
+  // Create baseline proposal files
+  await createSampleProposalPDF({
+    filename: 'thesis_proposal.pdf',
+    title: 'Research Proposal Framework for Master Degree Program',
+    description: 'Comprehensive research methodology and experimental setup.',
+    studentName: 'Research Scholar',
+    rollNumber: '082MSNCS01',
+    programName: 'MSc in Network and Cyber Security',
+    batch: '2082',
+  });
+  await createSampleProposalPDF({
+    filename: 'project_proposal.pdf',
+    title: 'Project Proposal Design for Master 4-Credit Course',
+    description: 'Architecture design, component specification, and evaluation roadmap.',
+    studentName: 'Project Scholar',
+    rollNumber: '082MSNCS02',
+    programName: 'MSc in Network and Cyber Security',
+    batch: '2082',
+  });
+
   // ============================================================
-  // BACHELOR GROUPS (Minor & Major Projects)
+  // BACHELOR GROUPS (Minor: 2080 Batch, Major: 2079 Batch)
   // ============================================================
   const bachelorGroupTitles = [
     'AI-Powered Code Review Assistant for Nepali Developers',
@@ -314,11 +364,11 @@ async function main() {
     'Smart Agriculture Advisory System for Nepali Farmers',
     'Telemedicine Appointment & Record System for Rural Nepal',
     'Blockchain-based Food Supply Chain Traceability',
-    'Energy-Efficient Edge Computing Framework',
+    'Energy-Efficient Edge Computing Framework for Smart Cities',
     'IoT-based Smart Water Quality Monitoring System',
     'Nepali Sign Language Translation using Deep Learning',
     'Automated Attendance System using Facial Recognition',
-    'Smart Traffic Management for Kathmandu Valley',
+    'Smart Traffic Management System for Kathmandu Valley',
   ];
 
   let createdGroups = [];
@@ -334,9 +384,10 @@ async function main() {
       const startIdx = gi * 3;
       if (startIdx + 3 > bctStudents.length) break;
       const members = bctStudents.slice(startIdx, startIdx + 3);
-      const isMajor = bd.batch === '079' || gi === 0;
+      // Batch 079 is Major Project (2079); Batch 080 is Minor Project (2080)
+      const isMajor = bd.batch === '079';
       const pType = isMajor ? 'MAJOR' : 'MINOR';
-      const status = (gi === 0 && bd.batch === '079') ? 'COMPLETED' : (gi === 1 ? 'ACTIVE' : 'ACTIVE');
+      const status = (gi === 0 && isMajor) ? 'COMPLETED' : 'ACTIVE';
 
       const group = await prisma.projectGroup.create({
         data: {
@@ -344,6 +395,7 @@ async function main() {
           projectTitle: bachelorGroupTitles[bGroupIdx % bachelorGroupTitles.length],
           projectType: pType,
           status,
+          cluster: ['AIML', 'IPCV', 'NTS', 'EDMES'][gi % 4],
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
           supervisorId: supervisors[bGroupIdx % supervisors.length].id,
@@ -369,15 +421,18 @@ async function main() {
       bGroupIdx++;
     }
 
-    // 1 BEI group
+    // BEI group
     const beiStudents = findStudents(bsYear, 'BEI');
     if (beiStudents.length >= 2) {
+      const isMajor = bd.batch === '079';
+      const pType = isMajor ? 'MAJOR' : 'MINOR';
       const group = await prisma.projectGroup.create({
         data: {
           name: `BEI-${batchStr}-Group1`,
           projectTitle: 'IoT-based Smart Environmental Monitoring System',
-          projectType: 'MINOR',
+          projectType: pType,
           status: 'ACTIVE',
+          cluster: 'EDMES',
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-07-30'),
           supervisorId: supervisors[1].id,
@@ -394,39 +449,37 @@ async function main() {
       await prisma.examinerAssignment.create({
         data: { groupId: group.id, externalExaminerId: externalExaminers[0].id, assignedById: coordinators.BEI.id },
       });
-      await attachComponents({ groupId: group.id, projectType: 'MINOR' });
+      await attachComponents({ groupId: group.id, projectType: pType });
       createdGroups.push(group);
     }
   }
-  console.log(`Created ${createdGroups.length} bachelor project groups`);
+  console.log(`Created ${createdGroups.length} Bachelor project groups (Minor: 2080, Major: 2079)`);
 
   // ============================================================
   // MASTER THESES (16 Credits) & MASTER PROJECTS (4 Credits)
   // ============================================================
   const masterThesisTitles = [
-    'Deep Learning for Nepali Handwriting Recognition',
-    'Optimizing Transformer Models for Low-Resource Nepali Languages',
-    'Federated Learning for Privacy-Preserving Healthcare in Nepal',
-    'Intrusion Detection System using Deep Learning for Nepali Networks',
-    'Zero Trust Security Architecture for Cloud-Based Government Services',
-    'Explainable AI for Credit Risk Assessment in Nepali Banks',
-    'Autonomous Navigation using Reinforcement Learning for Nepali Terrain',
-    'GAN-based Medical Image Augmentation for Rural Diagnostics',
-    '5G Network Slicing for Smart City Applications in Nepal',
-    'IoMT-based Remote Patient Monitoring System for Rural Nepal',
-    'Predictive Analytics for Crop Yield Optimization using Satellite Data',
-    'Natural Language Processing for Nepali Legal Document Summarization',
+    'Automated Intrusion Detection in Software-Defined Networks using Deep Graph Convolutional Networks',
+    'Zero-Trust Architecture and Micro-Segmentation for Cloud-Native Kubernetes Clusters',
+    'Privacy-Preserving Federated Learning for IoT Malware Classification',
+    'Post-Quantum Cryptographic Key Exchange for Lightweight Embedded Systems',
+    'RIS-Assisted 6G Wireless Communication: Channel Estimation and Beamforming',
+    'Energy-Harvesting Cognitive Radio Networks using Deep Reinforcement Learning',
+    'FPGA Acceleration of Real-Time Video Super-Resolution for Telemedicine',
+    'Spatiotemporal Graph Neural Networks for Kathmandu Traffic Flow Prediction',
+    'Causal Inference and Multi-Modal Survival Analysis for Healthcare Outcomes',
+    'Multilingual Low-Resource Neural Machine Translation for Nepali Dialects',
+    'Neuro-Symbolic Knowledge Graph Completion for Biomedical Literature',
+    'High-Throughput Distributed Graph Analytics Engine on Apache Spark & GraphX',
   ];
 
   const masterProjectTitles = [
-    'Audio-Visual Speech Synthesis for Nepali Language Virtual Assistant',
-    'Microservices-Based Real-Time Log Analytics Engine for Cloud Infrastructure',
-    'Automated Fact-Checking System for Nepali News Media using LLMs',
-    'Computer Vision Pipeline for Automated Road Pothole Detection',
+    'Cloud-Native Microservices Security Auditing and Telemetry Pipeline',
+    'Real-Time Network Flow Anomaly Detection using eBPF and XDP',
+    'Automated Zero-Day Vulnerability Scanning in Smart Contracts',
+    'Hardware-Accelerated Cryptographic Accelerator for Edge Routers',
     'Decentralized Identity Verification Framework using Verifiable Credentials',
     'Smart Grid Energy Consumption Forecasting using Hybrid Temporal Networks',
-    'Semantic Code Search Engine for Multi-Repository Open Source Codebases',
-    'Edge-AI Accelerated Real-Time Video Analytics for Surveillance Systems',
   ];
 
   let createdTheses = [];
@@ -440,10 +493,10 @@ async function main() {
       const progStudents = findStudents(bsYear, prog.code);
       if (!progStudents.length) continue;
 
-      // 1. Create Master Thesis (16 Cr)
+      // Master Thesis (16 Cr)
       const thesisStudent = progStudents[0];
       if (thesisStudent) {
-        const isCompleted = (bd.batch === '079' && prog.code === 'MSDSA');
+        const isCompleted = (bd.batch === '079' && prog.code === 'MSNCS') || (bd.batch === '082' && tIdx === 0);
         const sup = supervisors[tIdx % supervisors.length];
         const extMid = externalExaminers[tIdx % externalExaminers.length];
         const extFinal = externalExaminers[(tIdx + 1) % externalExaminers.length];
@@ -465,27 +518,32 @@ async function main() {
           },
         });
 
-        // Attach THESIS components (300 marks total: Sup 100 + Ext Mid 100 + Ext Final 100)
         await attachComponents({ thesisId: thesis.id, projectType: 'THESIS' });
-
-        // Add examiner assignments
         await prisma.examinerAssignment.create({
           data: { thesisId: thesis.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
         });
 
-        // Proposal document
+        const pdfUrl = await createSampleProposalPDF({
+          filename: `thesis_${thesisStudent.rollNumber.toLowerCase()}.pdf`,
+          title: thesis.title,
+          studentName: `${thesisStudent.firstName} ${thesisStudent.lastName}`,
+          rollNumber: thesisStudent.rollNumber,
+          programName: prog.name,
+          batch: String(bsYear),
+        });
+
         await prisma.proposal.create({
-          data: { stage: 'PROPOSAL', documentUrl: '/api/files/theses/thesis_proposal.pdf', submittedById: thesisStudent.id, thesisId: thesis.id },
+          data: { stage: 'PROPOSAL', documentUrl: pdfUrl, submittedById: thesisStudent.id, thesisId: thesis.id },
         });
 
         createdTheses.push(thesis);
         tIdx++;
       }
 
-      // 2. Create Master Project (4 Cr)
+      // Master Project (4 Cr)
       if (progStudents.length > 1) {
         const projectStudent = progStudents[1];
-        const isCompleted = (bd.batch === '079' && prog.code === 'MSNCS');
+        const isCompleted = (bd.batch === '079' && prog.code === 'MSDSA');
         const extFinal = externalExaminers[pIdx % externalExaminers.length];
 
         const mProject = await prisma.thesis.create({
@@ -496,7 +554,7 @@ async function main() {
             status: isCompleted ? 'COMPLETED' : 'ACTIVE',
             startDate: new Date('2025-02-01'),
             endDate: new Date('2025-08-30'),
-            supervisorId: null,
+            supervisorId: supervisors[(pIdx + 2) % supervisors.length].id,
             externalMidTermId: null,
             externalFinalId: extFinal.id,
             batch: String(bsYear),
@@ -505,15 +563,22 @@ async function main() {
           },
         });
 
-        // Attach PROJECT components (100 marks total: 5 criteria x 20 marks)
         await attachComponents({ thesisId: mProject.id, projectType: 'PROJECT' });
-
         await prisma.examinerAssignment.create({
           data: { thesisId: mProject.id, externalExaminerId: extFinal.id, assignedById: coordinators[prog.code].id },
         });
 
+        const pdfUrl = await createSampleProposalPDF({
+          filename: `project_${projectStudent.rollNumber.toLowerCase()}.pdf`,
+          title: mProject.title,
+          studentName: `${projectStudent.firstName} ${projectStudent.lastName}`,
+          rollNumber: projectStudent.rollNumber,
+          programName: prog.name,
+          batch: String(bsYear),
+        });
+
         await prisma.proposal.create({
-          data: { stage: 'PROPOSAL', documentUrl: '/api/files/theses/project_proposal.pdf', submittedById: projectStudent.id, thesisId: mProject.id },
+          data: { stage: 'PROPOSAL', documentUrl: pdfUrl, submittedById: projectStudent.id, thesisId: mProject.id },
         });
 
         createdProjects.push(mProject);
@@ -524,10 +589,9 @@ async function main() {
   console.log(`Created ${createdTheses.length} Master Theses (16 Cr) and ${createdProjects.length} Master Projects (4 Cr)`);
 
   // ============================================================
-  // EVALUATIONS & MARKS (Populate demo evaluations)
+  // EVALUATIONS & MARKS (Full grading for showcase)
   // ============================================================
-
-  // 1. Fully evaluate completed Bachelor group
+  // 1. Fully evaluate completed Bachelor Major group
   const compGroup = createdGroups.find(g => g.status === 'COMPLETED') || createdGroups[0];
   if (compGroup) {
     const comps = await prisma.evaluationComponent.findMany({ where: { groupId: compGroup.id } });
@@ -536,12 +600,12 @@ async function main() {
 
     if (cMap.PROPOSAL_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 8.5, comments: 'Well prepared proposal.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
+        data: { componentId: cMap.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 8.5, comments: 'Well prepared proposal defense with sound feasibility study.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
       });
     }
     if (cMap.MIDTERM_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 8.0, comments: 'Significant implementation progress.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
+        data: { componentId: cMap.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 8.0, comments: 'Good milestone progress; core pipeline verified.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
       });
     }
     if (cMap.SUPERVISOR && compGroup.supervisorId) {
@@ -551,7 +615,7 @@ async function main() {
     }
     if (cMap.EXTERNAL_EXAMINER && ext) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 18.0, comments: 'Clear presentation and solid defense.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
+        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 18.0, comments: 'Clear presentation and solid defense of technical choices.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
       });
     }
     if (cMap.FINAL_DEFENSE) {
@@ -559,6 +623,7 @@ async function main() {
         data: { componentId: cMap.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 9.0, comments: 'Excellent final project defense.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
       });
     }
+    console.log(`Evaluated completed Bachelor Major Group "${compGroup.name}"`);
   }
 
   // 2. Fully evaluate completed Master Thesis (300 Marks: Sup 100 + Ext Mid 100 + Ext Final 100)
@@ -566,7 +631,7 @@ async function main() {
   if (compThesis) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compThesis.id } });
     for (const c of comps) {
-      let subId = compThesis.supervisorId;
+      let subId = compThesis.supervisorId || supervisors[0].id;
       let score = 17.5;
       if (c.evaluationType === 'EXTERNAL_MIDTERM') {
         subId = compThesis.externalMidTermId || externalExaminers[0].id;
@@ -589,7 +654,7 @@ async function main() {
         },
       });
     }
-    console.log(`Fully evaluated demo Master Thesis "${compThesis.title}" (300 Marks)`);
+    console.log(`Evaluated completed Master Thesis "${compThesis.title}" (300 Marks Scheme)`);
   }
 
   // 3. Fully evaluate completed Master Project (100 Marks: 5 criteria x 20)
@@ -612,90 +677,78 @@ async function main() {
         },
       });
     }
-    console.log(`Fully evaluated demo Master Project "${compProject.title}" (100 Marks)`);
-  }
-
-  // 4. Partially evaluate active Master Thesis & Project (for live grading / testing)
-  const activeThesis = createdTheses.find(t => t.status === 'ACTIVE');
-  if (activeThesis) {
-    const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: activeThesis.id } });
-    const supComps = comps.filter(c => c.evaluatorRole === 'SUPERVISOR');
-    for (const c of supComps) {
-      await prisma.evaluation.create({
-        data: {
-          componentId: c.id,
-          stage: 'FINAL',
-          evaluationType: 'SUPERVISOR',
-          marks: 16.0,
-          comments: 'Good consistent progress.',
-          status: 'COMPLETED',
-          submittedById: activeThesis.supervisorId,
-          thesisId: activeThesis.id,
-        },
-      });
-    }
+    console.log(`Evaluated completed Master Project "${compProject.title}" (100 Marks Scheme)`);
   }
 
   // ============================================================
-  // ANNOUNCEMENTS & FORMS
+  // ANNOUNCEMENTS & FORMS (Batch 2080 Minor, 2079 Major, 2082 Master)
   // ============================================================
-  // 1. Master Thesis Registration Announcement
-  await prisma.announcement.create({
+
+  // 1. Master Thesis Registration (Batch 2082 - MSNCS Coordinator)
+  const masterThesisAnn = await prisma.announcement.create({
     data: {
-      title: 'Master Thesis Topic Registration 2081 (Batch 2080)',
-      message: 'All enrolled M.Sc. students of Batch 2080 must register their research thesis proposal topic and preferred supervisor before the deadline.',
+      title: 'M.Sc. Research Thesis Topic Registration & Concept Note (Batch 2082)',
+      message: 'All enrolled M.Sc. students of Batch 2082 (MSNCS, MSDSA, MSICE, MSCSK) must register their research thesis proposal topic and preferred supervisor before the deadline.',
       type: 'THESIS',
       audience: 'PROGRAMS',
       degreeType: 'MASTER',
-      programIds: [programs.MSDSA.id, programs.MSNCS.id, programs.MSICE.id, programs.MSCSK.id],
-      batch: '2080',
-      academicYearId: ayMap['080'].id,
+      programIds: [programs.MSNCS.id, programs.MSDSA.id, programs.MSICE.id, programs.MSCSK.id],
+      batch: '2082',
+      academicYearId: ayMap['082'].id,
       departmentId: eceDept.id,
       formEnabled: true,
       formFields: [
-        { key: 'research_area', label: 'Research Area / Cluster', type: 'text', required: true, placeholder: 'e.g. AI/ML, Cloud Security, Signal Processing' },
-        { key: 'expected_mentor', label: 'Preferred Supervisor (optional)', type: 'text', required: false, placeholder: 'Faculty name' },
+        { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis', 'Project'] },
+        { key: 'cluster', label: 'Research Cluster / Area', type: 'select', required: true, options: ['AI/ML and image processing', 'Audio, NLP and data/text analytics', 'Electronic devices, circuits and communication', 'Computer networks and security'] },
+        { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'select', required: true, options: ['Yes', 'No'] },
+        { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: false, placeholder: 'Enter primary supervisor name (optional)' },
+        { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: false, placeholder: 'Enter secondary supervisor name(s) (optional)' },
+        { key: 'pdfUrl', label: 'Concept Note / Proposal Document (PDF, max 10MB)', type: 'file', required: false },
+        { key: 'remarks', label: 'Remarks / Abstract (if any)', type: 'textarea', required: false },
       ],
       startDate: new Date('2026-01-01'),
       expirationDate: new Date('2027-06-30'),
-      createdById: coordinators.MSDSA.id,
+      createdById: coordinators.MSNCS.id,
     },
   });
 
-  // 2. Master Project Registration Announcement
-  await prisma.announcement.create({
+  // 2. Master Project Registration (Batch 2082 - MSNCS Coordinator)
+  const masterProjectAnn = await prisma.announcement.create({
     data: {
-      title: 'Master Project Registration (4 Credit Course)',
-      message: 'M.Sc. students undertaking the 4-credit Master Project course should register their project title and domain.',
+      title: 'Master Project Registration (4 Credit Course) - Batch 2082',
+      message: 'M.Sc. students of Batch 2082 undertaking the 4-credit Master Project course should register their project title, cluster, and domain.',
       type: 'THESIS',
       audience: 'PROGRAMS',
       degreeType: 'MASTER',
-      programIds: [programs.MSDSA.id, programs.MSNCS.id, programs.MSICE.id, programs.MSCSK.id],
-      batch: '2080',
-      academicYearId: ayMap['080'].id,
+      programIds: [programs.MSNCS.id, programs.MSDSA.id, programs.MSICE.id, programs.MSCSK.id],
+      batch: '2082',
+      academicYearId: ayMap['082'].id,
       departmentId: eceDept.id,
       formEnabled: true,
       formFields: [
-        { key: 'project_domain', label: 'Project Domain', type: 'text', required: true, placeholder: 'e.g. DevOps, Computer Vision' },
+        { key: 'project_domain', label: 'Project Domain', type: 'text', required: true, placeholder: 'e.g. DevOps, Computer Vision, Cloud Security' },
       ],
       startDate: new Date('2026-01-01'),
       expirationDate: new Date('2027-06-30'),
-      createdById: coordinators.MSDSA.id,
+      createdById: coordinators.MSNCS.id,
     },
   });
 
-  // 3. Bachelor Project Registration
-  await prisma.announcement.create({
+  // 3. Bachelor Minor Project Call (Batch 2080 - BCT Coordinator)
+  const bachelorMinorAnn = await prisma.announcement.create({
     data: {
-      title: 'Bachelor Major Project Group Formation & Proposal Call',
-      message: 'Final year BCT & BEI students must form groups of 2–4 members and submit project proposals.',
-      type: 'MAJOR',
+      title: 'Bachelor Minor Project Group Formation & Proposal Call (Batch 2080)',
+      message: 'Third year BCT & BEI students of Batch 2080 must form groups of 2–4 members and submit minor project proposals.',
+      type: 'MINOR',
       audience: 'PROGRAMS',
       degreeType: 'BACHELOR',
       programIds: [programs.BCT.id, programs.BEI.id],
       batch: '2080',
       academicYearId: ayMap['080'].id,
       departmentId: eceDept.id,
+      allowGroupFormation: true,
+      groupSizeMin: 2,
+      groupSizeMax: 4,
       formEnabled: true,
       formFields: [
         { key: 'project_cluster', label: 'Project Cluster', type: 'text', required: true, placeholder: 'AIML, IPCV, NTS, EDMES' },
@@ -706,28 +759,278 @@ async function main() {
     },
   });
 
-  // ── Test User Convenience Accounts ──
-  await prisma.user.create({
-    data: { email: 'bachelor@test.com', password: hash, firstName: 'Bikash', lastName: 'Shrestha', role: 'STUDENT', degreeType: 'BACHELOR', departmentId: eceDept.id, programId: programs.BCT.id, rollNumber: '080BCT099', batch: '2080' },
-  }).catch(() => {});
+  // 4. Bachelor Major Project Call (Batch 2079 - BCT Coordinator)
+  const bachelorMajorAnn = await prisma.announcement.create({
+    data: {
+      title: 'Bachelor Major Project Group Formation & Defense Call (Batch 2079)',
+      message: 'Final year BCT & BEI students of Batch 2079 must finalize their major project groups and defense submissions.',
+      type: 'MAJOR',
+      audience: 'PROGRAMS',
+      degreeType: 'BACHELOR',
+      programIds: [programs.BCT.id, programs.BEI.id],
+      batch: '2079',
+      academicYearId: ayMap['079'].id,
+      departmentId: eceDept.id,
+      allowGroupFormation: true,
+      groupSizeMin: 2,
+      groupSizeMax: 4,
+      formEnabled: true,
+      startDate: new Date('2026-01-01'),
+      expirationDate: new Date('2027-06-30'),
+      createdById: coordinators.BCT.id,
+    },
+  });
 
-  await prisma.user.create({
-    data: { email: 'master@test.com', password: hash, firstName: 'Manish', lastName: 'Poudel', role: 'STUDENT', degreeType: 'MASTER', departmentId: eceDept.id, programId: programs.MSDSA.id, rollNumber: '080MSDSA99', batch: '2080' },
-  }).catch(() => {});
+  console.log('Created presentation announcements for Minor (2080), Major (2079), and Master (2082)');
 
-  console.log('\n======================================================');
-  console.log('Seed Complete! Comprehensive Presentation Dataset Ready:');
-  console.log('------------------------------------------------------');
-  console.log('• Password for all seeded users: "subesh"');
-  console.log('• Maintainer:          subeshgaming@gmail.com');
-  console.log('• MSDSA Coordinator:   msdsa.coordinator@pcampus.edu.np');
-  console.log('• MSNCS Coordinator:   msncs.coordinator@pcampus.edu.np');
-  console.log('• BCT Coordinator:     bct.coordinator@pcampus.edu.np');
-  console.log('• Faculty/Supervisor:  prabesh.bhattarai@pcampus.edu.np');
-  console.log('• External Examiner:   hari.adhikari@pcampus.edu.np');
-  console.log('• Bachelor Student:    bachelor@test.com');
-  console.log('• Master Student:      master@test.com');
-  console.log('======================================================\n');
+  // ============================================================
+  // PRE-POPULATE DEMO FORM RESPONSES MATRIX FOR MASTER ANNOUNCEMENTS (2082 Batch)
+  // ============================================================
+  const master2082Students = students.filter(s => s.batch === '2082' && s.degreeType === 'MASTER');
+
+  const demoConceptSubmissions = [
+    {
+      roll: '082MSNCS01',
+      title: 'Automated Intrusion Detection in Software-Defined Networks using Deep Graph Convolutional Networks',
+      cluster: 'Computer networks and security',
+      is_guided: 'Yes',
+      primary_supervisor: 'Dr. Prabesh Bhattarai', // Fuzzy title prefix match
+      secondary_supervisor: 'Ramesh Sharma',
+      project_domain: 'Network Security & SDN',
+      remarks: 'Consulted Dr. Bhattarai. Dataset from CIC-IDS2018 benchmark.',
+      status: 'SUBMITTED',
+      description: 'Automated intrusion detection framework for SDN using graph convolutional networks to model topological flow dependencies.'
+    },
+    {
+      roll: '082MSNCS02',
+      title: 'Zero-Trust Architecture and Micro-Segmentation for Cloud-Native Kubernetes Clusters',
+      cluster: 'Computer networks and security',
+      is_guided: 'No',
+      primary_supervisor: 'Prof. Andrew Ng (Stanford/Coursera)', // Non-matching external mentor -> prompts manual coordinator selection
+      secondary_supervisor: 'Bishnu Tamang',
+      project_domain: 'Cloud Security & DevOps',
+      remarks: 'Requested external advisor, needs internal supervisor allocation.',
+      status: 'SUBMITTED',
+      description: 'Evaluating zero-trust network policies and eBPF-based packet filtering in high-concurrency microservices.'
+    },
+    {
+      roll: '082MSNCS03',
+      title: 'Privacy-Preserving Federated Learning for IoT Malware Classification',
+      cluster: 'Computer networks and security',
+      is_guided: 'Yes',
+      primary_supervisor: 'Prof. Anita Gurung', // Fuzzy title prefix match
+      secondary_supervisor: 'Bhattarai', // Fuzzy last name match
+      project_domain: 'IoT Security & Federated Learning',
+      remarks: 'Differential privacy parameters aligned with campus IoT lab protocols.',
+      status: 'SUBMITTED',
+      description: 'Investigating differential privacy guarantees in federated edge learning for IoT malware telemetry classification.'
+    },
+    {
+      roll: '082MSNCS04',
+      title: 'Post-Quantum Cryptographic Key Exchange for Lightweight Embedded Systems',
+      cluster: 'Computer networks and security',
+      is_guided: 'No',
+      primary_supervisor: 'Assoc. Prof. Rajendra Neupane', // Fuzzy match
+      secondary_supervisor: 'Dr. Yann LeCun (External Consultant)', // Non-matching
+      project_domain: 'Applied Cryptography & Embedded Systems',
+      remarks: 'Benchmarking Kyber-512 and Dilithium on ARM Cortex-M4 microcontrollers.',
+      status: 'LATE_SUBMITTED', // Demonstrates late submission badge
+      description: 'Benchmarking and optimization of NIST post-quantum cryptographic primitives on resource-constrained embedded nodes.'
+    },
+    {
+      roll: '082MSICE01',
+      title: 'RIS-Assisted 6G Wireless Communication: Channel Estimation and Beamforming',
+      cluster: 'Electronic devices, circuits and communication',
+      is_guided: 'Yes',
+      primary_supervisor: 'Sagar Acharya', // Exact match
+      secondary_supervisor: 'Maya Khadka (HOD)', // Fuzzy match
+      project_domain: 'Wireless Communications & 6G',
+      remarks: 'Co-simulation with MATLAB/Simulink and SDR hardware in campus lab.',
+      status: 'SUBMITTED',
+      description: 'Design of reconfigurable intelligent surface phase-shift matrices for millimeter-wave multi-user channel estimation.'
+    },
+    {
+      roll: '082MSICE02',
+      title: 'Energy-Harvesting Cognitive Radio Networks using Deep Reinforcement Learning',
+      cluster: '', // Empty cluster -> Demonstrates inline dropdown selection in matrix
+      is_guided: 'No',
+      primary_supervisor: 'Dr. John Doe (Industry Mentor)', // Non-matching
+      secondary_supervisor: 'Sarita', // Fuzzy first name match
+      project_domain: 'Cognitive Radio & Green Communications',
+      remarks: 'Unsure of cluster taxonomy; requesting coordinator guidance.',
+      status: 'SUBMITTED',
+      description: 'Multi-agent deep reinforcement learning for dynamic spectrum access under RF ambient energy harvesting constraints.'
+    },
+    {
+      roll: '082MSICE03',
+      title: 'FPGA Acceleration of Real-Time Video Super-Resolution for Telemedicine',
+      cluster: 'AI/ML and image processing',
+      is_guided: 'Yes',
+      primary_supervisor: 'Sarita Poudel', // Exact match
+      secondary_supervisor: 'Dr. Sagar', // Partial match
+      project_domain: 'Hardware Acceleration & Computer Vision',
+      remarks: 'Targeting Xilinx Zynq UltraScale+ FPGA with Vitis AI runtime.',
+      status: 'SUBMITTED',
+      description: 'Hardware-software co-design of quantized convolutional super-resolution models on embedded SoC FPGA.'
+    },
+    {
+      roll: '082MSDSA01',
+      title: 'Spatiotemporal Graph Neural Networks for Kathmandu Traffic Flow Prediction',
+      cluster: 'Audio, NLP and data/text analytics',
+      is_guided: 'Yes',
+      primary_supervisor: 'gurung', // Lowercase last name fuzzy match
+      secondary_supervisor: 'Prabesh Bhattarai',
+      project_domain: 'Spatiotemporal Data Mining & GNNs',
+      remarks: 'Traffic sensor & GPS telemetry dataset collected from Valley Traffic Police.',
+      status: 'SUBMITTED',
+      description: 'Spatial-temporal graph neural network architecture for urban corridor congestion forecasting in Kathmandu Valley.'
+    },
+    {
+      roll: '082MSDSA02',
+      title: 'Causal Inference and Multi-Modal Survival Analysis for Healthcare Outcomes',
+      cluster: 'Audio, NLP and data/text analytics',
+      is_guided: 'No',
+      primary_supervisor: 'Tamang Sir', // Informal honorific fuzzy match
+      secondary_supervisor: 'Prof. Geoffrey Hinton', // Non-matching
+      project_domain: 'Healthcare Analytics & Causal ML',
+      remarks: 'De-identified MIMIC-IV electronic health records approved.',
+      status: 'SUBMITTED',
+      description: 'Counterfactual reasoning and transformer-based multi-modal survival estimators for critical patient progression.'
+    },
+    {
+      roll: '082MSDSA03',
+      title: 'Multilingual Low-Resource Neural Machine Translation for Nepali Dialects',
+      cluster: 'Audio, NLP and data/text analytics',
+      is_guided: 'Yes',
+      primary_supervisor: 'Bishnu Tamang', // Exact match
+      secondary_supervisor: 'Sharma', // Last name fuzzy match
+      project_domain: 'Natural Language Processing & LLMs',
+      remarks: 'Fine-tuning LLaMA/Mistral with LoRA and custom bilingual corpus.',
+      status: 'SUBMITTED',
+      description: 'Parameter-efficient fine-tuning and synthetic back-translation strategies for low-resource Nepali language translation.'
+    },
+    {
+      roll: '082MSDSA04',
+      title: 'Large Language Model Reasoning Verification via Automated Formal Theorem Proving',
+      cluster: 'Audio, NLP and data/text analytics',
+      is_guided: 'Yes',
+      primary_supervisor: 'Dr. Anita Gurung', // Fuzzy match
+      secondary_supervisor: 'Bishnu Tamang',
+      project_domain: 'Formal Methods & Generative AI',
+      remarks: 'Integration with Lean 4 and Isabelle interactive theorem provers.',
+      status: 'SUBMITTED',
+      description: 'Neuro-symbolic feedback loops between generative language models and interactive proof assistants for mathematical verification.'
+    },
+    {
+      roll: '082MSCSK01',
+      title: 'Neuro-Symbolic Knowledge Graph Completion for Biomedical Literature',
+      cluster: 'Audio, NLP and data/text analytics',
+      is_guided: 'Yes',
+      primary_supervisor: 'Ramesh Sharma', // Exact match
+      secondary_supervisor: 'Dr. Prabesh', // Partial first name
+      project_domain: 'Knowledge Graphs & NLP',
+      remarks: 'Extracting entity relations from PubMed open dataset.',
+      status: 'SUBMITTED',
+      description: 'Combining first-order logic rules and vector embeddings for robust multi-hop link prediction in biomedical knowledge graphs.'
+    },
+    {
+      roll: '082MSCSK02',
+      title: 'High-Throughput Distributed Graph Analytics Engine on Apache Spark & GraphX',
+      cluster: 'Computer networks and security',
+      is_guided: 'No',
+      primary_supervisor: 'Bhattarai', // Last name fuzzy match
+      secondary_supervisor: 'External Advisor - Dr. K. R. Joshi (KU)', // Non-matching
+      project_domain: 'Big Data Systems & Distributed Computing',
+      remarks: 'Benchmarking on 8-node cluster in departmental laboratory.',
+      status: 'LATE_SUBMITTED', // Late submission
+      description: 'Design and partitioning optimizations for petabyte-scale distributed graph centrality and community detection.'
+    },
+    {
+      roll: '082MSCSK03',
+      title: '3D Medical Image Segmentation Using Diffusion Models and Transformers',
+      cluster: 'AI/ML and image processing',
+      is_guided: 'Yes',
+      primary_supervisor: 'Dr. Sarita Poudel', // Fuzzy match
+      secondary_supervisor: 'Maya Khadka',
+      project_domain: 'Medical Imaging & Deep Learning',
+      remarks: 'CT and MRI brain tumor segmentation with BraTS 2024 dataset.',
+      status: 'SUBMITTED',
+      description: 'Conditional latent diffusion framework with 3D vision transformers for volumetric organ-at-risk segmentation.'
+    },
+    {
+      roll: '082MSCSK04',
+      title: 'Automated Vulnerability Detection in Smart Contracts via Semantic Graph Embeddings',
+      cluster: '', // Empty cluster -> Demonstrates inline selection
+      is_guided: 'No',
+      primary_supervisor: 'Neupane', // Last name fuzzy match
+      secondary_supervisor: 'Prabesh Bhattarai',
+      project_domain: 'Blockchain & Software Security',
+      remarks: 'Dataset of 50,000 verified Ethereum contracts analyzed with Slither.',
+      status: 'SUBMITTED',
+      description: 'Static AST and control-flow graph embedding pipeline for reentrancy and integer overflow detection in EVM bytecode.'
+    }
+  ];
+
+  for (const ann of [masterThesisAnn, masterProjectAnn]) {
+    for (const item of demoConceptSubmissions) {
+      const student = master2082Students.find(s => s.rollNumber.toUpperCase() === item.roll.toUpperCase());
+      if (!student) continue;
+
+      const pdfFilename = `proposal_${student.rollNumber.toLowerCase()}_${ann.id}.pdf`;
+      const pdfUrl = await createSampleProposalPDF({
+        filename: pdfFilename,
+        title: item.title,
+        description: item.description,
+        studentName: `${student.firstName} ${student.lastName}`,
+        rollNumber: student.rollNumber,
+        programName: 'Master Program',
+        batch: '2082',
+      });
+
+      const formData = {
+        title: item.title,
+        description: item.description,
+        cluster: item.cluster,
+        is_guided: item.is_guided,
+        primary_supervisor: item.primary_supervisor,
+        secondary_supervisor: item.secondary_supervisor,
+        remarks: item.remarks,
+        project_domain: item.project_domain,
+        pdfUrl,
+        pdf_document: pdfUrl,
+      };
+
+      await prisma.formResponse.create({
+        data: {
+          announcementId: ann.id,
+          studentId: student.id,
+          formData,
+          status: item.status,
+          createdAt: new Date(Date.now() - Math.floor(Math.random() * 5 + 1) * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+  }
+
+  console.log(`Pre-populated ${demoConceptSubmissions.length} demo form submissions for Master Announcements (Batch 2082)`);
+
+  console.log('\n========================================================================');
+  console.log(' SEED COMPLETE — SHOWCASE DATASET READY');
+  console.log('========================================================================');
+  console.log('• Password for ALL accounts:          "subesh"');
+  console.log('• Maintainer Admin:                  subeshgaming@gmail.com');
+  console.log('• MSNCS Master Coordinator (Lead):   msncs.coordinator@pcampus.edu.np');
+  console.log('• BCT Bachelor Coordinator (Lead):   bct.coordinator@pcampus.edu.np');
+  console.log('• MSDSA Coordinator:                 msdsa.coordinator@pcampus.edu.np');
+  console.log('• Faculty Supervisor (Dr. Prabesh):  prabesh.bhattarai@pcampus.edu.np');
+  console.log('• Faculty Supervisor (Dr. Anita):    anita.gurung@pcampus.edu.np');
+  console.log('• External Examiner (Dr. Hari):      hari.adhikari@pcampus.edu.np');
+  console.log('• External Examiner (Dr. Prajwal):   prajwal.ghimire@ioe.edu.np');
+  console.log('• Master Student (MSNCS 2082):       082msncs01@pcampus.edu.np');
+  console.log('• Master Student (MSDSA 2082):       082msdsa01@pcampus.edu.np');
+  console.log('• Bachelor Minor Student (2080):     080bct001@pcampus.edu.np');
+  console.log('• Bachelor Major Student (2079):     079bct001@pcampus.edu.np');
+  console.log('========================================================================\n');
 }
 
 main()
