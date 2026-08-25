@@ -23,9 +23,9 @@ const VALID_DEGREE_TYPES = ['BACHELOR', 'MASTER'];
 
 // Email policy:
 //  - STUDENT emails are ALWAYS auto-derived from the roll number: {rollNumber}@pcampus.edu.np
-//  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER emails must end with @pcampus.edu.np
+//  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER emails must end with @pcampus.edu.np or @ioe.edu.np
 //    (local part is free-form: ramyadav@pcampus.edu.np and ram.yadav@pcampus.edu.np are both valid)
-const PCAMPUS_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@pcampus\.edu\.np$/;
+const PCAMPUS_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@(pcampus\.edu\.np|ioe\.edu\.np)$/;
 const PCAMPUS_DOMAIN_ROLES = ['COORDINATOR', 'SUPERVISOR', 'EXTERNAL_EXAMINER'];
 
 function isPcampusEmail(email) {
@@ -119,14 +119,14 @@ exports.createUser = async (req, res) => {
       if (!isValidRollFormat(resolvedRoll)) {
         return res.status(400).json({ error: 'Invalid roll number. Use <batch><program><number>, e.g. 080BCT001 or 080msdsa01.' });
       }
-      // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
-      // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
-      // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
-      // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
-      // Replace the line below with:
-      //   resolvedEmail = `${resolvedRoll.toLowerCase()}.${(firstName || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
-      // ───────────────────────────────────────────────────────────────────
-      resolvedEmail = resolvedRoll.toLowerCase() + '@pcampus.edu.np';
+      if (email && email.trim()) {
+        resolvedEmail = email.trim().toLowerCase();
+      } else {
+        resolvedEmail = resolvedRoll.toLowerCase() + '@pcampus.edu.np';
+      }
+      if (!isPcampusEmail(resolvedEmail)) {
+        return res.status(400).json({ error: 'Email must end with @pcampus.edu.np or @ioe.edu.np' });
+      }
       // Check roll uniqueness
       const existingByRoll = await prisma.user.findFirst({ where: { rollNumber: resolvedRoll } });
       if (existingByRoll) {
@@ -149,7 +149,7 @@ exports.createUser = async (req, res) => {
 
     // Enforce @pcampus.edu.np domain for coordinator/supervisor/examiner accounts
     if (PCAMPUS_DOMAIN_ROLES.includes(role) && !isPcampusEmail(resolvedEmail)) {
-      return res.status(400).json({ error: 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
+      return res.status(400).json({ error: 'Email must end with @pcampus.edu.np or @ioe.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
     }
 
     if (resolvedDegreeType && !VALID_DEGREE_TYPES.includes(resolvedDegreeType)) {
@@ -330,26 +330,20 @@ exports.updateUser = async (req, res) => {
     }
 
     // Email rules:
-    //  - STUDENT: always auto-derived from roll number, never free-form.
-    //  - COORDINATOR / SUPERVISOR / EXTERNAL_EXAMINER: must end with @pcampus.edu.np.
     if (existing.role === 'STUDENT') {
-      if (req.body.email !== undefined || req.body.rollNumber !== undefined) {
-        if (!effectiveRoll) {
-          return res.status(400).json({ error: 'rollNumber is required for students' });
+      if (req.body.email !== undefined) {
+        const newEmail = (req.body.email || '').toString().trim().toLowerCase();
+        if (newEmail && !isPcampusEmail(newEmail)) {
+          return res.status(400).json({ error: 'Email must end with @pcampus.edu.np or @ioe.edu.np' });
         }
-        // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
-        // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
-        // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
-        // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
-        // Replace the line below with:
-        //   data.email = `${effectiveRoll.toLowerCase()}.${((req.body.firstName || existing.firstName) || '').toLowerCase().replace(/[^a-z]/g, '')}@pcampus.edu.np`;
-        // ───────────────────────────────────────────────────────────────────
+        data.email = newEmail || (effectiveRoll ? `${effectiveRoll.toLowerCase()}@pcampus.edu.np` : existing.email);
+      } else if (req.body.rollNumber !== undefined && effectiveRoll) {
         data.email = effectiveRoll.toLowerCase() + '@pcampus.edu.np';
       }
     } else if (req.body.email !== undefined) {
       const newEmail = (req.body.email || '').toString().trim().toLowerCase();
       if (PCAMPUS_DOMAIN_ROLES.includes(existing.role) && !isPcampusEmail(newEmail)) {
-        return res.status(400).json({ error: 'Email must end with @pcampus.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
+        return res.status(400).json({ error: 'Email must end with @pcampus.edu.np or @ioe.edu.np (e.g. ram.yadav@pcampus.edu.np)' });
       }
       data.email = newEmail;
     }
@@ -877,9 +871,9 @@ exports.bulkImportUsersExcel = async (req, res) => {
         email = `${fn}.${ln}@pcampus.edu.np`;
       }
 
-      // Enforce @pcampus.edu.np domain for staff accounts
+      // Enforce @pcampus.edu.np or @ioe.edu.np domain for staff accounts
       if (role !== 'STUDENT' && email && !isPcampusEmail(email)) {
-        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np (e.g. name@pcampus.edu.np)' });
+        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np or @ioe.edu.np (e.g. name@pcampus.edu.np)' });
         continue;
       }
 

@@ -1,0 +1,139 @@
+\chapter{Implementation}
+
+\section{Backend Implementation}
+
+\subsection{Server Entry Point and Middleware Pipeline}
+The Node.js/Express backend entry point (\texttt{backend/src/index.js}) mounts a sequential middleware pipeline:
+\begin{enumerate}
+    \item \texttt{helmet} --- Sets security-relevant HTTP response headers.
+    \item \texttt{cors} --- Allows cross-origin requests from the configured frontend domain.
+    \item \texttt{express.json()} --- Parses incoming JSON request bodies.
+    \item \texttt{authenticateToken} --- JWT verification middleware validating Bearer tokens on protected routes.
+    \item Role-specific authorization middleware (e.g., \texttt{requireCoordinator}, \texttt{requireSupervisor}).
+    \item Feature route handlers for each API resource group.
+\end{enumerate}
+
+\subsection{Authentication Module}
+The authentication subsystem implements stateless JWT-based identity verification:
+\begin{itemize}
+    \item \textbf{Login:} Accepts \texttt{POST /api/auth/login} with email and password. Queries the database for the user record, verifies the submitted password against the stored bcrypt hash using \texttt{bcryptjs.compare()}, and issues a signed JWT containing the user ID, role, program ID, and degree type with a 24-hour expiry.
+    \item \textbf{Token Verification Middleware:} All protected API routes invoke \texttt{authenticateToken()}, which extracts the Bearer token from the \texttt{Authorization} header, verifies its HMAC-SHA256 signature against the server secret, and attaches the decoded user payload to \texttt{req.user} for downstream handler access.
+    \item \textbf{Password Reset:} Generates a time-limited, cryptographically random reset token stored against the user record. A reset link is dispatched by email. On token submission, a new password is hashed and the token is invalidated.
+\end{itemize}
+
+\subsection{Group Formation and Invitation Engine}
+The group formation subsystem manages the complete lifecycle from team creation through coordinator finalization:
+\begin{itemize}
+    \item \textbf{Group Creation:} \texttt{POST /api/student-groups} validates that the requesting student has no active group membership (Engagement Guard), creates the \texttt{ProjectGroup} record, and automatically enrolls the creator as the first \texttt{GroupMember}.
+    \item \textbf{Invitation Dispatch and Accept/Decline:} \texttt{POST /api/student-groups/:id/invite} creates a \texttt{GroupInvitation} record for the target student and dispatches an in-app notification. The invitee calls \texttt{PATCH /api/student-groups/:id/invitations/:invId/respond} with status \texttt{ACCEPTED} or \texttt{DECLINED}. On acceptance, the Engagement Guard re-validates the invitee before inserting the \texttt{GroupMember} record.
+    \item \textbf{Proposal Upload:} \texttt{POST /api/proposals} accepts a multipart PDF upload via Multer, stores the file on the server filesystem under a structured directory hierarchy, and inserts a \texttt{Proposal} record with the file path, uploader ID, stage, and document type.
+\end{itemize}
+
+\subsection{Coordinator Response Matrix and Finalization}
+The response matrix is a deduplicated, real-time view of all proposal form submissions:
+\begin{itemize}
+    \item When multiple students in the same group submit proposal forms, the backend aggregates their submissions into a single row, joining all member names, supervisor preferences, and cluster selections.
+    \item Coordinator can perform 1-click fuzzy supervisor matching via \texttt{PATCH /api/groups/:id/supervisor}, which uses trigram similarity scoring to rank supervisor candidates by name proximity to the student-supplied supervisor preference.
+    \item Finalization (\texttt{POST /api/groups/:id/finalize}) atomically transitions the group status to ACTIVE, approves the proposal document record, generates default \texttt{EvaluationComponent} rubric entries for all stages and evaluation types, and emits email notifications to all group members and the assigned supervisor.
+\end{itemize}
+
+\subsection{Evaluation Rubric Engine}
+The evaluation engine provides stage-gated, type-segregated grading functionality:
+\begin{itemize}
+    \item \textbf{Bachelor Minor Project (50 Marks):} \texttt{EvaluationComponent} records are auto-generated for: Supervisor Evaluation (25), Proposal Defense (5), Mid-Term Defense (5), Final Defense (5), and Internal Examiner (10).
+    \item \textbf{Bachelor Major Project (100 Marks):} Supervisor (50), Proposal Defense (10), Mid-Term Defense (10), Final Defense (10), Internal Examiner (20).
+    \item \textbf{Master Thesis (300 Marks):} Supervisor (100 marks, 5 sub-criteria), External Mid-Term Examiner (100 marks, 5 sub-criteria), External Final Examiner (100 marks, 5 sub-criteria).
+\end{itemize}
+Evaluators submit marks via \texttt{POST /api/evaluations}, which validates that the submitter's role matches the \texttt{evaluationType} of the target component, that marks do not exceed \texttt{maxMarks}, and transitions the \texttt{Evaluation.status} from DRAFT to COMPLETED upon final submission.
+
+\subsection{PDF Grade Sheet Generation}
+The PDF generation pipeline uses Puppeteer to render server-side HTML templates into official A4 evaluation sheets:
+\begin{enumerate}
+    \item \texttt{GET /api/print/group/:id} or \texttt{GET /api/print/thesis/:id} is invoked by the coordinator.
+    \item The backend fetches the complete group/thesis record, all evaluation component records, submitted marks, student roster, supervisor designation, and examiner assignments.
+    \item An HTML template is populated with the fetched data, including automated number-to-words conversion of aggregate marks (e.g., 45 becomes ``Forty Five Only'').
+    \item Puppeteer launches a headless Chromium instance, loads the HTML template string, and invokes \texttt{page.pdf()} with A4 dimensions and print media emulation.
+    \item The resulting PDF binary is streamed directly as the HTTP response with \texttt{Content-Type: application/pdf} headers.
+    \item Bulk export (\texttt{GET /api/print/bulk}) concatenates multiple groups in a single PDF response, page-separated.
+\end{enumerate}
+
+\subsection{Excel Bulk Import with Anomaly Detection}
+The SheetJS-powered bulk ingestion pipeline (\texttt{POST /api/users/bulk-upload}) performs:
+\begin{enumerate}
+    \item Parsing of the uploaded \texttt{.xlsx} file using \texttt{xlsx.read()} into a JavaScript array of row objects.
+    \item Schema validation: verifying required columns (Roll Number, Full Name, Program Code, Batch) and flagging any missing fields.
+    \item Intra-file duplicate detection: identifying duplicate roll numbers within the uploaded spreadsheet.
+    \item Database cross-validation: querying existing \texttt{User} and \texttt{GroupMember} records to detect students already registered or currently engaged in active projects.
+    \item All detected anomalies are returned as a structured pre-flight report to the coordinator before any database writes occur.
+    \item Upon coordinator confirmation, clean records are bulk-inserted in a single Prisma \texttt{createMany} transaction.
+\end{enumerate}
+
+\subsection{Program-Scoped Audit Logging}
+Every significant system event is captured in the \texttt{AuditLog} table with the following attributes: event type, actor user ID, affected entity ID (group, thesis, proposal, or user), timestamp, and program ID. The program ID is resolved automatically by tracing the affected entity back to its owning program. Coordinators access only audit records belonging to their own program, while the Maintainer can view department-wide and system-level events.
+
+\section{Frontend Implementation}
+
+\subsection{Application Architecture and Routing}
+The React 18 SPA is bootstrapped using Vite 5 and organized into four role-specific page hierarchies under \texttt{frontend/src/pages/}:
+\begin{itemize}
+    \item \texttt{/coordinator/*} --- Coordinator dashboards, announcement management, response matrix, examiner assignment, bulk import, and PDF generation.
+    \item \texttt{/supervisor/*} --- Supervisor project lists, proposal review, and defense evaluation panels.
+    \item \texttt{/student/*} --- Student group formation, invitation management, document upload, and progress tracking.
+    \item \texttt{/external/*} --- External examiner defense rubric panels for assigned groups or theses.
+\end{itemize}
+React Router v6 enforces role-based route guarding via the \texttt{DegreeGuard} and \texttt{AuthGuard} components, which read the decoded JWT payload from React Context and redirect unauthorized access attempts.
+
+\subsection{Authentication and Token Management}
+An Axios HTTP client instance is created in \texttt{frontend/src/services/} with a request interceptor that automatically attaches the stored JWT Bearer token to every outgoing API call. A response interceptor detects \texttt{401 Unauthorized} responses and triggers a clean logout and redirect to the login page.
+
+\subsection{Coordinator Response Matrix View}
+The coordinator response matrix view presents grouped form submissions as a deduplicated table. Each row displays:
+\begin{itemize}
+    \item Combined student names and roll numbers for all group members.
+    \item Project title and preferred research cluster.
+    \item Supervisor preference field with a real-time fuzzy match button that queries the backend and auto-fills the supervisor dropdown.
+    \item Inline editable fields for title, cluster, and remarks.
+    \item A Finalize button that triggers the group activation flow with a confirmation modal.
+\end{itemize}
+
+\subsection{Evaluation Rubric Panel}
+The evaluation panel renders a dynamic set of rubric criterion rows from the \texttt{EvaluationComponent} API response. For each criterion:
+\begin{itemize}
+    \item The criterion name, maximum marks, and current saved marks are displayed.
+    \item An editable numeric input enforces the \texttt{maxMarks} upper bound via HTML5 validation.
+    \item Marks are auto-saved as DRAFT on blur events.
+    \item A Submit Evaluation button transitions all components to COMPLETED status, locking further edits.
+\end{itemize}
+
+\subsection{PDF Grade Sheet Preview and Export}
+A Print Grade Sheet button in the coordinator project management view triggers \texttt{window.open()} on the backend PDF endpoint URL. The browser opens the rendered PDF directly in a new tab, allowing immediate print or download. Bulk grade sheet export renders a multi-group combined PDF via the \texttt{/api/print/bulk} endpoint.
+
+\subsection{Notification System}
+In-app notifications are fetched from \texttt{GET /api/notifications} and rendered in a slide-over notification drawer in the navigation bar. Each notification displays its message, type icon, creation timestamp, and a navigable link to the relevant entity. Marking notifications as read is performed via \texttt{PATCH /api/notifications/mark-read}.
+
+\section{Sample API Route Reference}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Key REST API Endpoints and Their Functions}
+\label{tab:api_routes}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{Method} & \textbf{Endpoint} & \textbf{Functional Description} \\
+\hline
+\texttt{POST} & \texttt{/api/auth/login} & Authenticate user credentials, issue signed JWT token. \\
+\texttt{GET} & \texttt{/api/announcements} & Retrieve active academic announcements for the user program. \\
+\texttt{POST} & \texttt{/api/student-groups} & Create a new project group with Engagement Guard validation. \\
+\texttt{POST} & \texttt{/api/student-groups/:id/invite} & Dispatch group invitation to a peer student. \\
+\texttt{POST} & \texttt{/api/proposals} & Upload proposal/report PDF document with metadata. \\
+\texttt{POST} & \texttt{/api/groups/:id/finalize} & Finalize group, generate evaluation rubrics, notify members. \\
+\texttt{PATCH} & \texttt{/api/groups/:id/supervisor} & Assign or update project supervisor via fuzzy match. \\
+\texttt{POST} & \texttt{/api/evaluations} & Submit rubric evaluation mark for a component. \\
+\texttt{GET} & \texttt{/api/print/group/:id} & Generate and stream official A4 PDF grade sheet. \\
+\texttt{POST} & \texttt{/api/users/bulk-upload} & Parse Excel roster with anomaly pre-check. \\
+\texttt{GET} & \texttt{/api/files-audit} & Retrieve program-scoped audit log records. \\
+\hline
+\end{tabularx}
+\end{table}

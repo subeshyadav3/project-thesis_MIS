@@ -520,8 +520,9 @@ exports.updateFormResponse = async (req, res) => {
 
     // Merge with existing formData instead of replacing (preserves student-submitted fields)
     const mergedFormData = { ...(existing.formData || {}), ...incoming };
-    // finalSupervisorId is a coordinator-only control field — never part of the form submission
-    delete mergedFormData.finalSupervisorId;
+    if (incoming.finalSupervisorId !== undefined) {
+      mergedFormData.finalSupervisorId = incoming.finalSupervisorId ? parseInt(incoming.finalSupervisorId) : null;
+    }
 
     const updated = await prisma.formResponse.update({
       where: { id: responseId },
@@ -594,6 +595,37 @@ exports.finalizeFormResponse = async (req, res) => {
         where: { groupId, status: 'PENDING' },
         data: { status: 'APPROVED' },
       });
+
+      // Notify group members
+      const groupMembers = await prisma.groupMember.findMany({
+        where: { groupId },
+        include: { student: true },
+      });
+      const memberIds = groupMembers.map(m => m.studentId);
+      const memberEmails = groupMembers.map(m => m.student?.email).filter(Boolean);
+      await notifSvc.notifyMany(
+        memberIds,
+        'GROUP_FINALIZED',
+        `Your ${group.projectType} project "${group.projectTitle || group.name}" has been finalized and approved by the coordinator.`,
+        '/student/groups'
+      );
+
+      const emailService = require('../services/emailService');
+      if (memberEmails.length) {
+        await emailService.sendEmail({
+          to: memberEmails,
+          subject: `[Approved] ${group.projectType} Project: ${group.projectTitle || group.name}`,
+          title: `${group.projectType} Project Approved`,
+          contentLines: [
+            `Your project registration has been officially approved and finalized by the coordinator.`,
+            `<strong>Group:</strong> ${group.name}`,
+            `<strong>Project Title:</strong> ${group.projectTitle || group.name}`,
+            group.cluster ? `<strong>Cluster:</strong> ${group.cluster}` : null,
+            `<strong>Status:</strong> Active`,
+            `Please log in to your dashboard to submit milestone deliverables.`,
+          ].filter(Boolean),
+        });
+      }
 
       return res.json({ success: true, group });
     }
@@ -679,14 +711,77 @@ exports.finalizeFormResponse = async (req, res) => {
       }
     }
 
-    // Notify only when a supervisor was newly assigned or changed
+    const itemLabel = resolvedProjectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
+    const emailService = require('../services/emailService');
+
+    // Query supervisor details if assigned
+    let supUser = null;
+    if (selectedSupId) {
+      supUser = await prisma.user.findUnique({ where: { id: selectedSupId } });
+    }
+    const supName = supUser ? `${supUser.designation ? supUser.designation + ' ' : ''}${supUser.firstName} ${supUser.lastName}` : null;
+
+    // 1. Notify Student: In-App
+    try {
+      await notifSvc.notify(
+        student.id,
+        'THESIS_FINALIZED',
+        `Your ${itemLabel} topic "${thesis.title}" has been finalized and approved by the coordinator.`,
+        `/theses/${thesis.id}`
+      );
+    } catch (e) {
+      console.error('notify student error:', e.message);
+    }
+
+    // 2. Notify Student: Email
+    if (student.email) {
+      try {
+        await emailService.sendEmail({
+          to: student.email,
+          subject: `[Approved] ${itemLabel}: ${thesis.title}`,
+          title: `${itemLabel} Finalized & Approved`,
+          contentLines: [
+            `Dear ${student.firstName} ${student.lastName},`,
+            `Your registration for <strong>${itemLabel}</strong> has been officially approved and finalized by the department coordinator.`,
+            `<strong>Official Title:</strong> ${thesis.title}`,
+            thesis.cluster ? `<strong>Research Cluster:</strong> ${thesis.cluster}` : null,
+            supName ? `<strong>Assigned Supervisor:</strong> ${supName} (${supUser.email})` : `<strong>Supervisor Allocation:</strong> Under review / pending allocation`,
+            `<strong>Status:</strong> Active`,
+            `You can now log in to the Thesis Management System to view your thesis workspace, track evaluation criteria, and prepare your initial proposal defense.`,
+          ].filter(Boolean),
+        });
+      } catch (e) {
+        console.error('email student error:', e.message);
+      }
+    }
+
+    // 3. Notify Supervisor: In-App and Email (if newly assigned or changed)
     if (selectedSupId && (!existing.thesis || selectedSupId !== previousSupId)) {
       try {
-        const itemLabel = resolvedProjectType === 'PROJECT' ? 'Master Project' : 'Master Thesis';
         const assignerName = `${req.user.firstName} ${req.user.lastName}`.trim() || 'Coordinator';
-        await notifSvc.notify(selectedSupId, 'SUPERVISOR_ASSIGNMENT',
-          `${assignerName} assigned you as supervisor for "${thesis.title}" (${itemLabel}) — pending your acceptance.`, `/theses/${thesis.id}`);
-      } catch (e) { console.error('notify supervisor error:', e.message); }
+        await notifSvc.notify(
+          selectedSupId,
+          'SUPERVISOR_ASSIGNMENT',
+          `${assignerName} assigned you as supervisor for "${thesis.title}" (${itemLabel}) — pending your acceptance.`,
+          `/theses/${thesis.id}`
+        );
+        if (supUser?.email) {
+          await emailService.sendEmail({
+            to: supUser.email,
+            subject: `[Supervisor Assignment] ${itemLabel}: ${thesis.title}`,
+            title: 'Supervisor Assignment Notification',
+            contentLines: [
+              `Dear ${supUser.firstName} ${supUser.lastName},`,
+              `You have been assigned as supervisor for student <strong>${student.firstName} ${student.lastName}</strong> (${student.rollNumber || 'Master Student'}).`,
+              `<strong>${itemLabel} Title:</strong> ${thesis.title}`,
+              thesis.cluster ? `<strong>Cluster:</strong> ${thesis.cluster}` : null,
+              `Please log in to the portal to review the thesis proposal and provide supervisory guidance.`,
+            ].filter(Boolean),
+          });
+        }
+      } catch (e) {
+        console.error('notify supervisor error:', e.message);
+      }
     }
 
     // Reflect the official title/cluster back into the response formData (merge, don't overwrite)

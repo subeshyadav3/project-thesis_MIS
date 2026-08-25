@@ -12,34 +12,63 @@ import BsDateInput from '../../components/BsDateInput';
 
 const FIELD_TYPES = { TEXT: 'text', TEXTAREA: 'textarea', NUMBER: 'number', DATE: 'date', EMAIL: 'email' };
 
-const DEFAULT_STUDENT_FORM_FIELDS = [
+const MASTER_DEFAULT_FIELDS = [
   { key: 'projectType', label: 'Proposal Type (Thesis / Project)', type: 'select', required: true, options: ['Thesis', 'Project'] },
-  { key: 'program', label: 'Program', type: 'select', required: true, options: ['MSDSA', 'MSCSK', 'MSICE', 'MSNCS'] },
-  { key: 'cluster', label: 'Research Project Cluster / Area', type: 'select', required: true, options: ['AI/ML and image processing', 'Audio, NLP and data/text analytics', 'Electronic devices, circuits and communication', 'Computer networks and security'] },
+  { key: 'cluster', label: 'Research Cluster / Area', type: 'select', required: true, options: ['AI/ML and image processing', 'Audio, NLP and data/text analytics', 'Electronic devices, circuits and communication', 'Computer networks and security'] },
   { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'select', required: true, options: ['Yes', 'No'] },
   { key: 'primary_supervisor', label: 'Primary faculty member consulted or preferred as supervisor', type: 'text', required: false, placeholder: 'Enter primary supervisor name (optional)' },
   { key: 'secondary_supervisor', label: 'Secondary faculty member(s) consulted or preferred as supervisor', type: 'text', required: false, placeholder: 'Enter secondary supervisor name(s) (optional)' },
-  { key: 'pdfUrl', label: 'Concept Note Project Proposal Document (PDF, max 10MB)', type: 'file', required: true, note: 'Name file with your Roll Number (e.g., 080MSDSA010.pdf)' },
-  { key: 'remarks', label: 'Remarks (if any)', type: 'textarea', required: false, placeholder: 'Additional comments...' },
+  { key: 'pdfUrl', label: 'Concept Note / Proposal Document (PDF, max 10MB)', type: 'file', required: false, note: 'Upload your concept proposal PDF' },
+  { key: 'remarks', label: 'Remarks / Abstract (if any)', type: 'textarea', required: false, placeholder: 'Additional comments or brief abstract...' },
+];
+
+const BACHELOR_DEFAULT_FIELDS = [
+  { key: 'projectType', label: 'Project Type (Minor / Major)', type: 'select', required: true, options: ['Minor', 'Major'] },
+  { key: 'cluster', label: 'Project Cluster / Area', type: 'select', required: true, options: ['AIML', 'IPCV', 'ANLP', 'NTS', 'EDMES', 'ACOM', 'EII'] },
+  { key: 'is_guided', label: 'Is it a guided proposal? (topic provided by a faculty member)', type: 'select', required: true, options: ['Yes', 'No'] },
+  { key: 'pdfUrl', label: 'Concept Note / Proposal Document (PDF, max 10MB)', type: 'file', required: false, note: 'Upload your concept proposal PDF' },
+  { key: 'remarks', label: 'Remarks / Abstract (if any)', type: 'textarea', required: false, placeholder: 'Additional comments or brief abstract...' },
 ];
 
 function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const fields = (announcement.formFields && announcement.formFields.length > 0)
-    ? announcement.formFields
-    : DEFAULT_STUDENT_FORM_FIELDS;
+  const isBachelor = user?.program?.degreeType === 'BACHELOR' || announcement?.degreeType === 'BACHELOR' || ['MINOR', 'MAJOR'].includes(announcement?.type);
+  const baseDefaults = isBachelor ? BACHELOR_DEFAULT_FIELDS : MASTER_DEFAULT_FIELDS;
 
+  // Build unified field definitions: base defaults + custom extra fields
+  const fieldsMap = new Map();
+  baseDefaults.forEach(f => fieldsMap.set(f.key, { ...f }));
+
+  const announcementFields = (Array.isArray(announcement.formFields) ? announcement.formFields : [])
+    .filter(f => f && f.key && f.key !== 'title');
+
+  announcementFields.forEach(f => {
+    const key = (f.key === 'pdf_document' || f.key === 'document') ? 'pdfUrl' : f.key;
+    const existing = fieldsMap.get(key) || {};
+    fieldsMap.set(key, { ...existing, ...f, key });
+  });
+
+  const fields = Array.from(fieldsMap.values());
   const initialData = announcement.formSubmitted?.formData || {};
 
   const [form, setForm] = useState(() => {
+    const isProj = announcement.title?.toLowerCase().includes('project') || announcement.type === 'MINOR' || announcement.type === 'MAJOR';
     const init = {
       title: initialData.title || '',
       description: initialData.description || '',
       program: initialData.program || user.program?.code || '',
-      projectType: initialData.projectType || 'Thesis',
+      projectType: initialData.projectType || (isProj ? (isBachelor ? 'Minor' : 'Project') : (isBachelor ? 'Major' : 'Thesis')),
+      cluster: initialData.cluster || '',
+      is_guided: initialData.is_guided || 'No',
+      primary_supervisor: initialData.primary_supervisor || '',
+      secondary_supervisor: initialData.secondary_supervisor || '',
+      pdfUrl: initialData.pdfUrl || initialData.pdf_document || '',
+      remarks: initialData.remarks || initialData.description || '',
     };
     fields.forEach(f => {
-      if (f.key) init[f.key] = initialData[f.key] !== undefined ? initialData[f.key] : '';
+      if (f.key && init[f.key] === undefined) {
+        init[f.key] = initialData[f.key] !== undefined ? initialData[f.key] : '';
+      }
     });
     return init;
   });
@@ -59,7 +88,13 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
 
     setSubmitting(true);
     try {
-      await onSubmit({ title, description, ...Object.fromEntries(fields.map(f => [f.key, form[f.key]])) });
+      await onSubmit({
+        ...form,
+        title,
+        description,
+        pdfUrl: form.pdfUrl || form.pdf_document || '',
+        pdf_document: form.pdfUrl || form.pdf_document || '',
+      });
       setSubmitting(false);
     } catch (e) {
       setSubmitting(false);
@@ -149,10 +184,15 @@ function FormSubmissionModal({ announcement, toast, onClose, onSubmit }) {
                       }}
                     />
                     {form[f.key] ? (
-                      <p style={{ fontSize: 12, color: 'var(--color-success)', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
-                        Document attached successfully!
-                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                        <p style={{ fontSize: 12, color: 'var(--color-success)', margin: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} />
+                          Document attached
+                        </p>
+                        <a href={form[f.key]} target="_blank" rel="noreferrer" className="btn btn-xs btn-outline" style={{ fontSize: 11, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 14 }} /> View PDF
+                        </a>
+                      </div>
                     ) : (
                       <p style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', margin: '4px 0 0' }}>
                         {f.note || 'Named with student Roll e.g., 080MSDSA010.pdf'}

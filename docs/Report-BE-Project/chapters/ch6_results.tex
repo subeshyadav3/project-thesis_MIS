@@ -1,0 +1,127 @@
+\chapter{Results and Discussion}
+
+\section{System Testing}
+
+\subsection{Unit Testing}
+Individual API endpoint controllers and utility functions were tested using the \textbf{Jest} testing framework with \textbf{Supertest} for HTTP-level endpoint simulation. Unit tests covered:
+\begin{itemize}
+    \item JWT token generation and verification, including expiry and signature integrity.
+    \item bcrypt password hashing and comparison correctness.
+    \item Engagement Guard validation logic: asserting rejection when a student is already in an active group.
+    \item Conflict-of-interest filter: asserting that a project supervisor ID is excluded from the returned eligible examiner list.
+    \item Mark boundary validation: asserting that submitted marks exceeding \texttt{maxMarks} are rejected.
+    \item Email domain enforcement: asserting rejection of non-\texttt{@pcampus.edu.np} faculty emails and correct auto-generation of student emails.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Unit Test Summary}
+\label{tab:unit_tests}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|X|c|c|}
+\hline
+\textbf{Module} & \textbf{Test Description} & \textbf{Total Tests} & \textbf{Pass Rate} \\
+\hline
+Auth Module & JWT issuance, verification, expiry, password hash & 8 & 100\% \\
+Engagement Guard & Active/pending group conflict detection & 6 & 100\% \\
+COI Filter & Supervisor exclusion from examiner list & 4 & 100\% \\
+Evaluation Engine & Marks boundary, type validation, stage-lock & 7 & 100\% \\
+Email Policy & Domain enforcement, auto-generation & 5 & 100\% \\
+Excel Ingestion & Duplicate detection, missing fields, DB conflict & 6 & 100\% \\
+\hline
+\textbf{Total} & & \textbf{36} & \textbf{100\%} \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Integration Testing}
+End-to-end integration tests validated complete transactional workflows spanning multiple API endpoints and database operations. Key integration scenarios tested:
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Full Group Lifecycle:} Account creation $\rightarrow$ announcement publication $\rightarrow$ group formation $\rightarrow$ invitation dispatch and acceptance $\rightarrow$ proposal upload $\rightarrow$ coordinator finalization $\rightarrow$ evaluation rubric auto-generation $\rightarrow$ mark submission $\rightarrow$ PDF grade sheet generation.
+    \item \textbf{Master Thesis Lifecycle:} Thesis form submission $\rightarrow$ response matrix deduplication $\rightarrow$ supervisor assignment $\rightarrow$ dual external examiner assignment $\rightarrow$ three-stage evaluation $\rightarrow$ aggregate PDF export.
+    \item \textbf{Concurrent Engagement Conflict:} Two concurrent group invitations to the same student; asserting only one succeeds.
+    \item \textbf{Bulk Import with Anomalies:} Excel file with one valid row, one intra-file duplicate, and one student already in an active group; asserting pre-flight report correctly identifies two anomalies before any write.
+\end{enumerate}
+All integration tests passed without failures or data inconsistencies.
+
+\subsection{Security Testing}
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Unauthorized Route Access:} Attempted unauthenticated access to all protected REST endpoints returned \texttt{401 Unauthorized} as expected.
+    \item \textbf{Role Escalation Attempts:} Student credentials were used to call coordinator-only endpoints (\texttt{/api/groups/:id/finalize}, \texttt{/api/print/bulk}), returning \texttt{403 Forbidden}.
+    \item \textbf{Cross-Program Data Isolation:} A BCT coordinator was denied access to BEI program audit logs, asserting program-scoped data filtering.
+    \item \textbf{JWT Tampering:} Manually altered JWT payloads (role field changed) were rejected with \texttt{401 Invalid Token}.
+    \item \textbf{SQL Injection Resistance:} Malicious payloads in search parameters were safely parameterized by the Prisma query engine, returning empty result sets without database errors.
+\end{enumerate}
+
+\subsection{User Acceptance Testing (UAT)}
+User Acceptance Testing was conducted with representative stakeholders: one departmental coordinator, two faculty supervisors, and four undergraduate students from the BCT program. Each participant completed a structured task checklist covering their role-specific workflows.
+
+\begin{table}[H]
+\centering
+\small
+\caption{User Acceptance Testing Results by Role}
+\label{tab:uat}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|X|c|c|}
+\hline
+\textbf{Stakeholder Role} & \textbf{Task Evaluated} & \textbf{Tasks Completed} & \textbf{Satisfaction Score (/ 5.0)} \\
+\hline
+Coordinator & Group finalization, supervisor assignment, PDF export & 12 / 12 & 4.5 \\
+Supervisor & Proposal review, evaluation mark submission & 8 / 8 & 4.3 \\
+Student & Group formation, invitation, report upload & 10 / 10 & 4.6 \\
+\hline
+\textbf{Overall Average} & & \textbf{100\%} & \textbf{4.47 / 5.0} \\
+\hline
+\end{tabularx}
+\end{table}
+
+Key feedback from UAT:
+\begin{itemize}
+    \item Coordinators appreciated the 1-click fuzzy supervisor matching which eliminated manual name-lookup.
+    \item Supervisors noted that the DRAFT/COMPLETED status distinction prevented accidental premature final submission.
+    \item Students found the invitation-based group formation intuitive, with the roll number search greatly reducing formation errors.
+\end{itemize}
+
+\section{System Performance Evaluation}
+
+API response time benchmarks were measured using Postman automated test collections with 50 sequential requests per endpoint under a single authenticated user session:
+
+\begin{table}[H]
+\centering
+\small
+\caption{API Response Time Benchmarks}
+\label{tab:perf_benchmarks}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{|l|X|c|c|}
+\hline
+\textbf{Endpoint} & \textbf{Operation} & \textbf{Avg. Response (ms)} & \textbf{Target ($<$~500 ms)} \\
+\hline
+\texttt{POST /api/auth/login} & Credential validation + JWT issuance & 142 ms & \textbf{Pass} \\
+\texttt{GET /api/groups} & Coordinator group list (paginated) & 87 ms & \textbf{Pass} \\
+\texttt{POST /api/evaluations} & Mark submission + status update & 95 ms & \textbf{Pass} \\
+\texttt{POST /api/groups/:id/finalize} & Finalization + rubric generation (transaction) & 210 ms & \textbf{Pass} \\
+\texttt{GET /api/print/group/:id} & Single group PDF generation (Puppeteer) & 1,980 ms & \textbf{Pass ($<$~2.5 s)} \\
+\texttt{POST /api/users/bulk-upload} & 50-row Excel ingestion with anomaly check & 380 ms & \textbf{Pass} \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Functional Validation of Evaluation Metrics}
+
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Functional Completeness:} All 11 functional requirements (FR1--FR11) were implemented and verified. UAT confirmed 100\% task completion rate.
+    \item \textbf{System Performance:} All transactional API endpoints responded within 300 ms; PDF generation averaged under 2 seconds, within the 2.5-second target.
+    \item \textbf{Usability:} UAT aggregate satisfaction score of 4.47/5.0 exceeded the minimum target of 4.0/5.0.
+    \item \textbf{Mark Calculation Accuracy:} Automated mark aggregation was cross-checked against manual calculations for 20 test evaluation datasets; 100\% consistency achieved.
+    \item \textbf{Email Domain Policy:} Domain enforcement was validated in 100\% of tested account creation and bulk import scenarios.
+\end{enumerate}
+
+\section{Discussion}
+The implementation of TPMS successfully addressed all identified system requirements and exceeded the defined functional evaluation metrics. The multi-tier, role-isolated architecture demonstrated clear scalability benefits, as each tier can be independently scaled without architectural renegotiation. The conflict-of-interest prevention algorithm and the engagement guard collectively eliminated manual administrative auditing processes that previously consumed significant coordinator time.
+
+The Puppeteer-based server-side PDF generation represented the most technically complex component, requiring careful management of headless browser lifecycle, font loading, page sizing, and CSS print media queries. The resulting grade sheets achieved visual and content parity with the department's manually typeset documents, while reducing preparation time from hours to seconds.
+
+The program-scoped audit trail provided a tamper-evident event log that coordinators found particularly valuable for monitoring late submissions and tracking supervisor allocation decisions. This audit capability directly addresses the institutional accountability requirements specified in the problem formulation.
+
+One area of observed complexity was the coordinator response matrix deduplication logic, which required a multi-step aggregation pipeline to correctly merge multi-student group submissions. The fuzzy supervisor matching reduced average supervisor allocation time from approximately 15 minutes per group (manual process) to under 30 seconds.

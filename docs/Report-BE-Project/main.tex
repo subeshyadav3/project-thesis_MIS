@@ -1,84 +1,107 @@
 \documentclass[12pt]{report}
 \usepackage{xcolor}
 \usepackage[utf8]{inputenc}
-\usepackage{natbib}%referencing
-\usepackage[left=1.0in,right=1.0in,top=.8in,bottom=.8in]{geometry}
+\usepackage{natbib}
+\usepackage[left=1.25in,right=1.0in,top=1.0in,bottom=1.0in]{geometry}
 \usepackage{float}
 \linespread{1.3}
-\usepackage{graphicx}%figures
-\usepackage{rotating}%landscape
-\usepackage{amsmath}%math
-\usepackage{titlesec} %formatting chapters
-%\titlespacing*{<command>}{<left>}{<before-sep>}{<after-sep>}
+\usepackage{graphicx}
+\usepackage{rotating}
+\usepackage{amsmath,amssymb}
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, fit, calc}
+
+%--- Chapter/section formatting (match department template) ---
 \titlespacing*{\chapter}{-15pt}{10pt}{15pt}
 \titlespacing*{\section}{0pt}{0pt}{5pt}
 \titlespacing*{\subsection}{0pt}{5pt}{5pt}
-\titleformat{\chapter}[hang] 
+\titleformat{\chapter}[hang]
 {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter.}{1em}{}
 \renewcommand{\chaptername}{}
-\graphicspath{{Images/}}%image folder name
-%Cover page contents
-\title{
-{\includegraphics[scale=.3]{logotu.jpg}}\\
-\uppercase\large{
-    {Tribhuvan University}\\
-    {Institute of Engineering}\\
-    {Pulchowk Campus}\\
-    \vspace{.5cm}
-    {A \\Project Report\\On\\Title of project}\\
-    \vspace{.5cm}
-    {\textbf{Submitted By:}\\Person A (PUL063BCT037) \\Person 2 \\person 3\\person 4}\\
-    \vspace{.5cm}
-    {\textbf{Submitted To:}\\ Department of Electronics \& Computer engineering}\\
-                }
-    }
-\date{Month, Year} %{Month Year}
+
+\graphicspath{{Images/}}
 
 \begin{document}
-\maketitle
+
+% ===========================
+% Custom Title Page
+% ===========================
+\begin{titlepage}
+\begin{center}
+    \includegraphics[scale=.3]{logotu.jpg}\\[0.5cm]
+    {\large \textbf{TRIBHUVAN UNIVERSITY}}\\
+    {\large \textbf{INSTITUTE OF ENGINEERING}}\\
+    {\large \textbf{PULCHOWK CAMPUS}}\\[0.8cm]
+    {\large A Project Report On}\\[0.3cm]
+    {\Large \textbf{Project/Thesis Management System (TPMS)}}\\[0.8cm]
+    {\large \textbf{Submitted By:}}\\[0.2cm]
+    {\large Prabesh BC (PUL080BCT054)}\\
+    {\large Shreeyut Thapa (PUL080BCT080)}\\
+    {\large Subesh Yadav (PUL080BCT084)}\\[0.8cm]
+    {\large \textbf{Submitted To:}}\\[0.2cm]
+    {\large Department of Electronics \& Computer Engineering}\\[0.3cm]
+    {\large In Partial Fulfillment of the Requirements for the Degree of}\\
+    {\large Bachelor of Engineering in Computer Engineering}\\[0.8cm]
+    {\large \textbf{DEPARTMENT OF ELECTRONICS \& COMPUTER ENGINEERING}}\\
+    {\large Lalitpur, Nepal}\\[0.3cm]
+    {\large August, 2026}
+\end{center}
+\end{titlepage}
 \pagenumbering{roman}
 \setcounter{page}{2}
+
+%===========================
+% Page of Approval
+%===========================
 \chapter*{Page of Approval}
 \addcontentsline{toc}{chapter}{\numberline{}Page of Approval}
 \vspace{1.5cm}
 \begin{center}
 \uppercase{
-Tribhuvan Universiy\\
+Tribhuvan University\\
 Institute of Engineering\\
 Pulchowk Campus\\
 Department of Electronics and Computer Engineering
-    }
-    \end{center}
+}
+\end{center}
 \vspace{.5cm}
-The undersigned certifies that they have read and recommended to the Institute of Engineering for acceptance of a project report entitled \textbf{"Project Name"} submitted by \textbf{Person A}, \textbf{person B}, \textbf{person C}, \textbf{person D} in partial fulfillment of the requirements for the Bachelor's degree in Electronics \& Computer Engineering.\\
+The undersigned certifies that they have read and recommended to the Institute of Engineering for acceptance of a project report entitled \textbf{``Project/Thesis Management System (TPMS)''} submitted by \textbf{Prabesh BC}, \textbf{Shreeyut Thapa}, and \textbf{Subesh Yadav} in partial fulfillment of the requirements for the Bachelor's degree in Electronics \& Computer Engineering.\\
 
 \vspace{1cm}
 \begin{minipage}{.5\textwidth}
-        \raggedright
+    \raggedright
     .............................\\
     Supervisor\\
-    \textbf{Full Name}\\
-    Designation\\
-    Department of Electronics and Computer Engineering,\\
+    \textbf{Supervisor Full Name}\\
+    Designation, Department of Electronics and Computer Engineering,\\
     Pulchowk Campus, IOE, TU.\\
-    \end{minipage}%
-    \begin{minipage}{0.5\textwidth}
+\end{minipage}%
+\begin{minipage}{0.5\textwidth}
     \raggedleft
     .............................\\
-    External examiner\\
-    \textbf{Full Name}\\
+    External Examiner\\
+    \textbf{Examiner Full Name}\\
     Assistant Professor\\
     Department of Electronics and Computer Engineering,\\
     Pulchowk Campus, IOE, TU.\\
-    \end{minipage}\\
- \newline
- \newline
- \newline
+\end{minipage}\\
+\newline
+\newline
+\newline
 \centerline{Date of approval:}
-%new chapter
+
+%===========================
+% Copyright
+%===========================
 \chapter*{Copyright}
 \addcontentsline{toc}{chapter}{\numberline{}Copyright}
-The author has agreed that the Library, Department of Electronics and Computer Engineering, Pulchowk Campus, and Institute of Engineering may make this report freely available for inspection. Moreover, the author has agreed that permission for extensive copying of this project report for scholarly purposes may be granted by the supervisors who supervised the work recorded herein or, in their absence, by the Head of the Department wherein the project report was done. It is understood that recognition will be given to the author of this report and the Department of Electronics and Computer Engineering, Pulchowk Campus, Institute of Engineering for any use of the material of this project report. Copying publication or the other use of this report for financial gain without the approval of to the Department of Electronics and Computer Engineering, Pulchowk Campus, Institute of Engineering, and the author's written permission is prohibited.\\
+The author has agreed that the Library, Department of Electronics and Computer Engineering, Pulchowk Campus, and Institute of Engineering may make this report freely available for inspection. Moreover, the author has agreed that permission for extensive copying of this project report for scholarly purposes may be granted by the supervisors who supervised the work recorded herein or, in their absence, by the Head of the Department wherein the project report was done. It is understood that recognition will be given to the author of this report and the Department of Electronics and Computer Engineering, Pulchowk Campus, Institute of Engineering for any use of the material of this project report. Copying, publication, or other use of this report for financial gain without the approval of the Department of Electronics and Computer Engineering, Pulchowk Campus, Institute of Engineering, and the author's written permission is prohibited.\\
 Request for permission to copy or to make any other use of the material in this report in whole or in part should be addressed to:\\
 \newline
 \newline
@@ -87,60 +110,154 @@ Head\\
 Department of Electronics and Computer Engineering\\
 Pulchowk Campus, Institute of Engineering, TU\\
 Lalitpur, Nepal.
-%new chapter
-\chapter*{Acknowledgments}
+
+%===========================
+% Acknowledgements
+%===========================
+\chapter*{Acknowledgements}
 \addcontentsline{toc}{chapter}{\numberline{}Acknowledgements}
-On this page, the author expresses his gratitude and concern by using praising and thanksgiving words.  don’t forget to include your project supervisor's name. p.s. all the names must be bold.
-%new chapter
+We would like to express our profound gratitude to our project supervisor, \textbf{[Supervisor Full Name]}, Department of Electronics and Computer Engineering, Pulchowk Campus, for their continuous guidance, constructive feedback, and unwavering support throughout the entire development lifecycle of this project. Their technical insights and pedagogical direction were instrumental in shaping the architecture and quality of the Thesis and Project Management System.
+
+We are deeply grateful to the \textbf{Department of Electronics and Computer Engineering, Pulchowk Campus, Institute of Engineering, Tribhuvan University}, for providing the academic framework, laboratory infrastructure, and institutional context that made this project possible.
+
+We extend our sincere thanks to all faculty members and staff of DOECE who participated in User Acceptance Testing sessions and provided candid operational feedback that significantly improved the system's usability and functional coverage.
+
+We are also thankful to our fellow classmates and student peers who volunteered their time to validate the student-facing group formation and document submission workflows.
+
+Finally, we wish to express our deepest appreciation to our families for their constant moral support and encouragement throughout the duration of this program.
+
+%===========================
+% Abstract
+%===========================
 \chapter*{Abstract}
-Abstract represents a summarized report of the complete project in a very concise and informative format covering the main objective and aim of the project, the background information, processes and methods used, and methodologies implemented, a brief conclusion of two to three lines talking about the results and scope of the project followed with 3 to 5 keywords (italic). The entire abstract of a project report should be written in about 250 to 350 words.\\
-\newline
-Keywords: \textit{keyword 1, keyword 2, keyword 3, keyword 4, Keyword 5}
 \addcontentsline{toc}{chapter}{\numberline{}Abstract}
+The Project/Thesis Management System (TPMS) is a production-grade, role-aware web platform developed for the Department of Electronics and Computer Engineering (DOECE), Pulchowk Campus, Institute of Engineering, Tribhuvan University. The system digitalizes and automates the complete administrative and evaluative lifecycle of Bachelor Minor and Major projects and Master research theses across six academic programs (BCT, BEI, MSCSK, MSICE, MSDSA, MSNCS), replacing existing manual, paper-based workflows.
+
+The platform enforces a five-role hierarchy (Maintainer, Coordinator, Supervisor, Student, External Examiner) governed by Role-Based Access Control (RBAC) and strict program-scoped degree isolation. A Global Engagement Guard prevents students from enrolling in multiple active project groups simultaneously, while an automated Conflict-of-Interest Filter ensures that assigned supervisors cannot serve as defense evaluators for their own projects. The system implements the DOECE evaluation schemes (Minor: 50 marks; Major: 100 marks; Master Thesis: 300 marks) through a dynamic rubric engine.
+
+A server-side Puppeteer headless Chrome pipeline generates official A4 PDF grade sheets with automated number-to-words mark conversion. A SheetJS-powered Excel bulk import pipeline with pre-commit anomaly detection enables large-scale student onboarding. A program-scoped audit trail provides tamper-evident event logging for institutional accountability.
+
+The system is implemented with React 18 and Vite 5 on the frontend, Node.js and Express.js on the backend, and PostgreSQL 16 managed via Prisma 5 ORM. Evaluation through unit testing (36 tests, 100\% pass rate), integration testing, security testing, and User Acceptance Testing (average satisfaction 4.47/5.0) confirmed functional completeness and operational readiness. All API endpoints responded within 300 ms under test load, and PDF generation completed within 2 seconds.\\
+\newline
+Keywords: \textit{Academic Project Management, Role-Based Access Control, Evaluation Rubric Engine, PDF Grade Sheet Generation, Conflict-of-Interest Prevention, Node.js, React, PostgreSQL, Prisma ORM}
+
+%===========================
+% Tables of Contents / Figures / Tables
+%===========================
 \tableofcontents
 \addcontentsline{toc}{chapter}{\numberline{}Contents}
 \listoffigures
 \addcontentsline{toc}{chapter}{\numberline{}List of Figures}
 \listoftables
 \addcontentsline{toc}{chapter}{\numberline{}List of Tables}
+
+%===========================
+% List of Abbreviations
+%===========================
 \chapter*{List of Abbreviations}
 \addcontentsline{toc}{chapter}{\numberline{}List of Abbreviations}
-\begin{tabular}{c l}
-\textbf{LAH}     &  List of Abbreviations Here\\
-\textbf{AMC}     &  Add More Contents
+\begin{tabular}{l l}
+\textbf{API} & Application Programming Interface \\
+\textbf{BCT} & Bachelor of Computer Engineering \\
+\textbf{BEI} & Bachelor of Electronics, Communication and Information Engineering \\
+\textbf{CRUD} & Create, Read, Update, Delete \\
+\textbf{CSS} & Cascading Style Sheets \\
+\textbf{COI} & Conflict of Interest \\
+\textbf{DOECE} & Department of Electronics and Computer Engineering \\
+\textbf{DFD} & Data Flow Diagram \\
+\textbf{HTTP} & Hypertext Transfer Protocol \\
+\textbf{IOE} & Institute of Engineering \\
+\textbf{JWT} & JSON Web Token \\
+\textbf{MSDSA} & Master of Science in Data Science and Analytics \\
+\textbf{MSICE} & Master of Science in Information and Communication Engineering \\
+\textbf{MSCSK} & Master of Science in Computer Systems and Knowledge Engineering \\
+\textbf{MSNCS} & Master of Science in Network and Cyber Security \\
+\textbf{MVC} & Model-View-Controller \\
+\textbf{ORM} & Object-Relational Mapping \\
+\textbf{PDF} & Portable Document Format \\
+\textbf{RBAC} & Role-Based Access Control \\
+\textbf{REST} & Representational State Transfer \\
+\textbf{SPA} & Single-Page Application \\
+\textbf{SQL} & Structured Query Language \\
+\textbf{TPMS} & Thesis and Project Management System \\
+\textbf{TU} & Tribhuvan University \\
+\textbf{UAT} & User Acceptance Testing \\
+\textbf{UI} & User Interface \\
+\textbf{UML} & Unified Modeling Language \\
+\textbf{UX} & User Experience \\
+\textbf{VPS} & Virtual Private Server \\
 \end{tabular}
-\chapter{Introduction}
-\pagenumbering{arabic}%start arabic numbering(1,2,3..) from here
-This chapter should contain brief background information and an overview of the project, the problem statement, scope \& objective of the project. It rarely contains drawings and graphical illustrations.
-\section{Background}
-This is my first {\LaTeX} file using overleaf. it uses \textbf{report class}, at present there is nothing in \textit{table of contents} and \textit{table of figures}. we set the counter (2) for \textit{roman} numbering because the title page doesn't contain the page number and from chapter 1 the numbering is \textit{arabic}.
-\section{Problem statements}
-\section{Objectives}
-\section{Scope}
-\chapter{Literature Review}
-This chapter should contain related work and related theory "basic theoretical information" of the project. It evaluates the current work with the previous one. It depicts the current implementations that overcome the previous problems and limitations of the project and draws attention and focus on the foreknowledge work that would be conducted based on the current ongoing work. It must be clear and simple to understand.
-\section{Related work}
-\section{Related theory}
-\chapter{Methodology}
-This chapter should contain the methodology implemented for problem-solving. It should contain all the work done from feasibility study, requirement analysis and data collection, system design to testing and implementation.
-\chapter{Experimental Setup (if any)}
-In this section, you describe how the experiment was done and summarize how the data was taken. One typically describes the instruments and detectors that were used. Describe the procedure that was followed to collect the data etc.
-\chapter{System design}
-This chapter should include all the diagrams that contribute to best graphically representing the system, its components \& operations. They may be Context, Interaction, Structural, Behavioral models, network diagrams, model architecture or circuit diagrams etc.
-\chapter{Results \& Discussion}
-\section{Results}
-\section{Discussion}
-\section{Testing/evaluation/validation}
-This chapter should include results of software implementation, statistical analysis, calculations, results gained, and so on. The results should always be represented by pictorial representations, tabular demonstrations, diagrams, charts, visible graphs, images, photos, and other representations along with a good description and clarity.
-\chapter{Conclusions}
-The conclusion part summarizes the whole report by highlighting all the chapters and their significance and the importance of the project and the achievements.
-\chapter{Limitations and Future enhancement}
-This chapter should contain major limitations of the project and the further enhancement of the project soon with a different but related approach. \textbf{Referencing checking here}\cite{giri2019transfer}
-\addcontentsline{toc}{section}{References}
+
+%===========================
+% Chapters (Arabic numbering starts at Ch1)
+%===========================
+\input{chapters/ch1_introduction}
+\input{chapters/ch2_literature_review}
+\input{chapters/ch3_methodology}
+\input{chapters/ch4_system_design}
+\input{chapters/ch5_implementation}
+\input{chapters/ch6_results}
+\input{chapters/ch7_limitations}
+\input{chapters/ch8_conclusion}
+
+%===========================
+% References
+%===========================
+\addcontentsline{toc}{chapter}{\numberline{}References}
 \renewcommand{\bibname}{References}
 \bibliographystyle{unsrt}
 \bibliography{ref}
+
+%===========================
+% Appendices
+%===========================
 \chapter*{Appendices}
-\addcontentsline{toc}{section}{Appendices}
-It should contain the information that is somehow missing in the main body and it presents extra information about your project like program source code, raw data, and so on.
+\addcontentsline{toc}{chapter}{\numberline{}Appendices}
+
+\section*{Appendix A: Prisma Database Schema (Key Models)}
+The complete Prisma ORM schema is maintained in \texttt{backend/prisma/schema.prisma}. Key enum types used across the platform include:
+\begin{itemize}
+    \item \texttt{Role}: \texttt{MAINTAINER | COORDINATOR | SUPERVISOR | STUDENT | EXTERNAL\_EXAMINER}
+    \item \texttt{BachelorProjectType}: \texttt{MINOR | MAJOR}
+    \item \texttt{MasterProjectType}: \texttt{PROJECT | THESIS}
+    \item \texttt{GroupStatus / ThesisStatus}: \texttt{PENDING | ACTIVE | COMPLETED | OVERDUE | REJECTED}
+    \item \texttt{EvaluationStage}: \texttt{PROPOSAL | MID\_TERM | FINAL}
+    \item \texttt{EvaluationType}: \texttt{SUPERVISOR | PROPOSAL\_DEFENSE | MIDTERM\_DEFENSE | FINAL\_DEFENSE | EXTERNAL\_EXAMINER | EXTERNAL\_MIDTERM | EXTERNAL\_FINAL}
+\end{itemize}
+
+\section*{Appendix B: Backend API Route Summary}
+The Express.js application mounts 21 dedicated route modules under \texttt{/api/}:
+\begin{center}
+\begin{tabular}{l l}
+\texttt{/api/auth} & Authentication and password management \\
+\texttt{/api/announcements} & Academic announcement management \\
+\texttt{/api/student-groups} & Student team formation and invitations \\
+\texttt{/api/groups} & Coordinator group lifecycle management \\
+\texttt{/api/theses} & Master thesis lifecycle management \\
+\texttt{/api/evaluations} & Rubric evaluation mark submission \\
+\texttt{/api/proposals} & Document upload and retrieval \\
+\texttt{/api/print} & PDF grade sheet generation \\
+\texttt{/api/users} & User management and bulk import \\
+\texttt{/api/supervisors} & Supervisor assignment operations \\
+\texttt{/api/notifications} & In-app notification management \\
+\texttt{/api/files-audit} & Program-scoped audit log access \\
+\end{tabular}
+\end{center}
+
+\section*{Appendix C: Technology Versions}
+\begin{center}
+\begin{tabular}{l l}
+React & 18.x \\
+Vite & 5.x \\
+Node.js & 18.x \\
+Express.js & 4.x \\
+PostgreSQL & 16.x \\
+Prisma ORM & 5.x \\
+Puppeteer & 21.x \\
+SheetJS (xlsx) & 0.18.x \\
+bcryptjs & 2.4.x \\
+jsonwebtoken & 9.x \\
+\end{tabular}
+\end{center}
+
 \end{document}

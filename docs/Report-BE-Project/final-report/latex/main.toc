@@ -1,0 +1,84 @@
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Declaration of Authorship}{ii}{chapter*.1}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Page of Approval}{iii}{chapter*.2}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Copyright}{iv}{chapter*.3}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Acknowledgements}{v}{chapter*.4}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Abstract}{vi}{chapter*.5}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Contents}{ix}{chapter*.6}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }List of Figures}{x}{chapter*.7}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }List of Tables}{xi}{chapter*.8}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }List of Abbreviations}{xii}{chapter*.9}%
+\contentsline {chapter}{\numberline {1}Introduction}{xiii}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Background}{xiii}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Problem Statement}{xiii}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Objectives}{xiv}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}General Objectives}{xiv}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}Specific Objectives}{xiv}{subsection.1.3.2}%
+\contentsline {section}{\numberline {1.4}Rationale}{xv}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Scope}{xv}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Limitations}{xvi}{section.1.6}%
+\contentsline {section}{\numberline {1.7}Outline of the Report}{xvi}{section.1.7}%
+\contentsline {chapter}{\numberline {2}Literature Review}{xvii}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Review of Related Theory}{xvii}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Role-Based Access Control (RBAC)}{xvii}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Representational State Transfer (REST)}{xvii}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}JSON Web Tokens (JWT)}{xvii}{subsection.2.1.3}%
+\contentsline {subsection}{\numberline {2.1.4}Object-Relational Mapping (ORM)}{xvii}{subsection.2.1.4}%
+\contentsline {subsection}{\numberline {2.1.5}Agile Scrum Methodology}{xviii}{subsection.2.1.5}%
+\contentsline {subsection}{\numberline {2.1.6}Headless Browser Automation and PDF Generation}{xviii}{subsection.2.1.6}%
+\contentsline {section}{\numberline {2.2}Review of Related Works}{xviii}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Moodle Learning Management System}{xviii}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}ProQuest ETD Management}{xviii}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Turnitin Academic Integrity Platform}{xix}{subsection.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.4}Kaur and Singh (2014)}{xix}{subsection.2.2.4}%
+\contentsline {subsection}{\numberline {2.2.5}Sharma et al.\ (2019)}{xix}{subsection.2.2.5}%
+\contentsline {section}{\numberline {2.3}Gap Analysis}{xix}{section.2.3}%
+\contentsline {chapter}{\numberline {3}Methodology}{xxi}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Project Approach}{xxi}{section.3.1}%
+\contentsline {section}{\numberline {3.2}System Architecture}{xxi}{section.3.2}%
+\contentsline {section}{\numberline {3.3}System Design and Modules}{xxii}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Authentication and Authorization Module}{xxii}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Announcement and Group Formation Module}{xxii}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Coordinator Response Matrix Module}{xxii}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}Evaluation Rubric Engine}{xxii}{subsection.3.3.4}%
+\contentsline {subsection}{\numberline {3.3.5}PDF Grade Sheet Generation Module}{xxiii}{subsection.3.3.5}%
+\contentsline {subsection}{\numberline {3.3.6}Excel Bulk Import Module}{xxiii}{subsection.3.3.6}%
+\contentsline {subsection}{\numberline {3.3.7}Notification and Audit Module}{xxiii}{subsection.3.3.7}%
+\contentsline {section}{\numberline {3.4}Technology Stack}{xxiii}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Development Methodology}{xxiii}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Data Handling}{xxiv}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Testing and Validation}{xxiv}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Deployment Setup}{xxv}{section.3.8}%
+\contentsline {chapter}{\numberline {4}Implementation Details}{xxvi}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Requirements Specification}{xxvii}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}Functional Requirements}{xxvii}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}Non-Functional Requirements}{xxviii}{subsection.4.1.2}%
+\contentsline {section}{\numberline {4.2}System Overview}{xxviii}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Development Environment}{xxviii}{section.4.3}%
+\contentsline {section}{\numberline {4.4}System Implementation}{xxix}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Database Schema Design}{xxix}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Authentication Module}{xxx}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}Group Formation and Engagement Guard}{xxx}{subsection.4.4.3}%
+\contentsline {subsection}{\numberline {4.4.4}Conflict-of-Interest Filter}{xxxi}{subsection.4.4.4}%
+\contentsline {subsection}{\numberline {4.4.5}Evaluation Rubric Engine}{xxxii}{subsection.4.4.5}%
+\contentsline {subsection}{\numberline {4.4.6}PDF Grade Sheet Generation}{xxxii}{subsection.4.4.6}%
+\contentsline {subsection}{\numberline {4.4.7}Excel Bulk Import Pipeline}{xxxiii}{subsection.4.4.7}%
+\contentsline {section}{\numberline {4.5}Interface and Visualization}{xxxiii}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Deployment and Execution}{xxxiii}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Challenges and Solutions}{xxxiv}{section.4.7}%
+\contentsline {chapter}{\numberline {5}Results and Discussion}{xxxv}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Results}{xxxv}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Unit Testing Results}{xxxv}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2}Integration Testing Results}{xxxv}{subsection.5.1.2}%
+\contentsline {subsection}{\numberline {5.1.3}Security Testing Results}{xxxvi}{subsection.5.1.3}%
+\contentsline {subsection}{\numberline {5.1.4}User Acceptance Testing Results}{xxxvi}{subsection.5.1.4}%
+\contentsline {subsection}{\numberline {5.1.5}System Performance Benchmarks}{xxxvii}{subsection.5.1.5}%
+\contentsline {section}{\numberline {5.2}Discussion}{xxxvii}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Comparative Analysis}{xxxviii}{section.5.3}%
+\contentsline {chapter}{\numberline {6}Conclusions and Recommendations}{xxxix}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Conclusions}{xxxix}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Recommendations and Future Enhancements}{xl}{section.6.2}%
+\contentsline {section}{References}{xli}{Item.34}%
+\contentsline {section}{Appendices}{xliv}{chapter*.26}%
+\contentsline {chapter}{Appendix A: System API Route Reference}{xlv}{chapter*.27}%
+\contentsline {chapter}{Appendix B: Technology Version Reference}{xlvi}{chapter*.28}%
+\contentsline {chapter}{Appendix C: Database Enum Types}{xlvii}{chapter*.29}%

@@ -1,0 +1,46 @@
+\chapter{Literature Review}
+
+\section{Review of Related Theory}
+
+\subsection{Role-Based Access Control (RBAC)}
+Role-Based Access Control (RBAC) is an authorization mechanism where system access permissions are assigned to specific roles rather than individual user accounts \cite{ferraiolo2007rbac}. Users inherit permissions based on their assigned role, enforcing the principle of least privilege. In TPMS, RBAC governs access across five distinct roles (Student, Supervisor, External Examiner, Program Coordinator, and Maintainer), ensuring users only access authorized departmental data and actions.
+
+\subsection{Representational State Transfer (REST)}
+Representational State Transfer (REST) is an architectural style for building scalable web APIs through standard HTTP communication \cite{fielding2000architectural}. It relies on stateless client-server separation, standard request methods (GET, POST, PUT, DELETE), and resource-oriented URI endpoints. TPMS implements a RESTful API to cleanly decouple the frontend user interface from backend data processing.
+
+\subsection{JSON Web Tokens (JWT)}
+JSON Web Token (JWT) is a compact, URL-safe standard used for securely transmitting claims between a client and a server \cite{jones2015jwt}. A JWT contains a header, a payload (storing user identifier and role), and a cryptographic signature. TPMS uses stateless JWT authentication to verify user identities across API requests without requiring server-side session storage.
+
+\subsection{Object-Relational Mapping (ORM)}
+Object-Relational Mapping (ORM) provides a programming layer that allows developers to interact with relational databases using native programming objects instead of writing raw SQL queries \cite{prisma2024orm}. In this project, Prisma ORM is used to define database schemas, enforce foreign key relationships, manage migrations, and execute parameterized queries that prevent SQL injection.
+
+\subsection{Software Prototyping Model}
+The Prototyping Model is a development framework centered on building early interactive approximations of a system to visualize workflows and clarify requirements before final implementation. This process facilitates direct stakeholder feedback on user interfaces and business logic, ensuring the final application accurately meets departmental needs without requiring costly architectural changes later.
+
+\subsection{Automated Server-Side PDF Generation}
+Server-side document generation allows web applications to dynamically render database records into standardized, printable PDF files \cite{puppeteer2024headless}. By converting structured HTML/CSS templates into A4 documents on the server, the system automatically populates evaluation marks, computes totals, and generates official defense grade sheets ready for physical archiving.
+
+\section{Review of Related Works}
+
+\subsection{Moodle Learning Management System}
+Moodle is a widely used open-source Learning Management System (LMS) that supports course administration, assignment submissions, and general grading \cite{ritzer2022moodle}. While effective for standard classroom coursework, Moodle is not designed to handle specialized engineering project workflows, such as student team formation, supervisor-examiner allocations, multi-tier defense rubrics, and automated official A4 grade sheet generation.
+
+\subsection{Turnitin Assessment Platform}
+Turnitin is an academic platform widely used for document originality verification and rubric-based assignment grading \cite{turnitin2024feedback}. Although it supports criteria-based evaluations, it is focused primarily on individual assignment submissions rather than multi-stage project lifecycle management, role-based departmental coordination, or official university evaluation workflows.
+
+\subsection{Kaur and Singh (2014)}
+Kaur and Singh \cite{kaur2014design} proposed a web-based student project management system for engineering institutions, covering project registration, supervisor allocation, and basic milestone tracking. However, their system did not incorporate criteria-based defense rubrics, degree-specific marking schemes (Minor, Major, Master Thesis), or automated generation of print-ready university evaluation sheets.
+
+\subsection{Sharma et al.\ (2019)}
+Sharma et al.\ \cite{sharma2019web} developed a web-based academic management system for thesis submission tracking and supervisor communication. Their system provided document upload and supervisor feedback mechanisms but lacked RBAC-enforced role isolation, multi-program degree support, engagement guards for duplicate enrollment prevention, and automated official document generation.
+
+\section{Gap Analysis}
+Existing learning management platforms and academic tools fail to provide an integrated solution tailored to the multi-tier engineering project and thesis governance requirements of DOECE:
+
+\begin{itemize}
+  \item Generic LMS platforms (such as Moodle) lack native support for student group formation constraints, supervisor allocation matrices, and multi-evaluator defense rubrics.
+  \item Assignment evaluation tools (such as Turnitin) do not provide programmatic safeguards against supervisory conflicts of interest or duplicate enrollments across project groups.
+  \item Prior student project management research lacks server-side generation of standardized, print-ready university evaluation sheets with automated numerical-to-word mark conversion.
+\end{itemize}
+
+TPMS bridges these gaps by providing a domain-specific, role-aware web application engineered specifically for the academic lifecycle of Bachelor projects and Master research theses at Pulchowk Campus.

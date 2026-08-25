@@ -1,0 +1,107 @@
+\chapter{Introduction}
+
+\section{Background}
+Project and thesis work are integral components of the engineering curriculum at the Department of Electronics and Computer Engineering (DOECE), Pulchowk Campus, Institute of Engineering (IOE), Tribhuvan University. The department oversees compulsory Minor and Major projects for undergraduate students in Computer Engineering (BCT) and Electronics, Communication and Information Engineering (BEI). In addition, graduate students across various Master of Science programs (MSCSK, MSICE, MSDSA, and MSNCS) conduct research theses under faculty supervision.
+
+Traditionally, the administration of these academic projects has been handled through manual and paper-based procedures. Department coordinators manage student rosters across local spreadsheets, collect physical copies of proposals and reports, and distribute paper evaluation sheets during defense sessions. With increasing student numbers and multiple degree programs, this manual approach results in administrative delays, data redundancy, and risks of calculation errors during final mark tabulation \cite{pressman2015software}.
+
+To address these challenges, academic institutions increasingly adopt centralized information systems to streamline academic workflows and maintain transparent records \cite{ko2021systematic}. The \textbf{Thesis and Project Management System (TPMS)} is developed as a centralized web-based platform to automate and manage the complete lifecycle of student projects and theses at DOECE, Pulchowk Campus.
+
+\section{Problem Statement}
+The current process of managing student projects and theses at the Department of Electronics and Computer Engineering, Pulchowk Campus is predominantly manual and paper-based. This approach introduces a range of operational and administrative challenges that adversely affect the efficiency, accuracy, and transparency of academic project management.
+
+The key problems identified are as follows:
+\begin{itemize}
+  \item \textbf{Absence of a Centralized System:} There is no unified platform for tracking project registrations, document submissions, supervisor assignments, and evaluation records. Information is dispersed across physical files, email threads, and spreadsheets, making retrieval and monitoring difficult.
+  
+  \item \textbf{Manual Document Management:} Students submit physical copies of proposal documents, mid-term reports, and final reports, which are susceptible to loss, damage, and delays. There is no standardized system for version control or submission status tracking.
+  
+  \item \textbf{Inefficient Supervisor and Examiner Coordination:} The assignment of supervisors and external examiners is managed manually, requiring significant effort from coordinators and resulting in administrative delays and miscommunication.
+  
+  \item \textbf{Lack of Automated Mark Calculation:} Evaluation marks from multiple evaluators (supervisors, internal examiners, and external examiners) are collected and aggregated manually. This process is error-prone, time-consuming, and lacks proper audit trails.
+  
+  \item \textbf{Limited Progress Visibility:} Students and coordinators lack real-time visibility into project progress, submission statuses, and evaluation outcomes, resulting in inefficient monitoring and delayed interventions.
+  
+  \item \textbf{Communication Gaps:} In the absence of automated notifications, important updates such as supervisor assignments, feedback availability, and result publication are communicated inconsistently, leading to delays and misunderstandings.
+\end{itemize}
+
+These challenges collectively reduce the administrative efficiency of the department, compromise the academic experience of students, and impede the ability of coordinators to maintain oversight of a large number of concurrent projects and theses. A systematic, technology-driven solution is therefore required.
+
+\section{Objectives}
+
+\subsection{General Objectives}
+The general objective of this project is to design, develop, and test a centralized web-based Thesis and Project Management System (TPMS) for the Department of Electronics and Computer Engineering (DOECE), Pulchowk Campus, to streamline academic workflows, enhance progress tracking, and automate evaluation processes.
+
+\subsection{Specific Objectives}
+The specific objectives of this project are:
+\begin{enumerate}
+  \item To develop a centralized web platform that digitalizes project and thesis registrations, document submissions, and supervisor/examiner allocation workflows, eliminating manual paperwork and spreadsheet-based record keeping.
+  
+  \item To provide real-time progress tracking and transparency for students, supervisors, and coordinators through role-based dashboards reflecting project statuses, submission records, and evaluation outcomes.
+  
+  \item To implement automated student team formation, supervisor allocation mechanisms, and bulk student onboarding via spreadsheet data import.
+  
+  \item To build a rubric-based evaluation module enabling evaluators to enter marks per criteria, automatically calculating total scores and generating official print-ready PDF grade sheets.
+  
+  \item To integrate automated notification services that alert stakeholders on key milestone events such as supervisor allocations, feedback availability, and defense schedules, minimizing communication gaps.
+\end{enumerate}
+
+\section{Rationale}
+The development of the Thesis and Project Management System (TPMS) directly addresses the operational inefficiencies and administrative challenges identified in the current manual workflow. By establishing a centralized digital platform, the system replaces scattered physical documents and spreadsheets with a single, reliable repository for all project and thesis records.
+
+Digitizing document submissions and progress tracking eliminates the risk of lost paperwork, streamlines version tracking, and provides real-time visibility to students, supervisors, and coordinators. Furthermore, the criteria-wise score entry interface with automated mark calculation and PDF generation eliminates arithmetic errors and significantly reduces the time required to compile official evaluation sheets. Integrating automated notifications ensures timely communication among stakeholders, minimizing administrative delays and follow-ups.
+
+Overall, TPMS improves administrative efficiency, enhances academic transparency, and provides a scalable digital infrastructure to support the growing number of undergraduate and graduate programs within the department \cite{sommerville2016software}.
+
+\section{Scope}
+The scope of the Thesis and Project Management System (TPMS) encompasses the following functional areas within the Department of Electronics and Computer Engineering (DOECE), Pulchowk Campus:
+
+\begin{itemize}
+  \item \textbf{Academic Programs:} Support for undergraduate Bachelor projects (BCT and BEI Minor/Major) and graduate Master research theses (MSCSK, MSICE, MSDSA, and MSNCS).
+  
+  \item \textbf{Role-Based User Management:} Dedicated dashboards and access permissions for Students, Supervisors, External Examiners, Program Coordinators, and Department Maintainers.
+  
+  \item \textbf{Lifecycle Workflow Management:} End-to-end management covering student group formation, proposal and report submissions, and supervisor-examiner allocations.
+  
+  \item \textbf{Bulk Data Ingestion:} Fast onboarding of student cohorts and department rosters via structured spreadsheet imports.
+  
+  \item \textbf{Evaluation and Document Generation:} Criteria-wise defense scoring, automatic total mark calculation, and dynamic export of official print-ready A4 PDF evaluation sheets.
+  
+  \item \textbf{Notification System:} Automated email notifications to alert stakeholders about supervisor allocations, document feedback, and defense schedules.
+\end{itemize}
+
+The system is designed as a web-based platform for departmental academic governance. It does not include mobile application development, integration with external university-wide ERP systems, or live video conferencing for remote defense sessions.
+
+\section{Limitations}
+Although the developed system fulfills all its primary objectives, the following limitations are identified:
+
+\begin{enumerate}
+  \item \textbf{Institutional Customization:} The system is designed specifically for the academic workflows of DOECE, Pulchowk Campus; expanding to other departments would require adapting to their specific grading structures and formats.
+  
+  \item \textbf{Deployment Environment:} The platform is primarily targeted for deployment within the campus local network (intranet); hosting on the public internet requires additional network and domain security configurations.
+  
+  \item \textbf{Fixed Evaluation Schemes:} The evaluation criteria and mark weightages follow fixed departmental guidelines rather than being dynamically reconfigurable by coordinators.
+  
+  \item \textbf{Defense Scheduling:} The system manages mark entries, allocations, and grade sheets, but physical room allocation and defense timetabling are conducted outside the platform.
+  
+  \item \textbf{File Storage Mechanism:} Uploaded documents and reports are stored on the local server filesystem rather than external distributed cloud storage.
+\end{enumerate}
+
+\section{Outline of the Report}
+The remainder of this report is structured into the following chapters:
+
+\begin{itemize}
+  \item \textbf{Chapter 1: Introduction:} Presents the project background, problem statement, general and specific objectives, rationale, scope, and limitations.
+  
+  \item \textbf{Chapter 2: Literature Review:} Reviews related theoretical foundations, examines existing academic management platforms, and highlights the gap addressed by this work.
+  
+  \item \textbf{Chapter 3: Methodology:} Describes the project approach, system architecture, module design, technology stack, development methodology, and testing strategies.
+  
+  \item \textbf{Chapter 4: Implementation Details:} Details the system requirements, development environment, core module implementations, interface visualization, and technical challenges faced.
+  
+  \item \textbf{Chapter 5: Results and Discussion:} Demonstrates the implemented system outcomes, discusses functional performance, and provides a comparative analysis with existing manual workflows.
+  
+  \item \textbf{Chapter 6: Conclusions and Recommendations:} Summarizes the key achievements, draws conclusions, and suggests recommendations for future enhancements.
+\end{itemize}
+
+The report concludes with \textbf{References} formatted according to the IEEE citation style, followed by \textbf{Appendices} containing supplementary technical documentation.

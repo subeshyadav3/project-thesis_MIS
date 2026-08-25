@@ -1,0 +1,87 @@
+\begin{thebibliography}{10}
+
+\bibitem{pressman2015software}
+Roger~S. Pressman and Bruce~R. Maxim.
+\newblock {\em Software Engineering: A Practitioner's Approach}.
+\newblock McGraw-Hill Education, New York, NY, USA, 8th edition, 2015.
+
+\bibitem{ko2021systematic}
+Andrew~J. Ko, Thomas~D. LaToza, and Margaret~M. Burnett.
+\newblock A systematic review of academic software engineering project
+  management platforms.
+\newblock {\em IEEE Transactions on Software Engineering}, 47(3):612--631,
+  2021.
+
+\bibitem{sommerville2016software}
+Ian Sommerville.
+\newblock {\em Software Engineering}.
+\newblock Pearson, Harlow, UK, 10th edition, 2016.
+
+\bibitem{ferraiolo2007rbac}
+David~F. Ferraiolo, D.~Richard Kuhn, and Ramaswamy Chandramouli.
+\newblock {\em Role-Based Access Control}.
+\newblock Artech House, Norwood, MA, USA, 2nd edition, 2007.
+
+\bibitem{fielding2000architectural}
+Roy~Thomas Fielding.
+\newblock {\em Architectural Styles and the Design of Network-Based Software
+  Architectures}.
+\newblock PhD thesis, University of California, Irvine, 2000.
+
+\bibitem{jones2015jwt}
+Michael~B. Jones, John Bradley, and Nat Sakimura.
+\newblock Json web token ({JWT}).
+\newblock RFC 7519, Internet Engineering Task Force (IETF), 2015.
+
+\bibitem{prisma2024orm}
+{Prisma Data, Inc.}
+\newblock Prisma orm documentation, 2024.
+\newblock Accessed: Aug.\ 2026.
+
+\bibitem{rubin2012scrum}
+Kenneth~S. Rubin.
+\newblock {\em Essential Scrum: A Practical Guide to the Most Popular Agile
+  Process}.
+\newblock Addison-Wesley, Upper Saddle River, NJ, USA, 2012.
+
+\bibitem{puppeteer2024headless}
+{Google LLC}.
+\newblock Puppeteer: Headless chrome node.js api, 2024.
+\newblock Accessed: Aug.\ 2026.
+
+\bibitem{ritzer2022moodle}
+George Ritzer and Jeffrey Stepnisky.
+\newblock Evaluation of learning management systems for academic project
+  governance.
+\newblock {\em Computers and Education}, 180:104--120, 2022.
+
+\bibitem{proquest2024etd}
+{ProQuest LLC}.
+\newblock Electronic theses and dissertations management system, 2024.
+\newblock Accessed: Aug.\ 2026.
+
+\bibitem{turnitin2024feedback}
+{Turnitin LLC}.
+\newblock Turnitin feedback studio and grademark, 2024.
+\newblock Accessed: Aug.\ 2026.
+
+\bibitem{kaur2014design}
+Amandeep Kaur and Charanjit Singh.
+\newblock Design and development of a web-based student project management
+  system.
+\newblock {\em International Journal of Computer Science and Mobile Computing},
+  3(4):1172--1179, 2014.
+
+\bibitem{sharma2019web}
+Priya Sharma, Ankit Goyal, and Rakesh Verma.
+\newblock A web-based academic management system for thesis tracking.
+\newblock {\em International Journal of Engineering Research and Technology},
+  8(5):345--350, 2019.
+
+\bibitem{martin2017clean}
+Robert~C. Martin.
+\newblock {\em Clean Architecture: A Craftsman's Guide to Software Structure
+  and Design}.
+\newblock Prentice Hall, Upper Saddle River, NJ, USA, 2017.
+
+\end{thebibliography}

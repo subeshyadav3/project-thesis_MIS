@@ -413,7 +413,7 @@ function CoordinatorAnnouncements() {
           is_guided: d.is_guided || 'No',
           primary_supervisor: d.primary_supervisor || '',
           secondary_supervisor: d.secondary_supervisor || '',
-          finalSupervisorId: response.thesis?.supervisorId ? response.thesis.supervisorId.toString() : '',
+          finalSupervisorId: response.thesis?.supervisorId ? response.thesis.supervisorId.toString() : (d.finalSupervisorId ? d.finalSupervisorId.toString() : ''),
           pdfUrl: d.pdfUrl || d.pdf_document || '',
           remarks: d.remarks || d.description || d.feedback || '',
         };
@@ -1036,26 +1036,33 @@ function CoordinatorAnnouncements() {
                 </div>
               </div>
 
-              <div className="modal-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="modal-body" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 0 }}>
                 {responsesLoading ? (
                   <div className="loading-state"><Icon name="progress_activity" className="material-symbols-outlined spin" /><p>Loading responses matrix...</p></div>
                 ) : responses ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-surface-container-high)', fontSize: 12, fontWeight: 600 }}>
-                        <Icon name="groups" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Eligible: {responses.total}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minHeight: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${!showRemainingStudents ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => setShowRemainingStudents(false)}
+                        >
+                          <Icon name="fact_check" className="material-symbols-outlined" /> Submitted Responses ({responses.filled.length})
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${showRemainingStudents ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => setShowRemainingStudents(true)}
+                        >
+                          <Icon name="pending" className="material-symbols-outlined" /> Remaining Eligible ({responses.remaining.length})
+                        </button>
+                        <span style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', fontWeight: 600, marginLeft: 8 }}>
+                          Total Eligible: {responses.total}
+                        </span>
                       </div>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-success-container)', color: 'var(--color-on-success-container)', fontSize: 12, fontWeight: 600 }}>
-                        <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Filled: {responses.filled.length}
-                      </div>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'var(--color-warning-container)', color: 'var(--color-on-warning-container)', fontSize: 12, fontWeight: 600 }}>
-                        <Icon name="pending" className="material-symbols-outlined" style={{ fontSize: 16 }} /> Remaining: {responses.remaining.length}
-                      </div>
-                    </div>
 
-                    <div>
-                      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 style={{ margin: 0 }}>Submitted Form Responses ({responses.filled.length})</h3>
+                      {!showRemainingStudents && (
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button
                             type="button"
@@ -1111,13 +1118,25 @@ function CoordinatorAnnouncements() {
                             <Icon name="check_circle" className="material-symbols-outlined" /> Finalize Selected ({selectedResponseIds.length})
                           </button>
                         </div>
-                      </div>
+                      )}
+                    </div>
 
-                      <div className="table-container" style={{ overflowX: 'auto' }}>
-                        <table className="table" style={{ fontSize: 13, minWidth: 1400, borderCollapse: 'collapse' }}>
-                          <thead>
+                    {!showRemainingStudents ? (
+                      <div
+                        className="table-container"
+                        style={{
+                          flex: 1,
+                          minHeight: 0,
+                          overflow: 'auto',
+                          border: '1px solid var(--color-outline-variant)',
+                          borderRadius: 8,
+                          position: 'relative'
+                        }}
+                      >
+                        <table className="table" style={{ fontSize: 13, minWidth: 1400, borderCollapse: 'separate', borderSpacing: 0 }}>
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)' }}>
                             <tr>
-                              <th style={{ width: 36, textAlign: 'center', verticalAlign: 'middle' }}>
+                              <th style={{ width: 36, textAlign: 'center', verticalAlign: 'middle', position: 'sticky', left: 0, top: 0, zIndex: 25, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>
                                 <input
                                   type="checkbox"
                                   checked={responses.filled.length > 0 && selectedResponseIds.length === responses.filled.filter(r => r.response.status !== 'APPROVED').length}
@@ -1130,23 +1149,23 @@ function CoordinatorAnnouncements() {
                                   }}
                                 />
                               </th>
-                              <th style={{ width: 180, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Group Name & Members' : 'Student & Roll'}</th>
-                              <th style={{ width: 200, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Project Title' : 'Concept Thesis Title'}</th>
-                              <th style={{ width: 160, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Cluster' : 'Research Cluster'}</th>
+                              <th style={{ width: 180, verticalAlign: 'middle', position: 'sticky', left: 36, top: 0, zIndex: 25, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)', borderRight: '1px solid var(--color-outline-variant)' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Group Name & Members' : 'Student & Roll'}</th>
+                              <th style={{ width: 200, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Project Title' : 'Concept Thesis Title'}</th>
+                              <th style={{ width: 160, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Cluster' : 'Research Cluster'}</th>
                               {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
-                                <th style={{ width: 75, verticalAlign: 'middle' }}>Guided?</th>
+                                <th style={{ width: 75, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Guided?</th>
                               )}
                               {!(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') && (
                                 <>
-                                  <th style={{ width: 150, verticalAlign: 'middle' }}>Primary Supervisor Pref</th>
-                                  <th style={{ width: 150, verticalAlign: 'middle' }}>Secondary Supervisor Pref</th>
+                                  <th style={{ width: 150, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Primary Supervisor Pref</th>
+                                  <th style={{ width: 150, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Secondary Supervisor Pref</th>
                                 </>
                               )}
-                              <th style={{ width: 160, verticalAlign: 'middle' }}>Remarks / Feedback</th>
-                              <th style={{ width: 170, verticalAlign: 'middle' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Supervisor' : 'Final Supervisor'}</th>
-                              <th style={{ width: 65, textAlign: 'center', verticalAlign: 'middle' }}>Proposal</th>
-                              <th style={{ width: 80, verticalAlign: 'middle' }}>Status</th>
-                              <th style={{ width: 120, textAlign: 'right', verticalAlign: 'middle' }}>Actions</th>
+                              <th style={{ width: 160, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Remarks / Feedback</th>
+                              <th style={{ width: 185, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>{(viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR') ? 'Supervisor' : 'Final Supervisor'}</th>
+                              <th style={{ width: 65, textAlign: 'center', verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Proposal</th>
+                              <th style={{ width: 80, verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Status</th>
+                              <th style={{ width: 130, textAlign: 'right', verticalAlign: 'middle', position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)', borderBottom: '2px solid var(--color-outline-variant)' }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1158,7 +1177,7 @@ function CoordinatorAnnouncements() {
                               const isBach = (viewResponses?.degreeType === 'BACHELOR' || viewResponses?.type === 'MINOR' || viewResponses?.type === 'MAJOR' || user.program?.degreeType === 'BACHELOR');
                               return (
                                 <tr key={response.id || student.id} style={{ background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : undefined }}>
-                                  <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                  <td style={{ textAlign: 'center', verticalAlign: 'middle', position: 'sticky', left: 0, zIndex: 5, background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : 'var(--color-surface, #fff)' }}>
                                     {response.status !== 'APPROVED' && (
                                       <input
                                         type="checkbox"
@@ -1170,7 +1189,7 @@ function CoordinatorAnnouncements() {
                                       />
                                     )}
                                   </td>
-                                  <td style={{ verticalAlign: 'middle' }}>
+                                  <td style={{ verticalAlign: 'middle', position: 'sticky', left: 36, zIndex: 5, background: isSelected ? 'var(--color-primary-container-low, #f0f4ff)' : 'var(--color-surface, #fff)', borderRight: '1px solid var(--color-outline-variant)' }}>
                                     {isBach && response.formData?.groupName ? (
                                       <>
                                         <div style={{ fontWeight: 600 }}>{response.formData.groupName}</div>
@@ -1248,17 +1267,27 @@ function CoordinatorAnnouncements() {
                                               const input = norm(pref);
                                               let matched = supervisors.find(s => {
                                                 const fn = norm(`${s.firstName} ${s.lastName}`);
-                                                return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                                const ln = norm(s.lastName || '');
+                                                return fn === input || input.includes(fn) || fn.includes(input) || (ln.length > 2 && input.includes(ln));
                                               });
+                                              if (!matched && pref.length > 2) {
+                                                const parts = pref.split(/\s+/).filter(w => !['dr', 'prof', 'mr', 'ms', 'sir', 'hod'].includes(norm(w)));
+                                                for (const p of parts) {
+                                                  if (p.length > 2) {
+                                                    const m = supervisors.find(s => norm(`${s.firstName} ${s.lastName}`).includes(norm(p)));
+                                                    if (m) { matched = m; break; }
+                                                  }
+                                                }
+                                              }
                                               if (matched) {
                                                 setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
-                                                toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                                toast.success(`Matched "${matched.firstName} ${matched.lastName}"`);
                                               } else {
-                                                toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                                toast.info(`No exact faculty match for "${pref}" — select from dropdown`);
                                               }
                                             }}
                                           >
-                                            <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                            Select
                                           </button>
                                         )}
                                       </td>
@@ -1275,17 +1304,27 @@ function CoordinatorAnnouncements() {
                                               const input = norm(pref);
                                               let matched = supervisors.find(s => {
                                                 const fn = norm(`${s.firstName} ${s.lastName}`);
-                                                return fn.includes(input) || input.includes(s.lastName.toLowerCase());
+                                                const ln = norm(s.lastName || '');
+                                                return fn === input || input.includes(fn) || fn.includes(input) || (ln.length > 2 && input.includes(ln));
                                               });
+                                              if (!matched && pref.length > 2) {
+                                                const parts = pref.split(/\s+/).filter(w => !['dr', 'prof', 'mr', 'ms', 'sir', 'hod'].includes(norm(w)));
+                                                for (const p of parts) {
+                                                  if (p.length > 2) {
+                                                    const m = supervisors.find(s => norm(`${s.firstName} ${s.lastName}`).includes(norm(p)));
+                                                    if (m) { matched = m; break; }
+                                                  }
+                                                }
+                                              }
                                               if (matched) {
                                                 setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: matched.id.toString() } }));
-                                                toast.success(`Fuzzy matched: ${matched.firstName} ${matched.lastName}`);
+                                                toast.success(`Matched "${matched.firstName} ${matched.lastName}"`);
                                               } else {
-                                                toast.info(`Could not auto-match "${pref}". Select manually in Final Supervisor.`);
+                                                toast.info(`No exact faculty match for "${pref}" — select from dropdown`);
                                               }
                                             }}
                                           >
-                                            <Icon name="check" className="material-symbols-outlined" style={{ fontSize: 11 }} /> Select
+                                            Select
                                           </button>
                                         )}
                                       </td>
@@ -1297,54 +1336,49 @@ function CoordinatorAnnouncements() {
                                       style={{ padding: '4px 8px', fontSize: 12, width: '100%' }}
                                       value={edit.remarks ?? ''}
                                       onChange={e => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), remarks: e.target.value } }))}
-                                      placeholder="Remarks / Feedback"
+                                      placeholder="Remarks..."
                                     />
                                   </td>
                                   <td style={{ verticalAlign: 'middle' }}>
                                     <MatrixSupervisorSelect
                                       value={edit.finalSupervisorId ?? ''}
-                                      onChange={val => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: val } }))}
+                                      onChange={val => setMatrixEdits(prev => ({ ...prev, [response.id]: { ...(prev[response.id] || {}), finalSupervisorId: val ? val.toString() : '' } }))}
                                       supervisors={supervisors}
                                     />
                                   </td>
                                   <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                                    {edit.pdfUrl || response.formData?.pdfUrl ? (
-                                      <a href={edit.pdfUrl || response.formData?.pdfUrl} target="_blank" rel="noreferrer" title="View Proposal PDF">
-                                        <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: 18 }} />
-                                      </a>
-                                    ) : '—'}
-                                  </td>
-                                  <td style={{ verticalAlign: 'middle' }}>
-                                    {response.status === 'APPROVED' ? (
+                                    {(edit.pdfUrl || edit.fileUrl) ? (
                                       <a
-                                        href={
-                                          (isBach || response.groupId)
-                                            ? `/coordinator/project/group/${response.groupId}`
-                                            : `/coordinator/project/thesis/${response.thesis?.id || response.id}`
-                                        }
+                                        href={edit.pdfUrl || edit.fileUrl}
                                         target="_blank"
-                                        rel="noreferrer"
-                                        style={{ fontSize: 12 }}
+                                        rel="noopener noreferrer"
+                                        className="btn btn-xs btn-outline"
+                                        title="View Uploaded Proposal PDF"
+                                        style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 6px', color: 'var(--color-primary)' }}
                                       >
-                                        Finalized <Icon name="open_in_new" className="material-symbols-outlined" style={{ fontSize: 11 }} />
+                                        <Icon name="picture_as_pdf" className="material-symbols-outlined" style={{ fontSize: 15 }} />
                                       </a>
-                                    ) : response.status === 'LATE_SUBMITTED' ? (
-                                      <span className="badge badge-warning" style={{ fontSize: 10 }}>Late</span>
                                     ) : (
-                                      <span className="badge badge-completed" style={{ fontSize: 10 }}>Submitted</span>
+                                      <span style={{ fontSize: 11, color: 'var(--color-outline-variant)' }}>—</span>
                                     )}
                                   </td>
+                                  <td style={{ verticalAlign: 'middle' }}>
+                                    <span className={`status-pill ${response.status === 'APPROVED' ? 'status-approved' : (edit.isLate ? 'status-rejected' : 'status-submitted')}`}>
+                                      {response.status === 'APPROVED' ? 'Finalized' : (edit.isLate ? 'Late' : 'Submitted')}
+                                    </span>
+                                  </td>
                                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
                                       <button
                                         type="button"
-                                        className="btn btn-xs btn-outline"
+                                        className="btn btn-xs btn-outline-primary"
                                         disabled={savingResponse}
                                         onClick={async () => {
                                           setSavingResponse(true);
                                           try {
                                             await api.put(`/announcements/responses/${response.id}`, { formData: edit });
-                                            toast.success('Row saved');
+                                            toast.success('Saved response');
+                                            loadResponses(viewResponses);
                                           } catch (err) {
                                             toast.error(getApiMessage(err) || 'Failed to save');
                                           } finally {
@@ -1400,39 +1434,42 @@ function CoordinatorAnnouncements() {
                           </tbody>
                         </table>
                       </div>
-                    </div>
-
-                    <div>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline"
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                        onClick={() => setShowRemainingStudents(!showRemainingStudents)}
+                    ) : (
+                      <div
+                        className="table-container"
+                        style={{
+                          flex: 1,
+                          minHeight: 0,
+                          overflow: 'auto',
+                          border: '1px solid var(--color-outline-variant)',
+                          borderRadius: 8,
+                          position: 'relative'
+                        }}
                       >
-                        <Icon name={showRemainingStudents ? 'expand_less' : 'expand_more'} className="material-symbols-outlined" />
-                        {showRemainingStudents ? 'Hide' : 'Show'} Remaining Eligible Students ({responses.remaining.length})
-                      </button>
-
-                      {showRemainingStudents && (
-                        <div className="table-container" style={{ marginTop: 10 }}>
-                          <table className="table" style={{ fontSize: 13 }}>
-                            <thead><tr><th>Student Name</th><th>Roll Number</th><th>Program</th><th>Email Address</th></tr></thead>
-                            <tbody>
-                              {responses.remaining.length === 0 ? (
-                                <tr><td colSpan={4} className="empty-cell">All eligible students have filled and submitted the form</td></tr>
-                              ) : responses.remaining.map(s => (
-                                <tr key={s.id}>
-                                  <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
-                                  <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
-                                  <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
-                                  <td style={{ fontSize: 13 }}>{s.email}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
+                        <table className="table" style={{ fontSize: 13, minWidth: 600, borderCollapse: 'separate', borderSpacing: 0 }}>
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 20, background: 'var(--color-surface, #fff)' }}>
+                            <tr>
+                              <th style={{ borderBottom: '2px solid var(--color-outline-variant)' }}>Student Name</th>
+                              <th style={{ borderBottom: '2px solid var(--color-outline-variant)' }}>Roll Number</th>
+                              <th style={{ borderBottom: '2px solid var(--color-outline-variant)' }}>Program</th>
+                              <th style={{ borderBottom: '2px solid var(--color-outline-variant)' }}>Email Address</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {responses.remaining.length === 0 ? (
+                              <tr><td colSpan={4} className="empty-cell">All eligible students have filled and submitted the form</td></tr>
+                            ) : responses.remaining.map(s => (
+                              <tr key={s.id}>
+                                <td style={{ fontWeight: 500 }}>{s.firstName} {s.lastName}</td>
+                                <td style={{ fontSize: 13 }}>{s.rollNumber || '—'}</td>
+                                <td style={{ fontSize: 13 }}>{s.program?.code || '—'}</td>
+                                <td style={{ fontSize: 13 }}>{s.email}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </div>

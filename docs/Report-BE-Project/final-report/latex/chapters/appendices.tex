@@ -1,0 +1,73 @@
+\section*{Appendix A: System REST API Route Reference}
+\addcontentsline{toc}{section}{Appendix A: System REST API Route Reference}
+
+The backend application provides modular RESTful API endpoints mounted under \texttt{/api/}:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}l p{4.5cm} X@{}}
+\toprule
+\textbf{Endpoint Prefix} & \textbf{Module Scope} & \textbf{Primary Operational Responsibility} \\
+\midrule
+\texttt{/api/auth}           & Authentication & User login, password hashing, and JWT verification \\
+\texttt{/api/users}          & User Management & Account administration and Excel bulk onboarding \\
+\texttt{/api/announcements}  & Announcements & Publishing project calls with group constraints \\
+\texttt{/api/student-groups} & Group Formation & Peer invitations and team registration \\
+\texttt{/api/groups}         & Project Management & Coordinator group tracking and lifecycle states \\
+\texttt{/api/theses}         & Master Thesis & Individual graduate research thesis workflows \\
+\texttt{/api/supervisors}    & Faculty Allocation & Supervisor allocation and supervision requests \\
+\texttt{/api/evaluations}    & Defense Evaluation & Criteria-wise score submission and mark aggregation \\
+\texttt{/api/proposals}      & Document Management & Document upload, file retrieval, and feedback \\
+\texttt{/api/print}          & Document Export & Server-side A4 PDF grade sheet compilation \\
+\texttt{/api/examiner-assignments} & Defense Allocation & External examiner allocation with COI filter \\
+\texttt{/api/departments}    & Administration & Department, program, and academic year config \\
+\texttt{/api/notifications}  & Notification Service & In-app alerts and SMTP email dispatch \\
+\texttt{/api/files-audit}    & Audit Logging & Program-scoped audit log trail retrieval \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Appendix B: Technology and Dependency Versions}
+\addcontentsline{toc}{section}{Appendix B: Technology and Dependency Versions}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+\textbf{Technology / Library} & \textbf{Version} & \textbf{Role in Platform} \\
+\midrule
+React & 18.2.0 & Component-based frontend user interface library \\
+Vite & 5.1.0 & Next-generation frontend build tooling and HMR server \\
+Tailwind CSS & 4.3.3 & Utility-first CSS layout styling framework \\
+React Router DOM & 6.22.0 & Declarative client-side routing and protected paths \\
+Node.js & v18+ / v20+ & JavaScript asynchronous server runtime \\
+Express.js & 4.18.2 & Minimalist backend HTTP web framework \\
+PostgreSQL & 16.x & Relational Database Management System (RDBMS) \\
+Prisma ORM & 5.10.0 & Type-safe database client and schema migration tool \\
+Puppeteer Core & 25.3.0 & Headless Chromium engine for server-side PDF rendering \\
+SheetJS (\texttt{xlsx}) & 0.18.5 & Spreadsheet parsing library for roster batch onboarding \\
+bcryptjs & 2.4.3 & Cryptographic salt hashing for user password storage \\
+jsonwebtoken & 9.0.2 & RFC 7519 JSON Web Token signing and verification \\
+Nodemailer & 6.9.8 & SMTP mail transport client for automated email alerts \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Appendix C: Database Enumeration Types}
+\addcontentsline{toc}{section}{Appendix C: Database Enumeration Types}
+
+The Prisma database schema enforces strict domain constraints using the following PostgreSQL enum types:
+
+\begin{itemize}
+  \item \textbf{\texttt{Role}:} \texttt{STUDENT}, \texttt{SUPERVISOR}, \texttt{COORDINATOR}, \texttt{EXTERNAL\_EXAMINER}, \texttt{MAINTAINER}
+  \item \textbf{\texttt{DegreeType}:} \texttt{BACHELOR}, \texttt{MASTER}
+  \item \textbf{\texttt{BachelorProjectType}:} \texttt{MINOR}, \texttt{MAJOR}
+  \item \textbf{\texttt{GroupStatus}:} \texttt{PENDING}, \texttt{ACTIVE}, \texttt{COMPLETED}, \texttt{OVERDUE}, \texttt{REJECTED}
+  \item \textbf{\texttt{EvaluationStage}:} \texttt{PROPOSAL}, \texttt{MID\_TERM}, \texttt{FINAL}
+  \item \textbf{\texttt{EvaluationType}:} \texttt{SUPERVISOR}, \texttt{PROPOSAL\_DEFENSE}, \texttt{MIDTERM\_DEFENSE}, \texttt{FINAL\_DEFENSE}, \texttt{EXTERNAL\_EXAMINER}, \texttt{EXTERNAL\_MIDTERM}, \texttt{EXTERNAL\_FINAL}
+  \item \textbf{\texttt{EvaluationStatus}:} \texttt{DRAFT}, \texttt{COMPLETED}
+  \item \textbf{\texttt{InvitationStatus}:} \texttt{PENDING}, \texttt{ACCEPTED}, \texttt{DECLINED}, \texttt{CANCELLED}
+  \item \textbf{\texttt{AnnouncementType}:} \texttt{GENERAL}, \texttt{MINOR}, \texttt{MAJOR}, \texttt{THESIS}
+\end{itemize}

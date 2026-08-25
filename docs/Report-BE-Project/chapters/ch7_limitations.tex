@@ -1,0 +1,41 @@
+\chapter{Limitations and Future Enhancements}
+
+\section{Current Limitations}
+Despite successfully achieving all stated objectives, the TPMS platform has the following current limitations that are acknowledged for institutional awareness:
+
+\begin{enumerate}[label=\textbf{L\arabic*.}]
+    \item \textbf{Single Institutional Deployment:} The current implementation is scoped to DOECE, Pulchowk Campus. Adapting the system for multi-institution or multi-campus deployment would require a multi-tenancy architectural extension, including tenant-scoped data partitioning and centralized SSO integration.
+    
+    \item \textbf{Intranet-Only Deployment:} The initial deployment target is the departmental intranet. Exposing the system over the public internet would require additional hardening including rate limiting, DDOS mitigation, and TLS certificate management.
+    
+    \item \textbf{Static Evaluation Rubric Weightages:} The current implementation encodes the DOECE mark distribution (Minor 50, Major 100, Master 300) as application-layer constants. There is no UI for coordinators to dynamically reconfigure criterion weights for future academic sessions without code-level modification.
+    
+    \item \textbf{No Real-Time Collaboration:} The current platform does not support real-time concurrent editing (e.g., two coordinators simultaneously editing the same group record). WebSocket-based optimistic concurrency control is absent.
+    
+    \item \textbf{Limited Notification Channels:} The current notification infrastructure delivers in-app alerts and email notifications via SMTP. SMS-based notifications and push notification delivery via mobile applications are not yet implemented.
+    
+    \item \textbf{No Integrated Defense Scheduling:} The system manages evaluation rubrics and marks but does not provide an integrated defense calendar, slot booking, or room allocation module. Defense scheduling remains an external coordination activity.
+    
+    \item \textbf{File Storage Locality:} Uploaded proposal and report documents are stored on the application server local filesystem. This limits horizontal scalability and backup flexibility compared to cloud-native object storage.
+\end{enumerate}
+
+\section{Future Enhancements}
+The following roadmap items are identified as high-value enhancements for subsequent development phases:
+
+\begin{enumerate}[label=\textbf{FE\arabic*.}]
+    \item \textbf{Defense Scheduling and Calendar Integration:} Implement an integrated defense scheduling module enabling coordinators to propose defense date slots, supervisors and examiners to confirm availability, and the system to auto-generate defense timetable PDFs.
+    
+    \item \textbf{Configurable Evaluation Rubric Builder:} Develop a UI-driven rubric configuration panel allowing coordinators to define custom criterion names, sub-criteria weights, and evaluation schemes per academic session and project type.
+    
+    \item \textbf{Cloud Object Storage Integration:} Migrate document storage from local filesystem to cloud-native object storage (e.g., AWS S3 or equivalent), enabling geo-redundant backups, content delivery, and independent frontend/backend scaling.
+    
+    \item \textbf{Real-Time WebSocket Notifications:} Integrate Socket.IO or native WebSocket channels to deliver instant real-time notifications on group status changes, evaluation submissions, and coordinator assignments without page refresh.
+    
+    \item \textbf{Mobile Application (Progressive Web App):} Package the React SPA as a Progressive Web App (PWA) with offline caching, push notification support, and installable home screen presence for student and faculty convenience.
+    
+    \item \textbf{Multi-Institution Tenancy:} Re-architect the database schema and API layer to support multi-tenant deployment, enabling other IOE campus departments (e.g., Thapathali, Purwanchal) to independently administer their project management workflows within a shared platform.
+    
+    \item \textbf{Automated Plagiarism Similarity Check Integration:} Integrate a document similarity scoring pipeline that computes cosine similarity between submitted proposals and a corpus of prior submissions, flagging suspiciously similar documents for coordinator review prior to proposal approval.
+    
+    \item \textbf{Supervisor Workload Balancing Dashboard:} Provide coordinators with a visual workload distribution heatmap displaying the current supervisee count per faculty member across all programs, enabling equitable supervision allocation.
+\end{enumerate}
