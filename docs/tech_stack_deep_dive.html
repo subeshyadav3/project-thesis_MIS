@@ -423,6 +423,7 @@
             <li class="nav-item"><a href="#puppeteer" class="nav-link"><span class="badge">8</span> 🌐 Puppeteer-Core</a></li>
             <li class="nav-item"><a href="#nodemailer" class="nav-link"><span class="badge">9</span> 📧 Nodemailer</a></li>
             <li class="nav-item"><a href="#ratelimit" class="nav-link"><span class="badge">10</span> 🛡️ Express-Rate-Limit</a></li>
+            <li class="nav-item"><a href="#architecture-callgraph" class="nav-link" style="border-top: 1px solid var(--border-color); margin-top: 8px; padding-top: 10px;"><span class="badge" style="background: rgba(56, 189, 248, 0.2); color: var(--accent-blue);">★</span> 🗺️ System Call Graph & File Map</a></li>
         </ul>
     </nav>
 
@@ -1159,6 +1160,231 @@ router.<span class="function">post</span>(<span class="string">'/upload-proposal
                 <div class="viva-qa">
                     <div class="viva-q">Q: Why must you configure 'app.set("trust proxy", 1)' when running Express behind Nginx or Cloudflare?</div>
                     <div class="viva-a">A: Without <code>trust proxy</code>, Express sees the IP of the reverse proxy (Nginx) as <code>req.ip</code> for EVERY user request. This causes the rate-limiter to treat ALL system users as a single IP, blocking the entire site globally once the limit is reached.</div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 11. COMPLETE SYSTEM CALL GRAPH & FILE MAP -->
+        <article id="architecture-callgraph" class="tech-card" style="border-left-color: var(--accent-cyan);">
+            <div class="card-header">
+                <div class="tech-title">
+                    <h2>🗺️ Complete File Map & End-to-End Call Graph</h2>
+                    <span class="category-badge">Comprehensive Architecture Map</span>
+                </div>
+                <p class="tech-desc">
+                    An exhaustive, file-by-file traceability guide showing exactly <strong>what calls what</strong> across the entire TPMS stack — tracing user actions from React frontend components through Axios API services, Express routing, middleware, controllers, Prisma ORM queries, PostgreSQL models, and the Python FastAPI AI microservice.
+                </p>
+            </div>
+
+            <div class="sub-section">
+                <h3>1. Master Traceability Matrix: Frontend ⇄ Backend ⇄ Database / AI Microservice</h3>
+                <div style="overflow-x: auto; margin-top: 14px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #111827; color: var(--accent-blue); text-align: left;">
+                                <th style="padding: 10px; border: 1px solid var(--border-color);">Frontend Page / Component</th>
+                                <th style="padding: 10px; border: 1px solid var(--border-color);">HTTP API Call</th>
+                                <th style="padding: 10px; border: 1px solid var(--border-color);">Express Route & Middleware</th>
+                                <th style="padding: 10px; border: 1px solid var(--border-color);">Backend Controller & Function</th>
+                                <th style="padding: 10px; border: 1px solid var(--border-color);">Prisma Model / Microservice</th>
+                                <th style="padding: 10px; border: 1px solid var(--border-color);">Program Scope & Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/Login.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/auth/login</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/auth.js</code><br>+ <code>loginLimiter</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>authController.js</code><br><code>login()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>User</code>, <code>Program</code>, <code>Department</code>, <code>AuditLog</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">All 6 Programs. Authenticates user, compares bcrypt hash, signs 7-day JWT, sets cookie, enriches student batch/year.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/ResetPassword.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/auth/forgot-password</code><br><code>POST /api/auth/reset-password</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/auth.js</code><br>+ <code>passwordResetLimiter</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>authController.js</code><br><code>forgotPassword()</code>, <code>resetPassword()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>User</code>, <code>Nodemailer</code>, <code>AuditLog</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">All Programs. Generates crypto reset token, sends 1-hour expiration email, updates bcrypt hash (min 6 chars).</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/coordinator/Announcements.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>GET /api/announcements</code><br><code>POST /api/announcements</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/announcements.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>announcementController.js</code><br><code>getAnnouncements()</code>, <code>create()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Announcement</code>, <code>AcademicYear</code>, <code>Department</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Coordinator/Dept level. Publishes proposal calls, sets team size limits (1-4), toggles registration forms.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/coordinator/Announcements.jsx</code><br>(Matrix Modal)</td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>GET /api/announcements/:id/responses</code><br><code>POST /api/announcements/:id/finalize-batch</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/announcements.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>announcementController.js</code><br><code>getResponses()</code>, <code>finalizeBatch()</code><br>+ <code>fuzzyMatch.js</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>FormResponse</code>, <code>ProjectGroup</code>, <code>Thesis</code>, <code>EvaluationComponent</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">BCT/BEI & Master. Fuzzy auto-matches supervisors, deduplicates group rows, atomizes group creation via <code>$transaction</code>.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/coordinator/BachelorProjects.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>GET /api/groups</code><br><code>PUT /api/groups/:id</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/groups.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>groupController.js</code><br><code>getGroups()</code>, <code>updateGroup()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>ProjectGroup</code>, <code>GroupMember</code>, <code>User</code>, <code>Evaluation</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>BCT & BEI Programs</strong>. Filters by Minor (2080) vs Major (2079/2078), updates supervisors, enforces 4-member limit.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/coordinator/MasterThesis.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>GET /api/theses</code><br><code>PUT /api/theses/:id</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/theses.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>thesisController.js</code><br><code>getTheses()</code>, <code>updateThesis()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Thesis</code>, <code>User</code> (External Mid/Final), <code>Evaluation</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Master Programs (MSCSK, MSICE, MSDSA, MSNCS)</strong>. Assigns dual external examiners, handles 4-Cr project & 16-Cr thesis.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/student/Forms.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/announcements/form/:id/submit</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/announcements.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>announcementController.js</code><br><code>submitFormResponse()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>FormResponse</code> (JSONB <code>formData</code>)</td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Students. Submits concept proposals, research cluster, supervisor preference, attached PDF URL with edit ability.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/student/Groups.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/student-groups/create</code><br><code>POST /api/student-groups/invite</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/studentGroups.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>studentGroupController.js</code><br><code>createGroup()</code>, <code>invite()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>ProjectGroup</code>, <code>GroupInvitation</code>, <code>GroupMember</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Bachelor Students. Forms team, checks <code>engagementGuard</code>, sends invitations, attaches proposal document.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/supervisor/ProjectDetail.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/evaluations/submit</code><br><code>POST /api/proposals/:id/comment</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/evaluations.js</code><br>+ <code>authorize('SUPERVISOR')</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>evaluationController.js</code><br><code>submitEvaluation()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Evaluation</code>, <code>EvaluationComponent</code>, <code>ProposalComment</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Supervisors. Grades 5 criteria (Minor 25 / Major 50 / Thesis 100 marks), submits feedback, tracks student progress.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>pages/external/EvaluationPage.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/evaluations/external/submit</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/evaluations.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>evaluationController.js</code><br><code>submitExternalEvaluation()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Evaluation</code>, <code>ExaminerAssignment</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">External/Internal Examiners. Scores defense criteria (Minor 10 / Major 20 / Thesis 200) with supervisor conflict check.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>components/EvaluationPdfPreview.jsx</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>GET /api/print/group/:id/evaluation-sheet</code><br><code>POST /api/print/bulk-evaluations</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>routes/print.js</code><br>+ <code>authenticate</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>printController.js</code><br><code>generateGroupEvaluationPdf()</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Puppeteer</code>, <code>ProjectGroup</code>, <code>Thesis</code>, <code>Evaluation</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">All Programs. Renders official Pulchowk Campus A4 marksheets, converts numbers to words, builds merged PDF.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>components/ProposalsSection.jsx</code><br>(AI Chat Drawer)</td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>POST /api/ai/chat/stream</code><br><code>GET /api/ai/analysis/:id</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">FastAPI Microservice<br>(<code>ai_chatbot/app/router.py</code>)</td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>chat_agent.py</code>, <code>analyzer.py</code>, <code>pipeline.py</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>PyMuPDF</code>, <code>Sentence-Transformers</code>, <code>ChromaDB</code>, <code>Groq Llama-3.1</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">All Programs. Parses proposal PDF, computes dense vectors, performs semantic RAG search, streams SSE tokens.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="sub-section" style="margin-top: 30px;">
+                <h3>2. Directory Structure & Functional File Directory</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px;">
+                    <div style="background: var(--code-bg); padding: 18px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h4 style="color: var(--accent-blue); margin-bottom: 10px;">Frontend Architecture (<code>frontend/src/</code>)</h4>
+                        <ul style="list-style: none; font-size: 0.85rem; line-height: 1.8; color: var(--text-muted);">
+                            <li><code>App.jsx</code> — Root router, role-guarded routes with <code>DegreeGuard</code></li>
+                            <li><code>services/api.jsx</code> — Central Axios client with Bearer JWT interceptors</li>
+                            <li><code>contexts/AuthContext.jsx</code> — User session state, login/logout functions</li>
+                            <li><code>contexts/ToastContext.jsx</code> — Global toast notifications provider</li>
+                            <li><code>components/DegreeGuard.jsx</code> — Prevents Bachelor ⇄ Master cross-navigation</li>
+                            <li><code>components/ProposalsSection.jsx</code> — PDF preview, stage approvals, AI drawer trigger</li>
+                            <li><code>components/SupervisorAssignmentSection.jsx</code> — Supervisor selection with conflict filter</li>
+                            <li><code>components/ExaminerAssignmentSection.jsx</code> — Internal examiner allocation widget</li>
+                            <li><code>components/EvaluationPdfPreview.jsx</code> — Iframe PDF viewer for print sheets</li>
+                            <li><code>pages/coordinator/Announcements.jsx</code> — Form Responses Matrix & Fuzzy Matching</li>
+                            <li><code>pages/coordinator/BachelorProjects.jsx</code> — BCT/BEI Minor & Major Projects management</li>
+                            <li><code>pages/coordinator/MasterThesis.jsx</code> — Master 3rd Sem Projects & 4th Sem Theses</li>
+                            <li><code>pages/supervisor/ProjectDetail.jsx</code> — Supervisor live rubric grading interface</li>
+                            <li><code>pages/student/Forms.jsx</code> — Concept proposal submission & edit form</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--code-bg); padding: 18px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h4 style="color: var(--accent-emerald); margin-bottom: 10px;">Backend Architecture (<code>backend/src/</code>)</h4>
+                        <ul style="list-style: none; font-size: 0.85rem; line-height: 1.8; color: var(--text-muted);">
+                            <li><code>index.js</code> — Express app bootstrap, CORS, rate limiters, route mounting</li>
+                            <li><code>middleware/auth.js</code> — <code>authenticate</code> (JWT) and <code>authorize(roles)</code> guards</li>
+                            <li><code>utils/coordinatorScope.js</code> — Resolves program/degree scoping boundaries</li>
+                            <li><code>utils/fuzzyMatch.js</code> — Levenshtein & token overlap matching for supervisors</li>
+                            <li><code>config/evaluationScheme.js</code> — Tribhuvan University 50/100/300-mark rubrics</li>
+                            <li><code>controllers/authController.js</code> — Login, forgot/reset password, change password</li>
+                            <li><code>controllers/announcementController.js</code> — Matrix queries, batch finalization</li>
+                            <li><code>controllers/groupController.js</code> — Bachelor group lifecycle & engagement guard</li>
+                            <li><code>controllers/thesisController.js</code> — Master thesis lifecycle & cross-program requests</li>
+                            <li><code>controllers/evaluationController.js</code> — Rubric scoring, draft/complete validation</li>
+                            <li><code>controllers/printController.js</code> — Puppeteer PDF engine, mark-to-words converter</li>
+                            <li><code>controllers/userController.js</code> — User CRUD, password $\ge 6$ check, Excel parser</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-section" style="margin-top: 30px;">
+                <h3>3. End-to-End Workflow Call Sequence (Example: Proposal Submission & Batch Finalization)</h3>
+                <pre style="background: #030712; border: 1px solid #1f2937; padding: 16px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.6; color: #38bdf8;">
+[Student Submits Concept Form]
+  └─► Frontend: pages/student/Forms.jsx
+        └─► Axios POST /api/announcements/form/:id/submit
+              └─► Express: routes/announcements.js (authenticate middleware)
+                    └─► Controller: announcementController.js -> submitFormResponse()
+                          └─► Database: Prisma create/update FormResponse (status: SUBMITTED)
+                                └─► Async Trigger: uploadController.js -> POST http://localhost:8001/api/ai/analyze
+                                      └─► FastAPI Microservice: core/pipeline.py (PyMuPDF -> BGE Embeddings -> ChromaDB)
+
+[Coordinator Reviews & Finalizes Matrix]
+  └─► Frontend: pages/coordinator/Announcements.jsx (Matrix View)
+        └─► Axios GET /api/announcements/:id/responses
+              └─► Backend: announcementController.js -> getResponses() + utils/fuzzyMatch.js
+                    └─► Coordinator clicks "Finalize Selected"
+                          └─► Axios POST /api/announcements/:id/finalize-batch
+                                └─► Backend: announcementController.js -> finalizeBatch()
+                                      └─► Prisma $transaction [
+                                            1. Create ProjectGroup / Thesis (status: ACTIVE)
+                                            2. Insert GroupMembers
+                                            3. Generate EvaluationComponents (evaluationScheme.js)
+                                            4. Update FormResponse (status: FINALIZED)
+                                          ]
+
+[Faculty Supervisor Evaluates]
+  └─► Frontend: pages/supervisor/ProjectDetail.jsx
+        └─► Axios POST /api/evaluations/submit
+              └─► Backend: evaluationController.js -> submitEvaluation() (checks max marks per rubric)
+                    └─► Database: Evaluation (status: COMPLETED, marks: 45.0/50)
+
+[Export Official Pulchowk Grade Sheet]
+  └─► Frontend: components/EvaluationPdfPreview.jsx
+        └─► Axios GET /api/print/group/:id/evaluation-sheet
+              └─► Backend: printController.js -> generateGroupEvaluationPdf()
+                    └─► Runs numberToWords(45.0) -> 'Forty-Five Point Zero'
+                          └─► Puppeteer headless Chromium renders HTML/CSS template -> Emits A4 PDF stream
+                </pre>
+            </div>
+
+            <div class="viva-section" style="margin-top: 30px;">
+                <div class="viva-title">💡 Viva & Examination Questions on Call Hierarchy</div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How does data flow from the student's PDF upload to the AI Chatbot drawer in the coordinator's view?</div>
+                    <div class="viva-a">A: 1) Student uploads PDF via <code>Forms.jsx</code> or <code>Groups.jsx</code>. 2) Backend <code>uploadController.js</code> saves file locally via <code>Multer</code> and makes an asynchronous fire-and-forget HTTP call to FastAPI's <code>/api/ai/analyze</code>. 3) FastAPI processes the PDF using <code>PyMuPDF</code>, creates 384-dimensional dense vectors with <code>sentence-transformers</code>, and stores them in <code>ChromaDB</code>. 4) When the coordinator opens the AI drawer, the frontend connects to <code>/api/ai/chat/stream</code>, where FastAPI queries ChromaDB for top-$k$ passages, augments the prompt, and streams LLM tokens via Server-Sent Events (SSE).</div>
+                </div>
+                <div class="viva-qa">
+                    <div class="viva-q">Q: How does the system guarantee that coordinator actions never leak across degree programs?</div>
+                    <div class="viva-a">A: It uses a two-tier guard: On the frontend, <code>DegreeGuard.jsx</code> checks <code>user.degreeType</code> and blocks navigation to unauthorized degree URLs. On the backend, <code>utils/coordinatorScope.js</code> resolves the coordinator's exact <code>programId</code> (e.g. BCT) from the database and injects strict Prisma query filters (<code>where: { programId: coordinator.programId }</code>), ensuring API requests cannot access or mutate foreign program records even if URL parameters are manipulated.</div>
                 </div>
             </div>
         </article>

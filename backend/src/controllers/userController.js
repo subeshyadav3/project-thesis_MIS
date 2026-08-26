@@ -102,6 +102,9 @@ exports.createUser = async (req, res) => {
     if (!password || !firstName || !lastName || !role) {
       return res.status(400).json({ error: 'password, firstName, lastName, and role are required' });
     }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
     if (!VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` });
     }
@@ -306,7 +309,12 @@ exports.updateUser = async (req, res) => {
         data.programId = pid;
       }
     }
-    if (req.body.password) data.password = await bcrypt.hash(req.body.password, 10);
+    if (req.body.password) {
+      if (req.body.password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      }
+      data.password = await bcrypt.hash(req.body.password, 10);
+    }
     if (req.body.designation !== undefined) data.designation = req.body.designation;
 
     // Resolve roll number first so a student's derived email stays in sync
@@ -714,6 +722,10 @@ exports.bulkCreateUsers = async (req, res) => {
         errors.push({ email: email || 'unknown', error: 'Missing required fields (password, firstName, lastName, role)' });
         continue;
       }
+      if (password.length < 6) {
+        errors.push({ email: email || 'unknown', error: 'Password must be at least 6 characters' });
+        continue;
+      }
       if (!email && role !== 'STUDENT') {
         errors.push({ email: email || 'unknown', error: 'email is required for this role' });
         continue;
@@ -882,6 +894,11 @@ exports.bulkImportUsersExcel = async (req, res) => {
           errors.push({ row: rowNum, email: email || 'unknown', error: 'Missing required fields (email, password, firstName, lastName)' });
           continue;
         }
+      }
+
+      if (password && password.length < 6) {
+        errors.push({ row: rowNum, email: email || 'unknown', error: 'Password must be at least 6 characters' });
+        continue;
       }
 
       if (role === 'STUDENT') {
