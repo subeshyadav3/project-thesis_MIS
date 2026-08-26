@@ -132,7 +132,7 @@ function buildSupervisorPage(title, studentName, rollNo, supervisor, supCriteria
       <td style="text-align:center;padding:5px 4px;border:1px solid #000;">${c.comment ? esc(c.comment) : ''}</td>
     </tr>`).join('');
 
-  const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
+  const commentText = [...new Set([...comments, feedbackComments].filter(Boolean))].join('; ');
   const suggestionText = feedbackSuggestions || '';
 
   return `
@@ -220,7 +220,7 @@ function buildExternalPage(title, studentName, rollNo, extCriteria, comments, fe
   const phaseLabel = isFinal ? 'Final' : 'Mid-Term';
   const credit = isProject ? 4 : 16;
 
-  const commentText = [...comments, feedbackComments].filter(Boolean).join('; ');
+  const commentText = [...new Set([...comments, feedbackComments].filter(Boolean))].join('; ');
   const suggestionText = feedbackSuggestions || '';
 
   if (isFinal || isProject) {
@@ -416,17 +416,17 @@ function buildMasterFormat(data, scope = 'both') {
   const midCriteria = buildExtCriteria(midEvals.length ? midEvals : legacyExt);
   const finalCriteria = buildExtCriteria(finalEvals.length ? finalEvals : legacyExt);
 
-  const supComments = supEvals.filter(e => e.comment).map(e => e.comment);
-  const supFeedbackComments = supEvals.map(e => e.comments).filter(Boolean).join('\n');
-  const supFeedbackSuggestions = supEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+  const supComments = [...new Set(supEvals.filter(e => e.comment).map(e => e.comment))];
+  const supFeedbackComments = [...new Set(supEvals.map(e => e.comments).filter(Boolean))].join('\n');
+  const supFeedbackSuggestions = [...new Set(supEvals.map(e => e.suggestions).filter(Boolean))].join('\n');
 
-  const midComments = midEvals.filter(e => e.comment).map(e => e.comment);
-  const midFeedbackComments = midEvals.map(e => e.comments).filter(Boolean).join('\n');
-  const midFeedbackSuggestions = midEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+  const midComments = [...new Set(midEvals.filter(e => e.comment).map(e => e.comment))];
+  const midFeedbackComments = [...new Set(midEvals.map(e => e.comments).filter(Boolean))].join('\n');
+  const midFeedbackSuggestions = [...new Set(midEvals.map(e => e.suggestions).filter(Boolean))].join('\n');
 
-  const finalComments = finalEvals.filter(e => e.comment).map(e => e.comment);
-  const finalFeedbackComments = finalEvals.map(e => e.comments).filter(Boolean).join('\n');
-  const finalFeedbackSuggestions = finalEvals.map(e => e.suggestions).filter(Boolean).join('\n');
+  const finalComments = [...new Set(finalEvals.filter(e => e.comment).map(e => e.comment))];
+  const finalFeedbackComments = [...new Set(finalEvals.map(e => e.comments).filter(Boolean))].join('\n');
+  const finalFeedbackSuggestions = [...new Set(finalEvals.map(e => e.suggestions).filter(Boolean))].join('\n');
 
   const studentName = name;
   const rollNo = student?.rollNumber || '—';
@@ -551,10 +551,10 @@ function buildBachelorFormat(data) {
     </tr>`;
   }).join('');
 
-  const comments = evaluations.map(e => e.comment).filter(Boolean).join('; ');
-  const feedbackComments = evaluations.map(e => e.comments).filter(Boolean).join('; ');
-  const suggestionText = evaluations.map(e => e.suggestions).filter(Boolean).join('; ');
-  const commentText = [comments, feedbackComments].filter(Boolean).join('; ');
+  const comments = [...new Set(evaluations.map(e => e.comment).filter(Boolean))].join('; ');
+  const feedbackComments = [...new Set(evaluations.map(e => e.comments).filter(Boolean))].join('; ');
+  const suggestionText = [...new Set(evaluations.map(e => e.suggestions).filter(Boolean))].join('; ');
+  const commentText = [...new Set([comments, feedbackComments].filter(Boolean))].join('; ');
 
   // Distinct examiners (by submittedBy) for the signature block
   const seen = new Set();

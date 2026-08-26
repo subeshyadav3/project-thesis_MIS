@@ -1,4 +1,4 @@
-﻿"""Configuration module for the AI chatbot service.
+"""Configuration module for the AI chatbot service.
 
 Loads environment variables from the parent .env file (or a local one)
 and exposes a typed Settings object.
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # ──Groq (default primary — very fast, free tier) ──────────────────────
     groq_api_key: str = Field(default="")
     groq_base_url: str = Field(default="https://api.groq.com/openai/v1")
-    groq_model: str = Field(default="llama-3.3-70b-versatile")
+    groq_model: str = Field(default="qwen/qwen3.8-27b")
     groq_temperature: float = 0.2
     groq_max_tokens: int = 2048
 

@@ -97,14 +97,30 @@ function StudentProjectDetail() {
     const hasSubmitted = submittedStages.includes(stage);
     const types = stageEvalTypes[stage] || [];
     const stageComponents = components.filter(c => types.includes(c.evaluationType));
+
+    // 1. Completed: ONLY when ALL required criteria components for this stage have marks entered in DB
     const allMarked = stageComponents.length > 0 && stageComponents.every(c => {
       const e = evalByComponent.get(c.id);
       return e && e.marks !== null && e.marks !== undefined;
     });
-    if (allMarked) return 'done';
-    const hasFeedback = evaluations.some(e => e.stage === stage && e.comment);
-    if (hasSubmitted && hasFeedback) return 'done';
-    if (hasSubmitted) return 'submitted';
+
+    if (allMarked || (stage === 'FINAL' && assignment?.status === 'COMPLETED')) {
+      return 'done';
+    }
+
+    // 2. Awaiting review: Document uploaded OR evaluation is in progress (partial marks / feedback given)
+    const hasAnyMarks = stageComponents.some(c => {
+      const e = evalByComponent.get(c.id);
+      return e && e.marks !== null && e.marks !== undefined;
+    }) || evaluations.some(e => (e.stage === stage || types.includes(e.evaluationType)) && e.marks !== null && e.marks !== undefined);
+
+    const hasFeedback = evaluations.some(e => (e.stage === stage || types.includes(e.evaluationType)) && (e.comment || e.comments));
+
+    if (hasSubmitted || hasAnyMarks || hasFeedback) {
+      return 'submitted';
+    }
+
+    // 3. Not started: No document uploaded and no evaluation recorded
     return 'inactive';
   };
 

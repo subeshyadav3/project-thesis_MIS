@@ -107,9 +107,23 @@ The database reflects the IOE Tribhuvan University semester progression:
 
 ---
 
-## 5. Verified Excel Test Templates Inventory
+## 5. Live Defense Showcase Excel Datasets (`backend/excel-templates/defense-showcase/`)
 
-All templates in `backend/excel-templates/New-Test-data/` are tested and validated:
+These 5 spreadsheets strictly follow the official templates (including `degreeType` for users) and use **100% verified clean & unassigned students** (no active thesis, no project, no form submission) for seamless live demonstration:
+
+| File Name | Target Upload Destination | Batch / Semester | Description & Roles |
+| :--- | :--- | :--- | :--- |
+| `01_master_3rd_sem_082_projects.xlsx` | **Theses &rarr; Bulk Upload** | **Batch 2082 (3rd Sem Project - 4 Cr)** | 4 Master Projects (`082MSNCS05-06`, `082MSDSA05-06`). Type `Project`. External Final Examiner assigned. |
+| `02_master_4th_sem_081_theses.xlsx` | **Theses &rarr; Bulk Upload** | **Batch 2081 (4th Sem Thesis - 16 Cr)** | 4 Master Theses (`081MSNCS02-03`, `081MSDSA02-03`). Type `Thesis`. Supervisor, External Midterm & Final assigned. |
+| `03_master_student_users.xlsx` | **Users &rarr; Bulk Upload** | **New Enrollment (Batch 083)** | 4 New Master students. Columns: `email`, `password`, `firstName`, `lastName`, `rollNumber`, `programCode`, `degreeType` (`MASTER`). |
+| `04_master_supervisor_users.xlsx` | **Users &rarr; Bulk Upload** | **Department Faculty** | 3 Faculty Supervisors (Prof. Dr. Subarna Shakya, Prof. Dr. Nanda Bikram Adhikari, Assoc. Prof. Dr. Babu Ram Dawadi). |
+| `05_master_external_examiners.xlsx` | **Users &rarr; Bulk Upload** | **External Defense Jury** | 2 External Examiners (Prof. Dr. Shashidhar Ram Joshi, Assoc. Prof. Dr. Sanjeeb Prasad Panday). |
+
+---
+
+## 6. Legacy / Reference Excel Templates Inventory
+
+Reference templates in `backend/excel-templates/New-Test-data/`:
 
 | File Name | Target Upload Destination | Role / Type |
 | :--- | :--- | :--- |

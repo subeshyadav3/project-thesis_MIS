@@ -802,6 +802,7 @@ async function main() {
   const completedTheses = createdTheses.filter(t => t.status === 'COMPLETED');
   for (const compThesis of completedTheses) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compThesis.id } });
+    const seenTypes = new Set();
     for (const c of comps) {
       let subId = compThesis.supervisorId || supervisors[0].id;
       let score = 18.0;
@@ -812,14 +813,17 @@ async function main() {
         subId = compThesis.externalFinalId || externalExaminers[1].id;
         score = 18.5;
       }
+      const isFirstForType = !seenTypes.has(c.evaluationType);
+      seenTypes.add(c.evaluationType);
+
       await prisma.evaluation.create({
         data: {
           componentId: c.id,
           stage: c.stage || 'FINAL',
           evaluationType: c.evaluationType,
           marks: score,
-          comments: `${c.name} evaluated thoroughly with commendable rigor.`,
-          suggestions: 'Consider submitting extended results to an IEEE conference.',
+          comments: isFirstForType ? 'Evaluated thoroughly with commendable research rigor.' : null,
+          suggestions: isFirstForType ? 'Consider submitting extended results to an IEEE conference.' : null,
           status: 'COMPLETED',
           submittedById: subId,
           thesisId: compThesis.id,
@@ -832,6 +836,7 @@ async function main() {
   for (const compProject of completedProjects) {
     const comps = await prisma.evaluationComponent.findMany({ where: { thesisId: compProject.id } });
     const subId = compProject.externalFinalId || externalExaminers[0].id;
+    let isFirst = true;
     for (const c of comps) {
       await prisma.evaluation.create({
         data: {
@@ -839,13 +844,14 @@ async function main() {
           stage: 'FINAL',
           evaluationType: 'EXTERNAL_FINAL',
           marks: 18.5,
-          comments: 'High quality implementation and defense.',
-          suggestions: 'Refactor modular components for production packaging.',
+          comments: isFirst ? 'High quality implementation and defense.' : null,
+          suggestions: isFirst ? 'Refactor modular components for production packaging.' : null,
           status: 'COMPLETED',
           submittedById: subId,
           thesisId: compProject.id,
         },
       });
+      isFirst = false;
     }
   }
 

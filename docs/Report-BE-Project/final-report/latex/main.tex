@@ -46,12 +46,12 @@
 \titleformat{\chapter}[block]
   {\normalfont\fontsize{14}{16}\bfseries\centering}
   {Chapter \thechapter.\ }{0pt}{\fontsize{14}{16}\bfseries\centering}
-\titlespacing*{\chapter}{0pt}{0pt}{12pt}
+\titlespacing*{\chapter}{0pt}{-24pt}{12pt}
 
 \titleformat{name=\chapter,numberless}[block]
   {\normalfont\fontsize{14}{16}\bfseries\centering}
   {}{0pt}{\fontsize{14}{16}\bfseries\centering}
-\titlespacing*{name=\chapter,numberless}{0pt}{0pt}{12pt}
+\titlespacing*{name=\chapter,numberless}{0pt}{-24pt}{12pt}
 
 \renewcommand{\thesection}{\thechapter.\arabic{section}}
 \titleformat{\section}
@@ -106,27 +106,28 @@
 % TITLE PAGE (Per Minor Project Final Report Template.docx)
 %==================================================================
 \begin{titlepage}
-\noindent{\fontsize{11}{13}\selectfont\textbf{Cluster: EII}}\\[0.2cm]
+{\raggedright\fontsize{11}{13}\selectfont\textbf{Cluster: EII}\par}
+\vspace{0.1cm}
 {\centering
-  \includegraphics[scale=0.28]{logotu.jpg}\\[0.3cm]
+  \includegraphics[scale=0.28]{logotu.jpg}\\[0.25cm]
   {\fontsize{14}{16}\selectfont\textbf{TRIBHUVAN UNIVERSITY}}\\[0.1cm]
   {\fontsize{14}{16}\selectfont\textbf{INSTITUTE OF ENGINEERING}}\\[0.1cm]
-  {\fontsize{14}{16}\selectfont\textbf{PULCHOWK CAMPUS}}\\[0.6cm]
-  {\fontsize{15}{18}\selectfont\textbf{``PROJECT/THESIS MANAGEMENT SYSTEM (TPMS)''}}\\[0.7cm]
+  {\fontsize{14}{16}\selectfont\textbf{PULCHOWK CAMPUS}}\\[0.55cm]
+  {\fontsize{15}{18}\selectfont\textbf{``PROJECT/THESIS MANAGEMENT SYSTEM (TPMS)''}}\\[0.85cm]
   {\fontsize{12}{14}\selectfont\textbf{Submitted by}}\\[0.25cm]
   {\fontsize{12}{14}\selectfont\textbf{Prabesh BC (PUL080BCT054)}}\\[0.12cm]
   {\fontsize{12}{14}\selectfont\textbf{Shreeyut Thapa (PUL080BCT080)}}\\[0.12cm]
-  {\fontsize{12}{14}\selectfont\textbf{Subesh Yadav (PUL080BCT084)}}\\[0.65cm]
+  {\fontsize{12}{14}\selectfont\textbf{Subesh Yadav (PUL080BCT084)}}\\[0.75cm]
   {\fontsize{12}{14}\selectfont\textbf{A}}\\[0.12cm]
-  {\fontsize{13}{15}\selectfont\textbf{BE MINOR PROJECT REPORT}}\\[0.5cm]
+  {\fontsize{13}{15}\selectfont\textbf{BE MINOR PROJECT REPORT}}\\[0.45cm]
   {\fontsize{11}{14}\selectfont\textbf{SUBMITTED TO THE DEPARTMENT OF ELECTRONICS \& COMPUTER\\
   ENGINEERING IN PARTIAL FULFILLMENT OF THE REQUIREMENTS\\
   FOR THE DEGREE OF BACHELOR OF ENGINEERING IN\\
   COMPUTER ENGINEERING}}\\[0.65cm]
   {\fontsize{12}{14}\selectfont\textbf{DEPARTMENT OF ELECTRONICS \& COMPUTER ENGINEERING}}\\[0.12cm]
   {\fontsize{12}{14}\selectfont\textbf{LALITPUR, NEPAL}}\\[0.45cm]
-  {\fontsize{12}{14}\selectfont\textbf{AUGUST, 2026}}
-\end{center}
+  {\fontsize{12}{14}\selectfont\textbf{AUGUST, 2026}}\par
+}
 \end{titlepage}
 
 %==================================================================

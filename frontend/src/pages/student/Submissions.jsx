@@ -32,10 +32,56 @@ function StudentSubmissions() {
   const completed = selectedItem?.status === 'COMPLETED';
 
   useEffect(() => {
-    if (items.length > 0 && !selectedId) {
-      setSelectedId(items[0].id);
+    let isMounted = true;
+    setLoading(true);
+    Promise.all([
+      api.get('/students/groups').catch(() => ({ data: [] })),
+      api.get('/students/theses').catch(() => ({ data: [] }))
+    ])
+      .then(([groupRes, thesisRes]) => {
+        if (!isMounted) return;
+        const gList = Array.isArray(groupRes.data) ? groupRes.data : [];
+        const tList = Array.isArray(thesisRes.data) ? thesisRes.data : [];
+        setGroups(gList);
+        setTheses(tList);
+
+        const isMaster = user?.degreeType === 'MASTER' || user?.program?.degreeType === 'MASTER' || user?.studentType === 'master';
+        if (isMaster && tList.length > 0) {
+          setActiveTab('theses');
+          setSelectedId(tList[0].id);
+        } else if (gList.length > 0) {
+          setActiveTab('groups');
+          setSelectedId(gList[0].id);
+        } else if (tList.length > 0) {
+          setActiveTab('theses');
+          setSelectedId(tList[0].id);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) toast.error(getApiMessage(err) || 'Failed to load assignments');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setProposals([]);
+      return;
     }
-  }, [items, selectedId]);
+    const endpoint = activeTab === 'groups' ? `/students/groups/${selectedId}` : `/students/theses/${selectedId}`;
+    api.get(endpoint)
+      .then(({ data }) => {
+        setProposals(data.proposals || []);
+        if (data.announcement) setAnnouncement(data.announcement);
+      })
+      .catch(() => {
+        setProposals([]);
+      });
+  }, [selectedId, activeTab]);
 
   const handleUpload = async (stage, e) => {
     const file = e.target.files[0];

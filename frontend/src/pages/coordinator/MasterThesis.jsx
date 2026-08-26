@@ -1141,7 +1141,7 @@ return (
                     </td>
                     <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 10px', color: 'var(--color-on-surface-variant)', fontSize: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 10, padding: '2px 7px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {t.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
                         </span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
@@ -1154,18 +1154,18 @@ return (
                             {t.supervisor.firstName} {t.supervisor.lastName}
                           </span>
                           {t.supervisorAssignmentStatus === 'PENDING' && (
-                            <span className="badge badge-warning" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                            <span className="badge badge-warning" style={{ fontSize: 10, padding: '2px 7px', width: 'fit-content', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               <span className="dot" />Awaiting Response
                             </span>
                           )}
                           {t.supervisorAssignmentStatus === 'REJECTED' && (
-                            <span className="badge badge-error" style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                            <span className="badge badge-error" style={{ fontSize: 10, padding: '2px 7px', width: 'fit-content', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               Declined
                             </span>
                           )}
                         </div>
                       ) : (
-                        <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                        <span className="badge badge-pending" style={{ fontSize: 10, flexShrink: 0, whiteSpace: 'nowrap' }}>
                           <span className="dot" />
                           Unassigned
                         </span>

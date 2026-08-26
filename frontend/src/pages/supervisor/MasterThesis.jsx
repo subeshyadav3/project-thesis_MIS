@@ -317,7 +317,7 @@ function SupervisorMasterThesis() {
                     <td style={{ color: 'var(--color-on-surface-variant)', fontSize: 13 }}>{t.student?.rollNumber || '—'}</td>
                     <td style={{ color: 'var(--color-on-surface-variant)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 9, padding: '1px 5px', width: 'fit-content' }}>
+                        <span className={`badge ${t.projectType === 'PROJECT' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: 10, padding: '2px 7px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {t.projectType === 'PROJECT' ? 'Project' : 'Thesis'}
                         </span>
                         <span>{t.title}</span>
