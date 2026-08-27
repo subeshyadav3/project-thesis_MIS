@@ -459,7 +459,7 @@ function CoordinatorDashboard() {
                               {item?.title || '—'}
                             </td>
                             <td style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item?.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : <span style={{ color: 'var(--color-outline)' }}>Unassigned</span>}
+                              {item?.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : <span style={{ color: 'var(--color-outline)' }}>Unassigned</span>}
                             </td>
                             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                               {item ? (

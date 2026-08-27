@@ -310,17 +310,27 @@ async function main() {
     'Nepali Sign Language Translation using Deep Learning',
     'Automated Attendance System using Facial Recognition',
     'Smart Traffic Management System for Kathmandu Valley',
+    'Decentralized Land Registry System on Hyperledger Fabric',
+    'Autonomous Rover with LiDAR SLAM for Disaster Rescue',
+    'Low-Cost Smart Prosthetic Arm with EMG Signal Processing',
+    'Nepali Speech-to-Text Transcription using Conformer Architecture',
+    'Microservices Architecture for Distributed Banking Systems',
+    'Deep Learning based Plant Pathology and Yield Prediction',
+    'Automated Toll Collection System with ANPR and RFID',
+    'Federated Learning for Privacy-Preserving Health Diagnostics',
+    'IoT-driven Cold Chain Telemetry System for Pharmaceuticals',
+    'Urban Air Quality Forecasting using Spatial-Temporal Networks',
   ];
 
   let createdGroups = [];
   let bGroupIdx = 0;
 
   const bachelorBatches = [
-    { batch: '078', bsYear: 2078, pType: 'MINOR', status: 'COMPLETED' },
-    { batch: '078', bsYear: 2078, pType: 'MAJOR', status: 'COMPLETED' },
-    { batch: '079', bsYear: 2079, pType: 'MINOR', status: 'COMPLETED' },
-    { batch: '079', bsYear: 2079, pType: 'MAJOR', status: 'ACTIVE' },
-    { batch: '080', bsYear: 2080, pType: 'MINOR', status: 'ACTIVE' },
+    { batch: '078', bsYear: 2078, pType: 'MINOR', status: 'COMPLETED', start: '2022-02-01', end: '2022-07-30' },
+    { batch: '078', bsYear: 2078, pType: 'MAJOR', status: 'COMPLETED', start: '2023-02-01', end: '2023-08-30' },
+    { batch: '079', bsYear: 2079, pType: 'MINOR', status: 'COMPLETED', start: '2023-02-01', end: '2023-07-30' },
+    { batch: '079', bsYear: 2079, pType: 'MAJOR', status: 'ACTIVE',    start: '2026-04-01', end: '2027-01-31' },
+    { batch: '080', bsYear: 2080, pType: 'MINOR', status: 'ACTIVE',    start: '2026-05-01', end: '2027-02-28' },
   ];
 
   for (const item of bachelorBatches) {
@@ -339,13 +349,13 @@ async function main() {
 
       const group = await prisma.projectGroup.create({
         data: {
-          name: `BCT-${batchStr}-Group${gi + 1}`,
+          name: `BCT-${batchStr}-${item.pType === 'MAJOR' ? 'Major' : 'Minor'}-G${gi + 1}`,
           projectTitle: title,
           projectType: item.pType,
           status: item.status,
           cluster: ['AIML', 'IPCV', 'NTS', 'EDMES'][gi % 4],
-          startDate: new Date('2025-02-01'),
-          endDate: new Date('2025-07-30'),
+          startDate: new Date(item.start),
+          endDate: new Date(item.end),
           supervisorId: sup.id,
           programId: programs.BCT.id,
           academicYearId: ayMap[batchStr].id,
@@ -454,13 +464,13 @@ async function main() {
 
       const group = await prisma.projectGroup.create({
         data: {
-          name: `BEI-${batchStr}-Group1`,
+          name: `BEI-${batchStr}-${item.pType === 'MAJOR' ? 'Major' : 'Minor'}-G1`,
           projectTitle: title,
           projectType: item.pType,
           status: item.status,
           cluster: 'EDMES',
-          startDate: new Date('2025-02-01'),
-          endDate: new Date('2025-07-30'),
+          startDate: new Date(item.start),
+          endDate: new Date(item.end),
           supervisorId: sup.id,
           programId: programs.BEI.id,
           academicYearId: ayMap[batchStr].id,
@@ -567,10 +577,10 @@ async function main() {
   let pIdx = 0;
 
   const masterBatches = [
-    { batch: '078', bsYear: 2078, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
-    { batch: '079', bsYear: 2079, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
-    { batch: '080', bsYear: 2080, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED' },
-    { batch: '081', bsYear: 2081, thesisStatus: 'ACTIVE',    projectStatus: 'COMPLETED' },
+    { batch: '078', bsYear: 2078, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED', projStart: '2022-02-01', projEnd: '2022-07-30', thesisStart: '2022-08-01', thesisEnd: '2023-04-30' },
+    { batch: '079', bsYear: 2079, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED', projStart: '2023-02-01', projEnd: '2023-07-30', thesisStart: '2023-08-01', thesisEnd: '2024-04-30' },
+    { batch: '080', bsYear: 2080, thesisStatus: 'COMPLETED', projectStatus: 'COMPLETED', projStart: '2024-02-01', projEnd: '2024-07-30', thesisStart: '2024-08-01', thesisEnd: '2025-04-30' },
+    { batch: '081', bsYear: 2081, thesisStatus: 'ACTIVE',    projectStatus: 'COMPLETED', projStart: '2025-02-01', projEnd: '2025-07-30', thesisStart: '2026-04-01', thesisEnd: '2027-02-28' },
   ];
 
   for (const item of masterBatches) {
@@ -596,8 +606,8 @@ async function main() {
           projectType: 'PROJECT',
           studentId: student.id,
           status: item.projectStatus,
-          startDate: new Date('2024-02-01'),
-          endDate: new Date('2024-07-30'),
+          startDate: new Date(item.projStart),
+          endDate: new Date(item.projEnd),
           supervisorId: sup.id,
           externalMidTermId: null,
           externalFinalId: extFinal.id,
@@ -668,8 +678,8 @@ async function main() {
           projectType: 'THESIS',
           studentId: student.id,
           status: item.thesisStatus,
-          startDate: new Date('2025-02-01'),
-          endDate: new Date('2025-08-30'),
+          startDate: new Date(item.thesisStart),
+          endDate: new Date(item.thesisEnd),
           supervisorId: sup.id,
           externalMidTermId: extMid.id,
           externalFinalId: extFinal.id,
@@ -771,30 +781,32 @@ async function main() {
     const comps = await prisma.evaluationComponent.findMany({ where: { groupId: compGroup.id } });
     const cMap = Object.fromEntries(comps.map(c => [c.evaluationType, c]));
     const ext = await prisma.examinerAssignment.findFirst({ where: { groupId: compGroup.id } });
+    const isMinor = compGroup.projectType === 'MINOR';
+    const coordId = compGroup.programId === programs.BEI.id ? coordinators.BEI.id : coordinators.BCT.id;
 
     if (cMap.PROPOSAL_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: 8.5, comments: 'Well prepared proposal defense with sound feasibility study.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
+        data: { componentId: cMap.PROPOSAL_DEFENSE.id, stage: 'PROPOSAL', evaluationType: 'PROPOSAL_DEFENSE', marks: isMinor ? 4.5 : 8.5, comments: 'Well prepared proposal defense with sound feasibility study.', status: 'COMPLETED', submittedById: coordId, groupId: compGroup.id },
       });
     }
     if (cMap.MIDTERM_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: 8.0, comments: 'Good milestone progress; core pipeline verified.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
+        data: { componentId: cMap.MIDTERM_DEFENSE.id, stage: 'MID_TERM', evaluationType: 'MIDTERM_DEFENSE', marks: isMinor ? 4.0 : 8.0, comments: 'Good milestone progress; core pipeline verified.', status: 'COMPLETED', submittedById: coordId, groupId: compGroup.id },
       });
     }
     if (cMap.SUPERVISOR && compGroup.supervisorId) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: 45.0, comments: 'Outstanding dedication and high software quality.', suggestions: 'Publish benchmark results.', status: 'COMPLETED', submittedById: compGroup.supervisorId, groupId: compGroup.id },
+        data: { componentId: cMap.SUPERVISOR.id, stage: 'FINAL', evaluationType: 'SUPERVISOR', marks: isMinor ? 22.0 : 44.0, comments: 'Outstanding dedication and high software quality.', suggestions: 'Publish benchmark results.', status: 'COMPLETED', submittedById: compGroup.supervisorId, groupId: compGroup.id },
       });
     }
     if (cMap.EXTERNAL_EXAMINER && ext) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: 18.5, comments: 'Clear presentation and solid defense of technical choices.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
+        data: { componentId: cMap.EXTERNAL_EXAMINER.id, stage: 'FINAL', evaluationType: 'EXTERNAL_EXAMINER', marks: isMinor ? 8.5 : 17.5, comments: 'Clear presentation and solid defense of technical choices.', status: 'COMPLETED', submittedById: ext.externalExaminerId, groupId: compGroup.id },
       });
     }
     if (cMap.FINAL_DEFENSE) {
       await prisma.evaluation.create({
-        data: { componentId: cMap.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: 9.0, comments: 'Excellent final project defense.', status: 'COMPLETED', submittedById: coordinators.BCT.id, groupId: compGroup.id },
+        data: { componentId: cMap.FINAL_DEFENSE.id, stage: 'FINAL', evaluationType: 'FINAL_DEFENSE', marks: isMinor ? 4.5 : 9.0, comments: 'Excellent final project defense.', status: 'COMPLETED', submittedById: coordId, groupId: compGroup.id },
       });
     }
   }

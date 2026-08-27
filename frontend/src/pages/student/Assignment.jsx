@@ -183,7 +183,7 @@ function StudentProjectDetail() {
                 <span className="detail-label">Supervisor</span>
                 <span style={{ fontWeight: 500 }}>
                   {assignment.supervisor
-                    ? `${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`
+                    ? `${assignment.supervisor.designation ? assignment.supervisor.designation + ' ' : ''}${assignment.supervisor.firstName} ${assignment.supervisor.lastName}`
                     : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
                   }
                 </span>
@@ -191,19 +191,19 @@ function StudentProjectDetail() {
               {isGroup && (assignment.examinerAssignments || []).filter(a => a.externalExaminer).map(a => (
                 <div key={a.id} className="detail-item">
                   <span className="detail-label">Internal Examiner</span>
-                  <span style={{ fontWeight: 500 }}>{a.externalExaminer.firstName} {a.externalExaminer.lastName}</span>
+                  <span style={{ fontWeight: 500 }}>{a.externalExaminer.designation ? a.externalExaminer.designation + ' ' : ''}{a.externalExaminer.firstName} {a.externalExaminer.lastName}</span>
                 </div>
               ))}
               {!isGroup && assignment.externalMidTerm && (
                 <div className="detail-item">
                   <span className="detail-label">External Mid-Term</span>
-                  <span style={{ fontWeight: 500 }}>{assignment.externalMidTerm.firstName} {assignment.externalMidTerm.lastName}</span>
+                  <span style={{ fontWeight: 500 }}>{assignment.externalMidTerm.designation ? assignment.externalMidTerm.designation + ' ' : ''}{assignment.externalMidTerm.firstName} {assignment.externalMidTerm.lastName}</span>
                 </div>
               )}
               {!isGroup && assignment.externalFinal && (
                 <div className="detail-item">
                   <span className="detail-label">External Final</span>
-                  <span style={{ fontWeight: 500 }}>{assignment.externalFinal.firstName} {assignment.externalFinal.lastName}</span>
+                  <span style={{ fontWeight: 500 }}>{assignment.externalFinal.designation ? assignment.externalFinal.designation + ' ' : ''}{assignment.externalFinal.firstName} {assignment.externalFinal.lastName}</span>
                 </div>
               )}
               <div className="detail-item" style={{ gridColumn: 'span 2' }}>
@@ -311,7 +311,7 @@ function StudentProjectDetail() {
               {assignment.status === 'COMPLETED' && <span className="badge badge-completed"><span className="dot" />Completed</span>}
             </div>
             <div style={{ padding: '0 16px 16px' }}>
-              {assignment.endDate && (() => {
+              {assignment.endDate && assignment.status !== 'COMPLETED' && (() => {
                 const info = getDeadlineInfo(assignment.endDate);
                 if (!info) return null;
                 return (

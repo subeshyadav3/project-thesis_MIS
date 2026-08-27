@@ -83,7 +83,7 @@ function StudentProjects() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <StatusBadge status={g.status} />
-                  {g.endDate && (() => {
+                  {g.endDate && g.status !== 'COMPLETED' && (() => {
                     const info = getDeadlineInfo(g.endDate);
                     if (!info) return null;
                     return (
@@ -101,7 +101,7 @@ function StudentProjects() {
               </div>
               <div style={{ padding: '4px 16px 12px', display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
                 <span>{g.members?.length || 0} member{(g.members?.length || 0) !== 1 ? 's' : ''}</span>
-                {g.supervisor && <span>Supervisor: {g.supervisor.firstName} {g.supervisor.lastName}</span>}
+                {g.supervisor && <span>Supervisor: {g.supervisor.designation ? g.supervisor.designation + ' ' : ''}{g.supervisor.firstName} {g.supervisor.lastName}</span>}
               </div>
             </div>
           </Link>

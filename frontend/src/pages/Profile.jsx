@@ -28,7 +28,24 @@ function Profile() {
   const [resetForm, setResetForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [resetting, setResetting] = useState(false);
 
-  const roleLabel = user.role?.replace('_', ' ') || 'USER';
+  const getDisplayRole = (role) => {
+    if (!role) return 'User';
+    switch (role) {
+      case 'COORDINATOR':
+        return 'Coordinator, Supervisor, Examiner';
+      case 'SUPERVISOR':
+        return 'Supervisor, Examiner';
+      case 'EXTERNAL_EXAMINER':
+        return 'External Examiner';
+      case 'STUDENT':
+        return 'Student';
+      case 'MAINTAINER':
+        return 'Maintainer (Admin)';
+      default:
+        return role.replace('_', ' ');
+    }
+  };
+  const roleLabel = getDisplayRole(user?.role);
   const initials = `${user?.firstName?.[0] || 'U'}${user?.lastName?.[0] || ''}`;
   const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User';
 

@@ -105,12 +105,17 @@ def test_analyzer_fallback():
 def test_llm_factory_errors_without_key():
     _banner("LLM factory (missing key)")
     from ai_chatbot.core.llm_factory import LLMFactory
+    from unittest.mock import patch
 
-    try:
-        LLMFactory(api_key="")
-    except LLMAuthError as exc:
-        print(f"  raised as expected: {exc}")
-        return
+    with patch("ai_chatbot.core.llm_factory.settings") as mock_settings:
+        mock_settings.llm_provider = "groq"
+        mock_settings.groq_api_key = ""
+        mock_settings.nvidia_api_key = ""
+        try:
+            LLMFactory(api_key="")
+        except LLMAuthError as exc:
+            print(f"  raised as expected: {exc}")
+            return
     raise AssertionError("expected LLMAuthError when key is missing")
 
 

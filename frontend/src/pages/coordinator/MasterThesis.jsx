@@ -592,7 +592,7 @@ return (
                   <span>
                     {showDetail.supervisor ? (
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span>{showDetail.supervisor.firstName} {showDetail.supervisor.lastName}</span>
+                        <span>{showDetail.supervisor.designation ? showDetail.supervisor.designation + ' ' : ''}{showDetail.supervisor.firstName} {showDetail.supervisor.lastName}</span>
                         {showDetail.supervisorAssignmentStatus === 'PENDING' && (
                           <span className="badge badge-warning" style={{ fontSize: 10 }}>
                             <span className="dot" />Awaiting Response
@@ -621,7 +621,7 @@ return (
                       <span className="detail-label">External (Mid-Term)</span>
                       <span>
                         {showDetail.externalMidTerm ? (
-                          <>{showDetail.externalMidTerm.firstName} {showDetail.externalMidTerm.lastName}</>
+                          <>{showDetail.externalMidTerm.designation ? showDetail.externalMidTerm.designation + ' ' : ''}{showDetail.externalMidTerm.firstName} {showDetail.externalMidTerm.lastName}</>
                         ) : (
                           <span className="badge badge-pending" style={{ fontSize: 10 }}>
                             <span className="dot" />Not Assigned
@@ -633,7 +633,7 @@ return (
                       <span className="detail-label">External (Final)</span>
                       <span>
                         {showDetail.externalFinal ? (
-                          <>{showDetail.externalFinal.firstName} {showDetail.externalFinal.lastName}</>
+                          <>{showDetail.externalFinal.designation ? showDetail.externalFinal.designation + ' ' : ''}{showDetail.externalFinal.firstName} {showDetail.externalFinal.lastName}</>
                         ) : (
                           <span className="badge badge-pending" style={{ fontSize: 10 }}>
                             <span className="dot" />Not Assigned
@@ -647,7 +647,7 @@ return (
                     <span className="detail-label">External Examiner</span>
                     <span>
                       {showDetail.externalFinal || showDetail.externalMidTerm ? (
-                        <>{(showDetail.externalFinal || showDetail.externalMidTerm).firstName} {(showDetail.externalFinal || showDetail.externalMidTerm).lastName}</>
+                        <>{((ex) => `${ex.designation ? ex.designation + ' ' : ''}${ex.firstName} ${ex.lastName}`)(showDetail.externalFinal || showDetail.externalMidTerm)}</>
                       ) : (
                         <span className="badge badge-pending" style={{ fontSize: 10 }}>
                           <span className="dot" />Not Assigned
@@ -1151,7 +1151,7 @@ return (
                       {t.supervisor ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <span style={{ fontWeight: 500, color: 'var(--color-primary)', fontSize: 12 }}>
-                            {t.supervisor.firstName} {t.supervisor.lastName}
+                            {t.supervisor.designation ? t.supervisor.designation + ' ' : ''}{t.supervisor.firstName} {t.supervisor.lastName}
                           </span>
                           {t.supervisorAssignmentStatus === 'PENDING' && (
                             <span className="badge badge-warning" style={{ fontSize: 10, padding: '2px 7px', width: 'fit-content', flexShrink: 0, whiteSpace: 'nowrap' }}>

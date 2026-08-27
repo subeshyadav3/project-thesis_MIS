@@ -100,14 +100,9 @@ app.get('/api/files/:type/:filename', authenticate, async (req, res) => {
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({ error: 'Invalid filename' });
     }
-    const url = `/api/files/${type}/${filename}`;
-    const proposal = await prisma.proposal.findFirst({ where: { documentUrl: url } });
-    const { canAccessProposal } = require('./utils/fileAccessPolicy');
-    if (proposal) {
-      if (!(await canAccessProposal(req.user, proposal))) return res.status(403).json({ error: 'Access denied' });
-    } else if (req.user.role === 'STUDENT') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
+    const { canAccessFile } = require('./utils/fileAccessPolicy');
+    const allowed = await canAccessFile(req.user, type, filename);
+    if (!allowed) return res.status(403).json({ error: 'Access denied' });
     let filePath = path.join(__dirname, '..', 'storage', type, filename);
     if (!fs.existsSync(filePath)) {
       // Some uploads were historically stored under the sibling folder while their URL

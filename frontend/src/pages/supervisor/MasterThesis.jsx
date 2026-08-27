@@ -362,7 +362,13 @@ function SupervisorMasterThesis() {
       </div>
     </PageLayout></ErrorBoundary>
       {pdfPreviewItem && (
-        <EvaluationPdfPreview type="thesis" id={pdfPreviewItem.id} onClose={() => setPdfPreviewItem(null)} onSave={loadData} initialScope="supervisor" />
+        <EvaluationPdfPreview
+          type="thesis"
+          id={pdfPreviewItem.id}
+          onClose={() => setPdfPreviewItem(null)}
+          onSave={loadData}
+          initialScope={pdfPreviewItem.projectType === 'PROJECT' ? 'external-final' : 'supervisor'}
+        />
       )}
 
     </>

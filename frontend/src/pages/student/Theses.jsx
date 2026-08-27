@@ -83,7 +83,7 @@ function StudentTheses() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <StatusBadge status={t.status} />
-                  {t.endDate && (() => {
+                  {t.endDate && t.status !== 'COMPLETED' && (() => {
                     const info = getDeadlineInfo(t.endDate);
                     if (!info) return null;
                     return (
@@ -100,7 +100,7 @@ function StudentTheses() {
                 </div>
               </div>
               <div style={{ padding: '4px 16px 12px', display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
-                {t.supervisor && <span>Supervisor: {t.supervisor.firstName} {t.supervisor.lastName}</span>}
+                {t.supervisor && <span>Supervisor: {t.supervisor.designation ? t.supervisor.designation + ' ' : ''}{t.supervisor.firstName} {t.supervisor.lastName}</span>}
               </div>
             </div>
           </Link>

@@ -98,9 +98,29 @@ async function shutdownBrowser() {
 process.on('SIGTERM', () => { shutdownBrowser(); });
 process.on('SIGINT', () => { shutdownBrowser(); });
 
+let ioeLogoBase64 = '';
+try {
+  const candidateLogoPaths = [
+    path.join(__dirname, '..', '..', 'storage', 'ioe_logo.png'),
+    path.join(__dirname, '..', '..', '..', 'frontend', 'public', 'ioe_logo.png'),
+    path.join(__dirname, '..', '..', '..', 'frontend', 'public', 'ioe_logo.jpg'),
+  ];
+  for (const p of candidateLogoPaths) {
+    if (fsSync.existsSync(p)) {
+      const ext = path.extname(p).toLowerCase() === '.jpg' || path.extname(p).toLowerCase() === '.jpeg' ? 'jpeg' : 'png';
+      ioeLogoBase64 = `data:image/${ext};base64,${fsSync.readFileSync(p).toString('base64')}`;
+      break;
+    }
+  }
+} catch (_) {}
+
 function buildPageHeader() {
+  const logoHtml = ioeLogoBase64
+    ? `<div style="margin-bottom:6px;"><img src="${ioeLogoBase64}" style="height:62px;width:auto;display:inline-block;" alt="IOE Logo" /></div>`
+    : '';
   return `
     <div style="text-align:center;margin-bottom:12px;font-family:'Times New Roman', Times, serif;">
+      ${logoHtml}
       <div style="font-weight:700;font-size:14pt;line-height:1.25;">TRIBHUVAN UNIVERSITY</div>
       <div style="font-weight:700;font-size:13pt;line-height:1.25;">INSTITUTE OF ENGINEERING</div>
       <div style="font-weight:700;font-size:13pt;line-height:1.25;">PULCHOWK CAMPUS</div>
@@ -714,35 +734,45 @@ function sendPdf(res, pdf, filename) {
  *  Returns true if access is granted. */
 async function checkPrintAccess(req, res, type, id) {
   if (req.user.role === 'MAINTAINER') return true;
+  const item = type === 'group'
+    ? await prisma.projectGroup.findUnique({
+        where: { id },
+        select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
+      })
+    : await prisma.thesis.findUnique({
+        where: { id },
+        select: {
+          id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+          student: { select: { programId: true } },
+          examinerAssignments: { select: { externalExaminerId: true } },
+        },
+      });
+  if (!item) {
+    res.status(404).json({ error: 'Item not found' });
+    return false;
+  }
+  const isAssignedSupervisor = item.supervisorId === req.user.id;
+  const isAssignedExaminer = type === 'group'
+    ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
+    : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
+
   if (req.user.role === 'COORDINATOR') {
     const scope = await resolveCoordinatorScope(req.user);
-    const item = type === 'group'
-      ? await prisma.projectGroup.findUnique({
-          where: { id },
-          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
-        })
-      : await prisma.thesis.findUnique({
-          where: { id },
-          select: {
-            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
-            student: { select: { programId: true } },
-            examinerAssignments: { select: { externalExaminerId: true } },
-          },
-        });
-    if (!item) {
-      res.status(404).json({ error: 'Item not found' });
-      return false;
-    }
-    const isAssignedExaminer = type === 'group'
-      ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
-      : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
-
     const canManage = type === 'group'
       ? await canManageGroupAsCoordinator(item, scope, req.user)
       : await canManageThesisAsCoordinator(item, scope, req.user);
-    // The assigned supervisor or examiner can print; a coordinator in-scope can also print.
-    if (canManage || item.supervisorId === req.user.id || isAssignedExaminer) return true;
+    if (canManage || isAssignedSupervisor || isAssignedExaminer) return true;
     res.status(403).json({ error: 'Access denied. Item is not within your coordinator scope.' });
+    return false;
+  }
+  if (req.user.role === 'SUPERVISOR') {
+    if (isAssignedSupervisor || isAssignedExaminer) return true;
+    res.status(403).json({ error: 'Access denied. You are not the supervisor of this project/thesis.' });
+    return false;
+  }
+  if (req.user.role === 'EXTERNAL_EXAMINER') {
+    if (isAssignedExaminer || isAssignedSupervisor) return true;
+    res.status(403).json({ error: 'Access denied. You are not assigned as examiner for this project/thesis.' });
     return false;
   }
   return true;
@@ -751,29 +781,37 @@ async function checkPrintAccess(req, res, type, id) {
 /** Boolean access check (no response side effects) for bulk downloads. */
 async function canAccessItem(req, type, id) {
   if (req.user.role === 'MAINTAINER') return true;
+  const item = type === 'group'
+    ? await prisma.projectGroup.findUnique({
+        where: { id },
+        select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
+      })
+    : await prisma.thesis.findUnique({
+        where: { id },
+        select: {
+          id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
+          student: { select: { programId: true } },
+          examinerAssignments: { select: { externalExaminerId: true } },
+        },
+      });
+  if (!item) return false;
+  const isAssignedSupervisor = item.supervisorId === req.user.id;
+  const isAssignedExaminer = type === 'group'
+    ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
+    : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
+
   if (req.user.role === 'COORDINATOR') {
     const scope = await resolveCoordinatorScope(req.user);
-    const item = type === 'group'
-      ? await prisma.projectGroup.findUnique({
-          where: { id },
-          select: { id: true, programId: true, supervisorId: true, examinerAssignments: { select: { externalExaminerId: true } } },
-        })
-      : await prisma.thesis.findUnique({
-          where: { id },
-          select: {
-            id: true, programId: true, supervisorId: true, externalMidTermId: true, externalFinalId: true,
-            student: { select: { programId: true } },
-            examinerAssignments: { select: { externalExaminerId: true } },
-          },
-        });
-    if (!item) return false;
-    const isAssignedExaminer = type === 'group'
-      ? item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id)
-      : (item.externalMidTermId === req.user.id || item.externalFinalId === req.user.id || item.examinerAssignments?.some(ea => ea.externalExaminerId === req.user.id));
     const canManage = type === 'group'
       ? await canManageGroupAsCoordinator(item, scope, req.user)
       : await canManageThesisAsCoordinator(item, scope, req.user);
-    return canManage || item.supervisorId === req.user.id || isAssignedExaminer;
+    return canManage || isAssignedSupervisor || isAssignedExaminer;
+  }
+  if (req.user.role === 'SUPERVISOR') {
+    return isAssignedSupervisor || isAssignedExaminer;
+  }
+  if (req.user.role === 'EXTERNAL_EXAMINER') {
+    return isAssignedExaminer || isAssignedSupervisor;
   }
   return true;
 }
@@ -815,7 +853,7 @@ async function buildThesisHtml(id, scope = 'both') {
   return buildMasterFormat({
     title: thesis.title,
     name: `${thesis.student.firstName} ${thesis.student.lastName}`,
-    supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+    supervisor: thesis.supervisor ? `${thesis.supervisor.designation ? thesis.supervisor.designation + ' ' : ''}${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
     supervisorDesignation: thesis.supervisor?.designation || '',
     evaluations: evalData,
     student: thesis.student || null,
@@ -831,7 +869,7 @@ async function buildGroupHtml(id) {
     where: { id },
     include: {
       program: { select: { name: true, code: true } },
-      supervisor: { select: { firstName: true, lastName: true } },
+      supervisor: { select: { firstName: true, lastName: true, designation: true } },
       members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } } } },
       evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
       evaluationComponents: true,
@@ -867,7 +905,7 @@ async function buildGroupHtml(id) {
   return buildBachelorFormat({
     title: group.projectTitle,
     name: group.name,
-    supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
+    supervisor: group.supervisor ? `${group.supervisor.designation ? group.supervisor.designation + ' ' : ''}${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
     members: memberList,
     evaluations: evalData,
     projectType,
@@ -952,7 +990,7 @@ exports.previewGroupEvaluation = async (req, res) => {
       where: { id },
       include: {
         program: { select: { name: true, code: true } },
-        supervisor: { select: { firstName: true, lastName: true } },
+        supervisor: { select: { firstName: true, lastName: true, designation: true } },
         members: { include: { student: { select: { firstName: true, lastName: true, email: true, rollNumber: true, program: { select: { name: true, code: true } } } } } },
         evaluations: { include: { submittedBy: { select: { firstName: true, lastName: true } } } },
         evaluationComponents: true,
@@ -989,7 +1027,7 @@ exports.previewGroupEvaluation = async (req, res) => {
     const html = buildBachelorFormat({
       title: group.projectTitle,
       name: group.name,
-      supervisor: group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
+      supervisor: group.supervisor ? `${group.supervisor.designation ? group.supervisor.designation + ' ' : ''}${group.supervisor.firstName} ${group.supervisor.lastName}` : 'N/A',
       members: memberList,
       evaluations: evalData,
       projectType,
@@ -1050,7 +1088,7 @@ exports.previewThesisEvaluation = async (req, res) => {
     const html = buildMasterFormat({
       title: thesis.title,
       name: `${thesis.student.firstName} ${thesis.student.lastName}`,
-      supervisor: thesis.supervisor ? `${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
+      supervisor: thesis.supervisor ? `${thesis.supervisor.designation ? thesis.supervisor.designation + ' ' : ''}${thesis.supervisor.firstName} ${thesis.supervisor.lastName}` : 'N/A',
       supervisorDesignation: thesis.supervisor?.designation || '',
       evaluations: evalData,
       student: thesis.student || null,

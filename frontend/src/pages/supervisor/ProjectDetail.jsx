@@ -95,7 +95,7 @@ function ProjectDetail() {
   }, [components, user.role, isCoordinator, canManageItem]);
 
   const progress = useMemo(() => {
-    const visible = canManageItem ? orderedComponents : currentUserComponents;
+    const visible = canManageItem || (isMasterProject && isSupervisor) ? orderedComponents : currentUserComponents;
     const total = visible.reduce((s, c) => s + c.maxMarks, 0);
     const earned = visible.reduce((s, c) => {
       const e = evaluationForComponent(c.id);
@@ -106,7 +106,7 @@ function ProjectDetail() {
       return e?.marks !== null && e?.marks !== undefined;
     }).length;
     return { total, earned, completed, count: visible.length, pct: total > 0 ? Math.round((earned / total) * 100) : 0 };
-  }, [orderedComponents, currentUserComponents, evaluations, canManageItem]);
+  }, [orderedComponents, currentUserComponents, evaluations, canManageItem, isMasterProject, isSupervisor]);
 
   const name = type === 'group' ? item?.name : `${item?.student?.firstName} ${item?.student?.lastName}`;
   const title = type === 'group' ? item?.projectTitle : item?.title;
@@ -426,29 +426,33 @@ function ProjectDetail() {
                 {type === 'thesis' && (
                   <InfoRow label="Student" value={`${item?.student?.firstName || ''} ${item?.student?.lastName || ''}${item?.student?.rollNumber ? ` (${item.student.rollNumber})` : ''}`} />
                 )}
-                {!isMasterProject && (
-                  <InfoRow label="Supervisor" value={item?.supervisor
-                    ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
-                    : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
-                  } />
-                )}
+                <InfoRow label="Supervisor" value={item?.supervisor
+                  ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}`
+                  : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
+                } />
                 {type === 'thesis' ? (
                   isMasterProject ? (
                     <InfoRow label="External Examiner" value={
                       (item?.externalFinal || item?.externalMidTerm)
-                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>{(item.externalFinal || item.externalMidTerm).firstName} {(item.externalFinal || item.externalMidTerm).lastName}</span>
+                        ? <span className="badge badge-info" style={{ fontSize: 11 }}>
+                            {((ex) => `${ex.designation ? ex.designation + ' ' : ''}${ex.firstName} ${ex.lastName}`)(item.externalFinal || item.externalMidTerm)}
+                          </span>
                         : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                     } />
                   ) : (
                     <>
                       <InfoRow label="External (Mid-Term)" value={
                         item?.externalMidTerm
-                          ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalMidTerm.firstName} {item.externalMidTerm.lastName}</span>
+                          ? <span className="badge badge-info" style={{ fontSize: 11 }}>
+                              {item.externalMidTerm.designation ? item.externalMidTerm.designation + ' ' : ''}{item.externalMidTerm.firstName} {item.externalMidTerm.lastName}
+                            </span>
                           : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                       } />
                       <InfoRow label="External (Final)" value={
                         item?.externalFinal
-                          ? <span className="badge badge-info" style={{ fontSize: 11 }}>{item.externalFinal.firstName} {item.externalFinal.lastName}</span>
+                          ? <span className="badge badge-info" style={{ fontSize: 11 }}>
+                              {item.externalFinal.designation ? item.externalFinal.designation + ' ' : ''}{item.externalFinal.firstName} {item.externalFinal.lastName}
+                            </span>
                           : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
                       } />
                     </>
@@ -458,7 +462,7 @@ function ProjectDetail() {
                     item?.examinerAssignments?.length > 0
                       ? item.examinerAssignments.map(a => (
                         <span key={a.id} className="badge badge-info" style={{ fontSize: 11, marginRight: 6 }}>
-                          {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                          {a.externalExaminer?.designation ? a.externalExaminer.designation + ' ' : ''}{a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
                         </span>
                       ))
                       : <span style={{ color: 'var(--color-on-surface-variant)' }}>Not assigned</span>
@@ -471,11 +475,11 @@ function ProjectDetail() {
             </div>              {/* Evaluation breakdown — only user's own components for non-coordinators */}
             <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
-                <h3><Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />{canManageItem ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
+                <h3><Icon name="assignment" className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 8 }} />{canManageItem || (isMasterProject && isSupervisor) ? 'Evaluation Breakdown' : 'Your Evaluation Breakdown'}</h3>
               </div>
               <div style={{ padding: '4px 0' }}>
                 {(() => {
-                  const visibleComponents = canManageItem ? orderedComponents : currentUserComponents;
+                  const visibleComponents = canManageItem || (isMasterProject && isSupervisor) ? orderedComponents : currentUserComponents;
                   if (visibleComponents.length === 0) {
                     return (
                       <div className="empty-state" style={{ padding: 24 }}>
@@ -739,6 +743,63 @@ function ProjectDetail() {
               </>
             )}
 
+            {/* Master project external evaluation view for supervisor */}
+            {isMasterProject && isSupervisor && !canManageItem && (
+              <div className="card" style={{ marginBottom: 24, padding: 0, overflow: 'hidden' }}>
+                <div style={{
+                  padding: '14px 20px', background: 'var(--color-surface-container-low)',
+                  borderBottom: '1px solid var(--color-outline-variant)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 15 }}>Master Project Evaluation (External Examiner)</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                      Evaluated by External Examiner · Total 100 Marks
+                    </p>
+                  </div>
+                  <span className="badge badge-info" style={{ fontSize: 12 }}>External Final</span>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--color-surface-container-low)' }}>
+                      <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Component</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Max Marks</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Status</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, fontSize: 12, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px', borderBottom: '1px solid var(--color-outline-variant)' }}>Marks Obtained</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderedComponents.map(comp => {
+                      const e = evaluationForComponent(comp.id);
+                      const hasMarks = e?.marks !== null && e?.marks !== undefined;
+                      return (
+                        <tr key={comp.id} style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
+                          <td style={{ padding: '10px 14px' }}>
+                            <div style={{ fontWeight: 500 }}>{comp.name}</div>
+                          </td>
+                          <td style={{ padding: '10px 14px', color: 'var(--color-on-surface-variant)', fontSize: 12 }}>{comp.maxMarks}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                            {hasMarks ? (
+                              <span className="badge badge-completed" style={{ fontSize: 10 }}>
+                                <Icon name="check_circle" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} /> Saved
+                              </span>
+                            ) : (
+                              <span className="badge badge-pending" style={{ fontSize: 10 }}>
+                                <Icon name="radio_button_unchecked" className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle' }} /> Pending
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, fontSize: 14, color: hasMarks ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                            {hasMarks ? `${e.marks} / ${comp.maxMarks}` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* Coordinator evaluation view */}
             {canManageItem && (
               <CoordinatorEvaluationView
@@ -752,7 +813,7 @@ function ProjectDetail() {
             )}
 
             {/* No component fallback */}
-            {currentUserComponents.length === 0 && !canManageItem && (
+            {currentUserComponents.length === 0 && !canManageItem && !(isMasterProject && isSupervisor) && (
               <div className="card" style={{ textAlign: 'center', padding: 40 }}>
                 <Icon name="info" className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--color-outline)' }} />
                 <h3 style={{ marginTop: 12 }}>No Evaluation Component</h3>
@@ -877,7 +938,7 @@ function ProjectDetail() {
           type={type} id={id}
           onClose={() => setShowPdfPreview(false)}
           {...(!canManageItem && type === 'thesis'
-            ? { initialScope: 'supervisor' }
+            ? { initialScope: item?.projectType === 'PROJECT' ? 'external-final' : 'supervisor' }
             : {})}
         />
       )}

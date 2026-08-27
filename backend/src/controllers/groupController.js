@@ -34,11 +34,11 @@ exports.getGroups = async (req, res) => {
       where,
       include: {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
         evaluations: true,
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } } } },
       },
     });
     res.json(groups);
@@ -54,14 +54,14 @@ exports.getGroup = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: {
         members: { include: { student: { select: { id: true, firstName: true, lastName: true, email: true } } } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
         evaluations: {
           include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
         },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } } } },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
