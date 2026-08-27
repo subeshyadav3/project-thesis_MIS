@@ -137,7 +137,7 @@ function Evaluations() {
       rolls: viewMode === 'bachelor'
         ? item.members?.map(m => m.rollNumber).join(', ')
         : '',
-      supervisorName: item.supervisor ? `${item.supervisor.firstName} ${item.supervisor.lastName}` : 'N/A',
+      supervisorName: item.supervisor ? `${item.supervisor.designation ? item.supervisor.designation + ' ' : ''}${item.supervisor.firstName} ${item.supervisor.lastName}` : 'N/A',
       status: item.status || 'PENDING',
     }));
   }, [items, viewMode]);

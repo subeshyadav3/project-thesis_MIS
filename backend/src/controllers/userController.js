@@ -883,9 +883,9 @@ exports.bulkImportUsersExcel = async (req, res) => {
         email = `${fn}.${ln}@pcampus.edu.np`;
       }
 
-      // Enforce @pcampus.edu.np or @ioe.edu.np domain for staff accounts
-      if (role !== 'STUDENT' && email && !isPcampusEmail(email)) {
-        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np or @ioe.edu.np (e.g. name@pcampus.edu.np)' });
+      // Enforce @pcampus.edu.np or @ioe.edu.np domain for all accounts
+      if (email && !isPcampusEmail(email)) {
+        errors.push({ row: rowNum, email, error: 'Email must end with @pcampus.edu.np or @ioe.edu.np' });
         continue;
       }
 
@@ -910,12 +910,12 @@ exports.bulkImportUsersExcel = async (req, res) => {
           errors.push({ row: rowNum, email: email || 'unknown', error: 'Invalid roll number. Use <batch><program><number>, e.g. 080BCT001 or 080msdsa01.' });
           continue;
         }
-        // ── STUDENT EMAIL FORMAT (change here when needed) ───────────────
-        // Current: {roll}@pcampus.edu.np → 080BCT001 → 080bct001@pcampus.edu.np
-        // Want:    {roll}.{firstName}@pcampus.edu.np (roll any case, lowercased for consistency)
-        // Regex:   /^[a-z0-9]+\.[a-z]+@pcampus\.edu\.np$/i  e.g. 080bct001.ram@pcampus.edu.np
         if (!email) {
           email = rollNumber.toLowerCase() + '@pcampus.edu.np';
+        }
+        if (!isPcampusEmail(email)) {
+          errors.push({ row: rowNum, email, error: 'Student email must end with @pcampus.edu.np or @ioe.edu.np' });
+          continue;
         }
         // Roll uniqueness
         if (existingRolls.has(rollNumber.toLowerCase())) {

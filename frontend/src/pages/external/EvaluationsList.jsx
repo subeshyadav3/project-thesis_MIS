@@ -45,16 +45,17 @@ function ExternalEvaluationsList() {
   }, [groups]);
 
   const thesesWithStatus = useMemo(() => {
+    const userId = Number(user.id);
     return theses.map(t => {
-      const isMid = t.externalRole === 'MIDTERM' || t.externalRole === 'BOTH' || t.externalMidTermId === user.id;
-      const isFinal = t.externalRole === 'FINAL' || t.externalRole === 'BOTH' || t.externalFinalId === user.id;
-      const externalRole = t.externalRole || (isMid && isFinal ? 'BOTH' : isMid ? 'MIDTERM' : isFinal ? 'FINAL' : null);
+      const isMid = t.externalRole === 'MIDTERM' || t.externalRole === 'BOTH' || Number(t.externalMidTermId || t.externalMidTerm?.id) === userId;
+      const isFinal = t.externalRole === 'FINAL' || t.externalRole === 'BOTH' || Number(t.externalFinalId || t.externalFinal?.id) === userId;
+      const externalRole = (isMid && isFinal) ? 'BOTH' : (isFinal ? 'FINAL' : (isMid ? 'MIDTERM' : (t.externalRole || null)));
 
       // Only count components for this examiner's phase(s)
       const extComps = (t.evaluationComponents || []).filter(c => {
         if (c.evaluatorRole !== 'EXTERNAL_EXAMINER') return false;
-        if (externalRole === 'MIDTERM') return c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_EXAMINER';
-        if (externalRole === 'FINAL') return c.evaluationType === 'EXTERNAL_FINAL' || c.evaluationType === 'EXTERNAL_EXAMINER';
+        if (externalRole === 'MIDTERM') return c.evaluationType === 'EXTERNAL_MIDTERM';
+        if (externalRole === 'FINAL') return c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER';
         return true;
       });
       const statuses = extComps.map(c => t.evaluations?.find(e => e.componentId === c.id)?.status || 'DRAFT');

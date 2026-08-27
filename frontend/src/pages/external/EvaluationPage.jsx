@@ -124,8 +124,9 @@ function ExternalExaminerEvaluationPage() {
   // Auto-detect if this user is the mid-term or final external examiner for this thesis
   const externalType = useMemo(() => {
     if (type !== 'thesis' || !item) return null;
-    const isMid = item.externalMidTerm?.id === user.id;
-    const isFinal = item.externalFinal?.id === user.id;
+    const userId = Number(user.id);
+    const isMid = Number(item.externalMidTerm?.id || item.externalMidTermId) === userId;
+    const isFinal = Number(item.externalFinal?.id || item.externalFinalId) === userId;
     if (isMid && isFinal) return 'BOTH';
     if (isMid) return 'MIDTERM';
     if (isFinal) return 'FINAL';
@@ -245,7 +246,7 @@ function ExternalExaminerEvaluationPage() {
                   <span>
                     {item?.externalMidTerm ? (
                       <span className="badge badge-info" style={{ fontSize: 12 }}>
-                        {item.externalMidTerm.firstName} {item.externalMidTerm.lastName}
+                        {item.externalMidTerm.designation ? item.externalMidTerm.designation + ' ' : ''}{item.externalMidTerm.firstName} {item.externalMidTerm.lastName}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
@@ -255,7 +256,7 @@ function ExternalExaminerEvaluationPage() {
                   <span>
                     {item?.externalFinal ? (
                       <span className="badge badge-warning" style={{ fontSize: 12 }}>
-                        {item.externalFinal.firstName} {item.externalFinal.lastName}
+                        {item.externalFinal.designation ? item.externalFinal.designation + ' ' : ''}{item.externalFinal.firstName} {item.externalFinal.lastName}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--color-on-surface-variant)' }}>—</span>
@@ -268,7 +269,7 @@ function ExternalExaminerEvaluationPage() {
                   <span>
                     {item.examinerAssignments.map(a => (
                       <span key={a.id} className="badge badge-info" style={{ fontSize: 12, marginRight: 4 }}>
-                        {a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                        {a.externalExaminer?.designation ? a.externalExaminer.designation + ' ' : ''}{a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
                       </span>
                     ))}
                   </span>

@@ -159,7 +159,7 @@ function SupervisorAssignments() {
                         <td style={{ color: 'var(--color-on-surface-variant)' }}>{title}</td>
                         <td>
                           {t.supervisor ? (
-                            <span style={{ fontSize: 13 }}>{t.supervisor.firstName} {t.supervisor.lastName}</span>
+                            <span style={{ fontSize: 13 }}>{t.supervisor.designation ? t.supervisor.designation + ' ' : ''}{t.supervisor.firstName} {t.supervisor.lastName}</span>
                           ) : (
                             <span className="badge badge-pending">Unassigned</span>
                           )}

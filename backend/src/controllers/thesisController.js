@@ -36,13 +36,13 @@ exports.getTheses = async (req, res) => {
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } },
         program: { select: { id: true, name: true, code: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
+        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
+        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
         evaluations: true,
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } } } },
       },
     });
     if (req.user.role === 'COORDINATOR') {
@@ -64,14 +64,14 @@ exports.getThesis = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: {
         student: { select: { id: true, firstName: true, lastName: true, email: true, rollNumber: true, programId: true } },
-        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
-        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true } },
+        supervisor: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
+        externalMidTerm: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
+        externalFinal: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } },
         evaluations: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } } },
         evaluationComponents: true,
         proposals: { include: { submittedBy: { select: { id: true, firstName: true, lastName: true } }, commentedBy: { select: { id: true, firstName: true, lastName: true, role: true } } }, orderBy: { createdAt: 'desc' } },
         recommendations: true,
-        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true } } } },
+        examinerAssignments: { include: { externalExaminer: { select: { id: true, firstName: true, lastName: true, email: true, active: true, designation: true } } } },
       },
     });
     if (!thesis) return res.status(404).json({ error: 'Thesis not found' });

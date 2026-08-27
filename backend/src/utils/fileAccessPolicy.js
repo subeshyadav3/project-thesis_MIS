@@ -110,4 +110,88 @@ async function canUploadForItem(user, group, thesis) {
   return false;
 }
 
-module.exports = { canAccessProposal, canUploadForItem };
+/**
+ * Comprehensive file access check: handles Proposal models, FormResponse uploads,
+ * student ownership (rollNumber/studentId in filename), and staff scope.
+ */
+async function canAccessFile(user, type, filename) {
+  if (!user || !filename) return false;
+  if (user.role === 'MAINTAINER') return true;
+
+  const url = `/api/files/${type}/${filename}`;
+
+  // 1. Check Proposal table
+  const proposal = await prisma.proposal.findFirst({
+    where: {
+      OR: [
+        { documentUrl: url },
+        { documentUrl: { endsWith: filename } },
+      ],
+    },
+  });
+
+  if (proposal) {
+    return await canAccessProposal(user, proposal);
+  }
+
+  // 2. If student, verify file ownership through student metadata / forms / items
+  if (user.role === 'STUDENT') {
+    const roll = (user.rollNumber || '').toLowerCase();
+    const fname = filename.toLowerCase();
+
+    // Check if filename contains student's roll number or ID
+    if (roll && fname.includes(roll)) return true;
+    if (fname.includes(`_${user.id}.`) || fname.includes(`_${user.id}_`)) return true;
+
+    // Check FormResponse records by student
+    const formResponses = await prisma.formResponse.findMany({
+      where: { studentId: user.id },
+      select: { formData: true },
+    });
+    for (const fr of formResponses) {
+      if (JSON.stringify(fr.formData || {}).includes(filename)) return true;
+    }
+
+    // Check Thesis belonging to student
+    const thesis = await prisma.thesis.findFirst({
+      where: { studentId: user.id },
+      include: { proposals: { select: { documentUrl: true } } },
+    });
+    if (thesis) {
+      if (thesis.proposals?.some(p => p.documentUrl && p.documentUrl.includes(filename))) return true;
+    }
+
+    // Check Group belonging to student
+    const member = await prisma.groupMember.findFirst({
+      where: { studentId: user.id },
+      include: { group: { include: { proposals: { select: { documentUrl: true } } } } },
+    });
+    if (member?.group?.proposals?.some(p => p.documentUrl && p.documentUrl.includes(filename))) return true;
+
+    return false;
+  }
+
+  // 3. Coordinator has access to student documents
+  if (user.role === 'COORDINATOR') {
+    return true;
+  }
+
+  // 4. Supervisor access
+  if (user.role === 'SUPERVISOR') {
+    const supervisedThesis = await prisma.thesis.findFirst({
+      where: { supervisorId: user.id },
+      include: { proposals: { select: { documentUrl: true } } },
+    });
+    if (supervisedThesis && supervisedThesis.proposals.some(p => p.documentUrl?.includes(filename))) return true;
+
+    const supervisedGroup = await prisma.projectGroup.findFirst({
+      where: { supervisorId: user.id },
+      include: { proposals: { select: { documentUrl: true } } },
+    });
+    if (supervisedGroup && supervisedGroup.proposals.some(p => p.documentUrl?.includes(filename))) return true;
+  }
+
+  return false;
+}
+
+module.exports = { canAccessProposal, canUploadForItem, canAccessFile };

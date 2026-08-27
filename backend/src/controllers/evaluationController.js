@@ -94,13 +94,17 @@ exports.submitComponentMarks = async (req, res) => {
         } else if (thesisIdNum) {
           const thesis = await prisma.thesis.findUnique({
             where: { id: thesisIdNum },
-            select: { externalMidTermId: true, externalFinalId: true },
+            select: { externalMidTermId: true, externalFinalId: true, supervisorId: true, projectType: true },
           });
-          const isAssigned = (thesis && (thesis.externalMidTermId === req.user.id || thesis.externalFinalId === req.user.id)) ||
+          const isAssigned = (thesis && (
+            thesis.externalMidTermId === req.user.id ||
+            thesis.externalFinalId === req.user.id ||
+            (thesis.projectType === 'PROJECT' && thesis.supervisorId === req.user.id)
+          )) ||
             await prisma.examinerAssignment.findFirst({
               where: { externalExaminerId: req.user.id, thesisId: thesisIdNum },
             });
-          if (!isAssigned) return res.status(403).json({ error: 'You are not assigned as examiner for this thesis' });
+          if (!isAssigned) return res.status(403).json({ error: 'You are not assigned as examiner or supervisor for this thesis' });
         }
       }
     }

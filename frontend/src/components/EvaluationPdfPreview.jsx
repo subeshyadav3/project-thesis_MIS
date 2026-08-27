@@ -16,40 +16,57 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState('');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userId = Number(user.id);
   const isScopeLocked = !!initialScope;
-  // Auto-detect the correct scope for external examiners
+  // Auto-detect the correct scope for external examiners & supervisors
   const computedInitial = useMemo(() => {
-    if (user.role === 'EXTERNAL_EXAMINER' && initialScope === 'both') {
-      // External with both mid and final roles: use external-both scope
-      return 'external-both';
+    if (user.role === 'EXTERNAL_EXAMINER') {
+      if (initialScope === 'both' || initialScope === 'external-both') return 'external-both';
+      if (initialScope === 'external-final') return 'external-final';
+      if (initialScope === 'external') return 'external';
+      if (item?.projectType === 'PROJECT') return 'external-final';
+      const isMid = Number(item?.externalMidTerm?.id || item?.externalMidTermId) === userId;
+      const isFinal = Number(item?.externalFinal?.id || item?.externalFinalId) === userId || item?.examinerAssignments?.some(a => Number(a.externalExaminerId) === userId);
+      if (isMid && isFinal) return 'external-both';
+      if (isFinal && !isMid) return 'external-final';
+      if (isMid && !isFinal) return 'external';
+      return 'external-final';
+    }
+    if (user.role === 'SUPERVISOR') {
+      if (item?.projectType === 'PROJECT') return 'external-final';
+      return 'supervisor';
     }
     if (initialScope === 'external') {
       if (item) {
         if (item.projectType === 'PROJECT') return 'external-final';
-        if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
-        if (item.externalMidTerm?.id === user.id && item.externalFinal?.id !== user.id) return 'external';
+        const isMid = Number(item?.externalMidTerm?.id || item?.externalMidTermId) === userId;
+        const isFinal = Number(item?.externalFinal?.id || item?.externalFinalId) === userId;
+        if (isFinal && !isMid) return 'external-final';
+        if (isMid && !isFinal) return 'external';
       }
       // Fallback: pick the one that has an assignment for this user
       if (item) {
-        if (item.externalMidTerm?.id === user.id) return 'external';
-        if (item.externalFinal?.id === user.id) return 'external-final';
+        if (Number(item?.externalMidTerm?.id || item?.externalMidTermId) === userId) return 'external';
+        if (Number(item?.externalFinal?.id || item?.externalFinalId) === userId) return 'external-final';
       }
     }
     if (!initialScope && item) {
       if (item.projectType === 'PROJECT') return 'external-final';
-      if (item.externalFinal?.id === user.id && item.externalMidTerm?.id !== user.id) return 'external-final';
-      if (item.externalMidTerm?.id === user.id && item.externalFinal?.id !== user.id) return 'external';
+      const isMid = Number(item?.externalMidTerm?.id || item?.externalMidTermId) === userId;
+      const isFinal = Number(item?.externalFinal?.id || item?.externalFinalId) === userId;
+      if (isFinal && !isMid) return 'external-final';
+      if (isMid && !isFinal) return 'external';
     }
     return initialScope;
-  }, [initialScope, user.role, user.id, item]);
+  }, [initialScope, user.role, userId, item]);
   const [pdfScope, setPdfScope] = useState(computedInitial || 'both');
 
   // Keep scope in sync when computedInitial changes (data loads)
   useEffect(() => {
-    if (computedInitial && (isScopeLocked || hideScopeSelector)) {
+    if (computedInitial && (isScopeLocked || hideScopeSelector || user.role === 'EXTERNAL_EXAMINER')) {
       setPdfScope(computedInitial);
     }
-  }, [computedInitial, isScopeLocked, hideScopeSelector]);
+  }, [computedInitial, isScopeLocked, hideScopeSelector, user.role]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,40 +90,53 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   // --- Filter components based on scope + user role ---
   const editableComponents = useMemo(() => {
     const components = item?.evaluationComponents || [];
-    const isAssignedSupervisor = item?.supervisor?.id === user.id || item?.supervisorId === user.id;
-    const isAssignedExternalMid = item?.externalMidTerm?.id === user.id;
-    const isAssignedExternalFinal = item?.externalFinal?.id === user.id || item?.examinerAssignments?.some(a => a.externalExaminerId === user.id);
-    const isAssignedExaminer = user.role === 'EXTERNAL_EXAMINER' || isAssignedExternalMid || isAssignedExternalFinal;
+    const isAssignedSupervisor = Number(item?.supervisor?.id || item?.supervisorId) === userId;
+    const isAssignedExternalMid = Number(item?.externalMidTerm?.id || item?.externalMidTermId) === userId;
+    const isAssignedExternalFinal = Number(item?.externalFinal?.id || item?.externalFinalId) === userId || item?.examinerAssignments?.some(a => Number(a.externalExaminerId) === userId);
+    const isProject = item?.projectType === 'PROJECT';
 
-    const scopeFiltered = type === 'thesis' && pdfScope !== 'both'
-      ? components.filter(c =>
-          pdfScope === 'supervisor'
-            ? c.evaluatorRole === 'SUPERVISOR'
-            : pdfScope === 'external'
-              ? (c.evaluationType === 'EXTERNAL_MIDTERM' || (item?.projectType === 'PROJECT' && c.evaluatorRole === 'EXTERNAL_EXAMINER'))
-              : pdfScope === 'external-both'
-                ? (c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER')
-              : (c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER')
-        )
-      : components;
+    // 1. Filter by pdfScope
+    let scopeFiltered = components;
+    if (type === 'thesis' && pdfScope !== 'both') {
+      if (pdfScope === 'supervisor') {
+        scopeFiltered = components.filter(c => c.evaluatorRole === 'SUPERVISOR' || (isProject && isAssignedSupervisor));
+      } else if (pdfScope === 'external') {
+        scopeFiltered = components.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM');
+      } else if (pdfScope === 'external-final') {
+        scopeFiltered = components.filter(c => c.evaluationType === 'EXTERNAL_FINAL' || (!c.evaluationType && c.evaluatorRole === 'EXTERNAL_EXAMINER'));
+      } else if (pdfScope === 'external-both') {
+        scopeFiltered = components.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL' || (!c.evaluationType && c.evaluatorRole === 'EXTERNAL_EXAMINER'));
+      }
+    }
 
     if (['COORDINATOR', 'MAINTAINER'].includes(user.role)) {
       return scopeFiltered;
     }
 
-    return scopeFiltered.filter(c => {
-      if (c.evaluatorRole === 'SUPERVISOR') {
-        return isAssignedSupervisor || user.role === 'SUPERVISOR';
+    if (user.role === 'SUPERVISOR') {
+      return scopeFiltered.filter(c => c.evaluatorRole === 'SUPERVISOR' || (isProject && isAssignedSupervisor));
+    }
+
+    if (user.role === 'EXTERNAL_EXAMINER') {
+      if (type === 'group') {
+        return scopeFiltered.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER' || c.evaluationType === 'EXTERNAL_EXAMINER');
       }
-      if (c.evaluationType === 'EXTERNAL_MIDTERM') {
-        return isAssignedExternalMid || user.role === 'EXTERNAL_EXAMINER';
+      if (isAssignedExternalMid && !isAssignedExternalFinal) {
+        return scopeFiltered.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM');
       }
-      if (c.evaluationType === 'EXTERNAL_FINAL' || c.evaluatorRole === 'EXTERNAL_EXAMINER') {
-        return isAssignedExternalFinal || isAssignedExaminer || user.role === 'EXTERNAL_EXAMINER';
+      if (isAssignedExternalFinal && !isAssignedExternalMid) {
+        return scopeFiltered.filter(c => c.evaluationType === 'EXTERNAL_FINAL' || (!c.evaluationType && c.evaluatorRole === 'EXTERNAL_EXAMINER') || c.evaluationType === 'EXTERNAL_EXAMINER');
       }
-      return c.evaluatorRole === user.role;
-    });
-  }, [item, user.role, user.id, type, pdfScope]);
+      if (isAssignedExternalMid && isAssignedExternalFinal) {
+        return scopeFiltered.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER' || c.evaluationType === 'EXTERNAL_MIDTERM' || c.evaluationType === 'EXTERNAL_FINAL');
+      }
+      if (pdfScope === 'external') return scopeFiltered.filter(c => c.evaluationType === 'EXTERNAL_MIDTERM');
+      if (pdfScope === 'external-final') return scopeFiltered.filter(c => c.evaluationType === 'EXTERNAL_FINAL' || (!c.evaluationType && c.evaluatorRole === 'EXTERNAL_EXAMINER') || c.evaluationType === 'EXTERNAL_EXAMINER');
+      return scopeFiltered.filter(c => c.evaluatorRole === 'EXTERNAL_EXAMINER' || c.evaluationType === 'EXTERNAL_EXAMINER');
+    }
+
+    return scopeFiltered.filter(c => c.evaluatorRole === user.role);
+  }, [item, user.role, userId, type, pdfScope]);
 
   const evaluationFor = (componentId) => (item?.evaluations || []).find(e => e.componentId === componentId);
 
@@ -125,7 +155,7 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
   const feedbackInitial = useMemo(() => {
     const result = {};
     editableComponents.forEach(c => {
-      const key = c.evaluationType;
+      const key = c.evaluationType || c.evaluatorRole;
       const e = evaluationFor(c.id);
       if (!result[key]) result[key] = { comments: '', suggestions: '' };
       if (e?.comments) result[key].comments = e.comments;
@@ -152,51 +182,50 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
       });
       return merged;
     });
-  }, [item, editableComponents.length, feedbackInitial]);
+    setSaved(false);
+  }, [editableComponents, feedbackInitial]);
 
   const saveChanges = async () => {
-    setSaving(true); setError('');
-    let saveOk = false;
+    setSaving(true);
+    setError('');
     try {
-      // Track which evaluationTypes have had feedback saved already
-      const feedbackSavedForType = {};
       for (const component of editableComponents) {
-        const value = marks[component.id];
-        if (value !== '' && (Number.isNaN(Number(value)) || Number(value) < 0 || Number(value) > component.maxMarks)) {
-          setError(`${component.name}: enter marks from 0 to ${component.maxMarks}.`);
-          setSaving(false);
-          return;
+        const val = marks[component.id];
+        if (val !== undefined && val !== null && val !== '') {
+          const num = Number(val);
+          if (Number.isNaN(num) || num < 0 || num > component.maxMarks) {
+            throw new Error(`Marks for "${component.name}" must be between 0 and ${component.maxMarks}`);
+          }
         }
-        const typeKey = component.evaluationType;
-        // Only save comments/suggestions to the FIRST component per evaluationType
-        const fb = feedback[typeKey] || { comments: '', suggestions: '' };
-        const comments = !feedbackSavedForType[typeKey] ? (fb.comments || null) : null;
-        const suggestions = !feedbackSavedForType[typeKey] ? (fb.suggestions || null) : null;
-        feedbackSavedForType[typeKey] = true;
-        await api.post('/evaluations/marks', {
-          componentId: component.id,
-          marks: value === '' ? null : Number(value),
-          comments,
-          suggestions,
-          ...(type === 'group' ? { groupId: Number(id) } : { thesisId: Number(id) }),
-        });
       }
-      saveOk = true;
+
+      for (const component of editableComponents) {
+        const marksVal = marks[component.id];
+        const num = marksVal === '' || marksVal === null || marksVal === undefined ? null : Number(marksVal);
+        const fb = feedback[component.evaluationType] || feedback[component.evaluatorRole] || { comments: '', suggestions: '' };
+        const payload = {
+          componentId: component.id,
+          marks: num,
+          comments: fb.comments || null,
+          suggestions: fb.suggestions || null,
+        };
+        if (type === 'group') payload.groupId = parseInt(id); else payload.thesisId = parseInt(id);
+        await api.post('/evaluations/marks', payload);
+      }
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      if (onSave) onSave();
+      await load();
     } catch (e) {
-      setError(getApiMessage(e) || e.message || 'Could not save changes.');
+      setError(e.message || 'Failed to save marks');
+    } finally {
+      setSaving(false);
     }
-    // Always refresh the preview so it reflects latest data (even if some saves failed, partial data may have been saved)
-    try { await load(); } catch (_) { /* preview load is best-effort */ }
-    if (saveOk && onSave) onSave();
-    setSaving(false);
   };
 
-  const updateFeedback = (key, field, value) => {
+  const updateFeedback = (typeKey, field, value) => {
     setFeedback(prev => ({
       ...prev,
-      [key]: { ...(prev[key] || { comments: '', suggestions: '' }), [field]: value },
+      [typeKey]: { ...prev[typeKey], [field]: value },
     }));
   };
 
@@ -230,10 +259,16 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6, color: 'var(--color-on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Print scope</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(user.role === 'EXTERNAL_EXAMINER'
-                    ? [
-                        { value: 'external', label: 'External (Mid-Term)' },
-                        { value: 'external-final', label: 'External (Final)' },
-                      ]
+                    ? (item?.externalMidTerm?.id === user.id && item?.externalFinal?.id === user.id
+                        ? [
+                            { value: 'external', label: 'External (Mid-Term)' },
+                            { value: 'external-final', label: 'External (Final)' },
+                            { value: 'external-both', label: 'Both Phases' },
+                          ]
+                        : item?.externalMidTerm?.id === user.id
+                          ? [{ value: 'external', label: 'External (Mid-Term)' }]
+                          : [{ value: 'external-final', label: 'External (Final)' }]
+                      )
                     : [
                         { value: 'supervisor', label: 'Supervisor' },
                         { value: 'external', label: 'External (Mid-Term)' },
@@ -269,24 +304,39 @@ export default function EvaluationPdfPreview({ type, id, onClose, onSave, initia
             {/* Per-type sections */}
             {displayedRoles.map((role, ri) => {
               const components = groupedByRole[role];
-              // When the scope is "both" or external section is unlocked, an external may have both mid-term and final components.
-              const shouldShowBothExt = role === 'EXTERNAL_EXAMINER' && (pdfScope === 'both' || pdfScope === 'external-both');
-              // Split external sections only when actual mid-term/final components exist (master thesis).
-              // Otherwise (e.g. bachelor "Internal Examiner") fall back to a single generic section.
-              const extSections = shouldShowBothExt
-                ? [
-                    { key: 'EXTERNAL_MIDTERM', label: 'External (Mid-Term)', filter: c => c.evaluationType === 'EXTERNAL_MIDTERM' },
-                    { key: 'EXTERNAL_FINAL', label: 'External (Final)', filter: c => c.evaluationType === 'EXTERNAL_FINAL' },
-                  ].filter(s => components.some(s.filter))
-                : [];
-              const sections = extSections.length
-                ? extSections
-                : [{ key: components[0]?.evaluationType || 'UNKNOWN', label: role === 'SUPERVISOR' ? 'Supervisor'
+              const hasMid = components.some(c => c.evaluationType === 'EXTERNAL_MIDTERM');
+              const hasFinal = components.some(c => c.evaluationType === 'EXTERNAL_FINAL');
+
+              let sections = [];
+              if (role === 'EXTERNAL_EXAMINER' && (hasMid || hasFinal)) {
+                if (hasMid) {
+                  sections.push({
+                    key: 'EXTERNAL_MIDTERM',
+                    label: 'External (Mid-Term)',
+                    filter: c => c.evaluationType === 'EXTERNAL_MIDTERM'
+                  });
+                }
+                if (hasFinal) {
+                  sections.push({
+                    key: 'EXTERNAL_FINAL',
+                    label: 'External (Final)',
+                    filter: c => c.evaluationType === 'EXTERNAL_FINAL' || (!hasMid && c.evaluatorRole === 'EXTERNAL_EXAMINER')
+                  });
+                }
+              } else {
+                const isInternal = type === 'group' && role === 'EXTERNAL_EXAMINER';
+                sections = [{
+                  key: components[0]?.evaluationType || role,
+                  label: role === 'SUPERVISOR' ? 'Supervisor'
                     : role === 'EXTERNAL_EXAMINER'
-                      ? (components[0]?.evaluationType === 'EXTERNAL_MIDTERM' ? 'External (Mid-Term)'
+                      ? (isInternal ? 'Internal Examiner'
+                          : components[0]?.evaluationType === 'EXTERNAL_MIDTERM' ? 'External (Mid-Term)'
                           : components[0]?.evaluationType === 'EXTERNAL_FINAL' ? 'External (Final)'
                           : (ROLE_LABEL[role] || 'External Examiner'))
-                    : (ROLE_LABEL[role] || role), filter: () => true }];
+                    : (ROLE_LABEL[role] || role),
+                  filter: () => true
+                }];
+              }
               return sections.map((section, si) => {
                 const fb = feedback[section.key] || { comments: '', suggestions: '' };
                 return (

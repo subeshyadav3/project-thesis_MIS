@@ -516,6 +516,11 @@ const filteredGroups = useMemo(() => {
       const matchesSearch = !searchTerm || searchStr.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
       const matchesType = typeFilter === 'ALL' || g.projectType === typeFilter;
+      const matchesSupervisor = supervisorFilter === 'ALL'
+        ? true
+        : supervisorFilter === 'NONE'
+          ? (!g.supervisor && !g.supervisorId)
+          : (g.supervisorId?.toString() === supervisorFilter || g.supervisor?.id?.toString() === supervisorFilter);
       const hasSupervisor = Boolean(g.supervisorId || g.supervisor);
       const hasExaminer = Boolean(g.examinerAssignments?.some(ea => ea.externalExaminerId || ea.externalExaminer));
       const matchesAssignment = assignmentFilter === 'ALL' ? true :
@@ -709,6 +714,17 @@ const filteredGroups = useMemo(() => {
                 <div className="detail-item">
                   <span className="detail-label">Status</span>
                   <StatusBadge status={showDetail.status} />
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Internal Examiner</span>
+                  <span>{showDetail.examinerAssignments?.length > 0 && showDetail.examinerAssignments.some(a => a.externalExaminer)
+                    ? showDetail.examinerAssignments.filter(a => a.externalExaminer).map(a => (
+                      <span key={a.id} className="badge badge-info" style={{ fontSize: 11, marginRight: 6 }}>
+                        {a.externalExaminer?.designation ? a.externalExaminer.designation + ' ' : ''}{a.externalExaminer?.firstName} {a.externalExaminer?.lastName}
+                      </span>
+                    ))
+                    : <span className="badge badge-pending"><span className="dot" />Unassigned</span>
+                  }</span>
                 </div>
               </div>
             </div>
